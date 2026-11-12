@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 用平台主题，避免引入 AppCompat / Material Components 依赖。Compose 自行绘制 UI。 -->
+    <style name="Theme.OfflineLedger" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
