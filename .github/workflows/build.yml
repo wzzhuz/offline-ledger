@@ -1,0 +1,102 @@
+name: 编译与校验
+
+# branches: ['**'] 是硬要求。曾写成 [main, master, 'feature/**']，
+# 导致 fix/ 分支推送后 Actions 静默不跑，列表里查不到记录，
+# 极易被误读成「已经编译通过了」。
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# 一旦写了 permissions 块就覆盖全部默认值：
+# 只写 contents: write 会让 actions 变成 none，upload-artifact 会失败。
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    name: 校验与编译
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 静态检查（隐私基线 / Kotlin 字符串 / 文档一致性）
+        run: |
+          python3 scripts/check_manifest_privacy.py
+          python3 scripts/check_kotlin_strings.py
+          python3 scripts/check_docs_consistency.py
+
+      - name: 校验固定签名密钥存在
+        run: |
+          test -f app/debug.keystore || (echo "缺少 app/debug.keystore" && exit 1)
+          keytool -list -keystore app/debug.keystore \
+            -storepass offlineledger2026 -alias offlineledgerdebug > /dev/null
+          echo "debug.keystore 已就绪（各次编译签名一致）"
+
+      # 显式指定 Gradle 版本，wrapper 损坏也不影响构建。
+      - name: 配置 Gradle 8.13（带依赖缓存）
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      # assembleDebug 只编译主源码，不碰 src/test。
+      # 必须单独跑一次 test，否则测试文件写错了也照样「编译通过」。
+      - name: 运行单元测试
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
+
+      - name: 编译 Debug APK
+        run: gradle assembleDebug --stacktrace --no-daemon
+
+      # release 会跑 lintVital，debug 不跑。
+      # 阶段 0 就跑一次，把备份规则 XML 之类的 Lint 问题提前逼出来。
+      - name: 编译 Release（触发 lintVital）
+        run: gradle assembleRelease --stacktrace --no-daemon
+
+      - name: 输出签名信息
+        run: |
+          keytool -printcert -jarfile app/build/outputs/apk/debug/app-debug.apk \
+            | tee /tmp/cert.txt
+          grep -q "OfflineLedger Debug" /tmp/cert.txt \
+            && echo "::warning::使用仓库内 debug 密钥签名，仅供自用"
+
+      - name: 计算校验值
+        id: hash
+        run: |
+          cd app/build/outputs/apk/debug
+          echo "sha256=$(sha256sum app-debug.apk | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "size=$(du -h app-debug.apk | cut -f1)" >> $GITHUB_OUTPUT
+
+      # v4 的 overwrite 默认 false，同名 artifact 已存在会直接失败，
+      # 而界面只显示「上传失败」，看不出原因。
+      - name: 上传 Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-ledger-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          overwrite: true
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: 输出摘要
+        run: |
+          echo "### 编译与校验完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 文件大小：${{ steps.hash.outputs.size }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SHA256：\`${{ steps.hash.outputs.sha256 }}\`" >> $GITHUB_STEP_SUMMARY
