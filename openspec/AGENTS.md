@@ -39,7 +39,8 @@ openspec/
 │   ├── category-stats/         两级分类、统计与下钻
 │   ├── privacy-security/       无网络权限、加密、备份排除、应用锁
 │   ├── backup-restore/         schemaVersion、导入重算
-│   └── reporting-ui/           4 Tab、低摩擦、万级数据性能
+│   ├── reporting-ui/           4 Tab、低摩擦、万级数据性能
+│   └── build-and-ci/           构建工具链、CI 验证、固定签名、静态检查
 ├── changes/                进行中的提案，每个 change 一个文件夹
 └── changes/archive/        已归档的历史 change
 ```
