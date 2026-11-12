@@ -3,7 +3,8 @@
 **纯本地、零网络权限、无广告的个人 Android 记账应用。** 知道自己的资产与支出构成，
 数据不托管给任何第三方，也不依赖长期开机的服务器或 NAS。
 
-> 状态：**阶段 0 / 阶段 1 均已归档；阶段 2 UI 已完成，CI 全绿（run 43218438836）**。
+> 状态：**阶段 0 / 阶段 1 / 阶段 2 均已完成并归档，CI 全绿（run 43218438836）**；
+> 阶段 3 处于对齐门禁，待确认后建 change。
 > 现在可以打开应用记一笔、翻明细、组合筛选、恢复删除流水、导出明文 JSON。
 > 资产与统计仍是标注「阶段 3 / 4」的占位页。
 > 本仓库遵循 OpenSpec 规范驱动开发，规格是唯一真理源。
@@ -153,8 +154,7 @@ offline-ledger/
 │   │   ├── reporting-ui/         4 Tab、低摩擦、万级数据性能
 │   │   └── build-and-ci/         构建工具链、CI 验证、固定签名
 │   └── changes/
-│       ├── build-record-entry-ui/        进行中：阶段 2 交互层
-│       └── archive/                      已归档（初始设计 / 阶段 0 / 阶段 1）
+│       └── archive/                      已归档（初始设计 / 阶段 0 / 阶段 1 / 阶段 2）
 ├── app/src/main/java/com/zwz/offlineledger/
 │   ├── core/                 Cents / LedgerClock / LedgerCurrency
 │   ├── data/model/           纯 JVM 数据模型
@@ -184,15 +184,17 @@ offline-ledger/
 
 ## 当前进行中的改动
 
-`openspec/changes/build-record-entry-ui/`（阶段 2，待归档）。
-阶段 0 / 1 均已按规范归档；归档阶段 1 时修正了初始 spec 残留的
-`isDeleted = 0` 旧口径（MODIFIED 条目）。归档需使用者明确指令，本轮未擅自归档。
+**无**。阶段 0 / 1 / 2 均已按规范归档（delta 合并进 `specs/`、change 移入
+`archive/`、逐模块校验通过）。归档阶段 2 时识别出两条「阶段限定 Requirement」
+会成为规格债，已记入 `2026-11-12-build-record-entry-ui/design.md`，
+要求阶段 3 用 MODIFIED 替换，避免 specs 出现互相矛盾的要求。
 
 ---
 
 ## 下一步
 
-阶段 3：净资产看板、账户详情、余额调整记录、对账流程（阈值 / 锚点 / 金额反查）。
+阶段 3：净资产看板、账户详情、余额调整记录、对账流程（阈值分流 / 对账锚点 /
+金额反查 / 核对视图），并用 MODIFIED 替换阶段 2 遗留的两条阶段限定 Requirement。
 之后依次是统计图表（4）、完整备份与设置（5）。
 `release.yml`、正式签名 Secrets 与分发方案留到出包阶段单独提 change。
 
