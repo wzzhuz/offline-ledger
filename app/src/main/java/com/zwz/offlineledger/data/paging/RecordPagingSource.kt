@@ -2,8 +2,6 @@ package com.zwz.offlineledger.data.paging
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import androidx.paging.LoadParams
-import androidx.paging.LoadResult
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.RecordRow
 
@@ -16,7 +14,7 @@ class RecordPagingSource(
     private val filter: RecordFilter
 ) : PagingSource<Int, RecordRow>() {
 
-    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, RecordRow> {
+    override suspend fun load(params: PagingSource.LoadParams<Int>): PagingSource.LoadResult<Int, RecordRow> {
         val offset = params.key ?: 0
         return try {
             val rows = dao.pagedFiltered(
@@ -32,14 +30,14 @@ class RecordPagingSource(
                 limit = params.loadSize,
                 offset = offset
             )
-            LoadResult.Page(
+            PagingSource.LoadResult.Page(
                 data = rows,
                 prevKey = if (offset == 0) null else (offset - params.loadSize).coerceAtLeast(0),
                 // 按实际返回行数推进，避免 loadSize 与实际不等时重复或漏记录
                 nextKey = if (rows.isEmpty()) null else offset + rows.size
             )
         } catch (e: Exception) {
-            LoadResult.Error(e)
+            PagingSource.LoadResult.Error(e)
         }
     }
 

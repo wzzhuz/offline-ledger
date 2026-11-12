@@ -9,7 +9,7 @@ import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
 import com.zwz.offlineledger.data.repository.LedgerRepository
 import dagger.hilt.EntryPoint
-import dagger.hilt.EntryPointAccessors
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 
