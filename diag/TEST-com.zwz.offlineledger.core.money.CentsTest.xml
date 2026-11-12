@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.zwz.offlineledger.core.money.CentsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-12T12:26:32.451Z" hostname="runnervmwuk1x" time="0.01">
+  <properties/>
+  <testcase name="negative balance is representable" classname="com.zwz.offlineledger.core.money.CentsTest" time="0.001"/>
+  <testcase name="illegal input fails loudly" classname="com.zwz.offlineledger.core.money.CentsTest" time="0.003"/>
+  <testcase name="one cent is stored as one" classname="com.zwz.offlineledger.core.money.CentsTest" time="0.001"/>
+  <testcase name="no floating point drift" classname="com.zwz.offlineledger.core.money.CentsTest" time="0.0"/>
+  <testcase name="half up rounding" classname="com.zwz.offlineledger.core.money.CentsTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

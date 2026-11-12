@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.zwz.offlineledger.engine.CalculatorTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-12T12:26:32.624Z" hostname="runnervmwuk1x" time="0.033">
+  <properties/>
+  <testcase name="illegal expression is rejected" classname="com.zwz.offlineledger.engine.CalculatorTest" time="0.023"/>
+  <testcase name="division is rounded not infinite" classname="com.zwz.offlineledger.engine.CalculatorTest" time="0.001"/>
+  <testcase name="divide by zero is rejected" classname="com.zwz.offlineledger.engine.CalculatorTest" time="0.003"/>
+  <testcase name="unary minus and decimals" classname="com.zwz.offlineledger.engine.CalculatorTest" time="0.001"/>
+  <testcase name="no floating point in amount path" classname="com.zwz.offlineledger.engine.CalculatorTest" time="0.0"/>
+  <testcase name="keypad append and simplify" classname="com.zwz.offlineledger.engine.CalculatorTest" time="0.004"/>
+  <testcase name="operator precedence" classname="com.zwz.offlineledger.engine.CalculatorTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

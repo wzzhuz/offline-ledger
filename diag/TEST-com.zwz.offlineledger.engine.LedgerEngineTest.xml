@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.zwz.offlineledger.engine.LedgerEngineTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-12T12:26:32.675Z" hostname="runnervmwuk1x" time="0.008">
+  <properties/>
+  <testcase name="06 restore re-applies record effect" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.001"/>
+  <testcase name="09 rebuild from tampered balance restores truth" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.001"/>
+  <testcase name="02 insert income increases balance" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.001"/>
+  <testcase name="04 update record is equivalent to recompute with new data" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.0"/>
+  <testcase name="03 transfer keeps net worth unchanged" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.0"/>
+  <testcase name="exclude from stats and transfer never pollute totals" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.0"/>
+  <testcase name="08 adjustment changes balance but never stats" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.0"/>
+  <testcase name="07 credit card spend and repayment" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.001"/>
+  <testcase name="01 insert expense decreases balance" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.003"/>
+  <testcase name="05 delete removes record effect" classname="com.zwz.offlineledger.engine.LedgerEngineTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
