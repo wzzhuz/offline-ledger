@@ -25,7 +25,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.zwz.offlineledger.ui.assets.AssetsPlaceholder
+import com.zwz.offlineledger.ui.assets.AssetsScreen
 import com.zwz.offlineledger.ui.detail.DetailScreen
 import com.zwz.offlineledger.ui.record.RecordEditorDialog
 import com.zwz.offlineledger.ui.settings.SettingsScreen
@@ -88,7 +88,7 @@ fun LedgerApp() {
                     onEdit = { id -> openEditor(id) }
                 )
             }
-            composable("assets") { AssetsPlaceholder() }
+            composable("assets") { AssetsScreen() }
             composable("stats") { StatsPlaceholder() }
             composable("settings") { SettingsScreen() }
         }

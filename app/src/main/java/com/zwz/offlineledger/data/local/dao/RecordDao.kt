@@ -31,6 +31,35 @@ data class RecordRow(
     val toAccountName: String?
 )
 
+/** 账户详情专属流水行。 */
+data class AccountRecordRow(
+    val id: Long,
+    val type: String,
+    val amountCents: Long,
+    val localDate: Int,
+    val note: String,
+    val categoryName: String?,
+    val categoryColorHex: String?
+)
+
+/**
+ * 核对视图行。suspectFlags 是 SQL CASE 算出的位掩码：
+ * 1=金额 0 / 2=未分类 / 4=异常大额；第 4 位「短时重复」在 ViewModel 补算。
+ */
+data class ReviewRow(
+    val id: Long,
+    val type: String,
+    val amountCents: Long,
+    val localDate: Int,
+    val timestamp: Long,
+    val note: String,
+    val categoryName: String?,
+    val fromAccountName: String?,
+    val toAccountName: String?,
+    val categoryId: Long?,
+    val suspectFlags: Int
+)
+
 /** 日期头用的整月按日合计，最多 31 行，不随分页加载跳变。 */
 data class DailyTotalRow(
     val localDate: Int,
@@ -148,4 +177,65 @@ interface RecordDao {
         """
     )
     suspend fun dailyTotals(ym: Int): List<DailyTotalRow>
+
+    /** 账户详情流水：LEFT JOIN 一次取分类名，LIMIT 兜底。 */
+    @Query(
+        """
+        SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents,
+               r.localDate AS localDate, r.note AS note,
+               c.name AS categoryName, c.colorHex AS categoryColorHex
+          FROM records r
+          LEFT JOIN categories c ON r.categoryId = c.id
+         WHERE (r.fromAccountId = :accountId OR r.toAccountId = :accountId)
+         ORDER BY r.localDate DESC, r.id DESC
+         LIMIT :limit
+        """
+    )
+    suspend fun accountRecords(accountId: Long, limit: Int): List<AccountRecordRow>
+
+    /**
+     * 核对视图基础集：范围由 SQL 限定（账户 + 锚点后 + 可选金额区间 + LIMIT），
+     * MUST NOT 全表加载后在 Kotlin 过滤。三个疑似标记由 CASE 算出。
+     */
+    @Query(
+        """
+        SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents,
+               r.localDate AS localDate, r.timestamp AS timestamp, r.note AS note,
+               c.name AS categoryName,
+               fa.name AS fromAccountName, ta.name AS toAccountName,
+               r.categoryId AS categoryId,
+                 (CASE WHEN r.amountCents = 0 THEN 1 ELSE 0 END)
+               + (CASE WHEN r.categoryId IS NULL AND r.type <> 'TRANSFER' THEN 2 ELSE 0 END)
+               + (CASE WHEN r.amountCents >= :largeThreshold THEN 4 ELSE 0 END) AS suspectFlags
+          FROM records r
+          LEFT JOIN categories c ON r.categoryId = c.id
+          LEFT JOIN accounts fa ON r.fromAccountId = fa.id
+          LEFT JOIN accounts ta ON r.toAccountId = ta.id
+         WHERE (r.fromAccountId = :accountId OR r.toAccountId = :accountId)
+           AND r.timestamp >= :fromTimestamp
+           AND (:minAmount IS NULL OR r.amountCents >= :minAmount)
+           AND (:maxAmount IS NULL OR r.amountCents <= :maxAmount)
+         ORDER BY r.timestamp DESC
+         LIMIT :limit
+        """
+    )
+    suspend fun reviewRows(
+        accountId: Long,
+        fromTimestamp: Long,
+        minAmount: Long?,
+        maxAmount: Long?,
+        largeThreshold: Long,
+        limit: Int
+    ): List<ReviewRow>
+
+    /** 供「未找到 0.01 的记录」判断；同样按锚点后范围。 */
+    @Query(
+        """
+        SELECT COUNT(*) FROM records
+         WHERE (fromAccountId = :accountId OR toAccountId = :accountId)
+           AND amountCents = :amountCents
+           AND timestamp >= :fromTimestamp
+        """
+    )
+    suspend fun countExactAmount(accountId: Long, amountCents: Long, fromTimestamp: Long): Int
 }

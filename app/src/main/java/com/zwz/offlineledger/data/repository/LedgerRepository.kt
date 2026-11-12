@@ -9,6 +9,7 @@ import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
+import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.BalanceAdjustmentEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
 import com.zwz.offlineledger.data.local.toDto
@@ -19,11 +20,19 @@ import com.zwz.offlineledger.data.model.LedgerAdjustment
 import com.zwz.offlineledger.data.model.LedgerCategory
 import com.zwz.offlineledger.engine.CategoryTree
 import com.zwz.offlineledger.engine.LedgerEngine
+import com.zwz.offlineledger.engine.Reconciliation
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 data class LedgerHealth(val checkedAccounts: Int, val repairedAccounts: Int, val driftCents: Long)
+
+data class ReconcileResult(
+    val deltaCents: Long,
+    val bookCents: Long,
+    val actualCents: Long,
+    val reconciledAt: Long
+)
 
 /**
  * 账本唯一写入口。
@@ -140,6 +149,69 @@ class LedgerRepository @Inject constructor(
             trashDao.insert(it.toEntity().toTrash(System.currentTimeMillis()))
         }
         rebuildAllBalancesInternal()
+    }
+
+
+    // ---------------------------------------------------------------
+    // 阶段 3：资产与对账的写操作。与阶段 1 的 9 个方法一样，
+    // 全部包在 db.withTransaction 内；check_transaction_annotations.py 已同步扩清单。
+
+    /**
+     * 对账：生成独立校准 → 重算余额 → 推进锚点，三者同一事务。
+     * 差额为 0 时不生成调整记录，但仍推进锚点（账实相符也是一次成功对账）。
+     * 锚点只用于缩小核对范围，MUST NOT 参与余额计算。
+     */
+    suspend fun reconcile(
+        accountId: Long,
+        actualBalanceCents: Long,
+        memo: String,
+        source: String = "TAIL_DIFFERENCE"
+    ): ReconcileResult = db.withTransaction {
+        val acc = accountDao.byId(accountId)
+            ?: throw IllegalArgumentException("账户不存在：$accountId")
+        require(memo.isNotBlank() || Reconciliation.isTailDifference(
+            Reconciliation.difference(acc.balanceCents, actualBalanceCents)
+        )) { "非尾差校准必须填写备注" }
+        val delta = Reconciliation.difference(acc.balanceCents, actualBalanceCents)
+        val now = System.currentTimeMillis()
+        if (delta != 0L) {
+            adjustmentDao.insert(
+                BalanceAdjustmentEntity(
+                    accountId = accountId,
+                    deltaCents = delta,
+                    memo = memo,
+                    source = source,
+                    createdAt = now
+                )
+            )
+            rebuildAllBalancesInternal()
+        }
+        accountDao.updateReconciliationAnchor(accountId, now, actualBalanceCents)
+        ReconcileResult(delta, acc.balanceCents, actualBalanceCents, now)
+    }
+
+    /** 新增账户后统一重算兜底，保证 balanceCents 与真相源一致。 */
+    suspend fun createAccount(a: AccountEntity): Long = db.withTransaction {
+        val id = accountDao.insert(a)
+        rebuildAllBalancesInternal()
+        id
+    }
+
+    /** 改名 / 计入净资产 / 额度 / 排序；不改余额真相源，仍统一走事务入口。 */
+    suspend fun updateAccountMeta(
+        id: Long,
+        name: String,
+        includeInTotal: Boolean,
+        creditLimitCents: Long?,
+        sortOrder: Int
+    ) = db.withTransaction {
+        require(name.isNotBlank()) { "账户名不能为空" }
+        accountDao.updateAccountMeta(id, name, includeInTotal, creditLimitCents, sortOrder)
+    }
+
+    /** 只归档不物理删；有流水的账户历史明细仍可查。 */
+    suspend fun archiveAccount(id: Long) = db.withTransaction {
+        accountDao.archiveAccount(id)
     }
 
     // ---------------------------------------------------------------

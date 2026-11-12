@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.zwz.offlineledger.data.local.dao.AccountDao
+import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
@@ -25,6 +26,7 @@ interface LedgerEntryPoint {
     fun categoryDao(): CategoryDao
     fun recordDao(): RecordDao
     fun trashDao(): TrashDao
+    fun balanceAdjustmentDao(): BalanceAdjustmentDao
 }
 
 object LedgerDi {

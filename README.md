@@ -3,10 +3,10 @@
 **纯本地、零网络权限、无广告的个人 Android 记账应用。** 知道自己的资产与支出构成，
 数据不托管给任何第三方，也不依赖长期开机的服务器或 NAS。
 
-> 状态：**阶段 0 / 阶段 1 / 阶段 2 均已完成并归档，CI 全绿（run 43218438836）**；
-> 阶段 3 处于对齐门禁，待确认后建 change。
-> 现在可以打开应用记一笔、翻明细、组合筛选、恢复删除流水、导出明文 JSON。
-> 资产与统计仍是标注「阶段 3 / 4」的占位页。
+> 状态：**阶段 0 / 1 / 2 均已归档；阶段 3 资产与对账已落地，CI 验证结果见 Actions**。
+> 现在能看净资产、账户详情、余额调整记录，并按「尾差一键抹平 / 大额先核对」处理账实不符。
+> 统计页仍是标注「阶段 4」的占位页。
+> 记账、明细、组合筛选、回收站恢复与明文 JSON 导出沿用阶段 2 能力。
 > 本仓库遵循 OpenSpec 规范驱动开发，规格是唯一真理源。
 
 ---
@@ -110,6 +110,39 @@ SQLCipher `4.5.6@aar`、kotlinx-serialization-json `1.9.0`；
 
 ---
 
+## 阶段 3 资产与对账
+
+**零表结构变更**：`AccountEntity` / `BackupAccount` 在阶段 1 已预留
+`lastReconciledAt` / `lastReconciledBalanceCents`，所以 `AppDatabase` 仍 `version = 1`、
+**无 Room Migration**、备份格式与 `schemaVersion = 1` 一字未改、不新增任何 Gradle 依赖。
+
+**资产页**（替换占位）：净资产大卡、总资产 / 总负债（注明「仅展示，不参与计算」）、
+资产账户 / 信用负债账户分组、可用额度 = `creditLimitCents + balanceCents`、
+新增账户 / 改名 / 归档 / 计入净资产开关。账户详情含专属流水与
+「余额调整记录」折叠区，可撤销校准。
+
+**对账流程**：输入实际余额 → 差额 = 实际 − 账面 →
+`|差额| ≤ 1.00 元` 一键「忽略尾差并校准」；`> 1.00 元` 默认只给「先核对」，
+「仍要校准」备注必填 + 二次确认。校准生成独立 `BalanceAdjustment`，
+与 `rebuildAllBalances()`、锚点推进同处一个事务，不进明细 / 分类 / 年报。
+
+**核对视图**（资产页内 Dialog，不新增 Tab）：锚点后流水切片 +
+近 7 / 30 / 90 天放宽、金额反查（等于 / 区间 / 近似 ±1.00 元）、
+疑似问题标记（金额 0 / 未分类 / 异常大额 / 24h 内同额重复）、
+「只看疑似项」、无匹配时提示「未找到 0.01 的记录」。
+反查与范围由参数化 SQL 限定，MUST NOT 全表加载后在 Kotlin 过滤。
+
+**两条规格债已修**：阶段 2 归档时识别的「资产页显示占位说明」与
+「筛选面板没有对账入口」，本 change 用 `## MODIFIED Requirements` 写出完整替换文本，
+归档阶段 3 时按标题替换，避免 specs 出现互相矛盾的要求。
+
+**测试边界（如实说明）**：新增纯 JVM 单测覆盖差额正负、尾差边界 100 / 101 分、
+可用额度、展示聚合值不被减法污染、三种反查区间、疑似标记解码与锚点备份往返。
+沙盒无 Android SDK / 模拟器，**5 万条真机切月耗时、滚动掉帧、SQLCipher 真机打开
+数据库仍未实测**；本阶段只验证范围 SQL 结构与依赖可编译，不把「编译通过」说成「性能达标」。
+
+---
+
 ## 本地构建
 
 ```bash
@@ -154,6 +187,7 @@ offline-ledger/
 │   │   ├── reporting-ui/         4 Tab、低摩擦、万级数据性能
 │   │   └── build-and-ci/         构建工具链、CI 验证、固定签名
 │   └── changes/
+│       ├── implement-assets-and-reconciliation/   进行中：阶段 3
 │       └── archive/                      已归档（初始设计 / 阶段 0 / 阶段 1 / 阶段 2）
 ├── app/src/main/java/com/zwz/offlineledger/
 │   ├── core/                 Cents / LedgerClock / LedgerCurrency
@@ -162,14 +196,17 @@ offline-ledger/
 │   ├── data/di/DatabaseModule.kt
 │   ├── data/repository/LedgerRepository.kt
 │   ├── data/paging/          RecordFilter / RecordPagingSource
-│   ├── engine/               LedgerEngine / CategoryTree / StatRules / Calculator
+│   ├── engine/               LedgerEngine / CategoryTree / StatRules /
+│   │                         Calculator / Reconciliation（对账计算）
 │   ├── backup/               BackupEnvelope / Payload / Exporter / Importer
 │   └── ui/                   LedgerApp / theme / LedgerDi / components
 │       ├── detail/            DetailScreen / DetailViewModel / FilterSheet
 │       ├── record/            RecordEditorDialog / RecordEditorViewModel
+│       ├── assets/            AssetsScreen / AssetsViewModel / AccountDetailDialog
+│       ├── reconcile/         ReconcileDialog / ReviewDialog + 两个 ViewModel
 │       ├── trash/             TrashScreen / TrashViewModel
 │       ├── settings/          SettingsScreen（临时明文导出）
-│       └── assets/ stats/     阶段 3 / 4 占位页
+│       └── stats/             阶段 4 占位页
 ├── app/src/test/             纯 JVM 单测
 ├── scripts/                  五个 CI 静态检查
 ├── .github/workflows/build.yml
@@ -184,18 +221,19 @@ offline-ledger/
 
 ## 当前进行中的改动
 
-**无**。阶段 0 / 1 / 2 均已按规范归档（delta 合并进 `specs/`、change 移入
-`archive/`、逐模块校验通过）。归档阶段 2 时识别出两条「阶段限定 Requirement」
-会成为规格债，已记入 `2026-11-12-build-record-entry-ui/design.md`，
-要求阶段 3 用 MODIFIED 替换，避免 specs 出现互相矛盾的要求。
+`openspec/changes/implement-assets-and-reconciliation/`（阶段 3，待归档）。
+阶段 0 / 1 / 2 均已按规范归档。本 change 含 **2 份 MODIFIED**，
+用于兑现阶段 2 归档时记录的两条「阶段限定 Requirement」规格债；
+归档阶段 3 时按标题替换，而不是只追加 ADDED。归档需使用者明确指令，本轮未擅自归档。
 
 ---
 
 ## 下一步
 
-阶段 3：净资产看板、账户详情、余额调整记录、对账流程（阈值分流 / 对账锚点 /
-金额反查 / 核对视图），并用 MODIFIED 替换阶段 2 遗留的两条阶段限定 Requirement。
-之后依次是统计图表（4）、完整备份与设置（5）。
+阶段 4：一级 / 二级环形图 + 下钻、月度趋势折线、年度收支双线、
+一级 / 二级合计一致性校验（原生 Canvas 自绘，不引入 Vico）。
+之后是完整备份与设置（5）：SAF 加密导入导出、CSV、应用锁、分类管理、阈值偏好。
+本 change 的 2 份 MODIFIED 需在归档阶段 3 时按标题合并进 `specs/`。
 `release.yml`、正式签名 Secrets 与分发方案留到出包阶段单独提 change。
 
 **每阶段结束必须能编译运行并跑一遍导出备份**，禁止一次性摊开全部页面。

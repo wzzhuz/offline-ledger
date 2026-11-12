@@ -20,4 +20,10 @@ interface BalanceAdjustmentDao {
 
     @Query("DELETE FROM balance_adjustments")
     suspend fun clear()
+
+    @Query("SELECT * FROM balance_adjustments WHERE accountId = :accountId ORDER BY createdAt DESC")
+    suspend fun byAccountId(accountId: Long): List<BalanceAdjustmentEntity>
+
+    @Query("SELECT * FROM balance_adjustments WHERE id = :id")
+    suspend fun byId(id: Long): BalanceAdjustmentEntity?
 }

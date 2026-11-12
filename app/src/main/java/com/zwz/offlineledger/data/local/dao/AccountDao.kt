@@ -30,4 +30,31 @@ interface AccountDao {
 
     @Query("DELETE FROM accounts")
     suspend fun clear()
+
+    /** 阶段 3：资产页观察账户列表（账户数最多几十个，不是万级）。 */
+    @Query("SELECT * FROM accounts ORDER BY sortOrder, id")
+    fun observeAccounts(): Flow<List<AccountEntity>>
+
+    @Query("SELECT COALESCE(SUM(balanceCents), 0) FROM accounts WHERE includeInTotal = 1 AND type = 'ASSET'")
+    suspend fun totalAssets(): Long
+
+    /** 原始负值（欠款为负）；展示取绝对值，MUST NOT 参与净资产计算。 */
+    @Query("SELECT COALESCE(SUM(balanceCents), 0) FROM accounts WHERE includeInTotal = 1 AND type = 'LIABILITY'")
+    suspend fun totalLiabilitiesRaw(): Long
+
+    @Query("UPDATE accounts SET lastReconciledAt = :at, lastReconciledBalanceCents = :balance WHERE id = :id")
+    suspend fun updateReconciliationAnchor(id: Long, at: Long, balance: Long)
+
+    @Query("UPDATE accounts SET name = :name, includeInTotal = :includeInTotal, creditLimitCents = :creditLimitCents, sortOrder = :sortOrder WHERE id = :id")
+    suspend fun updateAccountMeta(
+        id: Long, name: String, includeInTotal: Boolean,
+        creditLimitCents: Long?, sortOrder: Int
+    )
+
+    /** 只归档不物理删：有流水的账户 MUST NOT 删除。 */
+    @Query("UPDATE accounts SET isArchived = 1 WHERE id = :id")
+    suspend fun archiveAccount(id: Long)
+
+    @Query("SELECT COUNT(*) FROM records WHERE fromAccountId = :id OR toAccountId = :id")
+    suspend fun linkedRecordCount(id: Long): Int
 }

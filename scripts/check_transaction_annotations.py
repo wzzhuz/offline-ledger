@@ -14,7 +14,9 @@ SRC_ROOT = os.path.join(BASE, 'app', 'src', 'main', 'java')
 WRITE_METHODS = [
     'insertRecord', 'updateRecord', 'deleteRecord', 'restoreRecord',
     'addAdjustment', 'revokeAdjustment', 'rebuildAllBalances',
-    'checkAndRepair', 'importBackup'
+    'checkAndRepair', 'importBackup',
+    # 阶段 3 新增的 4 个写方法；不扩清单就会漏检（spec: build-and-ci delta）
+    'reconcile', 'createAccount', 'updateAccountMeta', 'archiveAccount'
 ]
 
 
