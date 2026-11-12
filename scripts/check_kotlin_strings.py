@@ -41,7 +41,8 @@ def main() -> int:
                     stripped = line.lstrip()
                     if '"""' in stripped:
                         # 三引号块内允许任意内容；简单切换状态
-                        in_raw = stripped.count('"""') % 2 == 1
+                        if stripped.count('"""') % 2 == 1:
+                            in_raw = not in_raw
                         continue
                     if in_raw or stripped.startswith('//') or stripped.startswith('*'):
                         continue

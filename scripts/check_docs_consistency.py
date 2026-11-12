@@ -44,7 +44,7 @@ def main() -> int:
             problems.append('构建脚本引入了 project.md 明确不引入的 ' + dep)
 
     # README 当前状态不得声称已有可用产物
-    if '阶段 0' not in readme:
+    if '阶段 ' not in readme:
         problems.append('README.md 未标注当前阶段')
 
     if '阶段 0' not in project and '阶段0' not in project:

@@ -37,11 +37,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: 静态检查（隐私基线 / Kotlin 字符串 / 文档一致性）
+      - name: 静态检查（隐私 / Kotlin 字符串 / 文档 / 事务 / 统计口径）
         run: |
           python3 scripts/check_manifest_privacy.py
           python3 scripts/check_kotlin_strings.py
           python3 scripts/check_docs_consistency.py
+          python3 scripts/check_transaction_annotations.py
+          python3 scripts/check_stat_rules.py
 
       - name: 校验固定签名密钥存在
         run: |
