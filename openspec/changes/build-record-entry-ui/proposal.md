@@ -68,7 +68,7 @@
    统计口径复用 `StatRules`；配色按 spec 用红 = 支出 / 绿 = 收入。
    两级分类不得把「点两下记完」变成点四下。
    **本轮查证到的硬约束**：Compose BOM 2026.06 起不再通过 `material3` 传递
-   `material-icons-core`，阶段 2 一用图标就会编译失败，必须显式声明图标 artifact；
+   `material-icons-core`，阶段 2 一用图标就会编译失败，必须显式声明图标 artifact（本轮最终锁定 `material-icons-core`）；
    Paging / Navigation 版本锁定与依据见 `design.md` 第 2 节。
    沙盒无 SDK / 模拟器，编译与单测由 Actions 验证；推送用单次 commit；
    Python 拼 Kotlin 后必跑五个检查脚本；不声明 `INTERNET`。

@@ -40,16 +40,18 @@ Scaffold
 `ViewModelProvider.Factory`（`androidx.lifecycle.viewmodel.compose.viewModel`），
 零新增依赖、零版本风险。Repository 与各 DAO 仍由阶段 1 的 `DatabaseModule` 提供。
 
-**图标方案的一处收敛（与对齐结论的实现细节差异，如实记录）**：
-对齐结论写「显式声明 material-icons-extended，因为 SeedData 的图标名大多在 extended 集」。
-实现时改成：**图标 artifact 照常显式声明，但分类图标不做字符串→ImageVector 映射**，
-而是用 `colorHex` 画圆 + 分类名中文首字。
+**图标方案的两处收敛（与对齐结论的实现细节差异，如实记录）**：
+① 对齐结论写「显式声明 material-icons-extended」，进一步查证后改为 **`material-icons-core`**：
+官方 BOM 映射表显示两个图标 artifact 都冻结在 1.7.8，extended 已被官方弃用且体积达数 MB，
+而本应用实际用到的图标（Add / Delete / Close / Settings / Home / List / Star /
+KeyboardArrowLeft / KeyboardArrowRight）全部属于 frozen core set。取 core 更轻、依赖面更小。
+② **分类图标不做字符串→ImageVector 映射**，而是用 `colorHex` 画圆 + 分类名中文首字。
 
 理由：SeedData 里有 30 个 `iconName`（`Restaurant` / `DirectionsBus` /
 `DeliveryDining` / `Soap` …），只要有一个在当前 BOM 的 extended 里不存在，
 整份映射表就编译失败；而且中文记账 App 用「彩色圆 + 首字」辨识度反而更高
 （钱迹等也是这个路子），还天然适配两级分类。`iconName` 字段原样保留，
-留给将来做图标包时再用。导航与按钮图标只用 extended 中确定存在的基础图标。
+留给将来做图标包时再用。导航与按钮图标只用 frozen core set 中确定存在的基础图标。
 
 ## 3. 分页：自定义 PagingSource，不是 Room PagingSource
 
@@ -170,7 +172,8 @@ ViewModel 载入原流水后填入；保存走 `updateRecord`（阶段 1 事务�
 
 ### CI 失败时的回退顺序（每次只改一处、单独推送）
 
-1. 图标 artifact 或图标名不存在 → 按编译错误改 import / 换基础图标
+1. 图标 artifact 或图标名不存在 → 按编译错误改 import / 换 core set 内基础图标；
+   仍不行则彻底去掉图标依赖，用文字或 Canvas 自绘矢量替代
 2. `paging-compose:3.3.6` 与 BOM 2026.06 的 Compose 版本冲突 → 先降级到 3.3.5
 3. `navigation-compose:2.9.0` 与 Kotlin 2.3 冲突 → 升到 2.9.8（同账号项目已有 2.9.8 升级记录）
 4. Room 不接受 `:param IS NULL OR ...` 或 `LIMIT :limit OFFSET :offset` →
@@ -190,6 +193,7 @@ ViewModel 载入原流水后填入；保存走 `updateRecord`（阶段 1 事务�
 | `room-paging:2.8.4` + DAO 返回 PagingSource | 官方标准、与 Room 同版本 | 动态组合筛选要 `@RawQuery` 或多份 `@Query`，组合爆炸；自定义 PagingSource 反而更直白 |
 | `@RawQuery` 拼 WHERE | 任意组合一条 SQL | 字符串拼接有注入面与转义风险；可选参数短路同样一条 SQL 且全参数化 |
 | 分类图标按 `iconName` 映射到 `ImageVector` | 图标好看 | 30 个图标名任一在当前 BOM 不存在就编译失败；彩色圆 + 中文首字零风险且辨识度更高 |
+| 引入 `material-icons-extended` 取图标超集 | 图标名可用性最高 | 官方已冻结并弃用该 artifact，体积达数 MB；实际用到的图标都在 core set 内 |
 | 引入 `hilt-navigation-compose` 用 `hiltViewModel()` | 写法标准 | 多一个未实测版本冲突面；`@EntryPoint` + 标准 Factory 零新增依赖 |
 | 日期头用已加载分页数据求和 | 少一条 SQL | 数值随滚动跳变，正是 `project.md` 禁止的 `records.size` 类错误 |
 | 三级分类 / 模板 / 预算 / 快捷方式 | 功能更全 | `project.md`「已确认不做」v1.1 清单，不得悄悄加回 |

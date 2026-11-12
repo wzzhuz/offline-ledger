@@ -99,6 +99,17 @@ dependencies {
     // 官方坐标带 @aar；不引入 Coil/Glide 之类会传递引入网络栈的库。
     implementation("net.zetetic:sqlcipher-android:4.5.6@aar")
 
+    // ---- 阶段 2：导航 / 分页 / ViewModel / 图标 ----
+    // Compose BOM 2026.06 起不再通过 material3 传递图标 artifact，
+    // 用图标就必须显式声明。取 frozen core set 即可，
+    // 不拖入已被官方冻结、体积达数 MB 的 material-icons-extended。
+    implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.navigation:navigation-compose:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
+    // paging-runtime 是 RecyclerView 适配器，Compose 不需要。
+    implementation("androidx.paging:paging-common:3.3.6")
+    implementation("androidx.paging:paging-compose:3.3.6")
+
     // ---- 单元测试 ----
     testImplementation("junit:junit:4.13.2")
 }

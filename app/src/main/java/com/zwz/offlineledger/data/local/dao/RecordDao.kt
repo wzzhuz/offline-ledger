@@ -10,6 +10,34 @@ data class AccountDeltaRow(val accountId: Long, val deltaCents: Long)
 data class CategoryTotalRow(val categoryId: Long, val totalCents: Long)
 data class MonthTotalRow(val yearMonth: Int, val type: String, val totalCents: Long)
 
+
+/** 明细行：一次 LEFT JOIN 取回分类与账户名，避免列表渲染时逐行查库（O(n²)）。 */
+data class RecordRow(
+    val id: Long,
+    val type: String,
+    val amountCents: Long,
+    val categoryId: Long?,
+    val rootCategoryId: Long?,
+    val fromAccountId: Long?,
+    val toAccountId: Long?,
+    val timestamp: Long,
+    val localDate: Int,
+    val yearMonth: Int,
+    val note: String,
+    val excludeFromStats: Boolean,
+    val categoryName: String?,
+    val categoryColorHex: String?,
+    val fromAccountName: String?,
+    val toAccountName: String?
+)
+
+/** 日期头用的整月按日合计，最多 31 行，不随分页加载跳变。 */
+data class DailyTotalRow(
+    val localDate: Int,
+    val expenseCents: Long,
+    val incomeCents: Long
+)
+
 @Dao
 interface RecordDao {
     @Insert suspend fun insert(r: RecordEntity): Long
@@ -67,4 +95,57 @@ interface RecordDao {
 
     @Query("SELECT * FROM records WHERE amountCents = :amountCents AND fromAccountId = :accountId ORDER BY timestamp DESC")
     suspend fun findByAmount(accountId: Long, amountCents: Long): List<RecordEntity>
+
+    /**
+     * 一条 SQL 覆盖时间 / 账户 / 类型 / 一级 / 二级分类 / 金额区间 / 备注全文
+     * 的全部组合。可选参数为 null 时短路，全部值通过参数绑定，无字符串拼接。
+     */
+    @Query(
+        """
+        SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents,
+               r.categoryId AS categoryId, r.rootCategoryId AS rootCategoryId,
+               r.fromAccountId AS fromAccountId, r.toAccountId AS toAccountId,
+               r.timestamp AS timestamp, r.localDate AS localDate,
+               r.yearMonth AS yearMonth, r.note AS note,
+               r.excludeFromStats AS excludeFromStats,
+               c.name AS categoryName, c.colorHex AS categoryColorHex,
+               fa.name AS fromAccountName, ta.name AS toAccountName
+          FROM records r
+          LEFT JOIN categories c ON r.categoryId = c.id
+          LEFT JOIN accounts fa ON r.fromAccountId = fa.id
+          LEFT JOIN accounts ta ON r.toAccountId = ta.id
+         WHERE (:fromDate IS NULL OR r.localDate >= :fromDate)
+           AND (:toDate IS NULL OR r.localDate <= :toDate)
+           AND (:accountId IS NULL OR r.fromAccountId = :accountId
+                                OR r.toAccountId = :accountId)
+           AND (:type IS NULL OR r.type = :type)
+           AND (:rootCategoryId IS NULL OR r.rootCategoryId = :rootCategoryId)
+           AND (:categoryId IS NULL OR r.categoryId = :categoryId)
+           AND (:minAmount IS NULL OR r.amountCents >= :minAmount)
+           AND (:maxAmount IS NULL OR r.amountCents <= :maxAmount)
+           AND (:noteQuery IS NULL OR r.note LIKE '%' || :noteQuery || '%')
+         ORDER BY r.localDate DESC, r.id DESC
+         LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun pagedFiltered(
+        fromDate: Int?, toDate: Int?, accountId: Long?, type: String?,
+        rootCategoryId: Long?, categoryId: Long?, minAmount: Long?,
+        maxAmount: Long?, noteQuery: String?, limit: Int, offset: Int
+    ): List<RecordRow>
+
+    /** 日期头真实值：整月按日聚合，不用已加载分页数据求和。 */
+    @Query(
+        """
+        SELECT localDate,
+               SUM(CASE WHEN type = 'EXPENSE' THEN amountCents ELSE 0 END) AS expenseCents,
+               SUM(CASE WHEN type = 'INCOME' THEN amountCents ELSE 0 END) AS incomeCents
+          FROM records
+         WHERE yearMonth = :ym AND excludeFromStats = 0
+           AND type IN ('EXPENSE', 'INCOME')
+         GROUP BY localDate
+         ORDER BY localDate DESC
+        """
+    )
+    suspend fun dailyTotals(ym: Int): List<DailyTotalRow>
 }

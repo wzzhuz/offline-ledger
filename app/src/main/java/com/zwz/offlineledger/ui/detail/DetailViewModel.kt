@@ -1,0 +1,145 @@
+package com.zwz.offlineledger.ui.detail
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import com.zwz.offlineledger.core.time.MonthRange
+import com.zwz.offlineledger.data.local.dao.AccountDao
+import com.zwz.offlineledger.data.local.dao.CategoryDao
+import com.zwz.offlineledger.data.local.dao.RecordDao
+import com.zwz.offlineledger.data.local.dao.RecordRow
+import com.zwz.offlineledger.data.local.entity.AccountEntity
+import com.zwz.offlineledger.data.local.entity.CategoryEntity
+import com.zwz.offlineledger.data.paging.RecordFilter
+import com.zwz.offlineledger.data.paging.RecordPagingSource
+import com.zwz.offlineledger.data.repository.LedgerRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.launch
+
+data class MonthOverview(
+    val yearMonth: Int = MonthRange.currentYearMonth(),
+    val expenseCents: Long = 0L,
+    val incomeCents: Long = 0L,
+    /** localDate -> (支出, 收入)，整月真实聚合值，不随分页加载跳变。 */
+    val dailyTotals: Map<Int, Pair<Long, Long>> = emptyMap()
+) {
+    val balanceCents: Long get() = incomeCents - expenseCents
+}
+
+/** 筛选面板的取值，与 Room 查询参数一一对应。 */
+data class FilterValues(
+    val fromDate: Int? = null,
+    val toDate: Int? = null,
+    val accountId: Long? = null,
+    val type: String? = null,
+    val rootCategoryId: Long? = null,
+    val categoryId: Long? = null,
+    val minAmountCents: Long? = null,
+    val maxAmountCents: Long? = null,
+    val noteQuery: String? = null
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class DetailViewModel(
+    private val recordDao: RecordDao,
+    private val accountDao: AccountDao,
+    private val categoryDao: CategoryDao,
+    private val repository: LedgerRepository
+) : ViewModel() {
+
+    private val _filter = MutableStateFlow(RecordFilter.currentMonth())
+    val filter: StateFlow<RecordFilter> = _filter.asStateFlow()
+
+    /**
+     * PagingData 必须是独立的 Flow，绝不能包进 UiState：
+     * 否则任何状态变化都会重建 UiState 并把列表弹回顶部。
+     */
+    val pagingData: Flow<PagingData<RecordRow>> = _filter
+        .flatMapLatest { f ->
+            Pager(
+                config = PagingConfig(
+                    pageSize = 60,
+                    initialLoadSize = 60,
+                    prefetchDistance = 20,
+                    enablePlaceholders = false
+                ),
+                pagingSourceFactory = { RecordPagingSource(recordDao, f) }
+            ).flow
+        }
+        .cachedIn(viewModelScope)
+
+    private val _overview = MutableStateFlow(MonthOverview())
+    val overview: StateFlow<MonthOverview> = _overview.asStateFlow()
+
+    private val _accounts = MutableStateFlow<List<AccountEntity>>(emptyList())
+    val accounts: StateFlow<List<AccountEntity>> = _accounts.asStateFlow()
+
+    private val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
+    val categories: StateFlow<List<CategoryEntity>> = _categories.asStateFlow()
+
+    init {
+        viewModelScope.launch { _accounts.value = accountDao.all() }
+        viewModelScope.launch { _categories.value = categoryDao.all() }
+        viewModelScope.launch { _filter.collect { f -> reload(f) } }
+    }
+
+    private suspend fun reload(f: RecordFilter) {
+        val expense = recordDao.totalExpense(f.yearMonth)
+        val income = recordDao.totalIncome(f.yearMonth)
+        val daily = recordDao.dailyTotals(f.yearMonth).associate {
+            it.localDate to (it.expenseCents to it.incomeCents)
+        }
+        _overview.value = MonthOverview(f.yearMonth, expense, income, daily)
+    }
+
+    fun switchMonth(deltaMonths: Int) {
+        _filter.value = _filter.value.copy(
+            yearMonth = MonthRange.shift(_filter.value.yearMonth, deltaMonths),
+            fromDate = null,
+            toDate = null,
+            revision = _filter.value.revision + 1
+        )
+    }
+
+    fun applyFilter(v: FilterValues) {
+        _filter.value = _filter.value.copy(
+            fromDate = v.fromDate,
+            toDate = v.toDate,
+            accountId = v.accountId,
+            type = v.type,
+            rootCategoryId = v.rootCategoryId,
+            categoryId = v.categoryId,
+            minAmountCents = v.minAmountCents,
+            maxAmountCents = v.maxAmountCents,
+            noteQuery = v.noteQuery,
+            revision = _filter.value.revision + 1
+        )
+    }
+
+    fun clearFilter() {
+        _filter.value = _filter.value.copy(
+            fromDate = null, toDate = null, accountId = null, type = null,
+            rootCategoryId = null, categoryId = null,
+            minAmountCents = null, maxAmountCents = null, noteQuery = null,
+            revision = _filter.value.revision + 1
+        )
+    }
+
+    /** 写操作成功后由外部调用，递增 revision 触发 flatMapLatest 重建 Pager。 */
+    fun bumpRevision() {
+        _filter.value = _filter.value.bumped()
+    }
+
+    suspend fun delete(id: Long) {
+        repository.deleteRecord(id)
+        bumpRevision()
+    }
+}

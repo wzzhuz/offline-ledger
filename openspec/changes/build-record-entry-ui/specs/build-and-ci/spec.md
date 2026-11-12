@@ -5,7 +5,7 @@
 ### Requirement: 阶段 2 依赖锁定且零网络面
 
 `app/build.gradle.kts` SHALL 显式声明
-`androidx.compose.material:material-icons-extended`（由 Compose BOM 管理）、
+`androidx.compose.material:material-icons-core`（由 Compose BOM 管理，实际使用的图标均在 frozen core set 内）、
 `navigation-compose:2.9.0`、`lifecycle-viewmodel-compose:2.9.1`、
 `paging-common:3.3.6` 与 `paging-compose:3.3.6`。
 系统 MUST NOT 引入 `room-paging`、`hilt-navigation-compose`、
@@ -15,7 +15,7 @@ Vico / Coil / Glide 或任何含网络行为的依赖。
 
 - **GIVEN** Compose BOM 2026.06 不再通过 `material3` 传递图标 artifact
 - **WHEN** `assembleDebug` 编译
-- **THEN** 因已显式声明 `material-icons-extended` 而通过
+- **THEN** 因已显式声明 `material-icons-core` 而通过
 - **AND** 依赖树中不含任何网络上报 SDK
 
 **理由**：阶段 2 首次使用图标，漏声明会直接编译失败；
