@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    API >= 31 的备份 / 转移规则。
+    cloud-backup 与 device-transfer 两个 section 都要排除数据库：
+    allowBackup=false 不会阻止设备间直接转移（device-transfer）。
+    只写 exclude、不写 include —— 见踩坑清单 2.3。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="offline_ledger.db" />
+        <exclude domain="database" path="offline_ledger.db-wal" />
+        <exclude domain="database" path="offline_ledger.db-shm" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="offline_ledger.db" />
+        <exclude domain="database" path="offline_ledger.db-wal" />
+        <exclude domain="database" path="offline_ledger.db-shm" />
+    </device-transfer>
+</data-extraction-rules>
