@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.zwz.offlineledger.engine.CategoryTreeTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-12T11:38:17.517Z" hostname="runnervmwuk1x" time="0.004">
+  <properties/>
+  <testcase name="root id resolution for level 0 and level 1" classname="com.zwz.offlineledger.engine.CategoryTreeTest" time="0.001"/>
+  <testcase name="level 1 sum equals level 0 sum equals total" classname="com.zwz.offlineledger.engine.CategoryTreeTest" time="0.001"/>
+  <testcase name="validate accepts well formed two level tree" classname="com.zwz.offlineledger.engine.CategoryTreeTest" time="0.0"/>
+  <testcase name="validate rejects type mismatch" classname="com.zwz.offlineledger.engine.CategoryTreeTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
