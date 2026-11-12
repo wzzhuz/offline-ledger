@@ -276,5 +276,6 @@ KSP 生成代码可能失败。
 - [x] 生成物中无 token 明文
 - [x] Actions 确实触发（28 次 push run，concurrency 取消前 27 次）
 - [x] 单元测试 / assembleDebug / assembleRelease(lintVital) 三步 success
-- [ ] 修复签名诊断步骤后重跑，job 结论为 success
+- [x] 修复后重跑：run 43184217199（commit de689582b6）**job 结论 success**，
+  静态检查 / keystore 校验 / 单测 / debug APK / release(lintVital) / 签名诊断 / 制品上传 全部 success
 - [ ] 推送后用远端 API 逐个校验文件与 sha

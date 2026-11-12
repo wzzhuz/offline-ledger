@@ -58,14 +58,14 @@
 - [x] 7.5 本地运行三个检查脚本并全部通过
 - [x] 7.6 查 Actions 列表：28 次 push run，concurrency 取消前 27 次，最终 run 43181928985
 - [x] 7.7 首轮结果：单测 / debug APK / release(lintVital) 全 success，但「输出签名信息」因 `grep -q && echo` 在 `set -e` 下返回 1 而判失败；已改用 apksigner + if 结构修复，待重跑
-- [ ] 7.8 用**单次 commit** 推送修复（逐文件 PUT 会触发 28 次 CI，已实测）
+- [x] 7.8 用**单次 commit**（de689582b6）推送修复；重跑 run 43184217199 结论 **success**
 
 ## 8. 同步与收尾
 
 - [x] 8.1 更新 `README.md` 的状态、目录结构、本地构建说明
-- [ ] 8.2 推完用远端 API 逐文件比对 sha
-- [ ] 8.3 清理本地凭据文件
+- [x] 8.2 每次推送后均用远端 Git Trees API 逐文件比对 blob sha，结果 PASS
+- [x] 8.3 清理本地凭据文件
 - [ ] 8.4 使用者确认后归档本 change（合并 delta 到 `openspec/specs/`）
 
-> 7.8 / 8.2 / 8.3 / 8.4 依赖远端 CI，写作时未完成，
-> 不预先打勾。归档需使用者明确指令，本轮不擅自归档。
+> 仅 8.4（归档）未完成：需使用者明确指令，本轮不擅自归档。
+> 归档时须把 delta 合并进 `openspec/specs/`，并把 change 移入 `archive/`。
