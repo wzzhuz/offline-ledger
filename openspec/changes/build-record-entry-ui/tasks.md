@@ -67,7 +67,8 @@
 - [x] 7.5 单次 commit 推送后用 GitHub API 查 Actions 列表，确认**确实触发**
 - [x] 7.6 首轮 4 个编译错误 + 次轮 1 个测试期望值错误，已按回退顺序修复
   （详见 `design.md`「首轮 CI 实测」）
-- [ ] 7.7 重跑后确认 job 结论为 success
+- [x] 7.7 重跑 run 43218438836 结论 **success**（commit fa7d33e6ff），
+  debug / release(lintVital) / 单测 / 五个静态检查全绿
 
 ## 8. 同步与收尾
 
@@ -76,5 +77,6 @@
 - [x] 8.3 清理本地凭据文件
 - [ ] 8.4 使用者确认后归档本 change（合并 delta 到 `openspec/specs/`）
 
-> 仅 7.7（最终 CI 结论）与 8.4（归档）未完成，不预先打勾。
+> 仅 8.4（归档）未完成：需使用者明确指令，本轮不擅自归档。
+> 归档时须把 6 份 delta 合并进 `openspec/specs/`，并把 change 移入 `archive/`。
 > 归档需使用者明确指令，本轮不擅自归档。

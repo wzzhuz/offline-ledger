@@ -270,6 +270,10 @@ GITHUB_TOKEN 产生的 commit 不触发新 workflow，没有形成循环；
 - [x] 阶段 1 已按规范归档，delta 合并进 specs，无进行中 change 冲突
 - [x] Delta 每个 Requirement 至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
 - [x] Kotlin 编译门禁全绿（新依赖全部解析通过）
-- [ ] 修正测试期望值后重跑，job 结论为 success
+- [x] 修正测试期望值后重跑：run 43218438836（commit fa7d33e6ff）**job 结论 success**，
+  五个静态检查 / keystore 校验 / 单测 / debug APK / release(lintVital) / 签名诊断 / 制品上传 全部 success
+- [x] 推送后用远端 Git Trees API 逐文件比对 blob sha，PASS
+- [x] 产物 offline-ledger-debug-apk 22,481,423 bytes（阶段 1 为 21,636,979 bytes，
+  增量主要来自 Paging / Navigation / 图标资源）
 - [ ] 推送后用远端 Git Trees API 逐文件比对 sha
 - [ ] 使用者确认后归档本 change
