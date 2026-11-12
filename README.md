@@ -62,7 +62,8 @@ SQLCipher `4.5.6@aar`、kotlinx-serialization-json `1.9.0`。
 **测试边界（如实说明）**：沙盒无 Android SDK / 模拟器，SQLCipher 的 native 库在 JVM 下
 无法加载。因此纯 JVM 单测覆盖的是 `LedgerEngine` 这一唯一余额算法、分类合计、
 统计口径与备份往返；**真实 SQLite 事务与加密库运行要等阶段 2 起真机验证**。
-事务包裹与聚合 SQL 由两个静态检查脚本兜底。详见
+事务包裹与聚合 SQL 由两个静态检查脚本兜底。首次 CI 编译门禁全绿，
+单测曾因测试自身写错净资产常数而失败，已修正（见 change 的 design.md）。详见
 `openspec/changes/implement-room-ledger-core/design.md` 第 8 节。
 
 ---

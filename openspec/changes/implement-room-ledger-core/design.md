@@ -247,6 +247,26 @@ Repository 的 SQL 聚合是它的声明式等价实现，由编译与静态检�
 
 ## 风险
 
+**首轮 CI 实测（重要，先记录再谈结果）**：
+
+| 项 | 内容 |
+|---|---|
+| **症状** | 静态检查 5 项全 success、Kotlin 编译全 success（Room KSP / Hilt / SQLCipher 接入均通过），但 `testDebugUnitTest` 判失败，后续 APK 步骤全部 skipped |
+| **根因** | **不是算法错误，是测试期望值写错**：`LedgerEngineTest.01` 里净资产写成 147000，实际应为 247000（100000 + 200000 − 50000 − 3000）。JUnit XML 明确给出 `expected:<147000> but was:<247000>` |
+| **解法** | 把期望值改为 247000；同步改回 `_stage1_code.py` 源脚本，避免下次重跑覆盖修复 |
+| **防范** | 净资产断言以后一律用 `LedgerEngine.netWorth(accounts, computeBalances(accounts, emptyList()))` 作基线，不手写常数；这也正是 `money-precision` spec「绝不用总资产 − 总负债」想防的那类心算错误 |
+
+**诊断手段**：沙盒读 Actions job logs 与 check-runs annotations 都返回 403
+（网络策略，见 `踩坑清单.md` 5.2）。按 2.5 的变通方案，在 workflow 里临时加了
+「失败时把 `/tmp/unit.log` 与 JUnit XML commit 回 `diag/`」的步骤，
+从 Contents API 读到 XML 才定位到具体断言。
+**GITHUB_TOKEN 产生的 commit 不会触发新 workflow，不会形成循环**；诊断步骤用完已移除，
+`diag/` 由单次 commit 推送删除。
+
+**这条也修正了第 8 节的一处乐观假设**：编译全绿不等于单测全绿。
+阶段 1 首次运行恰恰是「最难查的静默数字错误」被纯 JVM 单测拦下来——
+虽然这次错的是测试自己写的常数，不是 `LedgerEngine`。
+
 **残余风险 1**：SQLCipher 4.5.6 与 Room 2.8.4 的 `androidx.sqlite` 版本不兼容。
 **缓解**：第 8 节回退顺序；每次只改一处单独推送；推完查 Actions 列表确认确实跑了。
 
@@ -269,5 +289,6 @@ Repository 的 SQL 聚合是它的声明式等价实现，由编译与静态检�
 - [x] 阶段 0 归档三步已完成（合并 delta / 移入 archive / 校验 8 模块）
 - [x] 每个 Requirement 至少一个 GIVEN/WHEN/THEN 场景 + 「理由」
 - [x] 归档后 specs 共 8 个模块，build-and-ci 已落地
-- [ ] CI 全绿（写作时未完成）
+- [x] 编译门禁全绿（Room KSP / Hilt / SQLCipher 接入均通过）
+- [ ] 修正测试期望值后重跑，job 结论为 success
 - [ ] 推送后用远端 API 逐文件比对 sha

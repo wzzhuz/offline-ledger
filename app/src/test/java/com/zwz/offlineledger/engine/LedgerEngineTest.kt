@@ -28,7 +28,7 @@ class LedgerEngineTest {
     fun `01 insert expense decreases balance`() {
         val b = LedgerEngine.computeBalances(accounts, listOf(expense(3_000, 1)))
         assertEquals(97_000L, b[1])
-        assertEquals(147_000L, LedgerEngine.netWorth(accounts, b))
+        assertEquals(247_000L, LedgerEngine.netWorth(accounts, b))
     }
 
     @Test

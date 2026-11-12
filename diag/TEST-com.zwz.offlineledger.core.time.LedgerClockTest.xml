@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.zwz.offlineledger.core.time.LedgerClockTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-12T11:38:17.468Z" hostname="runnervmwuk1x" time="0.011">
-  <properties/>
-  <testcase name="utc month end stays in previous local month" classname="com.zwz.offlineledger.core.time.LedgerClockTest" time="0.01"/>
-  <testcase name="hong kong midnight belongs to local new year" classname="com.zwz.offlineledger.core.time.LedgerClockTest" time="0.0"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
