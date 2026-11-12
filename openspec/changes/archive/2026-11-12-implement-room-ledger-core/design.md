@@ -284,6 +284,64 @@ Repository 的 SQL 聚合是它的声明式等价实现，由编译与静态检�
 **缓解**：导出函数注释醒目提示；阶段 5 加密导出前不提供 SAF UI 入口，
 阶段 1 的导出仅供开发期自测。
 
+## 归档校验发现并修正的规格腐烂
+
+归档时逐模块比对 specs 与阶段 1 实现，发现初始 spec 的
+「全局唯一统计口径」仍写着：
+
+```
+isStatRelevant = type IN (EXPENSE, INCOME) AND isDeleted = 0 AND excludeFromStats = 0
+```
+
+而阶段 1 已改为 **trash 表**（主表无 `isDeleted` 字段），
+校准也改为独立 `balance_adjustments` 表（不再是 records 的一种 type）。
+若只把阶段 1 的新 Requirement 追加进去，specs 会同时存在两条互相矛盾的要求，
+下一阶段实现者不知道该信哪条。
+
+**修正方式**：在本 change 的 `specs/ledger-transactions/spec.md` 增加
+`## MODIFIED Requirements`，写出修改后的**完整要求文本**，
+归档时按标题替换原有 Requirement 而非追加。
+并新增一条归档校验：specs 中不得残留 `isDeleted = 0` 或 `BALANCE_ADJUST`。
+
+这正是 AGENTS.md「改完代码必须同步 spec」与
+「只挪目录不合并是最常见的流程失误」之外的第三类失误：
+**ADDED 了新要求，却忘了 MODIFIED 被它推翻的旧要求**。
+
+### 附带发现：静态检查第三次把自己判失败
+
+归档校验最初写成「specs 中不得出现字符串 `isDeleted = 0`」，
+结果立刻报错——因为修正后的新 spec 里本来就有
+「MUST NOT 含 `isDeleted` 字段」「无需任何 `WHERE isDeleted = 0` 条件」
+这类**禁止性表述**，它们是正确的说明文字，不是旧口径残留。
+
+同类坑在本仓库已是第三次：
+
+| 次序 | 脚本 | 误报来源 |
+|---|---|---|
+| 1 | `check_manifest_privacy.py` | Manifest 注释里写着「不声明 INTERNET」被当成声明了 INTERNET |
+| 2 | `check_transaction_annotations.py` | `Migrations.kt` 注释里写着「禁止 fallbackToDestructiveMigration」 |
+| 3 | 本次归档校验（第 1 稿） | spec 里写着「无需 `isDeleted = 0`」被当成仍在用旧口径 |
+| 4 | 本次归档校验（第 2 稿） | 理由段写着「`BALANCE_ADJUST` 也不再是 records 的一种 type」又被当成残留 |
+
+第 3、4 次发生在同一个脚本的连续两稿，改掉一个宽泛子串又踩另一个，
+正好说明这个坑有多顽固。
+
+**最终解法**：归档校验改为只匹配**旧要求的精确原文**
+（`type IN (EXPENSE, INCOME) AND isDeleted = 0` 与
+`` `TRANSFER` 与 `BALANCE_ADJUST` MUST NOT 计入收支统计``），
+并用「无重复 Requirement 标题」作为漏 MODIFIED 的兜底防线
+——漏了 MODIFIED 就会有两条同名要求。
+既不误伤说明文字，也不放过真正的规格腐烂。
+
+**抽象出的规则**：静态检查 MUST 区分「禁止性表述」与「实际使用」；
+优先匹配精确的定义式原文，MUST NOT 用宽泛子串搜索。
+建议下次整理 `my-app-workflow/踩坑清单.md` 时上提，本轮不改那个仓库。
+
+**流程副作用**：校验脚本半途抛异常时，前面的「合并 delta」「移入 archive」
+已经落盘，本地与远端不一致。本次用 `_sync_local_from_remote.py` 把本地
+**重建为远端基线**后重跑完整脚本，而不是在半完成状态上续跑
+（续跑会把 ADDED 再追加一遍，导致 Requirement 重复）。
+
 ## 验证
 
 - [x] 阶段 0 归档三步已完成（合并 delta / 移入 archive / 校验 8 模块）

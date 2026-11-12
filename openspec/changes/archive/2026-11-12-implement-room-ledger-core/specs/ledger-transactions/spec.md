@@ -96,3 +96,28 @@ MUST NOT 依赖 `RoomDatabase.Callback.onCreate` 重跑。
 - **AND** 既有流水与余额不受影响
 
 **理由**：破坏性迁移会丢真实账本数据；`onCreate` 的 seed 只对全新库生效。
+
+## MODIFIED Requirements
+
+### Requirement: 全局唯一统计口径
+
+系统 SHALL 定义唯一统计口径 `isStatRelevant = type IN ('EXPENSE', 'INCOME') AND excludeFromStats = 0`，报表、导出、明细概览 MUST 共用该出口（实现为 `StatRules.SQL_STAT_RELEVANT`）。删除流水 SHALL 通过移入 `trash` 表生效，主表 MUST NOT 含 `isDeleted` 字段，因此口径 MUST NOT 包含 `isDeleted = 0`。`TRANSFER` 因 `type` 不符被排除；余额校准记录存放于独立的 `balance_adjustments` 表，根本不在 `records` 中，天然不计入收支统计。
+
+#### Scenario: 年报不混入转账、校准与已删除流水
+
+- **GIVEN** 账本含 1 笔转账、1 笔余额校准、1 笔不计入收支的垫付，另有 1 笔已移入 trash 的支出
+- **WHEN** 生成年度报表
+- **THEN** 四者均不出现在收入 / 支出 / 分类占比中
+- **AND** 明细页与导出结果口径一致
+
+#### Scenario: 主表无软删除列
+
+- **GIVEN** 查看 `records` 表结构
+- **WHEN** 检查字段列表
+- **THEN** 不含 `isDeleted`
+- **AND** 任何聚合查询都不需要 `WHERE isDeleted = 0`
+
+**理由**：阶段 1 把软删除改为 trash 表后，旧的 `isDeleted = 0` 口径已无处可指；
+同时校准改为独立表，`BALANCE_ADJUST` 也不再是 records 的一种 type。
+若只追加新 Requirement 而不 MODIFIED 这一条，specs 会出现两条互相矛盾的要求，
+正是 AGENTS.md「改完代码必须同步 spec」要防的规格腐烂。

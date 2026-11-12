@@ -3,7 +3,8 @@
 **纯本地、零网络权限、无广告的个人 Android 记账应用。** 知道自己的资产与支出构成，
 数据不托管给任何第三方，也不依赖长期开机的服务器或 NAS。
 
-> 状态：**阶段 0 已完成并归档；阶段 1 数据层已完成，CI 全绿（run 43211076566）**。
+> 状态：**阶段 0 / 阶段 1 均已完成并归档，CI 全绿（run 43211076566）**；
+> 阶段 2 处于对齐门禁，待确认后开工。
 > 目前只有占位页，没有记账 UI；Room 数据层与加密库已落地。
 > 本仓库遵循 OpenSpec 规范驱动开发，规格是唯一真理源。
 
@@ -136,9 +137,10 @@ offline-ledger/
 
 ## 当前进行中的改动
 
-`openspec/changes/implement-room-ledger-core/`（阶段 1，待归档）。
-阶段 0 已按规范归档：delta 合并进 `specs/`、change 移入
-`archive/2026-11-12-scaffold-android-project/`、逐模块校验通过。
+**无**。阶段 0 与阶段 1 均已按规范归档（delta 合并进 `specs/`、change 移入
+`archive/`、逐模块校验通过）。归档阶段 1 时发现并修正了初始 spec 中
+残留的 `isDeleted = 0` 旧口径（见 `2026-11-12-implement-room-ledger-core/specs/`
+的 MODIFIED 条目）。阶段 2 正在对齐门禁，确认后建 change。
 
 ---
 
