@@ -21,6 +21,9 @@ class BackupAnchorTest {
                     lastReconciledBalanceCents = 99_999L
                 )
             ),
+            categories = emptyList(),
+            records = emptyList(),
+            balanceAdjustments = emptyList(),
             exportedAtEpochMilli = at
         )
         val json = BackupExporter.encode(snapshot)

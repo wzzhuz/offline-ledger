@@ -64,7 +64,9 @@
 - [x] 7.2 备份锚点往返单测
 - [x] 7.3 本地五个检查脚本全部 PASS（含扩展后的事务清单）
 - [x] 7.4 单次 commit 推送后用 GitHub API 查 Actions 列表，确认**确实触发**
-- [ ] 7.5 轮询 Actions；失败按 `design.md` 第 7 节回退顺序单次修复后重推
+- [x] 7.5 首轮主源码零编译错误；仅 `BackupAnchorTest` 漏传 3 个必填参数，已修
+  （详见 `design.md`「首轮 CI 实测」）
+- [ ] 7.5b 重跑后确认 job 结论为 success
 - [ ] 7.6 确认 job 结论为 success、制品产出
 
 ## 8. 同步与收尾

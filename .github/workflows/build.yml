@@ -60,37 +60,8 @@ jobs:
 
       # assembleDebug 只编译主源码，不碰 src/test。
       # 必须单独跑一次 test，否则测试文件写错了也照样「编译通过」。
-      # 临时诊断：沙盒读 Actions job logs 被网络策略 403（踩坑清单 5.2），
-      # 失败时把日志与 JUnit XML commit 回 diag/，再从 Contents API 读取。
-      # GITHUB_TOKEN 产生的 commit 不会触发新 workflow，不会形成循环。
       - name: 运行单元测试
-        id: unit_test
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/unit.log
-
-      - name: 回传单测日志（临时诊断）
-        if: steps.unit_test.outcome == 'failure'
-        continue-on-error: true
-        run: |
-          mkdir -p diag
-          tail -n 1200 /tmp/unit.log > diag/unit-test.log
-          cp app/build/test-results/testDebugUnitTest/*.xml diag/ 2>/dev/null || true
-          git config user.name "ci-bot"
-          git config user.email "ci-bot@users.noreply.github.com"
-          git add -f diag/
-          if git diff --cached --quiet; then
-            echo "日志无变化，跳过提交"
-          else
-            git commit -q -m "ci: 回传单测日志（临时）" && git push -q origin "HEAD:${{ github.ref_name }}"
-          fi
-
-      - name: 判定单测结果
-        if: steps.unit_test.outcome == 'failure'
-        run: |
-          echo "单元测试失败，日志已回传至 diag/unit-test.log"
-          exit 1
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: 编译 Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon

@@ -241,6 +241,33 @@ MODIFIED 后的「阶段边界明确」不再绑定阶段版本号，改为定�
   两条规格债在写作阶段就用 MODIFIED 修掉；
   差额 1 分钱一键抹平、几十块能反查这两条最真实的诉求都落地
 
+## 首轮 CI 实测（如实记录）
+
+**第 1 轮（commit `78a197a70a`）**：五个静态检查全 success，
+`compileDebugKotlin` **一次通过**——零新增依赖、零表结构变更、
+`reviewRows` 的 `CASE` 位掩码 SQL 与可选参数短路都被 Room 2.8.4 接受，
+第 7 节预留的 SQL 回退分支没有用上。
+
+失败挂在 **测试代码自己漏传参数**：`BackupAnchorTest` 构造 `LedgerSnapshot`
+时只写了 `accounts` 与 `exportedAtEpochMilli`，而 `LedgerSnapshot` 的前四个
+字段（`accounts` / `categories` / `records` / `balanceAdjustments`）**没有默认值**。
+`compileDebugUnitTestKotlin` 报
+`No value passed for parameter 'categories' / 'records' / 'balanceAdjustments'`。
+
+**这与阶段 1（净资产常数写错）、阶段 2（筛选维度数写成 8）是同一类错误**：
+构造或断言时凭印象写，没核对目标类型的实际定义。
+往后写测试 SHOULD 先读一次被构造 data class 的字段清单，
+并把「补 `emptyList()`」这种样板写全。
+
+**诊断手段**：job logs 依旧 403（网络策略），沿用阶段 2 的变通方案，
+临时在 workflow 里把日志与 JUnit XML commit 回 `diag/`，从 Contents API 读到
+`e: ` 行才定位到具体文件。GITHUB_TOKEN 的 commit 不触发新 workflow，无循环；
+诊断步骤用完已移除，`diag/` 由单次 commit 推送删除。
+
+**值得记下的好消息**：本阶段**主源码零编译错误**。
+阶段 2 首轮有 4 个 import / 嵌套类引用错误，阶段 3 一个都没有，
+说明「先读现有 API 再写代码」与「零新增依赖」确实把风险压下来了。
+
 ## 风险
 
 **残余风险 1**：Room 2.8.4 对 `CASE` 求和列 / 可选参数短路 SQL 的绑定不接受。
@@ -269,6 +296,7 @@ MODIFIED 后的「阶段边界明确」不再绑定阶段版本号，改为定�
 - [x] 阶段 2 已按规范归档，无进行中 change 冲突
 - [x] 两条规格债用 MODIFIED 写出完整替换文本，标题与原 Requirement 一致
 - [x] Delta 每个 Requirement 至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
-- [ ] CI 全绿（写作时未完成）
+- [x] 首轮 CI：`compileDebugKotlin` 一次通过，仅测试代码漏传 3 个必填参数（已修）
+- [ ] 修正后重跑，job 结论为 success
 - [ ] 推送后用远端 Git Trees API 逐文件比对 sha
 - [ ] 使用者确认后归档本 change
