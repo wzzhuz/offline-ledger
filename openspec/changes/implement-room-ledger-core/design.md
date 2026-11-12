@@ -290,5 +290,8 @@ Repository 的 SQL 聚合是它的声明式等价实现，由编译与静态检�
 - [x] 每个 Requirement 至少一个 GIVEN/WHEN/THEN 场景 + 「理由」
 - [x] 归档后 specs 共 8 个模块，build-and-ci 已落地
 - [x] 编译门禁全绿（Room KSP / Hilt / SQLCipher 接入均通过）
-- [ ] 修正测试期望值后重跑，job 结论为 success
+- [x] 修正测试期望值后重跑：run 43211076566（commit 534957790f）**job 结论 success**，
+  五个静态检查 / keystore 校验 / 单测 / debug APK / release(lintVital) / 签名诊断 / 制品上传 全部 success
+- [x] 推送后用远端 Git Trees API 逐文件比对 blob sha，PASS
+- [x] 产物 offline-ledger-debug-apk 21,636,979 bytes
 - [ ] 推送后用远端 API 逐文件比对 sha
