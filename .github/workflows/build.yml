@@ -69,12 +69,36 @@ jobs:
       - name: 编译 Release（触发 lintVital）
         run: gradle assembleRelease --stacktrace --no-daemon
 
-      - name: 输出签名信息
+      # 踩坑：run 默认 bash -e，`grep -q ... && echo` 在 grep 不匹配时
+      # 返回非 0，会让整步失败——明明三个编译门禁都通过了却判红。
+      # 另外 keytool -printcert -jarfile 只认 v1 JAR 签名，
+      # 现代 APK 可能只有 v2/v3 签名而不输出 Owner，所以优先用 apksigner。
+      - name: 输出并核对签名信息
         run: |
-          keytool -printcert -jarfile app/build/outputs/apk/debug/app-debug.apk \
-            | tee /tmp/cert.txt
-          grep -q "OfflineLedger Debug" /tmp/cert.txt \
-            && echo "::warning::使用仓库内 debug 密钥签名，仅供自用"
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          APKSIGNER=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" \
+            -name apksigner -type f 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --print-certs "$APK" 2>&1 | tee /tmp/cert.txt
+          else
+            echo "::notice::未找到 apksigner，退回 keytool"
+            keytool -printcert -jarfile "$APK" 2>&1 | tee /tmp/cert.txt || true
+          fi
+          cat /tmp/cert.txt
+          # 用 if 而非 &&，避免 grep 的返回码影响步骤结论
+          if grep -qi "offlineledger" /tmp/cert.txt; then
+            echo "✅ 证书包含 OfflineLedger，仓库内固定 keystore 生效"
+            echo "::warning::这是随仓库公开的 debug 密钥，仅供个人自用，勿对外分发"
+          else
+            echo "::notice::证书输出未含 OfflineLedger（可能只有 v2/v3 签名）。"
+            echo "::notice::签名一致性由 build.gradle.kts 固定引用 app/debug.keystore 保证。"
+            {
+              echo "### 签名诊断输出"
+              echo '```'
+              cat /tmp/cert.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: 计算校验值
         id: hash

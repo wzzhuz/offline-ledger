@@ -56,8 +56,9 @@
 - [x] 7.3 `scripts/check_manifest_privacy.py`
 - [x] 7.4 `.github/workflows/build.yml`
 - [x] 7.5 本地运行三个检查脚本并全部通过
-- [ ] 7.6 推送后用 GitHub API 查 Actions 列表，确认**确实触发**
-- [ ] 7.7 轮询 Actions 结果；失败则按 `design.md` 的回退顺序单次修复后重推
+- [x] 7.6 查 Actions 列表：28 次 push run，concurrency 取消前 27 次，最终 run 43181928985
+- [x] 7.7 首轮结果：单测 / debug APK / release(lintVital) 全 success，但「输出签名信息」因 `grep -q && echo` 在 `set -e` 下返回 1 而判失败；已改用 apksigner + if 结构修复，待重跑
+- [ ] 7.8 用**单次 commit** 推送修复（逐文件 PUT 会触发 28 次 CI，已实测）
 
 ## 8. 同步与收尾
 
@@ -66,5 +67,5 @@
 - [ ] 8.3 清理本地凭据文件
 - [ ] 8.4 使用者确认后归档本 change（合并 delta 到 `openspec/specs/`）
 
-> 7.6 / 7.7 / 8.2 / 8.3 / 8.4 依赖远端 CI，写作时未完成，
+> 7.8 / 8.2 / 8.3 / 8.4 依赖远端 CI，写作时未完成，
 > 不预先打勾。归档需使用者明确指令，本轮不擅自归档。

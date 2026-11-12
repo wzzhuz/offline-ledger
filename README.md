@@ -54,7 +54,9 @@ SQLCipher `4.5.6@aar`、kotlinx-serialization-json `1.9.0`。
 沙盒环境没有 Android SDK / Gradle / Java 编译器，
 真正的编译验证走 GitHub Actions：`.github/workflows/build.yml`。
 每次 push 到**任意分支**都会跑：三个静态检查 → 单元测试 → debug APK →
-release（`lintVital`）→ 签名校验 → 上传制品。
+release（`lintVital`）→ 签名诊断 → 上传制品。
+首轮实测：三个编译门禁全部通过；诊断步骤曾因 `grep -q && echo` 的返回码
+误判整条流水线，已修复（见 `scaffold-android-project/design.md`）。
 
 三个检查脚本：
 

@@ -247,6 +247,24 @@ KSP 生成代码可能失败。
 **缓解**：已在第 1 节如实写明证据链与限制；CI runner 可正常拉依赖，
 真实验证由 Actions 完成。
 
+**残余风险 5（首轮 CI 实测新增）**：诊断步骤把整条流水线判红。
+
+| 项 | 内容 |
+|---|---|
+| **症状** | 三个真正的编译门禁（单元测试 / `assembleDebug` / `assembleRelease` + lintVital）全部 success，但 job 结论为 failure，失败步骤是「输出签名信息」 |
+| **根因** | 该步骤写成 `grep -q "OfflineLedger Debug" /tmp/cert.txt && echo ...`。Actions 的 `run` 默认 `bash -e`，`grep -q` 不匹配返回 1，`&&` 列表整体返回非 0 → 步骤失败。次因：`keytool -printcert -jarfile` 只认 v1 JAR 签名，现代 APK 可能只有 v2/v3 签名而不输出 Owner |
+| **解法** | 改用 `if grep ...; then ...; else ...; fi`；优先用 `apksigner verify --print-certs`（能读 v2/v3），找不到才退回 keytool 并 `|| true`；证书内容写入日志与 Job Summary |
+| **防范** | 写进 `specs/build-and-ci/spec.md` 的 ADDED Requirement「CI 诊断步骤不得因返回码误判」；`run` 里凡是用 `grep -q` / `test` / `git diff --quiet` 做**提示性判断**时，一律用 `if` 而非 `&&`；硬断言才允许 `|| exit 1` |
+
+> 这是本项目新踩到的坑，与 `my-app-workflow/踩坑清单.md` 2.2.3
+> 「`git commit` 无变化返回非 0，set -e 下明明构建成功却判失败」同源。
+> 本轮不改 `my-app-workflow` 仓库，先记在本 change 的 design 里，
+> 待下次整理规范时再决定是否上提。
+
+**日志接口限制**：沙盒读 Actions job logs 返回 403（网络策略），
+与 `踩坑清单.md` 5.2 一致。因此没有硬猜证书内容，
+而是把诊断输出写进步骤日志与 Job Summary，让修复后的运行自己说话。
+
 **残余风险 5**：debug 密钥随仓库公开（private 仓库内）。
 **缓解**：`build.yml` 打印证书 Owner 提示；出包阶段改用 Secrets 注入正式密钥。
 
@@ -256,5 +274,7 @@ KSP 生成代码可能失败。
 - [x] 版本组合锁定表含依据与回退分支
 - [x] Manifest 与两个备份规则 XML 只写 exclude
 - [x] 生成物中无 token 明文
-- [ ] Actions 确实触发且 debug APK 构建成功（本文件写作时未完成）
+- [x] Actions 确实触发（28 次 push run，concurrency 取消前 27 次）
+- [x] 单元测试 / assembleDebug / assembleRelease(lintVital) 三步 success
+- [ ] 修复签名诊断步骤后重跑，job 结论为 success
 - [ ] 推送后用远端 API 逐个校验文件与 sha

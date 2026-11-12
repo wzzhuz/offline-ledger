@@ -159,3 +159,32 @@ Lint 问题会一直潜伏到出正式包时才炸。已有真实案例。
 
 **理由**：「数据是你的」是第一条铁律，只写在 `project.md` 里没有强制力。
 把铁律变成可执行检查，才能防住半年后的一次「顺手加个权限」。
+
+---
+
+### Requirement: CI 诊断步骤不得因返回码误判构建结果
+
+`build.yml` 中的诊断性步骤（打印证书、计算校验值、输出提示）
+SHALL 使用 `if ...; then ...; else ...; fi` 或显式 `|| true` 处理
+`grep -q` / `test` / `git diff --quiet` 等可能返回非 0 的命令。
+系统 MUST NOT 用 `cmd && echo` 作为步骤的最后一条语句。
+只有真正的硬断言 MAY 用 `|| exit 1` 中断构建。
+
+#### Scenario: 签名证书输出格式与预期不符
+
+- **GIVEN** 三个编译门禁（单测 / debug APK / release lintVital）均已 success
+- **WHEN** 签名诊断步骤里 `grep -q` 未匹配到预期字符串
+- **THEN** 该步骤仍为 success
+- **AND** 诊断内容写入日志或 Job Summary
+- **AND** job 整体结论为 success，不出现「编译全绿但流水线判红」
+
+#### Scenario: 真正的硬断言失败
+
+- **GIVEN** 某个必须成立的条件（如 `app/debug.keystore` 缺失）
+- **WHEN** 校验步骤执行
+- **THEN** 显式 `exit 1` 使 job 失败
+- **AND** 失败原因在日志中可读
+
+**理由**：Actions 的 `run` 默认 `bash -e`，提示性命令的返回码会让整步失败。
+首轮 CI 实测：三个编译门禁全 success，却因 `grep -q ... && echo` 判红，
+差点被误读成「编译没过」。诊断步骤的职责是给信息，不是当质量门禁。
