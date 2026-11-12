@@ -297,6 +297,9 @@ MODIFIED 后的「阶段边界明确」不再绑定阶段版本号，改为定�
 - [x] 两条规格债用 MODIFIED 写出完整替换文本，标题与原 Requirement 一致
 - [x] Delta 每个 Requirement 至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
 - [x] 首轮 CI：`compileDebugKotlin` 一次通过，仅测试代码漏传 3 个必填参数（已修）
-- [ ] 修正后重跑，job 结论为 success
+- [x] 修正后重跑：run 43225681304（commit 1ed284e768）**job 结论 success**，
+  五个静态检查 / keystore 校验 / 单测 / debug APK / release(lintVital) / 签名诊断 / 制品上传 全部 success
+- [x] 推送后用远端 Git Trees API 逐文件比对 blob sha，PASS
+- [x] 产物 offline-ledger-debug-apk 22,618,116 bytes（阶段 2 为 22,481,423 bytes）
 - [ ] 推送后用远端 Git Trees API 逐文件比对 sha
 - [ ] 使用者确认后归档本 change

@@ -66,8 +66,8 @@
 - [x] 7.4 单次 commit 推送后用 GitHub API 查 Actions 列表，确认**确实触发**
 - [x] 7.5 首轮主源码零编译错误；仅 `BackupAnchorTest` 漏传 3 个必填参数，已修
   （详见 `design.md`「首轮 CI 实测」）
-- [ ] 7.5b 重跑后确认 job 结论为 success
-- [ ] 7.6 确认 job 结论为 success、制品产出
+- [x] 7.5b 重跑 run 43225681304 结论 **success**（commit 1ed284e768）
+- [x] 7.6 制品 offline-ledger-debug-apk 22,618,116 bytes
 
 ## 8. 同步与收尾
 
@@ -76,5 +76,7 @@
 - [x] 8.3 token 按使用者说明保留至项目完成，仅清理临时诊断产物
 - [ ] 8.4 使用者确认后归档本 change（2 份 MODIFIED 按标题替换 + ADDED 合并）
 
-> 7.5 / 7.6（CI 轮询与结论）与 8.4（归档）未完成，不预先打勾。
+> 仅 8.4（归档）未完成：需使用者明确指令，本轮不擅自归档。
+> 归档时须把 14 条 ADDED 与 2 份 MODIFIED 合并进 `openspec/specs/`，
+> MODIFIED 按标题替换而非追加，再把 change 移入 `archive/`。
 > 归档需使用者明确指令，本轮不擅自归档。
