@@ -41,6 +41,6 @@ class RecordFilterTest {
             minAmountCents = 100L, maxAmountCents = 9999L,
             noteQuery = "午饭"
         )
-        assertEquals(8, f.activeCount())
+        assertEquals(7, f.activeCount())
     }
 }

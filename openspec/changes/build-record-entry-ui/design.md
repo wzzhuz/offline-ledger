@@ -210,6 +210,38 @@ ViewModel 载入原流水后填入；保存走 `updateRecord`（阶段 1 事务�
 - **换取**：不新增网络面依赖、不改表结构、不改备份格式；
   分页与筛选只落在一条 SQL 上；低摩擦路径没有被多级分类拉长
 
+## 首轮 CI 实测（两轮，如实记录）
+
+**第 1 轮（commit `a088868aff`）**：静态检查全 success，`compileDebugKotlin` 失败，
+4 个错误全是「引用位置写错」，不是设计问题：
+
+| 症状 | 根因 | 解法 |
+|---|---|---|
+| `MainActivity.kt` Unresolved `fillMaxSize` | 补了 `Modifier` 导入但漏了 `androidx.compose.foundation.layout.fillMaxSize` | 补导入 |
+| `RecordPagingSource.kt` Unresolved `LoadParams` / `LoadResult` | 这两个是 **`PagingSource` 的嵌套类**，不在 `androidx.paging` 顶层包 | 改用 `PagingSource.LoadParams` / `PagingSource.LoadResult` |
+| `LedgerDi.kt` Unresolved `EntryPointAccessors` | 正确包名是 `dagger.hilt.android.EntryPointAccessors`，不是 `dagger.hilt.*` | 改 import |
+
+**第 2 轮（commit `ad3bd87359`）**：Kotlin 编译全绿、Room KSP / Hilt / Paging /
+Navigation / 图标 artifact 全部解析通过，挂在**一个测试自己写错的期望值**：
+`RecordFilterTest` 里 `activeCount()` 实际设置了 7 个维度，断言却写 8。
+JUnit XML 给出 `expected:<8> but was:<7>`，改成 7 即可。
+
+**这与阶段 1 是同一类错误**：心算了一个常数却没数清楚。
+往后这类计数断言 SHOULD 用「构造条件时显式列出维度」或直接比对集合大小，
+不手写常数。
+
+**诊断手段**：沙盒读 Actions job logs 与 check-runs 都是 403（网络策略），
+按踩坑清单 2.5 的变通方案，临时在 workflow 里加了「失败时把日志与
+JUnit XML commit 回 `diag/`」的步骤，从 Contents API 读到 XML 才定位到具体断言。
+GITHUB_TOKEN 产生的 commit 不触发新 workflow，没有形成循环；
+诊断步骤用完已移除，`diag/` 由单次 commit 推送删除。
+
+**新依赖实测结论**：`material-icons-core`（BOM 管理）、`navigation-compose:2.9.0`、
+`lifecycle-viewmodel-compose:2.9.1`、`paging-common/compose:3.3.6`
+与既有 AGP 8.13.0 / Kotlin 2.3.21 / Compose BOM 2026.06.00 / Hilt 2.57.1
+**一次通过**，design.md 第 7 节预留的版本回退分支没有用上。
+`@EntryPoint` + 标准 `ViewModelProvider.Factory` 也未引入额外冲突。
+
 ## 风险
 
 **残余风险 1**：Compose BOM 2026.06.00 与 `paging-compose:3.3.6`、
@@ -237,6 +269,7 @@ ViewModel 载入原流水后填入；保存走 `updateRecord`（阶段 1 事务�
 - [x] 阶段 0 五项对齐结论齐全、分级判定已告知并等确认
 - [x] 阶段 1 已按规范归档，delta 合并进 specs，无进行中 change 冲突
 - [x] Delta 每个 Requirement 至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
-- [ ] CI 全绿（写作时未完成）
+- [x] Kotlin 编译门禁全绿（新依赖全部解析通过）
+- [ ] 修正测试期望值后重跑，job 结论为 success
 - [ ] 推送后用远端 Git Trees API 逐文件比对 sha
 - [ ] 使用者确认后归档本 change
