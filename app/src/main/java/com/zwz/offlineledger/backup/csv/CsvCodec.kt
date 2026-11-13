@@ -80,6 +80,7 @@ object CsvCodec {
             } catch (e: IllegalArgumentException) {
                 lineErrors += "金额格式非法"
                 null
+            }
             if (cents != null && cents <= 0L) lineErrors += "金额必须大于 0"
             if (account.isBlank()) lineErrors += "账户名为空"
             if (root.isBlank()) lineErrors += "一级分类为空"
