@@ -307,6 +307,45 @@ Gzip 解压失败三者都归到同一句「口令错误或备份文件已损坏
 **⑦ 纯 JVM 单测里 `expectFailure` 用 JUnit `fail()` + `catch IllegalArgumentException`**，
 不依赖 `kotlin-test` 或 `assertThrows` 的版本差异。
 
+## 首轮 CI 实测：挂在自己写的测试口令长度，修一次全绿
+
+| commit | run | 结论 |
+|---|---|---|
+| `2cfa122856`（提案文档） | — | 被后续 concurrency 取消，属正常 |
+| `9e775c0e04`（阶段 5 实现） | `43363414260` | **failure**：五个静态检查 / keystore / Gradle 配置全 success，**挂在「运行单元测试」**，debug 与 release 步骤被 skip |
+| `7483e9e6f6`（修复） | `43364038705` | **success**：五个静态检查、keystore 校验、单元测试、`assembleDebug`、`assembleRelease`（lintVital）、签名诊断、制品上传全部 success，产出 `offline-ledger-debug-apk` **23,479,144 bytes** |
+
+**根因不是加密实现**：`SecureBackupCodec` 要求口令至少 6 位（按 `CharArray.size`），
+而 `chinese text survives the round trip` 用了 `"口令密码"` —— **4 个中文字符**。
+`require` 正确拒绝，是测试自己写错了常量。改成 7 字符的 `"中文口令123"` 后全绿。
+主源码、Compose / Room / BiometricPrompt / SAF / FragmentActivity **零编译错误**，
+`design.md` 第 9 节预留的 8 条回退顺序一条都没用上。
+
+**这是本仓库第 5 次「凭印象手写常数」类错误**：
+
+| 阶段 | 错误 |
+|---|---|
+| 1 | 净资产期望值写成 147000（应 247000） |
+| 2 | 筛选维度设 7 个却断言 8 |
+| 3 | 构造 `LedgerSnapshot` 漏传 3 个必填字段 |
+| 4 | 归档文档手写「168 个 Scenario」（实际 166）；**代码首轮全绿** |
+| **5** | **中文口令 4 字符 < 最小 6 位** |
+
+共同模式：**约束写在代码里，测试却凭语感构造输入**。
+往后凡是「长度 / 个数 / 金额」类测试输入，先回读一次被测函数的 `require` 再写值。
+这条已写进本 change 的 `design.md`，建议上提 `my-app-workflow/踩坑清单.md`。
+
+**版本查证被 CI 证实**：`androidx.biometric:biometric:1.1.0` 与
+AGP 8.13.0 / Kotlin 2.3.21 / Compose BOM 2026.06.00 / activity-compose 1.11.0
+零冲突；`FragmentActivity` + `@AndroidEntryPoint` + `setContent` 组合可用；
+`PromptInfo.Builder.setAllowedAuthenticators` 与 `CreateDocument(String)` 契约
+签名均与查证一致。制品体积从阶段 4 的 22,712,565 增至 23,479,144 bytes
+（+766,579，主要是 biometric 及其传递的 fragment AAR）。
+
+**注意**：这不等于真机验证。5 万条切月 / 年报聚合耗时、滚动掉帧、
+SQLCipher 真机打开数据库、BiometricPrompt 真机弹窗、SAF 真机文件选择器
+仍未实测，见第 9 节测试边界。
+
 ## 风险
 
 **残余风险 1**：`androidx.biometric:1.1.0` 传递的 fragment / activity 版本
@@ -335,6 +374,9 @@ Gzip 解压失败三者都归到同一句「口令错误或备份文件已损坏
 - [x] 使用者确认「按推荐来」：CSV 不做 / BiometricPrompt+PIN / SharedPreferences
 - [x] 4 份 MODIFIED 写出完整替换文本，标题与原 Requirement 一致
 - [x] Delta 每个 Requirement 至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
-- [ ] CI 全绿（写作时未完成）
+- [x] CI 全绿：run 43364038705（commit 7483e9e6f6）**修复后 success**，
+  五个静态检查 / keystore 校验 / 单测 / debug APK / release(lintVital) / 签名诊断 / 制品上传 全部 success
+- [x] 推送后用远端 Git Trees API 逐文件比对 blob sha，PASS
+- [x] 产物 offline-ledger-debug-apk 23,479,144 bytes
 - [ ] 推送后用远端 Git Trees API 逐文件比对 blob sha
 - [ ] 使用者确认后归档本 change
