@@ -332,6 +332,46 @@ val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 Room KSP 处理 `version = 3` 与两张表/两列变更、
 30 个写方法、Compose 的 Budget/Detail/Stats 改动其余都编译通过了。
 
+## 最终验证（阶段 6b 收口）
+
+| 验证 | run | 结论 |
+|---|---|---|
+| change 文档推送（六个静态检查 + 编译） | `43395589278` | **success** |
+| 6b 实现首推 | `43396819705` | **failure**（`compileDebugKotlin`，唯一错误见「首轮 CI 实测」） |
+| 诊断回传（临时 commit 日志） | `43397590164` | failure + 拿到精确错误；步骤与 `diag/` 已移除 |
+| 修复后 push CI | `43398516500` | **success**，13 步全绿 |
+| R8 release（`minify=on`，不打 tag / 不传坚果云） | `43399249709` | **success**，24 步全绿 |
+
+- `offline-ledger-debug-apk` **23,655,181 B**；
+  release 三个 artifact：R8 APK（zip 12,016,706 B）、
+  `mapping.txt` 3,146,779 B、metrics 226 B。
+  **artifact 大小是压缩后 zip，不是 APK 实际体积**。
+- release 的 plain / AAB / 创建 Release / 坚果云四步按本次 input 正常 skipped，
+  不是失败；GitHub Release 数量为 0。
+- 六个静态检查全程 PASS：30 个写方法在事务内、两段 Migration 显式、
+  SQL 契约完整、3 条新 SETTLEMENT 查询带唯一口径、无 `INTERNET`。
+- 新增枚举值的 **5 处穷尽 `when`** 逐点补齐（`LedgerUiParts` 两个、
+  `RecordEditorViewModel.save`、`TemplateManagerDialog` 的 entries 过滤与
+  `typeLabel`），最终 Kotlin 编译只报了 1 个「旧快照覆盖 rep」错误。
+
+### 真机实测由使用者明确推迟（必须记录，不能视为已通过）
+
+使用者在 6a 结束时决定：**先不做真机实测，继续下一阶段，
+等完成度更高再统一装机体验**；6b 开阶段时再次确认沿用。
+因此以下各项**全部保持未验证**，且随阶段持续累积：
+
+- **`Migration(1→2)` + `Migration(2→3)` 从 v1 覆盖升级后数据是否完好**
+  （两次叠加、首次含 ALTER TABLE，**本项目最大残余风险**）
+- R8 release 包真机能否正常启动
+- SQLCipher 在真机打开加密数据库
+- BiometricPrompt 弹窗 / SAF 文件选择器
+- 5 万条切月 / 年报聚合耗时、滚动掉帧
+- 模板快选、周期补记、桌面快捷方式手感
+- 6b 新增：报销/退款入口、预算进度条、净支出环形图手感
+
+**装机前建议先用旧版导出一份加密备份**。后续每个阶段的对齐结论
+都要重新列出这份清单，直到使用者统一装机体验为止。
+
 ## 实现期补充与偏离（如实记录，不埋在注释里）
 
 1. **trash 表同步加 `linkedRecordId`**。写作稿只提了
@@ -391,6 +431,6 @@ UI 显示「分类（已归档）」而非空白。
   DetailScreen / DetailViewModel / RecordDao / Migrations / 两个检查脚本 /
   所有 `RecordType.` 引用点
 - [x] 6 份 delta 共 13 条 ADDED，每条至少一个 GIVEN/WHEN/THEN + 「理由」
-- [ ] CI 全绿（写作时未完成）
-- [ ] 推送后用远端 Git Trees API 逐文件比对 blob sha
-- [ ] 使用者确认后归档本 change
+- [x] CI 全绿（`43398516500` / `43399249709` 两次 success）
+- [x] 每次推送后均用远端 Git Trees API 逐文件比对 blob sha（PASS）
+- [x] 归档（使用者「接着开6c」按推荐 A 授权，本脚本执行）
