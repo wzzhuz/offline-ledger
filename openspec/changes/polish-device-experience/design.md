@@ -59,9 +59,30 @@ SQLCipher 打开数据库一次都没在真机验证」，不是「升级会丢�
 ⚠️ **已装机包必须卸载重装**。Room 打开已存在 version 4 的库时，
 version 1 且无迁移会直接失败。使用者已授权此路径，装机前先导出 CSV 带走测试数据。
 
-## 4. 实现期如实记录（写完再回填）
+## 4. 实现期如实记录
 
-_待 CI 结果与实现期偏离回填。_
+### 首轮 CI `43459412013` failure（挂在「运行单元测试」，主源码编译通过）
+
+根因不是新功能，而是 `MigrationContractTest` 里三个「迁移已注册」断言
+（`migration_is_registered` / `migration_2_3_is_registered` /
+`migration_3_4_is_registered`）与「稳定版前 `Migrations.ALL` 为空」直接冲突。
+把三者合并成一个 `migrations_are_frozen_before_stable_release()` 断言，
+SQL 常量校验保留供历史追溯。这是本仓库**第 6 次「测试断言描述的是旧决策」**，
+与前几次「手写常数」不同：这次是需求变更后忘了同步契约测试。
+
+另把 `LedgerClockTest` 的注释从 Hong_Kong 改成 Shanghai；断言日期结果不变
+（两地同为 UTC+8、均无夏令时），正好印证 design 第 0 节的判断。
+
+### 实现期偏离
+
+- 「一键把现有账户全部改为 CNY」从资产页挪到**设置页**，与默认币种下拉并排，
+  全局操作放设置更顺手；同时按事务同步更新 records/trash 的冗余币种标签，
+  否则统计页按币种筛选会与账户不一致。
+- 记一笔的备注与收款方做成同一行两个 `OutlinedTextField`（各 weight 1f），
+  比原计划的上下两行更紧凑；仍保留 `verticalScroll` 兜底，避免极小屏被裁。
+- `Migrations.kt` 的冻结 CREATE TABLE 常量**不含新增的 payee 列**——
+  它们已不执行，补列反而会让「冻结」语义变模糊；在 design 里显式说明，
+  避免新会话误以为常量与 Entity 必须逐字一致。
 
 ## 5. 真机验证累积清单（按使用者决定继续推迟）
 

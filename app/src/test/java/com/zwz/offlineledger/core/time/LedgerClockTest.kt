@@ -8,7 +8,7 @@ class LedgerClockTest {
 
     @Test
     fun `hong kong midnight belongs to local new year`() {
-        // 2025-12-31T16:00:00Z == 2026-01-01 00:00 Asia/Hong_Kong
+        // 2025-12-31T16:00:00Z == 2026-01-01 00:00 Asia/Shanghai
         val millis = Instant.parse("2025-12-31T16:00:00Z").toEpochMilli()
         val date = LedgerClock.fromEpochMilli(millis)
         assertEquals(20260101, date.localDate)
@@ -18,7 +18,7 @@ class LedgerClockTest {
 
     @Test
     fun `utc month end stays in previous local month`() {
-        // 2026-03-31T16:00:00Z == 2026-04-01 00:00 HKT
+        // 2026-03-31T16:00:00Z == 2026-04-01 00:00 CST
         val millis = Instant.parse("2026-03-31T16:00:00Z").toEpochMilli()
         val date = LedgerClock.fromEpochMilli(millis)
         assertEquals(20260401, date.localDate)

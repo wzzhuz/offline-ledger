@@ -6,8 +6,9 @@ import org.junit.Test
 
 /**
  * 纯 JVM 契约测试：CI 没有模拟器，跑不了 MigrationTestHelper，
- * 这里只能证明「两条 CREATE TABLE 常量写了该写的列」。
- * 真机从 v1 覆盖升级是否成功，必须由使用者实测，不假报。
+ * 这里只能证明「冻结的 CREATE TABLE 常量写了该写的列」。
+ * 使用者明确「稳定版前不考虑升级迁移」，故 ALL 为空是**预期行为**；
+ * SQL 常量保留仅供历史追溯，运行时不执行。
  */
 class MigrationContractTest {
 
@@ -24,9 +25,9 @@ class MigrationContractTest {
     )
 
     @Test
-    fun migration_is_registered() {
-        assertTrue(Migrations.ALL.isNotEmpty())
-        assertTrue(Migrations.ALL.any { it.startVersion == 1 && it.endVersion == 2 })
+    fun migrations_are_frozen_before_stable_release() {
+        // 稳定版前不注册迁移；恢复条件见 project.md「稳定版前的版本策略」。
+        assertTrue(Migrations.ALL.isEmpty())
     }
 
     @Test
@@ -53,10 +54,7 @@ class MigrationContractTest {
         assertTrue(!both.contains("FOREIGN KEY"))
     }
 
-    @Test
-    fun migration_2_3_is_registered() {
-        assertTrue(Migrations.ALL.any { it.startVersion == 2 && it.endVersion == 3 })
-    }
+
 
     @Test
     fun create_budgets_sql_has_all_columns() {
@@ -77,10 +75,7 @@ class MigrationContractTest {
         assertTrue(Migrations.SQL_2_3_ALTER_TRASH.contains("linkedRecordId"))
     }
 
-    @Test
-    fun migration_3_4_is_registered() {
-        assertTrue(Migrations.ALL.any { it.startVersion == 3 && it.endVersion == 4 })
-    }
+
 
     @Test
     fun alter_3_4_sql_has_default_HKD_for_both_tables() {
