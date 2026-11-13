@@ -3,8 +3,8 @@
 **纯本地、零网络权限、无广告的个人 Android 记账应用。** 知道自己的资产与支出构成，
 数据不托管给任何第三方，也不依赖长期开机的服务器或 NAS。
 
-> 状态：**阶段 0 / 1 / 2 / 3 / 4 均已归档；阶段 5 加密备份与设置已完成，CI 全绿（run 43364038705）**。
-> 现在能用 SAF 导出 / 恢复口令加密备份、应用锁与 PIN、分类管理、阈值与配色偏好。
+> 状态：**v1（阶段 0–5）全部完成并归档，8 模块 / 128 条 Requirement / 192 个 Scenario**；
+> 出包阶段 `build-release-pipeline` 进行中：`release.yml` 手动出正式包、默认 R8 混淆、上传坚果云。
 > 现在能看月 / 年收支概览、一级 / 二级分类占比、下钻明细、每日支出折线与年度收支双折线。
 > 记账、明细、组合筛选、回收站恢复、净资产与对账沿用阶段 2 / 3 能力。
 > 本仓库遵循 OpenSpec 规范驱动开发，规格是唯一真理源。
@@ -220,6 +220,48 @@ BiometricPrompt 真机弹窗、SAF 真机文件选择器仍未实测**。
 
 ---
 
+## 出包阶段：release.yml
+
+**触发**：仓库 → Actions → 左侧「编译 Release 包」→ Run workflow。
+与 `build.yml`（每次 push 自动跑 debug + release lintVital）分工明确。
+
+**默认开启 R8**：`minify` 输入默认 `on`，可选 `none / on / both`。
+Gradle 侧 `-PminifyRelease` 默认 `false`，所以 `build.yml` 的日常构建
+行为完全不变；`both` 一次产出 plain 与 minified 两个包，
+Job Summary 打印体积与差值。`app/proguard-rules.pro` 补齐了
+`kotlinx.serialization` / Room / Hilt / SQLCipher JNI / 枚举 / 备份 DTO
+的 keep 规则，R8 开启时 `mapping.txt` 作为制品上传。
+
+**版本号**：`defaultVersionName = "0.1.0"` 是唯一手动维护点，
+`versionCode` 由 `major*10000 + minor*100 + patch` 推导（不再恒为 1）。
+CI 可用 `-PversionNameOverride` 覆盖并**传进 Gradle**，不回写文件。
+
+**签名**：配齐 `RELEASE_KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` /
+`KEY_ALIAS` / `KEY_PASSWORD` 四个 Secret 就用正式密钥；
+缺任一**只告警、回退仓库内 `debug.keystore`，流程继续**。
+回退的包与历次 debug 包同签名，可直接覆盖安装、不丢数据，
+但密钥是公开的，**勿对外分发**。诊断用 `apksigner verify --print-certs`，
+不依赖只认 v1 JAR 签名的 `keytool -printcert -jarfile`。
+
+**坚果云 WebDAV**：`upload_nutstore` 默认开启，且**与 `create_release` 解耦**
+（不打 tag 也能传）。四步：PROPFIND 认证 → 两级 MKCOL → `curl -T` →
+HEAD 落盘校验，诊断日志写进 Job Summary。需要先在本仓库 Secrets 里配
+`JGY_USER`（注册邮箱）与 `JGY_APP_PASSWORD`（**坚果云网页端 → 账户信息 →
+安全选项 → 第三方应用管理 → 添加应用密码**，不是登录密码）。
+未配置时步骤跳过、job 仍 success。免费版每月上传 1GB，自用足够。
+
+**边界**：runner 上传的是**安装包 APK**，账本数据从不出设备。
+App 仍不声明 `INTERNET`，`check_manifest_privacy.py` 在出包后继续 PASS。
+新增 `scripts/check_workflow_syntax.py` 接入 `build.yml` 静态检查，
+防 YAML 1.1 把裸 `on` 布尔化导致工作流静默不注册。
+
+**如实说明的限制**：R8 包能否真机启动、SQLCipher 真机打开数据库、
+BiometricPrompt 弹窗、SAF 文件选择器、5 万条切月 / 年报聚合耗时，
+沙盒无模拟器**均未实测**。CI 构建成功不等于 release 包真机能用，
+keep 规则 + `mapping.txt` 只是兜底，装到手机实测这一步必须由使用者完成。
+
+---
+
 ## 本地构建
 
 ```bash
@@ -264,8 +306,8 @@ offline-ledger/
 │   │   ├── reporting-ui/         4 Tab、低摩擦、万级数据性能
 │   │   └── build-and-ci/         构建工具链、CI 验证、固定签名
 │   └── changes/
-│       ├── deliver-secure-backup-and-settings/   进行中：阶段 5
-│       └── archive/                      已归档（初始设计 / 阶段 0 / 1 / 2 / 3 / 4）
+│       ├── build-release-pipeline/        进行中：出包阶段
+│       └── archive/                      已归档（初始设计 / 阶段 0 / 1 / 2 / 3 / 4 / 5）
 ├── app/src/main/java/com/zwz/offlineledger/
 │   ├── core/                 Cents / LedgerClock / LedgerCurrency / LedgerPrefs
 │   ├── data/model/           纯 JVM 数据模型
@@ -287,8 +329,9 @@ offline-ledger/
 │       ├── lock/              AppLockScreen（BiometricPrompt + PIN）
 │       └── settings/          SettingsScreen / ViewModel / 三个 Dialog
 ├── app/src/test/             纯 JVM 单测
-├── scripts/                  五个 CI 静态检查
-├── .github/workflows/build.yml
+├── scripts/                  六个 CI 静态检查（含 workflow 语法）
+├── .github/workflows/           build.yml（push 校验）/ release.yml（手动出包）
+├── .github/scripts/             prepare-signing.sh / cleanup-artifacts.sh
 └── docs/设计规格书_v2.md     历史快照（非真理源，冲突时以 specs 为准）
 ```
 

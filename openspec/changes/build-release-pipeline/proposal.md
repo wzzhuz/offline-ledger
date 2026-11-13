@@ -119,8 +119,8 @@ Artifacts，也能自动传到坚果云 WebDAV，手机直接取来装。
 
 ## 影响范围
 
-**触及的 spec 模块**：`build-and-ci`（主，6 条 ADDED）、
-`privacy-security`（1 条 ADDED，边界澄清）。
+**触及的 spec 模块**：`build-and-ci`（主，8 条 ADDED）、
+`privacy-security`（1 条 ADDED，边界澄清）；合计 9 条 ADDED。
 
 **是否需要重新安装包**：否（签名未变，未配正式密钥时仍用仓库内
 `debug.keystore`，与历次 debug 包同签名，可直接覆盖安装、不丢数据）

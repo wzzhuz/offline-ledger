@@ -219,6 +219,31 @@ val minifyRelease = (findProperty("minifyRelease") as String?)?.toBoolean() ?: f
   缺 Secrets 照样出包；坚果云不打 tag 也能传；R8 崩溃有 `mapping.txt` 可查；
   日常 `build.yml` 行为完全不变
 
+## 首轮静态检查实测：第 7 次「检查器自误报」
+
+新增的 `check_workflow_syntax.py` 第一次跑就 FAIL：
+
+```
+- 产物名不是 ASCII 的 offline-ledger-v*：out/${{ steps.rename.outputs.apk_name }}
+```
+
+**不是产物名**：命中值是签名诊断步骤里的**路径变量**
+`APK="out/${{ steps.rename.outputs.apk_name }}"`，不是用于命名制品的
+`APK="offline-ledger-v${VER}-minified.apk"`。
+检查器用正则 `APK="([^"]+)"` 把路径变量当成了产物名。
+
+**双修正**：
+① 把该变量改名 `APK_PATH`，从命名上消除歧义；
+② 检查器跳过含 `/` 或 `${{` 的值，只校验**纯产物名**——
+检查力度未下降（真正的中文产物名仍会被抓到），
+沿用「精确匹配、别把元信息当行为」的一贯规则。
+
+这是本仓库第 7 次同类坑，前六次分别是：宽泛搜 `isDeleted = 0`、
+宽泛搜 `BALANCE_ADJUST`、脚本半途异常后未确认落盘、
+按分支名查 tree 的最终一致性延迟、手写常数 168→166、
+新 MODIFIED 的「理由」段引用旧 Scenario 原文。
+共同模式始终是**检查器比被检查对象更容易出错**。
+
 ## 风险
 
 **残余风险 1**：R8 混淆后真机启动崩溃（序列化 / JNI 边界）。
@@ -246,7 +271,7 @@ val minifyRelease = (findProperty("minifyRelease") as String?)?.toBoolean() ?: f
 - [x] 阶段 5 已按规范归档，无进行中 change 冲突
 - [x] 使用者确认「按推荐来」：先归档 / 正式签名可选 / R8 默认 on
 - [x] 通过 API 实际读取 lifelog 的 8 个参照文件
-- [x] Delta 每个 Requirement 至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
+- [x] 2 份 delta 共 9 条 ADDED（build-and-ci 8 + privacy-security 1），每条至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
 - [ ] CI 全绿（写作时未完成）
 - [ ] 手动触发一次 `release.yml` 并回报体积对比
 - [ ] 推送后用远端 Git Trees API 逐文件比对 blob sha

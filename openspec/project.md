@@ -107,9 +107,12 @@ Repository、备份序列化等多个构造依赖，引入 Hilt 的收益大于�
 
 ## 构建与发布
 
-- 本轮（初始设计归档）**不建 `.github/workflows/`**，避免 fine-grained token 推 workflow 的 403
-- `build.yml`（push 编译 debug）与 `release.yml`（手动触发编译 release）
-  SHALL 在阶段 0 / 出包阶段的 change 中建立
+- `build.yml`（push 全分支触发、六个静态检查、单测、debug APK + release lintVital）
+  在阶段 0 建立；`release.yml`（手动触发、`workflow_dispatch`）在出包阶段建立
+- 出包阶段 SHALL 默认开启 R8（`minify` 输入默认 `on`），
+  Gradle 侧 `-PminifyRelease` 默认 `false`，日常 `build.yml` 行为不变
+- 坚果云 WebDAV 上传发生在 GitHub runner 上，传的是**安装包**不是账本数据；
+  App 仍 MUST NOT 声明 `INTERNET`
 - `build.yml` 的 push 触发 MUST 覆盖所有分支（`branches: ['**']`）。
   曾写成 `[main, master, 'feature/**']`，`fix/` 分支推送后 Actions 静默不跑，
   极易被误读成「已编译通过」

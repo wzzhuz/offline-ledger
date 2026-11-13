@@ -9,6 +9,53 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+// ---------------------------------------------------------------
+// 出包阶段：版本号机制
+// 唯一手动维护点是 defaultVersionName，发版时改这里。
+// CI 可用 -PversionNameOverride=0.2.0 临时覆盖，但**不会回写文件**，
+// 会打印 warning 提醒发版后同步。
+// versionCode 由版本名推导（major*10000 + minor*100 + patch），
+// 不再恒为 1 —— 否则系统判不出新旧、装不上覆盖升级。
+// ---------------------------------------------------------------
+val defaultVersionName = "0.1.0"
+
+fun versionCodeFrom(name: String): Int {
+    val parts = name.removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
+    return (parts.getOrElse(0) { 0 } * 10000
+            + parts.getOrElse(1) { 0 } * 100
+            + parts.getOrElse(2) { 0 }).coerceAtLeast(1)
+}
+
+val versionNameValue =
+    (project.findProperty("versionNameOverride") as String?)?.takeIf { it.isNotBlank() }
+        ?: defaultVersionName
+val versionCodeValue =
+    (project.findProperty("versionCodeOverride") as String?)?.toIntOrNull()
+        ?: versionCodeFrom(versionNameValue)
+
+if (versionNameValue != defaultVersionName) {
+    println("[版本] ⚠️ CI 覆盖为 $versionNameValue（versionCode=$versionCodeValue），" +
+            "文件里仍是 \"$defaultVersionName\"，发版后请同步修改 defaultVersionName")
+} else {
+    println("[版本] $versionNameValue（versionCode=$versionCodeValue）")
+}
+
+// R8 默认关闭：只有 -PminifyRelease=true 才开启。
+// build.yml 不带这个参数，日常 push 的编译行为完全不变；
+// release.yml 的 minify 输入默认 'on'，出包即混淆。
+val minifyRelease: Boolean =
+    (project.findProperty("minifyRelease") as String?)?.toBoolean() ?: false
+
+// 正式签名：4 个环境变量全齐才启用，缺任一回退仓库内 commonDebug。
+// 环境变量由 .github/scripts/prepare-signing.sh 注入。
+val releaseSigningKeys = listOf(
+    "OFFLINELEDGER_KEYSTORE_FILE",
+    "OFFLINELEDGER_STORE_PASSWORD",
+    "OFFLINELEDGER_KEY_ALIAS",
+    "OFFLINELEDGER_KEY_PASSWORD"
+)
+val useReleaseSigning = releaseSigningKeys.all { !System.getenv(it).isNullOrBlank() }
+
 android {
     namespace = "com.zwz.offlineledger"
     compileSdk = 36
@@ -19,18 +66,26 @@ android {
         // Google Play 自 2026-08-31 起要求新应用以 Android 16 (API 36) 为目标。
         // 年度复核约定见 openspec/changes/scaffold-android-project/design.md。
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = versionCodeValue
+        versionName = versionNameValue
     }
 
     signingConfigs {
         // 不能 create("debug")：AGP 已内置同名 SigningConfig，会报 already exists。
-        // 换一个名字并让 debug / release 都引用它，保证 CI 每次编译签名一致。
         create("commonDebug") {
             storeFile = file("debug.keystore")
             storePassword = "offlineledger2026"
             keyAlias = "offlineledgerdebug"
             keyPassword = "offlineledger2026"
+        }
+        // 名字用 official 而不是 release，避免与 AGP 内置 SigningConfig 混淆。
+        if (useReleaseSigning) {
+            create("official") {
+                storeFile = file(System.getenv("OFFLINELEDGER_KEYSTORE_FILE")!!)
+                storePassword = System.getenv("OFFLINELEDGER_STORE_PASSWORD")!!
+                keyAlias = System.getenv("OFFLINELEDGER_KEY_ALIAS")!!
+                keyPassword = System.getenv("OFFLINELEDGER_KEY_PASSWORD")!!
+            }
         }
     }
 
@@ -40,9 +95,15 @@ android {
             isMinifyEnabled = false
         }
         release {
-            signingConfig = signingConfigs.getByName("commonDebug")
-            // 阶段 0 刻意不混淆：先让 lintVital 跑通，R8 取舍留到出包阶段。
-            isMinifyEnabled = false
+            signingConfig = if (useReleaseSigning) {
+                signingConfigs.getByName("official")
+            } else {
+                signingConfigs.getByName("commonDebug")
+            }
+            // 出包阶段：-PminifyRelease=true 才开 R8 与资源压缩。
+            // keep 规则见 app/proguard-rules.pro。
+            isMinifyEnabled = minifyRelease
+            isShrinkResources = minifyRelease
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -69,6 +130,7 @@ android {
         }
     }
 }
+
 
 dependencies {
     // ---- Compose ----

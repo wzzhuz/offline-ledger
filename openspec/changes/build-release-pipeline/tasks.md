@@ -22,7 +22,7 @@
 - [x] 2.2 `design.md` —— 版本查证 / 三处改良 / R8 keep 规则 /
   Gradle 开关 / 签名降级 / 坚果云四步 / 回退顺序 / 否决方案表
 - [x] 2.3 `tasks.md` —— 本文件
-- [x] 2.4 `specs/build-and-ci/spec.md` —— ADDED 6 条
+- [x] 2.4 `specs/build-and-ci/spec.md` —— ADDED 8 条
 - [x] 2.5 `specs/privacy-security/spec.md` —— ADDED 1 条（CI 网络 vs App 权限）
 - [ ] 2.6 推送 change 文件到远端并用 API 校验
 
@@ -66,7 +66,7 @@
 
 - [ ] 7.1 同步 `design.md` / `tasks.md` 的实测结果
 - [ ] 7.2 推完用远端 API 逐文件比对 blob sha
-- [ ] 7.3 使用者确认后归档本 change（7 条 ADDED 合并 + change 移入 archive）
+- [ ] 7.3 使用者确认后归档本 change（9 条 ADDED 合并 + change 移入 archive）
 
 ## 明确留到后续（不预先打勾）
 
