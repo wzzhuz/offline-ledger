@@ -4,13 +4,20 @@ import com.zwz.offlineledger.backup.dto.BackupAccount
 import com.zwz.offlineledger.backup.dto.BackupAdjustment
 import com.zwz.offlineledger.backup.dto.BackupCategory
 import com.zwz.offlineledger.backup.dto.BackupRecord
+import com.zwz.offlineledger.backup.dto.BackupTemplate
+import com.zwz.offlineledger.backup.dto.BackupRecurringRule
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.BalanceAdjustmentEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
 import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 import com.zwz.offlineledger.data.model.AccountType
+import com.zwz.offlineledger.data.model.Cadence
 import com.zwz.offlineledger.data.model.RecordType
+import com.zwz.offlineledger.core.time.LedgerClock
+import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
+import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
+import com.zwz.offlineledger.engine.RecurringSchedule
 
 fun RecordEntity.toTrash(deletedAt: Long): TrashEntryEntity = TrashEntryEntity(
     originalId = id, type = type, amountCents = amountCents,
@@ -83,3 +90,70 @@ fun BackupAdjustment.toEntity(): BalanceAdjustmentEntity = BalanceAdjustmentEnti
     id = id, accountId = accountId, deltaCents = deltaCents,
     memo = memo, source = source, createdAt = createdAt, isRevoked = isRevoked
 )
+
+// ---------------------------------------------------------------
+// 阶段 6a：模板 / 周期规则的 DTO 映射与流水生成。
+// 生成流水时字段语义与 RecordEntity 完全一致，再交给
+// LedgerRepository.withResolvedRoot 解析 rootCategoryId 并入同一事务。
+// ---------------------------------------------------------------
+
+fun RecordTemplateEntity.toDto(): BackupTemplate = BackupTemplate(
+    id = id, name = name, type = type.name, amountCents = amountCents,
+    categoryId = categoryId, rootCategoryId = rootCategoryId,
+    fromAccountId = fromAccountId, toAccountId = toAccountId,
+    note = note, excludeFromStats = excludeFromStats,
+    sortOrder = sortOrder, isArchived = isArchived, createdAt = createdAt
+)
+
+fun BackupTemplate.toEntity(): RecordTemplateEntity = RecordTemplateEntity(
+    id = id, name = name, type = RecordType.valueOf(type), amountCents = amountCents,
+    categoryId = categoryId, rootCategoryId = rootCategoryId,
+    fromAccountId = fromAccountId, toAccountId = toAccountId,
+    note = note, excludeFromStats = excludeFromStats,
+    sortOrder = sortOrder, isArchived = isArchived, createdAt = createdAt
+)
+
+fun RecurringRuleEntity.toDto(): BackupRecurringRule = BackupRecurringRule(
+    id = id, name = name, type = type.name, amountCents = amountCents,
+    categoryId = categoryId, rootCategoryId = rootCategoryId,
+    fromAccountId = fromAccountId, toAccountId = toAccountId,
+    note = note, excludeFromStats = excludeFromStats,
+    cadence = cadence.name, dayOfMonth = dayOfMonth, dayOfWeek = dayOfWeek,
+    anchorLocalDate = anchorLocalDate,
+    lastGeneratedLocalDate = lastGeneratedLocalDate,
+    isEnabled = isEnabled, createdAt = createdAt
+)
+
+fun BackupRecurringRule.toEntity(): RecurringRuleEntity = RecurringRuleEntity(
+    id = id, name = name, type = RecordType.valueOf(type), amountCents = amountCents,
+    categoryId = categoryId, rootCategoryId = rootCategoryId,
+    fromAccountId = fromAccountId, toAccountId = toAccountId,
+    note = note, excludeFromStats = excludeFromStats,
+    cadence = Cadence.valueOf(cadence), dayOfMonth = dayOfMonth,
+    dayOfWeek = dayOfWeek, anchorLocalDate = anchorLocalDate,
+    lastGeneratedLocalDate = lastGeneratedLocalDate,
+    isEnabled = isEnabled, createdAt = createdAt
+)
+
+fun RecordTemplateEntity.toRecordEntity(atEpochMilli: Long): RecordEntity {
+    val ld = LedgerClock.fromEpochMilli(atEpochMilli)
+    return RecordEntity(
+        type = type, amountCents = amountCents,
+        categoryId = categoryId, rootCategoryId = rootCategoryId,
+        fromAccountId = fromAccountId, toAccountId = toAccountId,
+        timestamp = atEpochMilli, localDate = ld.localDate,
+        yearMonth = ld.yearMonth, note = note,
+        excludeFromStats = excludeFromStats
+    )
+}
+
+fun RecurringRuleEntity.toRecordEntity(atEpochMilli: Long, dueLocalDate: Int): RecordEntity =
+    RecordEntity(
+        type = type, amountCents = amountCents,
+        categoryId = categoryId, rootCategoryId = rootCategoryId,
+        fromAccountId = fromAccountId, toAccountId = toAccountId,
+        timestamp = atEpochMilli, localDate = dueLocalDate,
+        yearMonth = RecurringSchedule.yearMonthOf(dueLocalDate),
+        note = if (note.isBlank()) name else note,
+        excludeFromStats = excludeFromStats
+    )

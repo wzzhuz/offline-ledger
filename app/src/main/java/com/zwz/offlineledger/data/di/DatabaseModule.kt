@@ -4,11 +4,14 @@ import android.content.Context
 import androidx.room.Room
 import com.zwz.offlineledger.data.local.AppDatabase
 import com.zwz.offlineledger.data.local.DatabaseKeyManager
+import com.zwz.offlineledger.data.local.Migrations
 import com.zwz.offlineledger.data.local.SeedCallback
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
+import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
+import com.zwz.offlineledger.data.local.dao.TemplateDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
 import dagger.Module
 import dagger.Provides
@@ -42,6 +45,7 @@ object DatabaseModule {
     )
         .openHelperFactory(factory)
         .addCallback(SeedCallback())
+        .addMigrations(*Migrations.ALL)
         .build()
 
     @Provides fun provideAccountDao(db: AppDatabase): AccountDao = db.accountDao()
@@ -49,4 +53,6 @@ object DatabaseModule {
     @Provides fun provideRecordDao(db: AppDatabase): RecordDao = db.recordDao()
     @Provides fun provideAdjustmentDao(db: AppDatabase): BalanceAdjustmentDao = db.balanceAdjustmentDao()
     @Provides fun provideTrashDao(db: AppDatabase): TrashDao = db.trashDao()
+    @Provides fun provideTemplateDao(db: AppDatabase): TemplateDao = db.templateDao()
+    @Provides fun provideRecurringRuleDao(db: AppDatabase): RecurringRuleDao = db.recurringRuleDao()
 }

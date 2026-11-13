@@ -34,6 +34,10 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefs = LedgerPrefs(this)
+        // 桌面快捷方式：只在解锁后的分支传给 LedgerApp，
+        // 因此启用应用锁时快捷方式仍必须先解锁，不绕过锁。
+        val startWithRecordEntry =
+            intent?.action == "com.zwz.offlineledger.ACTION_QUICK_RECORD"
         LedgerColors.applyReverseColors(prefs.reverseColors)
         applyFlagSecure(prefs.flagSecureEnabled)
 
@@ -54,7 +58,7 @@ class MainActivity : FragmentActivity() {
 
                 Surface(modifier = Modifier.fillMaxSize()) {
                     if (unlocked) {
-                        LedgerApp()
+                        LedgerApp(startWithRecordEntry = startWithRecordEntry)
                     } else {
                         AppLockScreen(
                             prefs = prefs,

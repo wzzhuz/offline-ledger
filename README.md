@@ -4,7 +4,7 @@
 数据不托管给任何第三方，也不依赖长期开机的服务器或 NAS。
 
 > 状态：**v1（阶段 0–5）全部完成并归档，8 模块 / 128 条 Requirement / 192 个 Scenario**；
-> 出包阶段 `build-release-pipeline` 进行中：`release.yml` 手动出正式包、默认 R8 混淆、上传坚果云。
+> 出包阶段已归档；**阶段 6a `add-quick-entry-and-templates` 进行中**：模板、周期记账、桌面快捷方式，首次 `Migration(1→2)`。
 > 现在能看月 / 年收支概览、一级 / 二级分类占比、下钻明细、每日支出折线与年度收支双折线。
 > 记账、明细、组合筛选、回收站恢复、净资产与对账沿用阶段 2 / 3 能力。
 > 本仓库遵循 OpenSpec 规范驱动开发，规格是唯一真理源。
@@ -259,6 +259,44 @@ App 仍不声明 `INTERNET`，`check_manifest_privacy.py` 在出包后继续 PAS
 BiometricPrompt 弹窗、SAF 文件选择器、5 万条切月 / 年报聚合耗时，
 沙盒无模拟器**均未实测**。CI 构建成功不等于 release 包真机能用，
 keep 规则 + `mapping.txt` 只是兜底，装到手机实测这一步必须由使用者完成。
+
+---
+
+## 阶段 6a：模板 / 周期记账 / 桌面快捷方式
+
+**闸门先行**：v1 的「已确认不做」清单改写成 `project.md` 的
+**「v1.1 分批计划」表格**，6a 本批放行、6b（预算 / 退款报销）与
+6c（多币种 / CSV）仍待决策、三级分类移入永久不做。清单不删除，
+只按批次显式放行——这是 `reporting-ui`「v1 范围收敛」Scenario 要求的那一步。
+
+**三处入口**：
+
+| 入口 | 行为 |
+|---|---|
+| 记一笔顶部模板 chips | 点一下直接生成流水并关闭弹窗，≤2 次点击记完一笔 |
+| 设置页「模板与周期记账」 | 两 Tab 管理模板与规则，新增 / 归档 / 启用开关 |
+| 桌面长按图标「记一笔」 | 静态 `shortcuts.xml`，直接进记一笔；**启用应用锁时仍先解锁** |
+
+**周期补记**：冷启动按日补记到期规则，幂等（`lastGeneratedLocalDate`）、
+单事务批量插入、末尾一次重算、60 天 catch-up 上限。
+不用精确闹钟（Android 12+ 要 `SCHEDULE_EXACT_ALARM`），也不引入 WorkManager；
+零新增依赖、零新增权限。
+
+**首次数据库迁移**：`AppDatabase version = 2` + `Migration(1→2)` 建
+`record_templates` / `recurring_rules` 两张表。两张新表刻意不声明索引与外键，
+Migration SQL 只两条 `CREATE TABLE`，把运行时 schema 校验风险压到最低。
+`SeedCallback.onCreate` 仍只对全新库生效。
+
+**备份**：`BackupSchema.CURRENT = 2`、`MIN_SUPPORTED = 1`。
+`BackupPayload` 新增两个带默认值的列表，**v1 加密备份仍可导入**
+（缺键解析成空列表）；`BackupEnvelope` 四项头部字段一字未改。
+
+**如实说明的限制**：**`Migration(1→2)` 从 v1 覆盖升级后数据是否完好，
+沙盒无法验证**——Room 的 schema 校验发生在真机打开数据库那一刻，
+CI 只能证明编译通过、静态 SQL 列齐全、纯 JVM 契约成立。
+装到手机上从旧版覆盖升级实测这一步必须由使用者完成。
+R8 包真机启动、SQLCipher 打开数据库、BiometricPrompt 弹窗、
+SAF 选择器、5 万条切月耗时也仍未实测。
 
 ---
 

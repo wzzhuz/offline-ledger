@@ -8,12 +8,17 @@ import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
+import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
+import com.zwz.offlineledger.data.local.dao.TemplateDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.BalanceAdjustmentEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
+import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
+import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.local.toDto
+import com.zwz.offlineledger.data.local.toRecordEntity
 import com.zwz.offlineledger.data.local.toEntity
 import com.zwz.offlineledger.data.local.toRecord
 import com.zwz.offlineledger.data.local.toTrash
@@ -22,6 +27,7 @@ import com.zwz.offlineledger.data.model.LedgerCategory
 import com.zwz.offlineledger.engine.CategoryTree
 import com.zwz.offlineledger.engine.LedgerEngine
 import com.zwz.offlineledger.engine.Reconciliation
+import com.zwz.offlineledger.engine.RecurringSchedule
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,7 +55,9 @@ class LedgerRepository @Inject constructor(
     private val categoryDao: CategoryDao,
     private val recordDao: RecordDao,
     private val adjustmentDao: BalanceAdjustmentDao,
-    private val trashDao: TrashDao
+    private val trashDao: TrashDao,
+    private val templateDao: TemplateDao,
+    private val ruleDao: RecurringRuleDao
 ) {
     fun observeNetWorth(): Flow<Long> = accountDao.observeNetWorth()
 
@@ -121,6 +129,8 @@ class LedgerRepository @Inject constructor(
         categories = categoryDao.all().map { it.toDto() },
         records = recordDao.all().map { it.toDto() },
         balanceAdjustments = adjustmentDao.all().map { it.toDto() },
+        templates = templateDao.all().map { it.toDto() },
+        recurringRules = ruleDao.all().map { it.toDto() },
         trash = trashDao.all().map {
             com.zwz.offlineledger.backup.dto.BackupRecord(
                 id = it.originalId, type = it.type.name, amountCents = it.amountCents,
@@ -139,6 +149,8 @@ class LedgerRepository @Inject constructor(
         recordDao.clear()
         trashDao.clear()
         adjustmentDao.clear()
+        templateDao.clear()
+        ruleDao.clear()
         categoryDao.clear()
         accountDao.clear()
 
@@ -146,6 +158,10 @@ class LedgerRepository @Inject constructor(
         file.payload.categories.forEach { categoryDao.insert(it.toEntity()) }
         file.payload.records.forEach { recordDao.insert(it.toEntity()) }
         file.payload.balanceAdjustments.forEach { adjustmentDao.insert(it.toEntity()) }
+        // v1 备份缺这两个键时已被解析成空列表，覆盖导入会清空现有模板 / 规则，
+        // 与「全量替换」语义一致（见 backup-restore delta）。
+        file.payload.templates.forEach { templateDao.insert(it.toEntity()) }
+        file.payload.recurringRules.forEach { ruleDao.insert(it.toEntity()) }
         file.payload.trash.forEach {
             trashDao.insert(it.toEntity().toTrash(System.currentTimeMillis()))
         }
@@ -242,6 +258,90 @@ class LedgerRepository @Inject constructor(
     suspend fun reorderCategories(orderedIds: List<Long>) = db.withTransaction {
         orderedIds.forEachIndexed { index, id -> categoryDao.updateSortOrder(id, index) }
         rebuildAllBalancesInternal()
+    }
+
+
+    // ---------------------------------------------------------------
+    // 阶段 6a：模板 / 周期规则。共 9 个写方法，全部包在 db.withTransaction 内，
+    // 已同步扩到 scripts/check_transaction_annotations.py 的 WRITE_METHODS。
+    // 模板本身不改账，但统一走事务 + 末尾重算，保持「唯一写路径」的一致性；
+    // 真正生成流水的两个方法与 insertRecord 完全同构。
+    // ---------------------------------------------------------------
+
+    suspend fun createTemplate(t: RecordTemplateEntity): Long = db.withTransaction {
+        require(t.name.isNotBlank()) { "模板名不能为空" }
+        require(t.amountCents > 0L) { "模板金额必须大于 0" }
+        templateDao.insert(t)
+    }
+
+    suspend fun updateTemplate(t: RecordTemplateEntity) = db.withTransaction {
+        require(t.name.isNotBlank()) { "模板名不能为空" }
+        require(t.amountCents > 0L) { "模板金额必须大于 0" }
+        templateDao.update(t)
+    }
+
+    /** 只归档不物理删；已由它生成的历史流水不受影响。 */
+    suspend fun archiveTemplate(id: Long) = db.withTransaction {
+        templateDao.archive(id)
+    }
+
+    suspend fun reorderTemplates(orderedIds: List<Long>) = db.withTransaction {
+        orderedIds.forEachIndexed { index, id -> templateDao.updateSortOrder(id, index) }
+        rebuildAllBalancesInternal()
+    }
+
+    suspend fun createRecurringRule(r: RecurringRuleEntity): Long = db.withTransaction {
+        require(r.name.isNotBlank()) { "规则名不能为空" }
+        require(r.amountCents > 0L) { "规则金额必须大于 0" }
+        ruleDao.insert(r)
+    }
+
+    suspend fun updateRecurringRule(r: RecurringRuleEntity) = db.withTransaction {
+        require(r.name.isNotBlank()) { "规则名不能为空" }
+        require(r.amountCents > 0L) { "规则金额必须大于 0" }
+        ruleDao.update(r)
+    }
+
+    suspend fun setRuleEnabled(id: Long, enabled: Boolean) = db.withTransaction {
+        ruleDao.setEnabled(id, enabled)
+    }
+
+    /** 从模板记一笔：与 insertRecord 同一事务、同一 root 解析、同一重算。 */
+    suspend fun recordFromTemplate(templateId: Long, atEpochMilli: Long): Long? = db.withTransaction {
+        val t = templateDao.byId(templateId) ?: return@withTransaction null
+        if (t.isArchived) return@withTransaction null
+        val id = recordDao.insert(withResolvedRoot(t.toRecordEntity(atEpochMilli)))
+        rebuildAllBalancesInternal()
+        id
+    }
+
+    /**
+     * 冷启动按日补记到期规则。
+     * 单事务批量插入 + 末尾一次重算；lastGeneratedLocalDate 只在确实生成时推进，
+     * 保证幂等且不因「未来 anchor」让规则永久失效。60 天 catch-up 上限见引擎。
+     */
+    suspend fun applyDueRules(todayLocalDate: Int): Int = db.withTransaction {
+        var inserted = 0
+        ruleDao.enabled().forEach { rule ->
+            val dues = RecurringSchedule.dueDates(
+                cadence = rule.cadence,
+                dayOfMonth = rule.dayOfMonth,
+                dayOfWeek = rule.dayOfWeek,
+                anchorLocalDate = rule.anchorLocalDate,
+                lastGeneratedLocalDate = rule.lastGeneratedLocalDate,
+                todayLocalDate = todayLocalDate
+            )
+            dues.forEach { due ->
+                val ts = RecurringSchedule.toEpochMilli(due)
+                recordDao.insert(withResolvedRoot(rule.toRecordEntity(ts, due)))
+                inserted++
+            }
+            if (dues.isNotEmpty()) {
+                ruleDao.update(rule.copy(lastGeneratedLocalDate = todayLocalDate))
+            }
+        }
+        if (inserted > 0) rebuildAllBalancesInternal()
+        inserted
     }
 
     private suspend fun validateCategory(c: CategoryEntity) {

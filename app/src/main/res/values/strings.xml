@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">离线账本</string>
+    <string name="shortcut_record_short">记一笔</string>
+    <string name="shortcut_record_long">直接打开记一笔</string>
 </resources>

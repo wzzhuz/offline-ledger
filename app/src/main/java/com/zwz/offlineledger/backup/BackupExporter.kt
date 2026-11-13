@@ -28,7 +28,9 @@ object BackupExporter {
                 accounts = snapshot.accounts.size,
                 categories = snapshot.categories.size,
                 records = snapshot.records.size,
-                balanceAdjustments = snapshot.balanceAdjustments.size
+                balanceAdjustments = snapshot.balanceAdjustments.size,
+                templates = snapshot.templates.size,
+                recurringRules = snapshot.recurringRules.size
             )
         )
         return json.encodeToString(
@@ -39,7 +41,9 @@ object BackupExporter {
                     categories = snapshot.categories,
                     records = snapshot.records,
                     balanceAdjustments = snapshot.balanceAdjustments,
-                    trash = snapshot.trash
+                    trash = snapshot.trash,
+                    templates = snapshot.templates,
+                    recurringRules = snapshot.recurringRules
                 )
             )
         )

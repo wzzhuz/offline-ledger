@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.ui.ledgerFactory
+import com.zwz.offlineledger.ui.templates.TemplateManagerDialog
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import com.zwz.offlineledger.ui.trash.TrashScreen
 
@@ -49,6 +50,7 @@ fun SettingsScreen() {
     var passwordMode by remember { mutableStateOf<PasswordMode?>(null) }
     var showCategories by remember { mutableStateOf(false) }
     var showTrash by remember { mutableStateOf(false) }
+    var showTemplates by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var thresholdInput by remember { mutableStateOf(state.thresholdYuan) }
 
@@ -161,6 +163,10 @@ fun SettingsScreen() {
             Text("分类管理（两级 · 新增 / 改名 / 排序 / 归档）")
         }
         Button(
+            onClick = { showTemplates = true },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        ) { Text("模板与周期记账（模板 / 规则 · 新增 / 归档 / 启用）") }
+        Button(
             onClick = { vm.runHealthCheck() },
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
         ) { Text("账本健康自检") }
@@ -229,6 +235,10 @@ fun SettingsScreen() {
             onDismiss = { showTrash = false },
             onChanged = { vm.message("回收站已变更；如恢复了流水，返回明细即可刷新。") }
         )
+    }
+
+    if (showTemplates) {
+        TemplateManagerDialog(onDismiss = { showTemplates = false })
     }
 }
 

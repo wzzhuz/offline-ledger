@@ -44,7 +44,11 @@ data class BackupPayload(
     val categories: List<BackupCategory> = emptyList(),
     val records: List<BackupRecord> = emptyList(),
     val balanceAdjustments: List<BackupAdjustment> = emptyList(),
-    val trash: List<BackupRecord> = emptyList()
+    val trash: List<BackupRecord> = emptyList(),
+    // 阶段 6a 新增。默认空列表是 v1 备份兼容的关键：
+    // kotlinx.serialization 的 ignoreUnknownKeys + 默认值会把缺失键补成空列表。
+    val templates: List<BackupTemplate> = emptyList(),
+    val recurringRules: List<BackupRecurringRule> = emptyList()
 )
 
 /** 顶层信封。BackupEnvelope 的四项头部字段一个字不改。 */
@@ -61,6 +65,8 @@ data class LedgerSnapshot(
     val records: List<BackupRecord>,
     val balanceAdjustments: List<BackupAdjustment>,
     val trash: List<BackupRecord> = emptyList(),
+    val templates: List<BackupTemplate> = emptyList(),
+    val recurringRules: List<BackupRecurringRule> = emptyList(),
     val exportedAtEpochMilli: Long = 0L,
     val currencyCode: String = "HKD",
     val schemaVersion: Int = BackupSchema.CURRENT

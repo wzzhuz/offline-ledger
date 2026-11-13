@@ -7,6 +7,8 @@ import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
+import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
+import com.zwz.offlineledger.data.local.dao.TemplateDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
 import com.zwz.offlineledger.data.repository.LedgerRepository
 import dagger.hilt.EntryPoint
@@ -27,6 +29,8 @@ interface LedgerEntryPoint {
     fun recordDao(): RecordDao
     fun trashDao(): TrashDao
     fun balanceAdjustmentDao(): BalanceAdjustmentDao
+    fun templateDao(): TemplateDao
+    fun recurringRuleDao(): RecurringRuleDao
 }
 
 object LedgerDi {

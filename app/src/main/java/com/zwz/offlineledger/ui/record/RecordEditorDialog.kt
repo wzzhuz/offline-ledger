@@ -51,7 +51,8 @@ import kotlinx.coroutines.launch
 fun RecordEditorDialog(
     recordId: Long?,
     onDismiss: () -> Unit,
-    onSaved: () -> Unit
+    onSaved: () -> Unit,
+    templateQuickPick: Boolean = true
 ) {
     val context = LocalContext.current
     val vm: RecordEditorViewModel = viewModel(
@@ -93,6 +94,10 @@ fun RecordEditorDialog(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 12.dp)
                 ) {
+                    // 只在新建时显示：编辑已有流水不该被模板 chips 干扰。
+                    if (recordId == null && templateQuickPick) {
+                        TemplateQuickPickBar(onPicked = onSaved)
+                    }
                     TypeTabs(state.type) { vm.setType(it) }
 
                     Text(
