@@ -217,6 +217,40 @@ Scenario 还写「**GIVEN** 阶段 3 版本」——这是同一个坑**第二�
   统计口径错误由纯 JVM 单测 + 静态检查拦住；
   「统计页占位」这条反复复发的规格债被彻底终结
 
+## 实现期补充（如实记录与写作稿的偏离）
+
+写作稿说「最多补一条 `WHERE rootCategoryId = :rootId GROUP BY categoryId` 查询」，
+实际落地是 **4 条只读查询**，都是被真实需求逼出来的，没有一条是范围蔓延：
+
+| 查询 | 为什么必须有 |
+|---|---|
+| `subcategoryTotalsUnderRoot(fromYm, toYm, rootId)` | 一级扇区下钻。改成 `yearMonth BETWEEN` 范围参数后，**月度与年度视图共用一条**，比写作稿的单月版本更省 |
+| `rootTotalsInRange(fromYm, toYm)` | 年度视图也要展示一级分类占比，而 `expenseByRoot(ym)` 只按月 |
+| `categoryTotalsInRange(fromYm, toYm)` | 同上，二级口径 |
+| `drillDownRows(fromYm, toYm, categoryId, limit)` | 下钻明细 |
+
+**为什么下钻明细没复用 `pagedFiltered`**：写作稿说「复用阶段 2 组合筛选 + 分页」，
+实际读代码发现 `pagedFiltered` 是**明细页筛选查询，不带 `excludeFromStats = 0`**，
+而统计页进来的明细 MUST NOT 显示「不计入收支」的流水。
+若在 Kotlin 里对结果再过滤，就成了「全量加载后过滤」的变体。
+所以新增一条带**唯一统计口径 + LIMIT + LEFT JOIN 取分类名**的只读查询，
+一次查询、最多 100 行。这是**有意偏离**，不是漏看 spec。
+
+**三条小偏离**：
+
+1. `FlowRow`（`ExperimentalLayoutApi`）→ 普通 `Column` + `chunked(2)` 两列 `Row`。
+   理由：图例不需要实验性布局，去掉一个版本风险点。
+2. `Color(argb: Long)` → `Color(argb.toInt())`。
+   Compose 的 `Color` 只有 `Color(Int)` 构造（`LedgerColors` 已在用），
+   ARGB Long 取低 32 位即正确位模式；写作稿回退顺序第 4 条提前兑现。
+3. 年度 `monthlyTrend(from,to)` 从「调两次」改成取一次存 `yearTrend` 复用，
+   少一次范围聚合。
+
+**`check_stat_rules.py` 的统计清单从 6 扩到 9**（4 条新查询里
+`subcategoryTotalsUnderRoot` 已在批 A 登记，这里补 3 条）；
+`check_transaction_annotations.py` 的 `WRITE_METHODS` **保持 13 个不变**——
+阶段 4 不新增任何写方法，只读查询不该被误登记进事务清单。
+
 ## 风险
 
 **残余风险 1**：`DrawScope.drawArc` 的 `startAngle` / `sweepAngle` 方向、
@@ -250,6 +284,6 @@ Float 只用于几何换算且不回写；`ChartDataTest` 里金额断言全用 
 - [x] 阶段 3 已按规范归档，无进行中 change 冲突
 - [x] 1 份 MODIFIED 写出完整替换文本，标题与原 Requirement 一致，不含阶段版本号
 - [x] Delta 每个 Requirement 至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
-- [ ] CI 全绿（写作时未完成）
+- [ ] CI 全绿（写作时未完成；实现完成后由 Actions 验证）
 - [ ] 推送后用远端 Git Trees API 逐文件比对 sha
 - [ ] 使用者确认后归档本 change

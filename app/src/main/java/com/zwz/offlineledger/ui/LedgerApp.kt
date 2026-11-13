@@ -29,7 +29,7 @@ import com.zwz.offlineledger.ui.assets.AssetsScreen
 import com.zwz.offlineledger.ui.detail.DetailScreen
 import com.zwz.offlineledger.ui.record.RecordEditorDialog
 import com.zwz.offlineledger.ui.settings.SettingsScreen
-import com.zwz.offlineledger.ui.stats.StatsPlaceholder
+import com.zwz.offlineledger.ui.stats.StatsScreen
 
 private data class TabSpec(val route: String, val label: String, val icon: ImageVector)
 
@@ -89,7 +89,7 @@ fun LedgerApp() {
                 )
             }
             composable("assets") { AssetsScreen() }
-            composable("stats") { StatsPlaceholder() }
+            composable("stats") { StatsScreen() }
             composable("settings") { SettingsScreen() }
         }
     }

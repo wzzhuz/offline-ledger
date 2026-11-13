@@ -3,11 +3,9 @@
 **纯本地、零网络权限、无广告的个人 Android 记账应用。** 知道自己的资产与支出构成，
 数据不托管给任何第三方，也不依赖长期开机的服务器或 NAS。
 
-> 状态：**阶段 0 / 1 / 2 / 3 均已完成并归档，CI 全绿（run 43226535584）**；
-> 阶段 4 处于对齐门禁，待确认后建 change。
-> 现在能看净资产、账户详情、余额调整记录，并按「尾差一键抹平 / 大额先核对」处理账实不符。
-> 统计页仍是标注「阶段 4」的占位页。
-> 记账、明细、组合筛选、回收站恢复与明文 JSON 导出沿用阶段 2 能力。
+> 状态：**阶段 0 / 1 / 2 / 3 均已归档；阶段 4 统计报表已落地，CI 验证结果见 Actions**。
+> 现在能看月 / 年收支概览、一级 / 二级分类占比、下钻明细、每日支出折线与年度收支双折线。
+> 记账、明细、组合筛选、回收站恢复、净资产与对账沿用阶段 2 / 3 能力。
 > 本仓库遵循 OpenSpec 规范驱动开发，规格是唯一真理源。
 
 ---
@@ -144,6 +142,36 @@ SQLCipher `4.5.6@aar`、kotlinx-serialization-json `1.9.0`；
 
 ---
 
+## 阶段 4 统计报表
+
+**零结构变更**：统计所需的聚合 SQL 在阶段 1 / 2 已全部备好
+（`totalExpense` / `totalIncome` / `expenseByRoot` / `expenseByCategory` /
+`monthlyTrend` / `dailyTotals` / `pagedFiltered`），本阶段只新增 **4 条只读查询**，
+`AppDatabase` 仍 `version = 1`、**无 Migration**、备份格式不变、零新增 Gradle 依赖、
+`WRITE_METHODS` 保持 13 个（不新增写方法）。
+
+**统计页**：月度 / 年度切换与周期左右切换、总收入 / 总支出 / 结余（负结余用红色）、
+一级 / 二级分类占比切换、合计一致性警告条（不一致时显示差额「分」）、
+月度每日支出 + 收入折线、年度 1–12 月收入 vs 支出双折线。
+
+**原生 Canvas 自绘**：`DonutChart` / `LineChart`，零 `TextMeasurer`、零 `FlowRow`、
+零 `android.graphics`。中心总额、图例、x 轴刻度全用普通 Compose `Text` 叠加；
+环形图点击命中由纯 JVM `ChartData.sectorHit` 判定，图例提供等价入口。
+
+**三级下钻**：点一级扇区 → 该大类下二级构成 → 点二级 → 该分类明细
+（带唯一统计口径 + `LIMIT 100` 的 SQL，不全量加载）。
+
+**合计一致性**：`ChartData.checkTotals` 比对
+「一级合计 = 二级合计 = 总支出」，UI 警告条 + 纯 JVM 单测双保险。
+空日期 / 空月份在纯 JVM 数据层补 0，闰年 2 月返回 29 个点、年度固定 12 个月。
+
+**测试边界（如实说明）**：新增纯 JVM 单测覆盖三口径合计、闰年 / 大小月补 0、
+空序列、扇区角度与跨 0° 命中、多系列归一化、颜色解析。
+沙盒无 Android SDK / 模拟器，**5 万条真机切月 / 年报聚合耗时、滚动掉帧、
+SQLCipher 真机打开数据库仍未实测**；本阶段只验证聚合 SQL 结构与依赖可编译。
+
+---
+
 ## 本地构建
 
 ```bash
@@ -188,6 +216,7 @@ offline-ledger/
 │   │   ├── reporting-ui/         4 Tab、低摩擦、万级数据性能
 │   │   └── build-and-ci/         构建工具链、CI 验证、固定签名
 │   └── changes/
+│       ├── build-statistics-charts/        进行中：阶段 4
 │       └── archive/                      已归档（初始设计 / 阶段 0 / 1 / 2 / 3）
 ├── app/src/main/java/com/zwz/offlineledger/
 │   ├── core/                 Cents / LedgerClock / LedgerCurrency
@@ -197,16 +226,17 @@ offline-ledger/
 │   ├── data/repository/LedgerRepository.kt
 │   ├── data/paging/          RecordFilter / RecordPagingSource
 │   ├── engine/               LedgerEngine / CategoryTree / StatRules /
-│   │                         Calculator / Reconciliation（对账计算）
+│   │                         Calculator / Reconciliation / ChartData
 │   ├── backup/               BackupEnvelope / Payload / Exporter / Importer
 │   └── ui/                   LedgerApp / theme / LedgerDi / components
 │       ├── detail/            DetailScreen / DetailViewModel / FilterSheet
 │       ├── record/            RecordEditorDialog / RecordEditorViewModel
 │       ├── assets/            AssetsScreen / AssetsViewModel / AccountDetailDialog
 │       ├── reconcile/         ReconcileDialog / ReviewDialog + 两个 ViewModel
+│       ├── charts/            DonutChart / LineChart（原生 Canvas）
+│       ├── stats/             StatsScreen / StatsViewModel / DrillDownDialog
 │       ├── trash/             TrashScreen / TrashViewModel
-│       ├── settings/          SettingsScreen（临时明文导出）
-│       └── stats/             阶段 4 占位页
+│       └── settings/          SettingsScreen（临时明文导出）
 ├── app/src/test/             纯 JVM 单测
 ├── scripts/                  五个 CI 静态检查
 ├── .github/workflows/build.yml
@@ -221,21 +251,21 @@ offline-ledger/
 
 ## 当前进行中的改动
 
-**无**。阶段 0 / 1 / 2 / 3 均已按规范归档（delta 合并进 `specs/`、change 移入
-`archive/`、逐模块校验通过）。阶段 3 首次真正执行了 **2 份 MODIFIED 按标题整块替换**，
-8 个模块现为 **107 条 Requirement / 145 个 Scenario**。
-归档 `design.md` 记录了一条新发现的规格债：替换后的「四 Tab 骨架一次成型」
-仍写着「统计页在阶段 4 落地前显示占位」，阶段 4 必须用 MODIFIED 第二次收口，
-并改成不含阶段版本号的长期表述。
+`openspec/changes/build-statistics-charts/`（阶段 4，待归档）。
+阶段 0 / 1 / 2 / 3 均已按规范归档，8 个模块现为
+**107 条 Requirement / 145 个 Scenario**。本 change 含 **1 份 MODIFIED**：
+把「四 Tab 骨架一次成型」里残留的「统计页显示阶段 4 占位」彻底收口为
+**不含阶段版本号**的长期表述，终结「每阶段都要改占位表述」的循环。
+归档需使用者明确指令，本轮未擅自归档。
 
 ---
 
 ## 下一步
 
-阶段 4（对齐门禁中）：一级 / 二级环形图 + 下钻、月度趋势折线、年度收支双线、
-一级 / 二级合计一致性校验（原生 Canvas 自绘，不引入 Vico）。
-阶段 4 还需用 MODIFIED 把「统计页占位」彻底收口为长期表述。
-之后是完整备份与设置（5）：SAF 加密导入导出、CSV、应用锁、分类管理、阈值偏好。
+阶段 5：完整备份与设置 —— SAF 加密导入导出、CSV、应用锁、分类管理、
+账本健康页、阈值 / 配色偏好，替换阶段 2 的临时明文导出入口。
+本 change 的 1 份 MODIFIED 需在归档阶段 4 时按标题第二次替换进 `specs/`。
+`release.yml`、正式签名 Secrets 与分发方案留到出包阶段单独提 change。
 `release.yml`、正式签名 Secrets 与分发方案留到出包阶段单独提 change。
 
 **每阶段结束必须能编译运行并跑一遍导出备份**，禁止一次性摊开全部页面。

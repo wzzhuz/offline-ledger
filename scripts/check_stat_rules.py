@@ -28,8 +28,12 @@ def main() -> int:
         problems.append('StatRules.SQL_STAT_RELEVANT 被改动')
 
     # 所有收支聚合查询都必须带 excludeFromStats = 0
+    # 阶段 4 新增的下钻查询也纳入统计口径检查。
+    # 注意：subcategoryTotalsUnderRoot 刻意不以 expenseByCategory 为前缀，
+    # 否则 dao.find('fun expenseByCategory') 会回溯到错误的 @Query。
     for marker in ['totalExpense', 'totalIncome', 'expenseByRoot',
-                   'expenseByCategory', 'monthlyTrend']:
+                   'expenseByCategory', 'monthlyTrend', 'subcategoryTotalsUnderRoot',
+                   'rootTotalsInRange', 'categoryTotalsInRange', 'drillDownRows']:
         idx = dao.find('fun ' + marker)
         if idx < 0:
             problems.append('缺少统计查询 ' + marker)

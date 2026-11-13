@@ -42,6 +42,16 @@ data class AccountRecordRow(
     val categoryColorHex: String?
 )
 
+/** 统计页下钻明细行：带唯一统计口径，LIMIT 由 SQL 限定。 */
+data class DrillRow(
+    val id: Long,
+    val type: String,
+    val amountCents: Long,
+    val localDate: Int,
+    val note: String,
+    val categoryName: String?
+)
+
 /**
  * 核对视图行。suspectFlags 是 SQL CASE 算出的位掩码：
  * 1=金额 0 / 2=未分类 / 4=异常大额；第 4 位「短时重复」在 ViewModel 补算。
@@ -178,6 +188,28 @@ interface RecordDao {
     )
     suspend fun dailyTotals(ym: Int): List<DailyTotalRow>
 
+
+    /**
+     * 阶段 4：点一级扇区后展开该大类下的二级构成。
+     * 用 yearMonth 范围而非单月：月度视图传 from=to=ym，年度视图传 1..12 月。
+     * 名字刻意不以 expenseByCategory 开头，避免 check_stat_rules.py
+     * 用 find('fun ' + marker) 回溯 @Query 时指向错误的方法。
+     */
+    @Query(
+        """
+        SELECT categoryId, SUM(amountCents) AS totalCents
+          FROM records
+         WHERE type = 'EXPENSE' AND excludeFromStats = 0
+           AND yearMonth BETWEEN :fromYm AND :toYm
+           AND rootCategoryId = :rootId
+         GROUP BY categoryId
+         ORDER BY totalCents DESC
+        """
+    )
+    suspend fun subcategoryTotalsUnderRoot(
+        fromYm: Int, toYm: Int, rootId: Long
+    ): List<CategoryTotalRow>
+
     /** 账户详情流水：LEFT JOIN 一次取分类名，LIMIT 兜底。 */
     @Query(
         """
@@ -238,4 +270,52 @@ interface RecordDao {
         """
     )
     suspend fun countExactAmount(accountId: Long, amountCents: Long, fromTimestamp: Long): Int
+
+    /** 年度视图按一级分类聚合；与月度 expenseByRoot 口径完全一致。 */
+    @Query(
+        """
+        SELECT rootCategoryId AS categoryId, SUM(amountCents) AS totalCents
+          FROM records
+         WHERE type = 'EXPENSE' AND excludeFromStats = 0
+           AND yearMonth BETWEEN :fromYm AND :toYm
+         GROUP BY rootCategoryId
+         ORDER BY totalCents DESC
+        """
+    )
+    suspend fun rootTotalsInRange(fromYm: Int, toYm: Int): List<CategoryTotalRow>
+
+    /** 年度视图按二级分类聚合。 */
+    @Query(
+        """
+        SELECT categoryId, SUM(amountCents) AS totalCents
+          FROM records
+         WHERE type = 'EXPENSE' AND excludeFromStats = 0
+           AND yearMonth BETWEEN :fromYm AND :toYm
+         GROUP BY categoryId
+         ORDER BY totalCents DESC
+        """
+    )
+    suspend fun categoryTotalsInRange(fromYm: Int, toYm: Int): List<CategoryTotalRow>
+
+    /**
+     * 下钻明细：不走 pagedFiltered，因为后者不带 excludeFromStats 口径，
+     * 而统计页进来的明细 MUST NOT 显示「不计入收支」的流水。
+     * LIMIT 由 SQL 限定，MUST NOT 全量加载该分类流水。
+     */
+    @Query(
+        """
+        SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents,
+               r.localDate AS localDate, r.note AS note, c.name AS categoryName
+          FROM records r
+          LEFT JOIN categories c ON r.categoryId = c.id
+         WHERE r.categoryId = :categoryId
+           AND r.yearMonth BETWEEN :fromYm AND :toYm
+           AND r.type IN ('EXPENSE', 'INCOME') AND r.excludeFromStats = 0
+         ORDER BY r.localDate DESC, r.id DESC
+         LIMIT :limit
+        """
+    )
+    suspend fun drillDownRows(
+        fromYm: Int, toYm: Int, categoryId: Long, limit: Int
+    ): List<DrillRow>
 }
