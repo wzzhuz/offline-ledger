@@ -348,6 +348,34 @@ SQLCipher 真机打开数据库仍未实测，见第 6 节测试边界。
 4. **跨模块口径冲突比同模块腐烂更隐蔽**：归档时除了逐模块校验，
    还应扫一遍 `project.md` 的「已确认不做」与各模块 spec 是否一致
 
+## 归档收尾：第 5 次「校验脚本自误报」
+
+归档 commit `4176c0cb7a58` 推送后，`_push_single_commit.py` 回报
+`远端校验: FAIL ['README.md', ...]`；但直接按 `main` 重算 blob sha，
+两个文件**均为 MATCH**，远端 HEAD commit 也确实是新 commit。
+根因不是数据不一致，而是脚本用 **分支名** 查 tree：
+
+```python
+tree2 = api('GET', base + '/git/trees/%s?recursive=1' % BRANCH)
+```
+
+`PATCH /git/refs/heads/main` 之后 GitHub API 有短暂最终一致性延迟，
+按分支名读可能拿到旧 tree，于是把「刚写进去的两个文件」判成不一致。
+前五次推送都 PASS 只是没撞上延迟。已改为用刚创建的
+`new_commit['sha']` 作为 tree-ish 查询（POST 返回即确定，不依赖 ref 传播）。
+
+这是本仓库同类坑**第 5 次**（前四次：Manifest 注释里的 INTERNET、
+Migrations 注释里的破坏性迁移、阶段 1 归档两次宽泛子串搜索）。
+共同模式：**检查器本身比被检查对象更容易出错**，
+而误报会让人怀疑真实数据。因此每次 FAIL 都必须用第二条独立路径复核
+（这次是「按 main 重新枚举 blob + 本地重算 git blob sha」），
+不能只看脚本结论就重推或回滚。
+
+另修了一处文档瑕疵：README 的 `release.yml` 那行被上一轮同步重复写了两次，
+已去重；归档 `design.md` / README 里手写的「168 个 Scenario」也已按脚本
+打印的实际值改成 **166**（又是手写常数，与阶段 1 的 147000、
+阶段 2 的维度数 8 同源）。
+
 ## 风险
 
 **残余风险 1**：`DrawScope.drawArc` 的 `startAngle` / `sweepAngle` 方向、
