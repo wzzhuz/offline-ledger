@@ -3,6 +3,7 @@ package com.zwz.offlineledger.ui.reconcile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zwz.offlineledger.core.money.Cents
+import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.repository.LedgerRepository
@@ -30,7 +31,8 @@ data class ReconcileState(
 class ReconcileViewModel(
     private val accountDao: AccountDao,
     private val recordDao: RecordDao,
-    private val repository: LedgerRepository
+    private val repository: LedgerRepository,
+    private val prefs: LedgerPrefs
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReconcileState())
@@ -67,7 +69,9 @@ class ReconcileViewModel(
             actualInput = text,
             parsedActualCents = parsed,
             deltaCents = delta,
-            isTail = delta != null && Reconciliation.isTailDifference(delta),
+            isTail = delta != null && Reconciliation.isTailDifference(
+                delta, prefs.reconcileThresholdCents
+            ),
             errorText = if (text.isNotBlank() && parsed == null) "金额格式非法" else null
         )
     }
@@ -86,7 +90,10 @@ class ReconcileViewModel(
         }
         viewModelScope.launch {
             try {
-                repository.reconcile(s.accountId, actual, s.memo.trim(), source)
+                repository.reconcile(
+                    s.accountId, actual, s.memo.trim(), source,
+                    prefs.reconcileThresholdCents
+                )
                 _state.value = s.copy(done = true, errorText = null)
             } catch (e: IllegalArgumentException) {
                 _state.value = s.copy(errorText = e.message ?: "对账失败")

@@ -28,56 +28,56 @@
 - [x] 2.7 `specs/category-stats/spec.md` —— ADDED 2
 - [x] 2.8 `specs/reconciliation/spec.md` —— ADDED 1
 - [x] 2.9 `specs/build-and-ci/spec.md` —— ADDED 2
-- [ ] 2.10 推送 change 文件到远端并用 API 校验
+- [x] 2.10 推送 change 文件到远端并用 API 校验
 
 ## 3. 纯 JVM 加密层与单测
 
-- [ ] 3.1 `backup/crypto/SecureBackupCodec.kt`：MAGIC + salt + IV +
+- [x] 3.1 `backup/crypto/SecureBackupCodec.kt`：MAGIC + salt + IV +
   PBKDF2WithHmacSHA256 + AES-256/GCM + Gzip，纯 JVM
-- [ ] 3.2 `SecureBackupCodecTest.kt`：往返、错口令、篡改、MAGIC 不匹配、
+- [x] 3.2 `SecureBackupCodecTest.kt`：往返、错口令、篡改、MAGIC 不匹配、
   截断、短口令、密文不含明文、两次导出不同
 
 ## 4. 依赖、权限与静态检查
 
-- [ ] 4.1 `app/build.gradle.kts` 加 `androidx.biometric:biometric:1.1.0`
-- [ ] 4.2 `AndroidManifest.xml` 加 `USE_BIOMETRIC`（normal 级）
-- [ ] 4.3 `check_manifest_privacy.py` 加 `ALLOWED_PERMISSIONS` 白名单检查
-- [ ] 4.4 `check_transaction_annotations.py` 的 `WRITE_METHODS` 13 → 17
-- [ ] 4.5 `check_docs_consistency.py` 复核 `project.md` 阶段 5 与 CSV 归属一致
+- [x] 4.1 `app/build.gradle.kts` 加 `androidx.biometric:biometric:1.1.0`
+- [x] 4.2 `AndroidManifest.xml` 加 `USE_BIOMETRIC`（normal 级）
+- [x] 4.3 `check_manifest_privacy.py` 加 `ALLOWED_PERMISSIONS` 白名单检查
+- [x] 4.4 `check_transaction_annotations.py` 的 `WRITE_METHODS` 13 → 17
+- [x] 4.5 `check_docs_consistency.py` 复核 `project.md` 阶段 5 与 CSV 归属一致
 
 ## 5. 偏好、配色与应用锁
 
-- [ ] 5.1 `core/prefs/LedgerPrefs.kt`：阈值 / 配色 / FLAG_SECURE /
+- [x] 5.1 `core/prefs/LedgerPrefs.kt`：阈值 / 配色 / FLAG_SECURE /
   应用锁 / 加盐 PIN hash
-- [ ] 5.2 `ui/theme/LedgerTheme.kt`：`mutableStateOf` 语义色反转
-- [ ] 5.3 `MainActivity.kt`：`FragmentActivity` + FLAG_SECURE + 冷启动 /
+- [x] 5.2 `ui/theme/LedgerTheme.kt`：`mutableStateOf` 语义色反转
+- [x] 5.3 `MainActivity.kt`：`FragmentActivity` + FLAG_SECURE + 冷启动 /
   后台恢复解锁门禁
-- [ ] 5.4 `ui/lock/AppLockScreen.kt`：BiometricPrompt + PIN 兜底
-- [ ] 5.5 `Reconciliation` / `LedgerRepository.reconcile` / `ReconcileViewModel`
+- [x] 5.4 `ui/lock/AppLockScreen.kt`：BiometricPrompt + PIN 兜底
+- [x] 5.5 `Reconciliation` / `LedgerRepository.reconcile` / `ReconcileViewModel`
   三处同步阈值
 
 ## 6. SAF 导入导出与设置页
 
-- [ ] 6.1 `ui/settings/SettingsViewModel.kt`：导出 / 导入 / 偏好 / 自检
-- [ ] 6.2 `ui/settings/SettingsScreen.kt` 重写为设置中心
+- [x] 6.1 `ui/settings/SettingsViewModel.kt`：导出 / 导入 / 偏好 / 自检
+- [x] 6.2 `ui/settings/SettingsScreen.kt` 重写为设置中心
   （移除临时明文导出入口）
-- [ ] 6.3 `ui/settings/BackupPasswordDialog.kt`：口令输入 +
+- [x] 6.3 `ui/settings/BackupPasswordDialog.kt`：口令输入 +
   「将全量替换现有全部数据」二次确认
-- [ ] 6.4 `ui/settings/CategoryManagerDialog.kt`：两级分类增删改排序归档
-- [ ] 6.5 `CategoryDao` 3 条新查询 + `LedgerRepository` 4 个事务写方法
+- [x] 6.4 `ui/settings/CategoryManagerDialog.kt`：两级分类增删改排序归档
+- [x] 6.5 `CategoryDao` 3 条新查询 + `LedgerRepository` 4 个事务写方法
 
 ## 7. 测试与静态检查
 
-- [ ] 7.1 本地五个检查脚本全部 PASS
-- [ ] 7.2 单次 commit 推送后用 GitHub API 查 Actions 列表，确认**确实触发**
+- [x] 7.1 本地五个检查脚本全部 PASS
+- [x] 7.2 单次 commit 推送后用 GitHub API 查 Actions 列表，确认**确实触发**
 - [ ] 7.3 轮询 Actions；失败按 `design.md` 第 9 节回退顺序单次修复后重推
 - [ ] 7.4 确认 job 结论为 success、制品产出
 
 ## 8. 同步与收尾
 
-- [ ] 8.1 更新 `README.md` 阶段状态、目录结构、阶段 5 说明、测试边界
-- [ ] 8.2 同步 `project.md` 阶段 5 表格里的 CSV 字样为「v1 不做」
-- [ ] 8.3 推完用远端 API 逐文件比对 blob sha
+- [x] 8.1 更新 `README.md` 阶段状态、目录结构、阶段 5 说明、测试边界
+- [x] 8.2 同步 `project.md` 阶段 5 表格里的 CSV 字样为「v1 不做」
+- [x] 8.3 推完用远端 API 逐文件比对 blob sha
 - [ ] 8.4 使用者确认后归档本 change（4 份 MODIFIED 按标题替换 + ADDED 合并）
 
 ## 明确留到后续（不预先打勾）
@@ -88,4 +88,7 @@
 - `release.yml`、正式签名 Secrets 与分发方案
 - CSV 导出（v1.1，需先显式更新「已确认不做」清单）
 
+> 7.3 / 7.4（CI 轮询与结论）与 8.4（归档）未完成，不预先打勾。
+> 归档时须把 12 条 ADDED 与 4 份 MODIFIED 合并进 `openspec/specs/`，
+> 4 份 MODIFIED 按标题整块替换，再把 change 移入 `archive/`。
 > 归档需使用者明确指令，本轮不擅自归档。

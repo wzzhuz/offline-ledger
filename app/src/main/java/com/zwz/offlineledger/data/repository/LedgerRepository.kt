@@ -11,6 +11,7 @@ import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.BalanceAdjustmentEntity
+import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
 import com.zwz.offlineledger.data.local.toDto
 import com.zwz.offlineledger.data.local.toEntity
@@ -165,12 +166,14 @@ class LedgerRepository @Inject constructor(
         accountId: Long,
         actualBalanceCents: Long,
         memo: String,
-        source: String = "TAIL_DIFFERENCE"
+        source: String = "TAIL_DIFFERENCE",
+        thresholdCents: Long = Reconciliation.TAIL_DIFFERENCE_THRESHOLD_CENTS
     ): ReconcileResult = db.withTransaction {
         val acc = accountDao.byId(accountId)
             ?: throw IllegalArgumentException("账户不存在：$accountId")
         require(memo.isNotBlank() || Reconciliation.isTailDifference(
-            Reconciliation.difference(acc.balanceCents, actualBalanceCents)
+            Reconciliation.difference(acc.balanceCents, actualBalanceCents),
+            thresholdCents
         )) { "非尾差校准必须填写备注" }
         val delta = Reconciliation.difference(acc.balanceCents, actualBalanceCents)
         val now = System.currentTimeMillis()
@@ -212,6 +215,46 @@ class LedgerRepository @Inject constructor(
     /** 只归档不物理删；有流水的账户历史明细仍可查。 */
     suspend fun archiveAccount(id: Long) = db.withTransaction {
         accountDao.archiveAccount(id)
+    }
+
+    // ---------------------------------------------------------------
+    // 阶段 5：分类管理。复用阶段 1 预留的 isArchived / sortOrder，
+    // 零表结构变更、零 Migration。全部包在 withTransaction 内。
+
+    /** 新增分类：最多两级，二级必须有父级且类型从父级继承。 */
+    suspend fun createCategory(c: CategoryEntity): Long = db.withTransaction {
+        validateCategory(c)
+        categoryDao.insert(c)
+    }
+
+    suspend fun renameCategory(id: Long, name: String) = db.withTransaction {
+        require(name.isNotBlank()) { "分类名不能为空" }
+        val current = categoryDao.byId(id) ?: return@withTransaction
+        categoryDao.update(current.copy(name = name.trim()))
+    }
+
+    /** 只归档不物理删；历史流水的 rootCategoryId 一个字不动。 */
+    suspend fun archiveCategory(id: Long) = db.withTransaction {
+        categoryDao.archive(id)
+    }
+
+    /** 批量排序，事务末尾重算兜底（排序不改账，但保持统一写路径）。 */
+    suspend fun reorderCategories(orderedIds: List<Long>) = db.withTransaction {
+        orderedIds.forEachIndexed { index, id -> categoryDao.updateSortOrder(id, index) }
+        rebuildAllBalancesInternal()
+    }
+
+    private suspend fun validateCategory(c: CategoryEntity) {
+        require(c.name.isNotBlank()) { "分类名不能为空" }
+        require(c.level in 0..1) { "最多两级分类" }
+        if (c.level == 0) {
+            require(c.parentId == null) { "一级分类不能有父级" }
+        } else {
+            val parent = c.parentId?.let { categoryDao.byId(it) }
+                ?: throw IllegalArgumentException("二级分类必须指定一级父分类")
+            require(parent.level == 0) { "父级必须是一级分类" }
+            require(parent.type == c.type) { "二级分类的收支类型须与父级一致" }
+        }
     }
 
     // ---------------------------------------------------------------

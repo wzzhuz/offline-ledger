@@ -22,4 +22,14 @@ interface CategoryDao {
 
     @Query("DELETE FROM categories")
     suspend fun clear()
+
+    /** 阶段 5：分类管理。只改名 / 归档 / 排序，MUST NOT 物理删除。 */
+    @Query("UPDATE categories SET name = :name WHERE id = :id")
+    suspend fun rename(id: Long, name: String)
+
+    @Query("UPDATE categories SET isArchived = 1 WHERE id = :id")
+    suspend fun archive(id: Long)
+
+    @Query("UPDATE categories SET sortOrder = :order WHERE id = :id")
+    suspend fun updateSortOrder(id: Long, order: Int)
 }

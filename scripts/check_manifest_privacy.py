@@ -18,6 +18,9 @@ FORBIDDEN_PERMISSIONS = [
 ]
 FORBIDDEN_DEPS = ['coil', 'glide', 'okhttp', 'firebase', 'vico', 'retrofit',
                   'umeng', 'bugly', 'appsflyer']
+# 阶段 5 新增：唯一允许声明的权限（BiometricPrompt 用，normal 级）。
+# 除此之外的任何 uses-permission 都会让检查失败，防止「加了权限忘了评审」。
+ALLOWED_PERMISSIONS = ['android.permission.USE_BIOMETRIC']
 
 
 def read(path):
@@ -47,6 +50,13 @@ def main() -> int:
         problems.append('Manifest 未引用 backup_rules.xml')
     if '@xml/data_extraction_rules' not in m:
         problems.append('Manifest 未引用 data_extraction_rules.xml')
+
+    # 精确匹配 <uses-permission> 标签并先剥注释；不做宽泛子串搜索，
+    # 否则注释里提到权限名会自己把自己判失败（阶段 1 归档自误报两次）。
+    declared = re.findall(r'<uses-permission[^>]*android:name="([^"]+)"', m)
+    for perm in declared:
+        if perm not in ALLOWED_PERMISSIONS:
+            problems.append('Manifest 声明了未在白名单中的权限：' + perm)
 
     for label, path in [('backup_rules.xml', BACKUP),
                         ('data_extraction_rules.xml', EXTRACT)]:

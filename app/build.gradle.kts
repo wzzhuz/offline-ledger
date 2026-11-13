@@ -110,6 +110,11 @@ dependencies {
     implementation("androidx.paging:paging-common:3.3.6")
     implementation("androidx.paging:paging-compose:3.3.6")
 
+    // ---- 阶段 5：应用锁（官方最新稳定版 1.1.0；1.4.0 仍属 alpha 线）----
+    // 传递引入 androidx.fragment，MainActivity 改继承 FragmentActivity。
+    // 刻意不引入任何含网络行为的依赖。
+    implementation("androidx.biometric:biometric:1.1.0")
+
     // ---- 单元测试 ----
     testImplementation("junit:junit:4.13.2")
 }

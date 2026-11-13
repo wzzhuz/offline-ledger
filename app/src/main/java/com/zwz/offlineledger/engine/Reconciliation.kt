@@ -10,7 +10,9 @@ import kotlin.math.abs
  */
 object Reconciliation {
 
-    /** 尾差阈值：1.00 元 = 100 分，比较含等号。阶段 5 再做可配置 UI。 */
+    /** 默认尾差阈值：1.00 元 = 100 分，比较含等号。
+     * 阶段 5 已落地可配置：UI / ViewModel / Repository 三层读同一个偏好值，
+     * 本常量只作为未设置偏好时的默认值。 */
     const val TAIL_DIFFERENCE_THRESHOLD_CENTS = 100L
 
     /** 近似金额反查容差：±1.00 元。 */

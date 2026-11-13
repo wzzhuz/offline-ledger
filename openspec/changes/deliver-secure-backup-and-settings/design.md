@@ -273,6 +273,40 @@ BiometricPrompt/PIN 冷启动门禁 + SharedPreferences 偏好 + 4 份 MODIFIED�
   换设备可恢复备份；明文导出入口被彻底替换；三处规格债一次收口；
   加密层可在无模拟器环境里验证往返与错口令
 
+## 实现期补充（如实记录与写作稿的偏离）
+
+**① 配色开关的实现比写作稿更轻**：写作稿说「`mutableStateOf` 承载语义色」，
+落地就是把 `LedgerColors.ExpenseRed` / `IncomeGreen` 改成显式
+`get() = _x.value` / `private set` 的属性，**其余 80+ 处引用一行未改**。
+不用 CompositionLocal、不改 `LedgerTheme` 的调用签名，
+`MainActivity.onCreate` 调一次 `applyReverseColors()` 即可。
+这是本阶段最省事的一处，也验证了「语义色集中在一个 object」这个阶段 0 的取舍。
+
+**② `SecureBackupCodec` 的错误提示统一**：错口令、GCM tag 校验失败、
+Gzip 解压失败三者都归到同一句「口令错误或备份文件已损坏」，
+避免让攻击者区分「口令错」与「文件坏」。单测断言这一点。
+
+**③ `SettingsViewModel` 的 Context 不持有**：只在 `exportTo` / `importFrom`
+的参数里取 `contentResolver`，ViewModel 不存 Context，无 Activity 泄漏。
+
+**④ 阈值三层同步实际改了 4 个文件**：`Reconciliation.kt`（注释）、
+`LedgerRepository.reconcile`（新增 `thresholdCents` 参数）、
+`ReconcileViewModel`（注入 `LedgerPrefs`）、`ReconcileDialog`（构造参数）。
+写作稿说「三处同步」，实际连常量注释与 Dialog 工厂一共 4 个文件。
+`ReconciliationTest` 的既有断言仍用默认 100 分，不需要改。
+
+**⑤ `WRITE_METHODS` 确实扩到 17 个**：4 个分类写方法全部 `db.withTransaction`，
+`createCategory` 在事务内校验层级与类型继承；`reorderCategories` 事务末尾
+照例 `rebuildAllBalancesInternal()` 兜底（排序不改账，但保持统一写路径）。
+
+**⑥ `check_manifest_privacy.py` 白名单用正则精确匹配标签**：
+`re.findall(r'<uses-permission[^>]*android:name="([^"]+)"', m)`，
+且 `m` 已先剥掉 XML 注释 —— 沿用阶段 1 归档两次自误报换来的规则，
+没有写成宽泛子串搜索。
+
+**⑦ 纯 JVM 单测里 `expectFailure` 用 JUnit `fail()` + `catch IllegalArgumentException`**，
+不依赖 `kotlin-test` 或 `assertThrows` 的版本差异。
+
 ## 风险
 
 **残余风险 1**：`androidx.biometric:1.1.0` 传递的 fragment / activity 版本

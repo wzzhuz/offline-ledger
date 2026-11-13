@@ -16,7 +16,9 @@ WRITE_METHODS = [
     'addAdjustment', 'revokeAdjustment', 'rebuildAllBalances',
     'checkAndRepair', 'importBackup',
     # 阶段 3 新增的 4 个写方法；不扩清单就会漏检（spec: build-and-ci delta）
-    'reconcile', 'createAccount', 'updateAccountMeta', 'archiveAccount'
+    'reconcile', 'createAccount', 'updateAccountMeta', 'archiveAccount',
+    # 阶段 5 新增的 4 个分类写方法；不扩清单就会漏检
+    'createCategory', 'renameCategory', 'archiveCategory', 'reorderCategories'
 ]
 
 

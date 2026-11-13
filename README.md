@@ -3,8 +3,8 @@
 **纯本地、零网络权限、无广告的个人 Android 记账应用。** 知道自己的资产与支出构成，
 数据不托管给任何第三方，也不依赖长期开机的服务器或 NAS。
 
-> 状态：**阶段 0 / 1 / 2 / 3 / 4 均已完成并归档，CI 全绿（run 43348602664）**；
-> 阶段 5 处于对齐门禁，待确认后建 change。
+> 状态：**阶段 0 / 1 / 2 / 3 / 4 均已归档；阶段 5 加密备份与设置已落地，CI 验证结果见 Actions**。
+> 现在能用 SAF 导出 / 恢复口令加密备份、应用锁与 PIN、分类管理、阈值与配色偏好。
 > 现在能看月 / 年收支概览、一级 / 二级分类占比、下钻明细、每日支出折线与年度收支双折线。
 > 记账、明细、组合筛选、回收站恢复、净资产与对账沿用阶段 2 / 3 能力。
 > 本仓库遵循 OpenSpec 规范驱动开发，规格是唯一真理源。
@@ -173,6 +173,53 @@ SQLCipher 真机打开数据库仍未实测**；本阶段只验证聚合 SQL 结
 
 ---
 
+## 阶段 5 加密备份与设置
+
+**零结构变更**：`AppDatabase` 仍 `version = 1`、**无 Migration**、
+备份信封四项头部与 `schemaVersion = 1` 一字不改、4 Tab 导航零改动。
+`CategoryEntity` 在阶段 1 预留的 `isArchived` / `sortOrder` 本阶段直接启用；
+偏好走 SharedPreferences，不进 Room、不进备份 DTO。
+
+**两套密钥严格分开**：SQLCipher 数据库口令由 Android Keystore 保管、
+换设备即失效、用户不可见；备份口令由用户自设、PBKDF2 派生、不落盘、
+跨设备必须仍可解密。MUST NOT 复用或互相推导。
+
+**加密文件格式**：`MAGIC("OLBK"+0x01)` + 随机 16B SALT + 随机 12B IV +
+`AES-256/GCM(Gzip(JSON))`。`PBKDF2WithHmacSHA256` 120k 次迭代；
+错口令 / 密文篡改 / 文件截断都归到同一句「口令错误或备份文件已损坏」，
+不泄露是哪种，且**不调用 `importBackup()`**、原账本一条不动。
+`SecureBackupCodec` 纯 JVM，单测覆盖往返、错口令、篡改、MAGIC、截断、
+短口令、密文不含明文、两次导出不同。
+
+**SAF**：`CreateDocument` / `OpenDocument` + `ContentResolver` 流式读写，
+官方明确无需任何存储权限；覆盖导入前二次确认「将全量替换现有全部数据」。
+设置页**不再有明文 JSON 导出按钮**。
+
+**应用锁**：`MainActivity` 改继承 `FragmentActivity`，冷启动与
+`ON_PAUSE` 后台恢复都重新上锁，解锁前**不渲染任何账目界面**；
+`androidx.biometric:biometric:1.1.0`（官方最新稳定版）+ 自建 PIN 兜底；
+`FLAG_SECURE` 开关防最近任务预览。PIN 以加盐 SHA-256 存储，
+UI 明确说明它防的是瞥视 / 丢机随手翻，不是强认证。
+
+**设置中心**：加密备份导出 / 恢复、应用锁与 PIN、FLAG_SECURE、
+对账尾差阈值（UI / ViewModel / Repository 三层读同一个偏好值）、
+支出 / 收入配色反转（`LedgerColors` 语义色改为可观察状态，
+既有 80+ 处引用一行不改）、两级分类管理、账本健康自检、回收站。
+
+**CSV 归属已拍板**：**v1 不做**，4 份 MODIFIED 把
+`backup-restore`「CSV 格式约定」与 `privacy-security`「导出文件默认加密」
+统一标注为 v1.1 预留，`project.md` 阶段 5 表格同步；
+`reporting-ui`「v1 范围收敛」与「已确认不做」清单保持不动。
+
+**测试边界（如实说明）**：新增纯 JVM 单测覆盖加密往返与失败路径；
+压缩 / 加密 / 写盘流式，但 `encodeToString` 对 5 万条仍会一次生成
+约 10–15 MB 的 JSON String（不产生第二份明文副本）——逐条流式序列化
+留到实测出现内存问题时再做。沙盒无 Android SDK / 模拟器，
+**5 万条真机切月 / 年报聚合耗时、滚动掉帧、SQLCipher 真机打开数据库、
+BiometricPrompt 真机弹窗、SAF 真机文件选择器仍未实测**。
+
+---
+
 ## 本地构建
 
 ```bash
@@ -217,9 +264,10 @@ offline-ledger/
 │   │   ├── reporting-ui/         4 Tab、低摩擦、万级数据性能
 │   │   └── build-and-ci/         构建工具链、CI 验证、固定签名
 │   └── changes/
+│       ├── deliver-secure-backup-and-settings/   进行中：阶段 5
 │       └── archive/                      已归档（初始设计 / 阶段 0 / 1 / 2 / 3 / 4）
 ├── app/src/main/java/com/zwz/offlineledger/
-│   ├── core/                 Cents / LedgerClock / LedgerCurrency
+│   ├── core/                 Cents / LedgerClock / LedgerCurrency / LedgerPrefs
 │   ├── data/model/           纯 JVM 数据模型
 │   ├── data/local/           Entity / DAO / AppDatabase / Seed / Keystore
 │   ├── data/di/DatabaseModule.kt
@@ -227,7 +275,7 @@ offline-ledger/
 │   ├── data/paging/          RecordFilter / RecordPagingSource
 │   ├── engine/               LedgerEngine / CategoryTree / StatRules /
 │   │                         Calculator / Reconciliation / ChartData
-│   ├── backup/               BackupEnvelope / Payload / Exporter / Importer
+│   ├── backup/               Envelope / Payload / Exporter / Importer / SecureBackupCodec
 │   └── ui/                   LedgerApp / theme / LedgerDi / components
 │       ├── detail/            DetailScreen / DetailViewModel / FilterSheet
 │       ├── record/            RecordEditorDialog / RecordEditorViewModel
@@ -236,7 +284,8 @@ offline-ledger/
 │       ├── charts/            DonutChart / LineChart（原生 Canvas）
 │       ├── stats/             StatsScreen / StatsViewModel / DrillDownDialog
 │       ├── trash/             TrashScreen / TrashViewModel
-│       └── settings/          SettingsScreen（临时明文导出）
+│       ├── lock/              AppLockScreen（BiometricPrompt + PIN）
+│       └── settings/          SettingsScreen / ViewModel / 三个 Dialog
 ├── app/src/test/             纯 JVM 单测
 ├── scripts/                  五个 CI 静态检查
 ├── .github/workflows/build.yml

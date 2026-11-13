@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.ui.components.formatCents
+import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
@@ -35,7 +36,9 @@ fun ReconcileDialog(
     val context = LocalContext.current
     val vm: ReconcileViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
-            ReconcileViewModel(ep.accountDao(), ep.recordDao(), ep.ledgerRepository())
+            ReconcileViewModel(
+                ep.accountDao(), ep.recordDao(), ep.ledgerRepository(), LedgerPrefs(context)
+            )
         }
     )
     LaunchedEffect(accountId) { vm.load(accountId) }

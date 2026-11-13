@@ -1,0 +1,252 @@
+package com.zwz.offlineledger.ui.settings
+
+import android.content.Context
+import android.net.Uri
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.zwz.offlineledger.backup.BackupExporter
+import com.zwz.offlineledger.backup.BackupImporter
+import com.zwz.offlineledger.backup.crypto.SecureBackupCodec
+import com.zwz.offlineledger.core.prefs.LedgerPrefs
+import com.zwz.offlineledger.data.local.dao.CategoryDao
+import com.zwz.offlineledger.data.local.entity.CategoryEntity
+import com.zwz.offlineledger.data.model.RecordType
+import com.zwz.offlineledger.data.repository.LedgerRepository
+import com.zwz.offlineledger.engine.Reconciliation
+import com.zwz.offlineledger.ui.theme.LedgerColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+data class SettingsState(
+    val message: String = "",
+    val error: String = "",
+    val busy: Boolean = false,
+    val categories: List<CategoryEntity> = emptyList(),
+    val healthText: String = "",
+    val thresholdYuan: String = "1.00",
+    val reverseColors: Boolean = false,
+    val flagSecure: Boolean = false,
+    val appLockEnabled: Boolean = false,
+    val hasPin: Boolean = false
+)
+
+class SettingsViewModel(
+    private val repository: LedgerRepository,
+    private val categoryDao: CategoryDao,
+    private val prefs: LedgerPrefs
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(SettingsState())
+    val state: StateFlow<SettingsState> = _state.asStateFlow()
+
+    init {
+        refreshPrefs()
+        loadCategories()
+    }
+
+    fun refreshPrefs() {
+        _state.value = _state.value.copy(
+            thresholdYuan = yuan(prefs.reconcileThresholdCents),
+            reverseColors = prefs.reverseColors,
+            flagSecure = prefs.flagSecureEnabled,
+            appLockEnabled = prefs.appLockEnabled,
+            hasPin = prefs.hasPin()
+        )
+    }
+
+    private fun yuan(cents: Long): String =
+        java.math.BigDecimal.valueOf(cents, 2).toPlainString()
+
+    fun message(text: String) {
+        _state.value = _state.value.copy(message = text, error = "")
+    }
+
+    fun fail(text: String) {
+        _state.value = _state.value.copy(error = text, message = "")
+    }
+
+    // ---------------------------------------------------------------
+    /** SAF 导出：JSON → Gzip → AES-GCM → 用户选择的 URI，全流式写出。 */
+    fun exportTo(context: Context, uri: Uri, passphrase: CharArray) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val snapshot = repository.exportSnapshot()
+                    val json = BackupExporter.encode(snapshot)
+                    val blob = SecureBackupCodec.encode(json, passphrase)
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(blob)
+                        out.flush()
+                    } ?: throw IllegalStateException("无法打开所选位置的输出流")
+                    "已导出加密备份（${blob.size} 字节，${snapshot.records.size} 条流水）。" +
+                        "请妥善保管口令：口令不落盘，遗忘后无法恢复。"
+                }
+                _state.value = _state.value.copy(busy = false, message = result)
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    busy = false,
+                    error = "导出失败：" + (e.message ?: e.javaClass.simpleName)
+                )
+            }
+        }
+    }
+
+    /** SAF 导入：解密 → 解析 → 单事务全量替换。任一步失败都不写账本。 */
+    fun importFrom(context: Context, uri: Uri, passphrase: CharArray) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val blob = context.contentResolver.openInputStream(uri)?.use {
+                        it.readBytes()
+                    } ?: throw IllegalStateException("无法打开所选文件")
+                    val json = SecureBackupCodec.decode(blob, passphrase)
+                    val file = BackupImporter.decode(json)
+                    // 只有解析与版本校验都通过，才进入覆盖导入事务
+                    repository.importBackup(file)
+                    val health = repository.checkAndRepair()
+                    "恢复完成：${file.payload.accounts.size} 个账户、" +
+                        "${file.payload.categories.size} 个分类、" +
+                        "${file.payload.records.size} 条流水；" +
+                        "自检检查 ${health.checkedAccounts} 个账户，修复 ${health.repairedAccounts} 个。"
+                }
+                loadCategories()
+                _state.value = _state.value.copy(busy = false, message = result)
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    busy = false,
+                    error = "导入失败，原账本未改动：" + (e.message ?: e.javaClass.simpleName)
+                )
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    fun setThresholdYuan(text: String) {
+        _state.value = _state.value.copy(thresholdYuan = text)
+        val cents = try {
+            com.zwz.offlineledger.core.money.Cents.fromYuan(text).value
+        } catch (e: Exception) {
+            null
+        }
+        if (cents != null && cents >= 0) prefs.reconcileThresholdCents = cents
+    }
+
+    fun setReverseColors(enabled: Boolean) {
+        prefs.reverseColors = enabled
+        LedgerColors.applyReverseColors(enabled)
+        refreshPrefs()
+    }
+
+    fun setFlagSecure(enabled: Boolean) {
+        prefs.flagSecureEnabled = enabled
+        refreshPrefs()
+        message("最近任务防泄露已" + (if (enabled) "开启" else "关闭") +
+            "；重新进入应用后完全生效。")
+    }
+
+    fun setAppLock(enabled: Boolean) {
+        if (enabled && !prefs.hasPin()) {
+            fail("请先设置 PIN，否则生物识别不可用时无法进入账本")
+            return
+        }
+        prefs.appLockEnabled = enabled
+        refreshPrefs()
+        message("应用锁已" + (if (enabled) "开启，下次冷启动 / 切回应用时生效" else "关闭"))
+    }
+
+    fun setPin(pin: String) {
+        try {
+            prefs.setPin(pin)
+            refreshPrefs()
+            message("PIN 已设置（加盐 hash 存储，不含明文）")
+        } catch (e: IllegalArgumentException) {
+            fail(e.message ?: "PIN 格式不合法")
+        }
+    }
+
+    fun clearPin() {
+        prefs.clearPin()
+        refreshPrefs()
+        message("PIN 已清除，应用锁同时关闭")
+    }
+
+    fun runHealthCheck() {
+        viewModelScope.launch {
+            try {
+                val h = repository.checkAndRepair()
+                val text = "账本自检：检查 ${h.checkedAccounts} 个账户，" +
+                    "修复 ${h.repairedAccounts} 个，偏差合计 ${h.driftCents} 分。"
+                _state.value = _state.value.copy(healthText = text, message = text, error = "")
+            } catch (e: Exception) {
+                fail("自检失败：" + (e.message ?: e.javaClass.simpleName))
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    fun loadCategories() {
+        viewModelScope.launch {
+            val all = withContext(Dispatchers.IO) { categoryDao.all() }
+            _state.value = _state.value.copy(categories = all)
+        }
+    }
+
+    fun createCategory(name: String, type: RecordType, parentId: Long?) {
+        viewModelScope.launch {
+            try {
+                val level = if (parentId == null) 0 else 1
+                repository.createCategory(
+                    CategoryEntity(
+                        name = name.trim(), type = type, parentId = parentId, level = level
+                    )
+                )
+                loadCategories()
+                message("已新增分类「${name.trim()}」")
+            } catch (e: IllegalArgumentException) {
+                fail(e.message ?: "分类不合法")
+            }
+        }
+    }
+
+    fun renameCategory(id: Long, name: String) {
+        viewModelScope.launch {
+            try {
+                repository.renameCategory(id, name)
+                loadCategories()
+            } catch (e: IllegalArgumentException) {
+                fail(e.message ?: "改名失败")
+            }
+        }
+    }
+
+    fun archiveCategory(id: Long) {
+        viewModelScope.launch {
+            repository.archiveCategory(id)
+            loadCategories()
+            message("分类已归档；历史流水归属不变")
+        }
+    }
+
+    fun moveCategory(id: Long, delta: Int) {
+        viewModelScope.launch {
+            val group = _state.value.categories.filter { !it.isArchived }
+            val idx = group.indexOfFirst { it.id == id }
+            val target = idx + delta
+            if (idx < 0 || target !in group.indices) return@launch
+            val swapped = group.toMutableList().apply {
+                val a = this[idx]; this[idx] = this[target]; this[target] = a
+            }
+            repository.reorderCategories(swapped.map { it.id })
+            loadCategories()
+        }
+    }
+
+    /** 供 UI 显示默认阈值，避免有人把偏好写成非法值后界面一片空白。 */
+    val defaultThresholdCents: Long = Reconciliation.TAIL_DIFFERENCE_THRESHOLD_CENTS
+}
