@@ -252,7 +252,7 @@ offline-ledger/
 ## 当前进行中的改动
 
 **无**。阶段 0 / 1 / 2 / 3 / 4 均已按规范归档，
-8 个模块现为 **116 条 Requirement / 168 个 Scenario**。
+8 个模块现为 **116 条 Requirement / 166 个 Scenario**。
 阶段 4 首次由**同一条 Requirement 的第二次 MODIFIED** 收口统计页占位。
 归档 `design.md` 记录了阶段 5 必须处理的 **3 处规格债**：
 ① 「后续阶段不改导航」Scenario 仍含阶段号；② 明文导出入口将被 SAF 加密导出替换；
