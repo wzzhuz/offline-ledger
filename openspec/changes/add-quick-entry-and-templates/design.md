@@ -239,6 +239,50 @@ WorkManager 会引入新依赖与后台行为，沙盒无法验证，
   周期账不漏不重；v1 备份仍可导入；4 Tab 与既有交互零改动；
   零新增依赖、零新增权限、零网络行为
 
+## 首轮 CI 实测：编译全过，挂在既有测试的硬编码常数
+
+| run | commit | 结论 | 说明 |
+|---|---|---|---|
+| `43386388893` | `cf33b6c697` | cancelled | 首推被后一次 push 的 concurrency 取消 |
+| `43386488446` | `a79c3011fb` | failure | Kotlin 测试源码里 v1 JSON 的双重转义写成非法字面量 |
+| `43387143071` | `068fd4c89e` | failure | 编译已全过；只剩 `BackupEnvelopeTest` 一个断言失败 |
+
+**两处真实问题，都不是架构问题**：
+
+1. **Python 拼 Kotlin 的双重转义**：`BackupV1CompatTest` 的 v1 JSON
+   先经修正脚本写入生成脚本、再执行生成脚本落盘，`\"` 在两层 Python
+   字符串里被吃掉了反斜杠，产出 `""envelope":...` 这种非法 Kotlin。
+   `check_kotlin_strings.py` 数引号是偶数所以没抓到——它防的是
+   「真实换行」，不是「转义丢失」。改成**单行 Kotlin 三引号原始字符串**
+   后编译通过。这是阶段 0 起记过的 `\n` 转义坑的一个新变体，
+   建议上提踩坑清单时补一句「生成脚本里嵌 JSON 一律用原始字符串」。
+2. **`BackupEnvelopeTest` 硬编码 `assertEquals(1, BackupSchema.CURRENT)`**。
+   阶段 6a 把 CURRENT 升到 2 后它必然失败。改成不手写 CURRENT，
+   只锁住真正需要长期成立的 `MIN_SUPPORTED == 1` 与
+   `CURRENT > MIN_SUPPORTED`。这是本仓库**第 8 次「凭印象手写常数」**
+   （前七次：147000 净资产、维度数 8、漏传 3 个必填参数、
+   168→166、4 字口令、7 次校验自误报中的常数、以及本次）。
+   共同模式：约束写在代码里，测试却凭语感固化了某个瞬时值。
+
+**排期引擎自己也写错过两处**，本地用 Python 复算后修掉，
+没留给 CI 去发现：
+- `monthly_first_day...` 用默认 60 天窗口时被截掉 1 月 1 日，
+  断言 4 个实际只有 3 个 → 单测辅助函数默认窗口放宽到 400，
+  只有 `catch_up_is_capped` 显式传 60
+- `minusDays(60)` 含两端会生成 **61** 条，与「60 天上限」语义不符 →
+  引擎 floor 改为 `minusDays(maxCatchUpDays - 1)`，严格 N 条
+
+**job logs / check-runs 仍然 403**，诊断靠临时在 `build.yml` 里
+把 Gradle 日志 commit 回 `diag/test.log`（GITHUB_TOKEN 推的 commit
+不触发新 workflow，没有循环）。诊断步骤用完已移除，
+`diag/` 文件由推送脚本按远端基线删除，不留残留。
+
+**Kotlin 编译一次通过的部分**（`068fd4c89e` 已证明）：
+Room KSP 处理 `version = 2` 与两张新 Entity、Converters 的 Cadence、
+`Migration(1→2)`、26 个写方法、Compose 的 `AssistChip` / `TabRow` /
+`DropdownMenu` / 静态 shortcuts 资源——**全部零编译错误**。
+这只能证明编译，不能证明真机 `Migration(1→2)` 升级成功。
+
 ## 风险
 
 **残余风险 1（最大）**：`Migration(1→2)` 在真机覆盖升级时
