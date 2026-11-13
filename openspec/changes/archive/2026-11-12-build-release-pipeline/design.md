@@ -266,6 +266,41 @@ artifacts 列表 API 能读到名字，于是无需下载 zip 就能核验体积
 与坚果云上传状态。`if: always()` + `continue-on-error: true`，
 不让这个辅助步骤拖垮主流程。
 
+## 实测：两次 release run 全绿，R8 减少 24.9%
+
+| run | commit | 结论 | 说明 |
+|---|---|---|---|
+| `43379471531` | `de24fc5ff1` | **success** | 首次触发，`minify=both`、`create_release=false`、`upload_nutstore=true`；24 步全绿 |
+| `43381245320` | `abb1655475` | **success** | 补「构建指标制品」后复跑，确认改动无回归 |
+
+- **工作流注册**：`编译 Release 包` id=416950295，state=**active**。
+  在 Actions 页能看到，不是「查不到=通过」。
+- **push CI**：`43378544043` success，六个静态检查 + 单测 + debug APK +
+  release lintVital 全绿。
+- **R8 体积对比**（同一次构建唯一变量就是 `minify`，对比干净）：
+
+  | | bytes | MiB |
+  |---|---|---|
+  | plain | 31,964,607 | 30.48 |
+  | minified | 24,017,315 | 22.90 |
+  | **减少** | **7,947,292** | **7.58（24.9%）** |
+
+  数值来自指标制品名
+  `offline-ledger-metrics-v0.1.0-p31964607-m24017315-nsfalse`，
+  无需下载 artifact zip（该通道在 fine-grained PAT 下 403）。
+- `mapping.txt` 制品 3,031,065 bytes 已上传。
+- **坚果云**：步骤 conclusion=success、`nsfalse` = `skipped=false`，
+  说明凭据已配且认证 / 两级 MKCOL / 上传四步均未触发失败分支。
+  **如实说明**：HEAD 落盘校验只写日志不中断，因此不把「HEAD 200」
+  当作已独立验证的事实。
+- 首次 CI 零编译错误；唯一一次失败是本地新增的
+  `check_workflow_syntax.py` 自误报（把路径变量当产物名，第 7 次同类坑），
+  已双修正后全绿。
+
+**未验证的边界（不在本 change 范围）**：R8 包真机启动、
+SQLCipher 真机打开数据库、BiometricPrompt 弹窗、SAF 文件选择器、
+5 万条切月 / 年报聚合耗时。CI 编译通过不等于 release 包真机能用。
+
 ## 风险
 
 **残余风险 1**：R8 混淆后真机启动崩溃（序列化 / JNI 边界）。
@@ -294,7 +329,7 @@ artifacts 列表 API 能读到名字，于是无需下载 zip 就能核验体积
 - [x] 使用者确认「按推荐来」：先归档 / 正式签名可选 / R8 默认 on
 - [x] 通过 API 实际读取 lifelog 的 8 个参照文件
 - [x] 2 份 delta 共 9 条 ADDED（build-and-ci 8 + privacy-security 1），每条至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
-- [ ] CI 全绿（写作时未完成）
-- [ ] 手动触发一次 `release.yml` 并回报体积对比
-- [ ] 推送后用远端 Git Trees API 逐文件比对 blob sha
+- [x] CI 全绿（`43378544043` / `43379471531` / `43381245320` 三次 success）
+- [x] 手动触发两次 `release.yml`（`minify=both`），体积对比见上表
+- [x] 三次推送后均用远端 Git Trees API 逐文件比对 blob sha（PASS）
 - [ ] 使用者确认后归档本 change

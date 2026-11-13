@@ -24,48 +24,48 @@
 - [x] 2.3 `tasks.md` —— 本文件
 - [x] 2.4 `specs/build-and-ci/spec.md` —— ADDED 8 条
 - [x] 2.5 `specs/privacy-security/spec.md` —— ADDED 1 条（CI 网络 vs App 权限）
-- [ ] 2.6 推送 change 文件到远端并用 API 校验
+- [x] 2.6 推送 change 文件到远端并用 API 校验（PASS）
 
 ## 3. release.yml 与 .github/scripts
 
-- [ ] 3.1 `.github/workflows/release.yml`：`workflow_dispatch` + 6 个 inputs
+- [x] 3.1 `.github/workflows/release.yml`：`workflow_dispatch` + 6 个 inputs
   （`version_name` / `create_release` / `minify` / `lint` /
   `build_aab` / `upload_nutstore` / `nutstore_folder`）
-- [ ] 3.2 `.github/scripts/prepare-signing.sh`：`OFFLINELEDGER_*` 环境变量，
+- [x] 3.2 `.github/scripts/prepare-signing.sh`：`OFFLINELEDGER_*` 环境变量，
   四项全齐才启用正式密钥，缺失降级
-- [ ] 3.3 `.github/scripts/cleanup-artifacts.sh`：按 glob 保留最近 N 个
-- [ ] 3.4 坚果云四步上传 + Summary 诊断 + EXIT trap
-- [ ] 3.5 产物重命名纯 ASCII、`mapping.txt` 制品、`overwrite: true`
+- [x] 3.3 `.github/scripts/cleanup-artifacts.sh`：按 glob 保留最近 N 个
+- [x] 3.4 坚果云四步上传 + Summary 诊断 + EXIT trap
+- [x] 3.5 产物重命名纯 ASCII、`mapping.txt` 制品、`overwrite: true`
 
 ## 4. Gradle 与 proguard
 
-- [ ] 4.1 `app/build.gradle.kts`：`defaultVersionName` + `versionCodeFrom()` +
+- [x] 4.1 `app/build.gradle.kts`：`defaultVersionName` + `versionCodeFrom()` +
   CI 覆盖机制（不再恒为 1）
-- [ ] 4.2 `-PminifyRelease` 开关、`isShrinkResources`、正式签名 `official`
+- [x] 4.2 `-PminifyRelease` 开关、`isShrinkResources`、正式签名 `official`
   signingConfig
-- [ ] 4.3 `app/proguard-rules.pro` 替换占位注释为完整 keep 规则
-- [ ] 4.4 `scripts/check_workflow_syntax.py` 并接入 `build.yml` 静态检查步骤
+- [x] 4.3 `app/proguard-rules.pro` 替换占位注释为完整 keep 规则
+- [x] 4.4 `scripts/check_workflow_syntax.py` 并接入 `build.yml` 静态检查步骤
 
 ## 5. 文档同步
 
-- [ ] 5.1 `README.md` 状态与出包阶段说明
-- [ ] 5.2 `project.md` 构建与发布节同步
-- [ ] 5.3 `build.yml` 的静态检查步骤加第 6 个脚本
+- [x] 5.1 `README.md` 状态与出包阶段说明
+- [x] 5.2 `project.md` 构建与发布节同步
+- [x] 5.3 `build.yml` 的静态检查步骤加第 6 个脚本
 
 ## 6. 测试与验证
 
-- [ ] 6.1 本地六个检查脚本全部 PASS
-- [ ] 6.2 单次 commit 推送后用 GitHub API 查 Actions 列表，确认**确实触发**
-- [ ] 6.3 确认 push CI 全绿、workflow 在 Actions 页可见
-- [ ] 6.4 **手动触发一次 `release.yml`**（`minify=both`、
+- [x] 6.1 本地六个检查脚本全部 PASS
+- [x] 6.2 单次 commit 推送后用 GitHub API 查 Actions 列表（workflow state=active），确认**确实触发**
+- [x] 6.3 确认 push CI 全绿（run 43378544043）、workflow 在 Actions 页可见
+- [x] 6.4 **手动触发两次 `release.yml`**（43379471531 / 43381245320 均 success）（`minify=both`、
   `create_release=false`、`upload_nutstore=true`）
-- [ ] 6.5 轮询 run，回报 plain / minified 体积对比与坚果云状态
-- [ ] 6.6 失败按 `design.md` 第 8 节回退顺序单次修复后重推
+- [x] 6.5 plain 31,964,607 B → minified 24,017,315 B（-24.9%）；坚果云 skipped=false
+- [x] 6.6 唯一失败是 workflow 语法检查自误报（第 7 次），双修正后全绿
 
 ## 7. 收尾
 
-- [ ] 7.1 同步 `design.md` / `tasks.md` 的实测结果
-- [ ] 7.2 推完用远端 API 逐文件比对 blob sha
+- [x] 7.1 同步 `design.md` / `tasks.md` 的实测结果
+- [x] 7.2 推完用远端 API 逐文件比对 blob sha（PASS）
 - [ ] 7.3 使用者确认后归档本 change（9 条 ADDED 合并 + change 移入 archive）
 
 ## 明确留到后续（不预先打勾）
