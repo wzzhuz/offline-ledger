@@ -21,11 +21,11 @@ import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 
 /**
- * 阶段 6b：第二次结构升级（2 -> 3），首次含 ALTER TABLE。
- * 阶段 6a：首次真正的结构升级（1 -> 2）。
- * 两张新表刻意不声明索引 / 外键，让 Migration 只需两条 CREATE TABLE。
- * exportSchema 仍为 false：CI 无模拟器跑不了 MigrationTestHelper，
- * 导出 JSON 不产生验证价值，取舍见 changes/.../design.md。
+ * 稳定版前按使用者授权重置为 version 1、不注册任何 Migration。
+ * 使用者只会用测试数据且在满意前不会长期使用，不需要保留升级路径；
+ * 全新安装走 onCreate，按 Entity 直接建含 payee 列的最新表结构。
+ * 三段迁移 SQL 常量保留在 Migrations.kt 供历史追溯与测试，但 ALL 为空。
+ * exportSchema = false：CI 无模拟器跑不了 MigrationTestHelper。
  */
 @Database(
     entities = [
@@ -38,7 +38,7 @@ import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
         RecurringRuleEntity::class,
         BudgetEntity::class
     ],
-    version = 4,
+    version = 1,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

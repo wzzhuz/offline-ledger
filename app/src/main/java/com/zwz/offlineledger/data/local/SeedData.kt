@@ -81,7 +81,7 @@ object SeedData {
             val limit = x.creditLimitCents?.toString() ?: "NULL"
             out += "INSERT INTO accounts (id, name, type, initialBalanceCents, balanceCents, creditLimitCents, includeInTotal, isArchived, sortOrder, currencyCode, lastReconciledAt, lastReconciledBalanceCents) " +
                 "VALUES (${x.id}, '${x.name}', '${x.type.name}', 0, 0, $limit, 1, 0, " +
-                "${x.sortOrder}, 'HKD', NULL, NULL)"
+                "${x.sortOrder}, 'CNY', NULL, NULL)"
         }
         return out
     }

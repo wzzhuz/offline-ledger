@@ -6,14 +6,15 @@ import java.time.LocalDate
 /**
  * CSV / TSV 明文编解码，纯 JVM、零第三方依赖。
  *
- * 表头固定 8 列，顺序可不同（按列名映射）；UTF-8 with BOM 保证 Excel 中文不乱码。
+ * 表头固定 9 列，顺序可不同（按列名映射）；UTF-8 with BOM 保证 Excel 中文不乱码。
+ * payee 为可选列：导出必带，导入缺列按空串处理，保证旧 8 列 CSV 仍可导入。
  * 金额只在展示层用 BigDecimal 换算，`Long` 分始终是真相源。
  */
 object CsvCodec {
 
     val HEADER: List<String> = listOf(
         "date", "type", "amount", "account",
-        "categoryRoot", "category", "note", "currencyCode"
+        "categoryRoot", "category", "note", "currencyCode", "payee"
     )
 
     private val BOM = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
@@ -27,7 +28,7 @@ object CsvCodec {
         rows.forEach { r ->
             val cells = listOf(
                 r.date, r.type, r.amountYuan, r.accountName,
-                r.categoryRoot, r.category, r.note, r.currencyCode
+                r.categoryRoot, r.category, r.note, r.currencyCode, r.payee
             )
             sb.append(cells.joinToString(",") { escape(it) }).append("\r\n")
         }
@@ -48,7 +49,8 @@ object CsvCodec {
 
         val header = raw.first()
         val idx = HEADER.associateWith { name -> header.indexOf(name.trim()) }
-        val missing = idx.filter { it.value < 0 }.keys.toList()
+        // payee 是可选列：旧版导出的 8 列文件不应因缺它而整份拒绝。
+        val missing = idx.filter { it.value < 0 }.keys.toList().filter { it != "payee" }
         if (missing.isNotEmpty()) {
             return CsvParseResult(emptyList(), listOf("表头缺少列：" + missing.joinToString(", ")))
         }
@@ -69,6 +71,7 @@ object CsvCodec {
             val child = get("category")
             val note = get("note")
             val cc = get("currencyCode")
+            val payee = get("payee")
 
             val lineErrors = mutableListOf<String>()
             if (!DATE_RE.matches(date) || !validDate(date)) lineErrors += "日期非法（应为 YYYY-MM-DD）"
@@ -86,7 +89,7 @@ object CsvCodec {
             if (root.isBlank()) lineErrors += "一级分类为空"
 
             if (lineErrors.isEmpty()) {
-                rows += CsvRow(date, type, amount, account, root, child, note, cc)
+                rows += CsvRow(date, type, amount, account, root, child, note, cc, payee)
             } else {
                 errors += "第 $lineNo 行：" + lineErrors.joinToString("、")
             }

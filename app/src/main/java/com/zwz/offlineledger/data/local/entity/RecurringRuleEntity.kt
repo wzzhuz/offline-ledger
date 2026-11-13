@@ -30,9 +30,12 @@ data class RecurringRuleEntity(
     @ColumnInfo(name = "dayOfMonth") val dayOfMonth: Int = 1,
     /** WEEKLY 用：ISO 1=Mon .. 7=Sun。 */
     @ColumnInfo(name = "dayOfWeek") val dayOfWeek: Int = 1,
-    /** YYYYMMDD，按 Asia/Hong_Kong 口径。 */
+    /** YYYYMMDD，按 Asia/Shanghai 口径。 */
     @ColumnInfo(name = "anchorLocalDate") val anchorLocalDate: Int,
     @ColumnInfo(name = "lastGeneratedLocalDate") val lastGeneratedLocalDate: Int? = null,
     @ColumnInfo(name = "isEnabled") val isEnabled: Boolean = true,
-    @ColumnInfo(name = "createdAt") val createdAt: Long = 0L
+    @ColumnInfo(name = "createdAt") val createdAt: Long = 0L,
+    /** 阶段 7：补记流水时带入收款方。 */
+    @ColumnInfo(name = "payee", defaultValue = "''")
+    val payee: String = ""
 )

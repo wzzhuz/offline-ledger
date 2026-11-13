@@ -20,4 +20,7 @@ interface TrashDao {
 
     @Query("DELETE FROM trash")
     suspend fun clear()
+
+    @Query("UPDATE trash SET currencyCode = :code")
+    suspend fun updateAllCurrency(code: String)
 }

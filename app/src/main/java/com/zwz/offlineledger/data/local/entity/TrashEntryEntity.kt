@@ -26,7 +26,10 @@ data class TrashEntryEntity(
     /** 与 records.linkedRecordId 同步，保证 SETTLEMENT 删除后恢复不丢关联。 */
     @ColumnInfo(name = "linkedRecordId") val linkedRecordId: Long? = null,
     /** 与 records.currencyCode 同步，删除->恢复不丢币种。 */
-    @ColumnInfo(name = "currencyCode", defaultValue = "'HKD'")
+    @ColumnInfo(name = "currencyCode", defaultValue = "'CNY'")
     val currencyCode: String = LedgerCurrency.DEFAULT,
+    /** 与 records.payee 同步，删除->恢复不丢收款方。 */
+    @ColumnInfo(name = "payee", defaultValue = "''")
+    val payee: String = "",
     @ColumnInfo(name = "deletedAt") val deletedAt: Long = 0L
 )

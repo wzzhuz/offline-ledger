@@ -151,10 +151,12 @@ class LedgerRepository @Inject constructor(
                 yearMonth = it.yearMonth, note = it.note,
                 excludeFromStats = it.excludeFromStats,
                 linkedRecordId = it.linkedRecordId,
-                currencyCode = it.currencyCode
+                currencyCode = it.currencyCode,
+                payee = it.payee
             )
         },
-        exportedAtEpochMilli = System.currentTimeMillis()
+        exportedAtEpochMilli = System.currentTimeMillis(),
+        currencyCode = LedgerCurrency.DEFAULT
     )
 
     /** 全量替换的覆盖导入：先清子表再清父表，事务末尾强制重算。 */
@@ -231,16 +233,34 @@ class LedgerRepository @Inject constructor(
         id
     }
 
-    /** 改名 / 计入净资产 / 额度 / 排序；不改余额真相源，仍统一走事务入口。 */
+    /**
+     * 阶段 7：账户编辑。期初余额是真相源之一，改完 MUST 重算余额缓存；
+     * 币种只是标签，不改金额。
+     */
     suspend fun updateAccountMeta(
         id: Long,
         name: String,
         includeInTotal: Boolean,
         creditLimitCents: Long?,
-        sortOrder: Int
+        sortOrder: Int,
+        initialBalanceCents: Long,
+        currencyCode: String
     ) = db.withTransaction {
         require(name.isNotBlank()) { "账户名不能为空" }
-        accountDao.updateAccountMeta(id, name, includeInTotal, creditLimitCents, sortOrder)
+        accountDao.updateAccountMeta(
+            id, name, includeInTotal, creditLimitCents, sortOrder,
+            initialBalanceCents, currencyCode
+        )
+        rebuildAllBalancesInternal()
+    }
+
+    /** 阶段 7：显式批量统一币种。只改冗余标签，金额一分不动，事务末尾重算。 */
+    suspend fun applyCurrencyToAll(code: String) = db.withTransaction {
+        require(code in LedgerCurrency.SUPPORTED) { "不支持的币种：$code" }
+        accountDao.updateAllCurrency(code)
+        recordDao.updateAllCurrency(code)
+        trashDao.updateAllCurrency(code)
+        rebuildAllBalancesInternal()
     }
 
     /** 只归档不物理删；有流水的账户历史明细仍可查。 */
@@ -412,7 +432,8 @@ class LedgerRepository @Inject constructor(
             note = if (original.note.isBlank()) "报销 / 退款" else "报销 / 退款：" + original.note,
             excludeFromStats = false,
             linkedRecordId = originalId,
-            currencyCode = original.currencyCode
+            currencyCode = original.currencyCode,
+            payee = original.payee
         )
         val id = recordDao.insert(withResolvedRoot(entity))
         rebuildAllBalancesInternal()
@@ -485,7 +506,8 @@ class LedgerRepository @Inject constructor(
             categoryRoot = r.rootName,
             category = r.categoryName,
             note = r.note,
-            currencyCode = r.currencyCode
+            currencyCode = r.currencyCode,
+            payee = r.payee
         )
     }
 
@@ -532,7 +554,8 @@ class LedgerRepository @Inject constructor(
                 localDate = ld,
                 yearMonth = ld / 100,
                 note = row.note,
-                excludeFromStats = false
+                excludeFromStats = false,
+                payee = row.payee
             )
             recordDao.insert(withResolvedRoot(entity))
             written++

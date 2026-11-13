@@ -1,9 +1,11 @@
 package com.zwz.offlineledger.ui.record
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,6 +16,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -46,7 +52,13 @@ import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.components.CategoryIcon
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneOffset
 
+/**
+ * 阶段 7 紧凑版记一笔：备注与收款方首屏可见、分类横向单行、
+ * 纯数字键盘、日历可选任意日期。「更多」折叠低频开关。
+ */
 @Composable
 fun RecordEditorDialog(
     recordId: Long?,
@@ -68,8 +80,12 @@ fun RecordEditorDialog(
     val state by vm.state.collectAsState()
     val accounts by vm.accounts.collectAsState()
     val categories by vm.categories.collectAsState()
+    val payees by vm.payees.collectAsState()
     var errorText by remember { mutableStateOf<String?>(null) }
+    var showMore by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val localDate = LedgerClock.fromEpochMilli(state.timestamp).localDate
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -77,7 +93,10 @@ fun RecordEditorDialog(
     ) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Filled.Close, contentDescription = "关闭")
                     }
@@ -94,21 +113,19 @@ fun RecordEditorDialog(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 12.dp)
                 ) {
-                    // 只在新建时显示：编辑已有流水不该被模板 chips 干扰。
                     if (recordId == null && templateQuickPick) {
                         TemplateQuickPickBar(onPicked = onSaved)
                     }
                     TypeTabs(state.type) { vm.setType(it) }
 
                     Text(
-                        text = if (state.amountExpr.isBlank()) "0.00"
-                        else state.amountExpr,
+                        text = if (state.amountExpr.isBlank()) "0.00" else state.amountExpr,
                         style = MaterialTheme.typography.displaySmall,
-                        modifier = Modifier.padding(vertical = 8.dp)
+                        modifier = Modifier.padding(vertical = 6.dp)
                     )
 
                     if (state.type != RecordType.TRANSFER) {
-                        CategoryGrid(
+                        CategoryStrip(
                             categories = categories,
                             type = state.type,
                             selectedId = state.categoryId,
@@ -118,7 +135,7 @@ fun RecordEditorDialog(
                         )
                     }
 
-                    AccountSection(
+                    AccountStrip(
                         type = state.type,
                         accounts = accounts,
                         fromId = state.fromAccountId,
@@ -128,25 +145,54 @@ fun RecordEditorDialog(
                     )
 
                     DateRow(
-                        localDate = LedgerClock.fromEpochMilli(state.timestamp).localDate,
+                        localDate = localDate,
+                        onPick = { showDatePicker = true },
                         onPrev = { vm.shiftDay(-1) },
                         onNext = { vm.shiftDay(1) },
                         onToday = { vm.setToday() }
                     )
 
-                    OutlinedTextField(
-                        value = state.note,
-                        onValueChange = { vm.setNote(it) },
-                        label = { Text("备注") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "不计入收支", modifier = Modifier.weight(1f))
-                        Switch(
-                            checked = state.excludeFromStats,
-                            onCheckedChange = { vm.setExclude(it) }
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = state.note,
+                            onValueChange = { vm.setNote(it) },
+                            label = { Text("备注") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).padding(end = 4.dp)
                         )
+                        OutlinedTextField(
+                            value = state.payee,
+                            onValueChange = { vm.setPayee(it) },
+                            label = { Text("收款方") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).padding(start = 4.dp)
+                        )
+                    }
+
+                    if (payees.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                        ) {
+                            payees.take(8).forEach { p ->
+                                TextButton(onClick = { vm.setPayee(p) }) {
+                                    Text(p, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+
+                    TextButton(onClick = { showMore = !showMore }) {
+                        Text(if (showMore) "收起" else "更多")
+                    }
+                    if (showMore) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "不计入收支", modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = state.excludeFromStats,
+                                onCheckedChange = { vm.setExclude(it) }
+                            )
+                        }
                     }
 
                     errorText?.let {
@@ -163,20 +209,24 @@ fun RecordEditorDialog(
                             if (err == null) onSaved() else errorText = err
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp)
-                ) {
-                    Text("保存")
-                }
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                ) { Text("保存") }
             }
         }
+    }
+
+    if (showDatePicker) {
+        LedgerDatePicker(
+            timestamp = state.timestamp,
+            onDismiss = { showDatePicker = false },
+            onConfirm = { vm.setDate(it); showDatePicker = false }
+        )
     }
 }
 
 @Composable
 private fun TypeTabs(current: RecordType, onSelect: (RecordType) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf(
             "支出" to RecordType.EXPENSE,
             "收入" to RecordType.INCOME,
@@ -191,9 +241,9 @@ private fun TypeTabs(current: RecordType, onSelect: (RecordType) -> Unit) {
     }
 }
 
-/** 一级彩色圆网格；点一级即可直接记，展开的二级 chips 只是可选细分。 */
+/** 一级横向单行；点一级即可直接记，二级 chips 只是可选细分。 */
 @Composable
-private fun CategoryGrid(
+private fun CategoryStrip(
     categories: List<CategoryEntity>,
     type: RecordType,
     selectedId: Long?,
@@ -201,61 +251,55 @@ private fun CategoryGrid(
     onSelect: (Long, Long) -> Unit,
     onKeepRoot: () -> Unit
 ) {
-    val roots = categories.filter {
-        it.level == 0 && it.type == type && !it.isArchived
-    }
-    roots.chunked(4).forEach { row ->
-        Row(modifier = Modifier.fillMaxWidth()) {
-            row.forEach { root ->
-                val chosen = selectedId == root.id
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(4.dp)
-                        .clickable { onSelect(root.id, root.id) }
-                ) {
-                    CategoryIcon(root.name, root.colorHex, size = if (chosen) 46 else 40)
-                    Text(
-                        text = root.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (chosen) LedgerColors.IncomeGreen else LedgerColors.Neutral
-                    )
-                }
+    val roots = categories.filter { it.level == 0 && it.type == type && !it.isArchived }
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+    ) {
+        roots.forEach { root ->
+            val chosen = selectedId == root.id
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .clickable { onSelect(root.id, root.id) }
+            ) {
+                CategoryIcon(root.name, root.colorHex, size = if (chosen) 40 else 34)
+                Text(
+                    text = root.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (chosen) LedgerColors.IncomeGreen else LedgerColors.Neutral
+                )
             }
-            repeat(4 - row.size) { Text(text = "", modifier = Modifier.weight(1f)) }
         }
     }
 
     val expanded = categories.firstOrNull { it.id == expandedRootId }
     if (expanded != null) {
         val children = categories.filter { it.level == 1 && it.parentId == expanded.id }
-        Text(
-            text = "「${expanded.name}」下细分（可不选，直接保存按一级记）",
-            style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            children.chunked(3).forEach { group ->
-                Column(modifier = Modifier.weight(1f)) {
-                    group.forEach { child ->
-                        TextButton(onClick = { onSelect(child.id, expanded.id) }) {
-                            Text(
-                                text = child.name,
-                                color = if (selectedId == child.id) LedgerColors.IncomeGreen
-                                else LedgerColors.Neutral
-                            )
-                        }
-                    }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
+            children.forEach { child ->
+                TextButton(onClick = { onSelect(child.id, expanded.id) }) {
+                    Text(
+                        text = child.name,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (selectedId == child.id) LedgerColors.IncomeGreen
+                        else LedgerColors.Neutral
+                    )
                 }
             }
+            TextButton(onClick = onKeepRoot) {
+                Text("就按「${expanded.name}」记", style = MaterialTheme.typography.labelSmall)
+            }
         }
-        TextButton(onClick = onKeepRoot) { Text("就按「${expanded.name}」记") }
     }
 }
 
 @Composable
-private fun AccountSection(
+private fun AccountStrip(
     type: RecordType,
     accounts: List<AccountEntity>,
     fromId: Long?,
@@ -265,40 +309,39 @@ private fun AccountSection(
 ) {
     val visible = accounts.filter { !it.isArchived }
     if (type == RecordType.TRANSFER) {
-        Text(text = "转出账户", style = MaterialTheme.typography.labelLarge)
-        AccountRow(visible, fromId, onFrom)
-        Text(text = "转入账户", style = MaterialTheme.typography.labelLarge)
-        AccountRow(visible, toId, onTo)
+        AccountChips("转出", visible, fromId, onFrom)
+        AccountChips("转入", visible, toId, onTo)
     } else {
         val chosenId = if (type == RecordType.EXPENSE) fromId else toId
-        val chosenCurrency = visible.firstOrNull { it.id == chosenId }?.currencyCode
-        Text(
-            text = (if (type == RecordType.EXPENSE) "支出账户" else "收入账户") +
-                (chosenCurrency?.let { " · $it" } ?: ""),
-            style = MaterialTheme.typography.labelLarge
-        )
-        if (type == RecordType.EXPENSE) AccountRow(visible, fromId, onFrom)
-        else AccountRow(visible, toId, onTo)
+        val cc = visible.firstOrNull { it.id == chosenId }?.currencyCode
+        val label = (if (type == RecordType.EXPENSE) "支出账户" else "收入账户") +
+            (cc?.let { " · $it" } ?: "")
+        AccountChips(label, visible, chosenId,
+            if (type == RecordType.EXPENSE) onFrom else onTo)
     }
 }
 
 @Composable
-private fun AccountRow(
+private fun AccountChips(
+    label: String,
     accounts: List<AccountEntity>,
     selectedId: Long?,
     onSelect: (Long) -> Unit
 ) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        accounts.chunked(3).forEach { group ->
-            Column(modifier = Modifier.weight(1f)) {
-                group.forEach { a ->
-                    TextButton(onClick = { onSelect(a.id) }) {
-                        Text(
-                            text = if (a.id == selectedId) "● ${a.name}" else a.name,
-                            color = if (a.id == selectedId) LedgerColors.IncomeGreen
-                            else LedgerColors.Neutral
-                        )
-                    }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(text = label, style = MaterialTheme.typography.labelSmall)
+        Row(
+            modifier = Modifier.weight(1f)
+                .horizontalScroll(rememberScrollState())
+        ) {
+            accounts.forEach { a ->
+                TextButton(onClick = { onSelect(a.id) }) {
+                    Text(
+                        text = if (a.id == selectedId) "● ${a.name}" else a.name,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (a.id == selectedId) LedgerColors.IncomeGreen
+                        else LedgerColors.Neutral
+                    )
                 }
             }
         }
@@ -308,15 +351,16 @@ private fun AccountRow(
 @Composable
 private fun DateRow(
     localDate: Int,
+    onPick: () -> Unit,
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onToday: () -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = onPick) { Text(MonthRange.dateLabel(localDate)) }
         IconButton(onClick = onPrev) {
             Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "前一天")
         }
-        Text(text = MonthRange.dateLabel(localDate), modifier = Modifier.weight(1f))
         IconButton(onClick = onNext) {
             Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "后一天")
         }
@@ -324,14 +368,38 @@ private fun DateRow(
     }
 }
 
+/** 日历回传 UTC 午夜毫秒，ViewModel 再换算回本地时区，避免差一天。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LedgerDatePicker(
+    timestamp: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    val localDate = Instant.ofEpochMilli(timestamp)
+        .atZone(LedgerClock.zoneId).toLocalDate()
+    val utcMillis = localDate.atStartOfDay(ZoneOffset.UTC)
+        .toInstant().toEpochMilli()
+    val pickerState = rememberDatePickerState(initialSelectedDateMillis = utcMillis)
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { pickerState.selectedDateMillis?.let(onConfirm) }) {
+                Text("确定")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    ) { DatePicker(state = pickerState) }
+}
+
+/** 阶段 7：纯数字键盘，无加减乘除与括号。空字符串占位只做 Spacer。 */
 @Composable
 private fun CalculatorKeypad(onKey: (String) -> Unit) {
     val keys = listOf(
-        "7", "8", "9", "÷",
-        "4", "5", "6", "×",
-        "1", "2", "3", "-",
-        "C", "0", ".", "+",
-        "⌫", "(", ")", "="
+        "7", "8", "9", "⌫",
+        "4", "5", "6", "C",
+        "1", "2", "3", ".",
+        "", "0", "", ""
     )
     Column(modifier = Modifier.padding(horizontal = 8.dp)) {
         keys.chunked(4).forEach { row ->
@@ -340,10 +408,14 @@ private fun CalculatorKeypad(onKey: (String) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 row.forEach { key ->
-                    TextButton(
-                        onClick = { onKey(key) },
-                        modifier = Modifier.weight(1f)
-                    ) { Text(text = key, style = MaterialTheme.typography.titleMedium) }
+                    if (key.isEmpty()) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    } else {
+                        TextButton(
+                            onClick = { onKey(key) },
+                            modifier = Modifier.weight(1f)
+                        ) { Text(text = key, style = MaterialTheme.typography.titleMedium) }
+                    }
                 }
             }
         }

@@ -28,7 +28,8 @@ data class RecordRow(
     val categoryName: String?,
     val categoryColorHex: String?,
     val fromAccountName: String?,
-    val toAccountName: String?
+    val toAccountName: String?,
+    val payee: String = ""
 )
 
 /** 账户详情专属流水行。 */
@@ -86,7 +87,8 @@ data class CsvSourceRow(
     val currencyCode: String,
     val accountName: String,
     val rootName: String,
-    val categoryName: String
+    val categoryName: String,
+    val payee: String = ""
 )
 
 @Dao
@@ -159,6 +161,7 @@ interface RecordDao {
                r.timestamp AS timestamp, r.localDate AS localDate,
                r.yearMonth AS yearMonth, r.note AS note,
                r.excludeFromStats AS excludeFromStats,
+               COALESCE(r.payee, '') AS payee,
                c.name AS categoryName, c.colorHex AS categoryColorHex,
                fa.name AS fromAccountName, ta.name AS toAccountName
           FROM records r
@@ -408,6 +411,7 @@ interface RecordDao {
         SELECT r.type AS type, r.amountCents AS amountCents,
                r.localDate AS localDate, COALESCE(r.note, '') AS note,
                r.currencyCode AS currencyCode,
+               COALESCE(r.payee, '') AS payee,
                COALESCE(a.name, '') AS accountName,
                COALESCE(rc.name, '') AS rootName,
                COALESCE(c.name, '') AS categoryName
@@ -435,4 +439,11 @@ interface RecordDao {
     suspend fun countDuplicate(
         accountId: Long, amountCents: Long, localDate: Int, note: String
     ): Int
+
+    /** 阶段 7：常用收款方自动补全，纯本地 DISTINCT，最多 20 个。 */
+    @Query("SELECT DISTINCT payee FROM records WHERE payee IS NOT NULL AND payee <> '' ORDER BY payee ASC LIMIT 20")
+    suspend fun distinctPayees(): List<String>
+
+    @Query("UPDATE records SET currencyCode = :code")
+    suspend fun updateAllCurrency(code: String)
 }

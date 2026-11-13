@@ -13,8 +13,9 @@ import com.zwz.offlineledger.data.local.entity.RecordEntity
 import com.zwz.offlineledger.data.model.LedgerCategory
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
-import com.zwz.offlineledger.engine.Calculator
 import com.zwz.offlineledger.engine.CategoryTree
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +30,7 @@ data class EditorState(
     val toAccountId: Long? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val note: String = "",
+    val payee: String = "",
     val excludeFromStats: Boolean = false,
     val loaded: Boolean = false
 )
@@ -49,6 +51,10 @@ class RecordEditorViewModel(
     private val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
     val categories: StateFlow<List<CategoryEntity>> = _categories.asStateFlow()
 
+    /** 阶段 7：本地 DISTINCT 出的常用收款方，最多 20 个。 */
+    private val _payees = MutableStateFlow<List<String>>(emptyList())
+    val payees: StateFlow<List<String>> = _payees.asStateFlow()
+
     /** 进程内记忆：下次打开直接预填，跨进程持久化留到阶段 5 偏好设置。 */
     private var lastAccountId: Long? = null
     private var lastCategoryId: Long? = null
@@ -61,6 +67,7 @@ class RecordEditorViewModel(
             val c = categoryDao.all()
             _accounts.value = a
             _categories.value = c
+            _payees.value = runCatching { recordDao.distinctPayees() }.getOrDefault(emptyList())
             val defaultAcc = lastAccountId ?: a.firstOrNull { !it.isArchived }?.id
             editingId = recordId
             if (recordId == null) {
@@ -87,6 +94,7 @@ class RecordEditorViewModel(
                         toAccountId = r.toAccountId,
                         timestamp = r.timestamp,
                         note = r.note,
+                        payee = r.payee,
                         excludeFromStats = r.excludeFromStats,
                         loaded = true
                     )
@@ -107,11 +115,15 @@ class RecordEditorViewModel(
         )
     }
 
+    /** 阶段 7：纯数字键盘，只追加数字 / 小数点 / 退格 / 清空，不再有表达式。 */
     fun onKey(key: String) {
-        _state.value = _state.value.copy(
-            amountExpr = if (key == "=") Calculator.simplify(_state.value.amountExpr)
-            else Calculator.append(_state.value.amountExpr, key)
-        )
+        val cur = _state.value.amountExpr
+        val next = when (key) {
+            "C" -> ""
+            "⌫" -> if (cur.isEmpty()) "" else cur.dropLast(1)
+            else -> cur + key
+        }
+        _state.value = _state.value.copy(amountExpr = next)
     }
 
     /** 点一级：既直接可选中（低摩擦），又展开二级 chips（可选细分）。 */
@@ -148,6 +160,21 @@ class RecordEditorViewModel(
         _state.value = _state.value.copy(note = v)
     }
 
+    fun setPayee(v: String) {
+        _state.value = _state.value.copy(payee = v)
+    }
+
+    /** 日历回传的是 UTC 午夜毫秒；换成同一本地日期、保留当前时分。 */
+    fun setDate(utcMidnightMillis: Long) {
+        val date = Instant.ofEpochMilli(utcMidnightMillis)
+            .atZone(ZoneOffset.UTC).toLocalDate()
+        val nowLocal = Instant.ofEpochMilli(_state.value.timestamp)
+            .atZone(LedgerClock.zoneId)
+        val ts = date.atTime(nowLocal.toLocalTime())
+            .atZone(LedgerClock.zoneId).toInstant().toEpochMilli()
+        _state.value = _state.value.copy(timestamp = ts)
+    }
+
     fun setExclude(v: Boolean) {
         _state.value = _state.value.copy(excludeFromStats = v)
     }
@@ -155,8 +182,9 @@ class RecordEditorViewModel(
     /** 返回 null 表示保存成功，否则返回可直接展示给用户的错误文案。 */
     suspend fun save(): String? {
         val s = _state.value
+        // 纯数字输入直接转分；不再经过表达式求值器（真机反馈：不需要运算符）。
         val amountCents = try {
-            Cents.fromYuan(Calculator.evaluate(s.amountExpr).toPlainString()).value
+            Cents.fromYuan(s.amountExpr.trim()).value
         } catch (e: IllegalArgumentException) {
             return e.message ?: "金额格式非法"
         }
@@ -205,7 +233,8 @@ class RecordEditorViewModel(
             localDate = ld.localDate,
             yearMonth = ld.yearMonth,
             note = s.note,
-            excludeFromStats = s.excludeFromStats
+            excludeFromStats = s.excludeFromStats,
+            payee = s.payee.trim()
         )
         return try {
             if (editingId == null) {

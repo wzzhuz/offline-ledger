@@ -9,6 +9,7 @@ import com.zwz.offlineledger.backup.csv.CsvCodec
 import com.zwz.offlineledger.backup.csv.CsvRow
 import com.zwz.offlineledger.backup.BackupImporter
 import com.zwz.offlineledger.backup.crypto.SecureBackupCodec
+import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
@@ -37,7 +38,8 @@ data class SettingsState(
     val flagSecure: Boolean = false,
     val appLockEnabled: Boolean = false,
     val hasPin: Boolean = false,
-    val csvPlan: CsvImportPlan? = null
+    val csvPlan: CsvImportPlan? = null,
+    val defaultCurrency: String = LedgerCurrency.DEFAULT
 )
 
 class SettingsViewModel(
@@ -60,7 +62,8 @@ class SettingsViewModel(
             reverseColors = prefs.reverseColors,
             flagSecure = prefs.flagSecureEnabled,
             appLockEnabled = prefs.appLockEnabled,
-            hasPin = prefs.hasPin()
+            hasPin = prefs.hasPin(),
+            defaultCurrency = prefs.defaultCurrency
         )
     }
 
@@ -73,6 +76,35 @@ class SettingsViewModel(
 
     fun fail(text: String) {
         _state.value = _state.value.copy(error = text, message = "")
+    }
+
+    /** 只改默认值，绝不自动改已有账户与流水。 */
+    fun setDefaultCurrency(code: String) {
+        require(code in LedgerCurrency.SUPPORTED) { "不支持的币种" }
+        prefs.defaultCurrency = code
+        _state.value = _state.value.copy(
+            defaultCurrency = code,
+            message = "默认币种已设为 $code，只影响之后新建的账户。"
+        )
+    }
+
+    /** 显式批量统一：单事务改三张表标签并重算，金额一分不动。 */
+    fun applyCurrencyToAll() {
+        viewModelScope.launch {
+            val code = prefs.defaultCurrency
+            runCatching { repository.applyCurrencyToAll(code) }
+                .onSuccess {
+                    _state.value = _state.value.copy(
+                        message = "已把现有账户、流水与回收站的币种标签统一为 $code（金额未变）。",
+                        error = ""
+                    )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(
+                        error = "统一币种失败：" + (it.message ?: it.javaClass.simpleName)
+                    )
+                }
+        }
     }
 
     // ---------------------------------------------------------------

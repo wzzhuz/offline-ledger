@@ -8,10 +8,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zwz.offlineledger.core.currency.LedgerCurrency
+import com.zwz.offlineledger.core.money.Cents
+import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.model.AccountType
 import com.zwz.offlineledger.engine.Reconciliation
@@ -42,7 +49,7 @@ fun AssetsScreen() {
     val context = LocalContext.current
     val vm: AssetsViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
-            AssetsViewModel(ep.accountDao(), ep.ledgerRepository())
+            AssetsViewModel(ep.accountDao(), ep.ledgerRepository(), LedgerPrefs(context))
         }
     )
     val state by vm.state.collectAsState()
@@ -52,6 +59,8 @@ fun AssetsScreen() {
     var addError by remember { mutableStateOf<String?>(null) }
     var detailId by remember { mutableStateOf<Long?>(null) }
     var reconcileId by remember { mutableStateOf<Long?>(null) }
+    var editAccount by remember { mutableStateOf<AccountEntity?>(null) }
+    var editError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { vm.reload() }
 
@@ -86,7 +95,8 @@ fun AssetsScreen() {
             AccountCard(
                 account = account,
                 onDetail = { detailId = account.id },
-                onReconcile = { reconcileId = account.id }
+                onReconcile = { reconcileId = account.id },
+                onEdit = { editError = null; editAccount = account }
             )
         }
 
@@ -99,7 +109,8 @@ fun AssetsScreen() {
             AccountCard(
                 account = account,
                 onDetail = { detailId = account.id },
-                onReconcile = { reconcileId = account.id }
+                onReconcile = { reconcileId = account.id },
+                onEdit = { editError = null; editAccount = account }
             )
         }
 
@@ -126,6 +137,25 @@ fun AssetsScreen() {
                 }
             },
             errorText = addError
+        )
+    }
+
+    editAccount?.let { account ->
+        EditAccountDialog(
+            account = account,
+            onDismiss = { editAccount = null },
+            onConfirm = { name, initial, limit, cc, include ->
+                scope.launch {
+                    val err = vm.editAccount(account, name, initial, limit, cc, include)
+                    if (err == null) {
+                        editAccount = null
+                        editError = null
+                    } else {
+                        editError = err
+                    }
+                }
+            },
+            errorText = editError
         )
     }
 
@@ -229,7 +259,8 @@ private fun EmptyHint(text: String) {
 private fun AccountCard(
     account: AccountEntity,
     onDetail: () -> Unit,
-    onReconcile: () -> Unit
+    onReconcile: () -> Unit,
+    onEdit: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -266,6 +297,7 @@ private fun AccountCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onDetail) { Text("详情") }
                 TextButton(onClick = onReconcile) { Text("对账") }
+                TextButton(onClick = onEdit) { Text("编辑") }
             }
         }
     }
@@ -326,6 +358,79 @@ private fun AddAccountDialog(
         },
         confirmButton = {
             Button(onClick = { onConfirm(name, type, initial, limit) }) { Text("保存") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
+}
+
+/** 阶段 7：预置账户与新建账户都能改期初余额与币种。 */
+@Composable
+private fun EditAccountDialog(
+    account: AccountEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, String, Boolean) -> Unit,
+    errorText: String?
+) {
+    var name by remember { mutableStateOf(account.name) }
+    var initial by remember { mutableStateOf(Cents(account.initialBalanceCents).toYuanString()) }
+    var limit by remember { mutableStateOf(
+        account.creditLimitCents?.let { Cents(it).toYuanString() } ?: ""
+    ) }
+    var currency by remember { mutableStateOf(account.currencyCode) }
+    var include by remember { mutableStateOf(account.includeInTotal) }
+    var expanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("编辑账户") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it },
+                    label = { Text("账户名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                OutlinedTextField(
+                    value = initial, onValueChange = { initial = it },
+                    label = { Text("期初余额（元）") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                if (account.type == AccountType.LIABILITY) {
+                    OutlinedTextField(
+                        value = limit, onValueChange = { limit = it },
+                        label = { Text("信用额度（元，可空）") },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                }
+                Box {
+                    TextButton(onClick = { expanded = true }) {
+                        Text("币种：$currency")
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        LedgerCurrency.SUPPORTED.forEach { code ->
+                            DropdownMenuItem(
+                                text = { Text(code) },
+                                onClick = { currency = code; expanded = false }
+                            )
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("计入净资产", modifier = Modifier.weight(1f))
+                    androidx.compose.material3.Switch(
+                        checked = include, onCheckedChange = { include = it }
+                    )
+                }
+                Text(
+                    text = "改期初余额会按流水重新计算余额；改币种只改标签，不改金额。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral
+                )
+                errorText?.let { Text(it, color = LedgerColors.ExpenseRed) }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(name, initial, limit, currency, include) }) {
+                Text("保存")
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )

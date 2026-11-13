@@ -30,7 +30,9 @@ data class BackupRecord(
     val timestamp: Long, val localDate: Int, val yearMonth: Int,
     val note: String = "", val excludeFromStats: Boolean = false,
     val linkedRecordId: Long? = null,
-    val currencyCode: String = "HKD"
+    val currencyCode: String = "HKD",
+    /** 阶段 7：收款方，带默认值让旧备份仍可解析。 */
+    val payee: String = ""
 )
 
 @Serializable

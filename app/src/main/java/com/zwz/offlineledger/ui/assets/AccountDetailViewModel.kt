@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.AccountRecordRow
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
+import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.BalanceAdjustmentEntity
@@ -51,8 +52,13 @@ class AccountDetailViewModel(
         creditLimitCents: Long?, sortOrder: Int
     ) {
         viewModelScope.launch {
+            // 本入口只改元数据；期初余额与币种保持原值，
+            // 完整编辑（含这两项）走资产页的 EditAccountDialog。
+            val cur = accountDao.byId(accountId)
             repository.updateAccountMeta(
-                accountId, name, includeInTotal, creditLimitCents, sortOrder
+                accountId, name, includeInTotal, creditLimitCents, sortOrder,
+                cur?.initialBalanceCents ?: 0L,
+                cur?.currencyCode ?: LedgerCurrency.DEFAULT
             )
             reload(accountId)
         }

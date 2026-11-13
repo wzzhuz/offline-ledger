@@ -46,6 +46,9 @@ data class RecordEntity(
     /** 阶段 6b：SETTLEMENT 指向被冲减的原支出流水；普通流水为 null。 */
     @ColumnInfo(name = "linkedRecordId") val linkedRecordId: Long? = null,
     /** 阶段 6c-1：流水币种 = 关联账户币种，只是标签，不参与金额运算。 */
-    @ColumnInfo(name = "currencyCode", defaultValue = "'HKD'")
-    val currencyCode: String = LedgerCurrency.DEFAULT
+    @ColumnInfo(name = "currencyCode", defaultValue = "'CNY'")
+    val currencyCode: String = LedgerCurrency.DEFAULT,
+    /** 阶段 7：收款方自由文本。不是账户、不产生复式分录、不参与余额联动。 */
+    @ColumnInfo(name = "payee", defaultValue = "''")
+    val payee: String = ""
 )

@@ -17,7 +17,8 @@ data class BackupTemplate(
     val excludeFromStats: Boolean = false,
     val sortOrder: Int = 0,
     val isArchived: Boolean = false,
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    val payee: String = ""
 )
 
 @Serializable
@@ -38,5 +39,6 @@ data class BackupRecurringRule(
     val anchorLocalDate: Int,
     val lastGeneratedLocalDate: Int? = null,
     val isEnabled: Boolean = true,
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    val payee: String = ""
 )

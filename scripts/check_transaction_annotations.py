@@ -27,7 +27,9 @@ WRITE_METHODS = [
     # 阶段 6b
     'createBudget', 'updateBudget', 'archiveBudget', 'recordSettlement',
     # 阶段 6c-2
-    'importRecords'
+    'importRecords',
+    # 阶段 7
+    'applyCurrencyToAll'
 ]
 
 TEMPLATE_SQL_COLS = [

@@ -2,6 +2,7 @@ package com.zwz.offlineledger.core.prefs
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.engine.Reconciliation
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -33,6 +34,11 @@ class LedgerPrefs(context: Context) {
     var appLockEnabled: Boolean
         get() = sp.getBoolean(KEY_APP_LOCK, false)
         set(value) = sp.edit().putBoolean(KEY_APP_LOCK, value).apply()
+
+    /** 阶段 7：默认币种，只影响之后新建的账户，不自动改已有数据。 */
+    var defaultCurrency: String
+        get() = sp.getString(KEY_DEFAULT_CURRENCY, null) ?: LedgerCurrency.DEFAULT
+        set(value) = sp.edit().putString(KEY_DEFAULT_CURRENCY, value).apply()
 
     fun hasPin(): Boolean = sp.getString(KEY_PIN_HASH, null)?.isNotBlank() == true
 
@@ -83,6 +89,7 @@ class LedgerPrefs(context: Context) {
         private const val KEY_APP_LOCK = "app_lock_enabled"
         private const val KEY_PIN_SALT = "pin_salt"
         private const val KEY_PIN_HASH = "pin_hash"
+        private const val KEY_DEFAULT_CURRENCY = "default_currency"
         const val MAX_THRESHOLD_CENTS = 100_000L // 1000.00 元
     }
 }

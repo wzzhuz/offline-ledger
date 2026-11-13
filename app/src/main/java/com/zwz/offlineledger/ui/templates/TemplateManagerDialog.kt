@@ -97,9 +97,11 @@ fun TemplateManagerDialog(onDismiss: () -> Unit) {
                         }
                         state.templates.forEach { t ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                val path = categoryPath(t.categoryId, state.categories)
                                 Text(
                                     text = t.name + " · " + Cents(t.amountCents).toYuanString() +
-                                        " 元" + if (t.isArchived) "（已归档）" else "",
+                                        " 元" + (if (path.isBlank()) "" else " · " + path) +
+                                        if (t.isArchived) "（已归档）" else "",
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
@@ -173,6 +175,7 @@ private fun QuickEntryForm(
     var fromAccountId by remember { mutableStateOf<Long?>(null) }
     var toAccountId by remember { mutableStateOf<Long?>(null) }
     var note by remember { mutableStateOf("") }
+    var payeeText by remember { mutableStateOf("") }
     var excluded by remember { mutableStateOf(false) }
     var cadence by remember { mutableStateOf(Cadence.MONTHLY) }
     var dayText by remember { mutableStateOf("1") }
@@ -180,6 +183,24 @@ private fun QuickEntryForm(
 
     val selectedCategory = categories.firstOrNull { it.id == categoryId }
     val rootId = selectedCategory?.let { it.parentId ?: it.id }
+
+    // 阶段 7：下拉只显示与当前收支类型一致、未归档的分类；
+    // 一级在前、二级紧跟父级，标签写成「一级 / 二级」而不是孤立的「└ xxx」。
+    val visibleCategories = categories.filter { it.type == type && !it.isArchived }
+    fun rootKey(c: CategoryEntity): Long =
+        if (c.level == 0) c.id else (c.parentId ?: 0L)
+    val orderedCategories = visibleCategories.sortedWith(
+        compareBy<CategoryEntity> { rootKey(it) }
+            .thenBy { it.level }
+            .thenBy { it.sortOrder }
+    )
+    val categoryOptions = orderedCategories.map { c ->
+        val label = if (c.level == 1) {
+            val parent = categories.firstOrNull { it.id == c.parentId }?.name
+            (if (parent.isNullOrBlank()) "" else parent + " / ") + c.name
+        } else c.name
+        c.id to label
+    }
 
     Column {
         OutlinedTextField(
@@ -202,7 +223,7 @@ private fun QuickEntryForm(
             listOf(RecordType.EXPENSE, RecordType.INCOME, RecordType.TRANSFER)
                 .filter { it != RecordType.TRANSFER || !isRule }.forEach { rt ->
                 AssistChip(
-                    onClick = { type = rt },
+                    onClick = { type = rt; categoryId = null },
                     label = { Text(typeLabel(rt)) },
                     modifier = Modifier.padding(end = 6.dp)
                 )
@@ -212,7 +233,7 @@ private fun QuickEntryForm(
         if (type != RecordType.TRANSFER) {
             DropdownSelector(
                 label = "分类：" + (selectedCategory?.name ?: "未选"),
-                options = categories.map { it.id to (if (it.level == 1) "└ " else "") + it.name },
+                options = categoryOptions,
                 onSelect = { categoryId = it }
             )
         }
@@ -234,6 +255,11 @@ private fun QuickEntryForm(
         OutlinedTextField(
             value = note, onValueChange = { note = it },
             label = { Text("备注（可选）") },
+            modifier = Modifier.fillMaxWidth(), singleLine = true
+        )
+        OutlinedTextField(
+            value = payeeText, onValueChange = { payeeText = it },
+            label = { Text("收款方（可选）") },
             modifier = Modifier.fillMaxWidth(), singleLine = true
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -274,6 +300,9 @@ private fun QuickEntryForm(
                 }
                 if (name.isBlank()) { error = "请填名称"; return@Button }
                 if (amount <= 0L) { error = "金额必须大于 0"; return@Button }
+                if (type != RecordType.TRANSFER && categoryId != null &&
+                    visibleCategories.none { it.id == categoryId }
+                ) { error = "分类与收支类型不匹配，请重新选择"; return@Button }
                 if (type == RecordType.EXPENSE && fromAccountId == null) {
                     error = "请选择转出账户"; return@Button
                 }
@@ -301,7 +330,8 @@ private fun QuickEntryForm(
                             cadence = cadence,
                             dayOfMonth = if (cadence == Cadence.MONTHLY) d.coerceIn(1, 31) else 1,
                             dayOfWeek = if (cadence == Cadence.WEEKLY) d.coerceIn(1, 7) else 1,
-                            anchorLocalDate = ld, createdAt = now
+                            anchorLocalDate = ld, createdAt = now,
+                            payee = payeeText.trim()
                         )
                     )
                 } else {
@@ -313,16 +343,25 @@ private fun QuickEntryForm(
                             fromAccountId = if (type == RecordType.INCOME) null else fromAccountId,
                             toAccountId = if (type == RecordType.EXPENSE) null else toAccountId,
                             note = commonNote, excludeFromStats = excluded,
-                            createdAt = now
+                            createdAt = now, payee = payeeText.trim()
                         )
                     )
                 }
                 error = null
-                name = ""; amountText = ""; note = ""
+                name = ""; amountText = ""; note = ""; payeeText = ""
             },
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
         ) { Text(if (isRule) "保存周期规则" else "保存模板") }
     }
+}
+
+/** 模板列表行用：把分类 id 还原成「一级 / 二级」可读路径。 */
+private fun categoryPath(id: Long?, categories: List<CategoryEntity>): String {
+    val c = categories.firstOrNull { it.id == id } ?: return ""
+    return if (c.level == 1) {
+        val parent = categories.firstOrNull { it.id == c.parentId }?.name
+        (if (parent.isNullOrBlank()) "" else parent + " / ") + c.name
+    } else c.name
 }
 
 private fun typeLabel(t: RecordType): String = when (t) {

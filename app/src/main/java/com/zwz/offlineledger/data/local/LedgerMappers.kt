@@ -29,7 +29,7 @@ fun RecordEntity.toTrash(deletedAt: Long): TrashEntryEntity = TrashEntryEntity(
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
     note = note, excludeFromStats = excludeFromStats,
     linkedRecordId = linkedRecordId, currencyCode = currencyCode,
-    deletedAt = deletedAt
+    payee = payee, deletedAt = deletedAt
 )
 
 fun TrashEntryEntity.toRecord(): RecordEntity = RecordEntity(
@@ -38,7 +38,8 @@ fun TrashEntryEntity.toRecord(): RecordEntity = RecordEntity(
     fromAccountId = fromAccountId, toAccountId = toAccountId,
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
     note = note, excludeFromStats = excludeFromStats,
-    linkedRecordId = linkedRecordId, currencyCode = currencyCode
+    linkedRecordId = linkedRecordId, currencyCode = currencyCode,
+    payee = payee
 )
 
 fun AccountEntity.toDto(): BackupAccount = BackupAccount(
@@ -77,7 +78,8 @@ fun RecordEntity.toDto(): BackupRecord = BackupRecord(
     fromAccountId = fromAccountId, toAccountId = toAccountId,
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
     note = note, excludeFromStats = excludeFromStats,
-    linkedRecordId = linkedRecordId, currencyCode = currencyCode
+    linkedRecordId = linkedRecordId, currencyCode = currencyCode,
+    payee = payee
 )
 
 fun BackupRecord.toEntity(): RecordEntity = RecordEntity(
@@ -86,7 +88,8 @@ fun BackupRecord.toEntity(): RecordEntity = RecordEntity(
     fromAccountId = fromAccountId, toAccountId = toAccountId,
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
     note = note, excludeFromStats = excludeFromStats,
-    linkedRecordId = linkedRecordId, currencyCode = currencyCode
+    linkedRecordId = linkedRecordId, currencyCode = currencyCode,
+    payee = payee
 )
 
 fun BalanceAdjustmentEntity.toDto(): BackupAdjustment = BackupAdjustment(
@@ -110,7 +113,8 @@ fun RecordTemplateEntity.toDto(): BackupTemplate = BackupTemplate(
     categoryId = categoryId, rootCategoryId = rootCategoryId,
     fromAccountId = fromAccountId, toAccountId = toAccountId,
     note = note, excludeFromStats = excludeFromStats,
-    sortOrder = sortOrder, isArchived = isArchived, createdAt = createdAt
+    sortOrder = sortOrder, isArchived = isArchived, createdAt = createdAt,
+    payee = payee
 )
 
 fun BackupTemplate.toEntity(): RecordTemplateEntity = RecordTemplateEntity(
@@ -118,7 +122,8 @@ fun BackupTemplate.toEntity(): RecordTemplateEntity = RecordTemplateEntity(
     categoryId = categoryId, rootCategoryId = rootCategoryId,
     fromAccountId = fromAccountId, toAccountId = toAccountId,
     note = note, excludeFromStats = excludeFromStats,
-    sortOrder = sortOrder, isArchived = isArchived, createdAt = createdAt
+    sortOrder = sortOrder, isArchived = isArchived, createdAt = createdAt,
+    payee = payee
 )
 
 fun RecurringRuleEntity.toDto(): BackupRecurringRule = BackupRecurringRule(
@@ -129,7 +134,7 @@ fun RecurringRuleEntity.toDto(): BackupRecurringRule = BackupRecurringRule(
     cadence = cadence.name, dayOfMonth = dayOfMonth, dayOfWeek = dayOfWeek,
     anchorLocalDate = anchorLocalDate,
     lastGeneratedLocalDate = lastGeneratedLocalDate,
-    isEnabled = isEnabled, createdAt = createdAt
+    isEnabled = isEnabled, createdAt = createdAt, payee = payee
 )
 
 fun BackupRecurringRule.toEntity(): RecurringRuleEntity = RecurringRuleEntity(
@@ -140,7 +145,7 @@ fun BackupRecurringRule.toEntity(): RecurringRuleEntity = RecurringRuleEntity(
     cadence = Cadence.valueOf(cadence), dayOfMonth = dayOfMonth,
     dayOfWeek = dayOfWeek, anchorLocalDate = anchorLocalDate,
     lastGeneratedLocalDate = lastGeneratedLocalDate,
-    isEnabled = isEnabled, createdAt = createdAt
+    isEnabled = isEnabled, createdAt = createdAt, payee = payee
 )
 
 fun RecordTemplateEntity.toRecordEntity(atEpochMilli: Long): RecordEntity {
@@ -151,7 +156,7 @@ fun RecordTemplateEntity.toRecordEntity(atEpochMilli: Long): RecordEntity {
         fromAccountId = fromAccountId, toAccountId = toAccountId,
         timestamp = atEpochMilli, localDate = ld.localDate,
         yearMonth = ld.yearMonth, note = note,
-        excludeFromStats = excludeFromStats
+        excludeFromStats = excludeFromStats, payee = payee
     )
 }
 
@@ -163,7 +168,7 @@ fun RecurringRuleEntity.toRecordEntity(atEpochMilli: Long, dueLocalDate: Int): R
         timestamp = atEpochMilli, localDate = dueLocalDate,
         yearMonth = RecurringSchedule.yearMonthOf(dueLocalDate),
         note = if (note.isBlank()) name else note,
-        excludeFromStats = excludeFromStats
+        excludeFromStats = excludeFromStats, payee = payee
     )
 
 // ---------------------------------------------------------------

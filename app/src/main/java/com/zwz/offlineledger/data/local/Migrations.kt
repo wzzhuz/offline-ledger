@@ -22,6 +22,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * SeedCallback.onCreate 仍只对全新库生效。6a 不新增预置分类 / 账户 / 模板，
  * 所以 migrate() 不需要补 seed 数据。
  */
+/**
+ * 稳定版前冻结：三段迁移 SQL 常量保留（历史追溯 + MigrationContractTest），
+ * 但 ALL 为空数组，Room 运行时不会执行任何迁移。
+ * 恢复条件见 project.md「稳定版前的版本策略」：只有使用者明确说
+ * 「需要考虑升级迁移」时，才重新注册 ALL 并恢复版本递增。
+ */
 object Migrations {
     // 列集合 / 类型 affinity / notNull / 主键必须与 RecordTemplateEntity 一致。
     // Room 按列名比较 TableInfo，列顺序不影响；Kotlin 默认值不产生 SQL DEFAULT，
@@ -112,5 +118,5 @@ object Migrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+    val ALL: Array<Migration> = emptyArray()
 }

@@ -310,8 +310,11 @@ private fun RecordRowCard(
                 Text(text = row.categoryName ?: "转账", style = MaterialTheme.typography.bodyLarge)
                 val account = row.fromAccountName ?: row.toAccountName ?: "-"
                 Text(
-                    text = listOfNotNull(account, row.note.takeIf { it.isNotBlank() })
-                        .joinToString(" · "),
+                    text = listOfNotNull(
+                        account,
+                        row.payee.takeIf { it.isNotBlank() },
+                        row.note.takeIf { it.isNotBlank() }
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = LedgerColors.Neutral
                 )

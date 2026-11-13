@@ -343,3 +343,17 @@ CSV BOM / 8 列表头 / 两位小数 / 逗号与引号转义 / TSV / 空行跳�
 - [x] CI 全绿（`43432655826` success，13 步全绿）
 - [x] 每次推送均用远端 Git Trees API 逐文件比对 blob sha（PASS）
 - [ ] 使用者确认后归档本 change（**本轮不擅自归档**）
+
+### 最终验证（使用者「跑一下上传坚果云的 actions」后补记）
+
+| 验证 | run | 结论 |
+|---|---|---|
+| push CI（六个静态检查 / 单测 / debug / release lintVital / 签名诊断） | `43432655826` | **success**，13 步全绿，debug APK 23,703,226 B |
+| release.yml 手动触发（不打 tag、不传坚果云、`minify=on`） | `43389145224` | **success**，24 步全绿 |
+| release.yml 手动触发（`upload_nutstore=true`，使用者装机用） | `43446433266` | **success**，24 步全绿，坚果云上传步骤 `skipped=false` |
+
+`43446433266` 的 metrics 制品名为 `...-nsfalse`，来自 `steps.nutstore.outputs.skipped`；
+脚本只在 PROPFIND 认证通过、两级 MKCOL 成功、`curl -T` 返回 201/204 之后才写
+`skipped=false`，因此上传请求成功可确认。HEAD 落盘校验只写日志不中断，
+故「HEAD 200」不列为已验证事实。该包已由使用者装机体验，产生本 change 之后的
+真机反馈（见 `polish-device-experience`）。

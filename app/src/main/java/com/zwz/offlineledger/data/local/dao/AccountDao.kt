@@ -45,11 +45,17 @@ interface AccountDao {
     @Query("UPDATE accounts SET lastReconciledAt = :at, lastReconciledBalanceCents = :balance WHERE id = :id")
     suspend fun updateReconciliationAnchor(id: Long, at: Long, balance: Long)
 
-    @Query("UPDATE accounts SET name = :name, includeInTotal = :includeInTotal, creditLimitCents = :creditLimitCents, sortOrder = :sortOrder WHERE id = :id")
+    /** 阶段 7：账户编辑支持期初余额与币种；调用方 MUST 在事务末尾重算。 */
+    @Query("UPDATE accounts SET name = :name, includeInTotal = :includeInTotal, creditLimitCents = :creditLimitCents, sortOrder = :sortOrder, initialBalanceCents = :initialBalanceCents, currencyCode = :currencyCode WHERE id = :id")
     suspend fun updateAccountMeta(
         id: Long, name: String, includeInTotal: Boolean,
-        creditLimitCents: Long?, sortOrder: Int
+        creditLimitCents: Long?, sortOrder: Int,
+        initialBalanceCents: Long, currencyCode: String
     )
+
+    /** 显式批量统一币种：只改标签，不改金额。 */
+    @Query("UPDATE accounts SET currencyCode = :code")
+    suspend fun updateAllCurrency(code: String)
 
     /** 只归档不物理删：有流水的账户 MUST NOT 删除。 */
     @Query("UPDATE accounts SET isArchived = 1 WHERE id = :id")

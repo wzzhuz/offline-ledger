@@ -3,6 +3,7 @@ package com.zwz.offlineledger.ui.assets
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zwz.offlineledger.core.money.Cents
+import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.model.AccountType
@@ -30,7 +31,8 @@ data class AssetsUiState(
 /** 本阶段「每阶段跑一遍导出备份」由设置页沿用，资产页只负责刷新聚合值。 */
 class AssetsViewModel(
     private val accountDao: AccountDao,
-    private val repository: LedgerRepository
+    private val repository: LedgerRepository,
+    private val prefs: LedgerPrefs
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AssetsUiState())
@@ -83,13 +85,51 @@ class AssetsViewModel(
                     initialBalanceCents = initialCents,
                     balanceCents = initialCents,
                     creditLimitCents = limitCents,
-                    sortOrder = accountDao.count()
+                    sortOrder = accountDao.count(),
+                    currencyCode = prefs.defaultCurrency
                 )
             )
             reload()
             null
         } catch (e: Exception) {
             e.message ?: "新增账户失败"
+        }
+    }
+
+    /** 阶段 7：完整账户编辑，含期初余额与币种。改真相源后由 Repository 重算。 */
+    suspend fun editAccount(
+        account: AccountEntity,
+        name: String,
+        initialYuan: String,
+        limitYuan: String,
+        currencyCode: String,
+        includeInTotal: Boolean
+    ): String? {
+        if (name.isBlank()) return "账户名不能为空"
+        val initialCents = try {
+            Cents.fromYuan(if (initialYuan.isBlank()) "0" else initialYuan).value
+        } catch (e: IllegalArgumentException) {
+            return e.message ?: "期初余额格式非法"
+        }
+        val limitCents = if (limitYuan.isBlank()) null else try {
+            Cents.fromYuan(limitYuan).value
+        } catch (e: IllegalArgumentException) {
+            return e.message ?: "信用额度格式非法"
+        }
+        return try {
+            repository.updateAccountMeta(
+                id = account.id,
+                name = name.trim(),
+                includeInTotal = includeInTotal,
+                creditLimitCents = limitCents,
+                sortOrder = account.sortOrder,
+                initialBalanceCents = initialCents,
+                currencyCode = currencyCode
+            )
+            reload()
+            null
+        } catch (e: Exception) {
+            e.message ?: "编辑账户失败"
         }
     }
 }

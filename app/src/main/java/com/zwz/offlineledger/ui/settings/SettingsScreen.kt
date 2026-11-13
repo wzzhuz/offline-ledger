@@ -12,7 +12,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -31,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.ui.budget.BudgetManagerDialog
 import com.zwz.offlineledger.ui.ledgerFactory
@@ -56,6 +60,7 @@ fun SettingsScreen() {
     var showBudgets by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var thresholdInput by remember { mutableStateOf(state.thresholdYuan) }
+    var currencyExpanded by remember { mutableStateOf(false) }
 
     // SAF：CreateDocument / OpenDocument 均不申请任何存储权限。
     val exportLauncher = rememberLauncherForActivityResult(
@@ -125,7 +130,8 @@ fun SettingsScreen() {
         Text(
             text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
                 "导入使用 CSV/TSV 模板：date, type, amount, account, " +
-                "categoryRoot, category, note, currencyCode（币种列导入时按账户继承）。",
+                "categoryRoot, category, note, currencyCode, payee" +
+                "（币种列导入时按账户继承；payee 列可选，缺列按空处理）。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral
         )
@@ -183,6 +189,33 @@ fun SettingsScreen() {
         SettingSwitch("支出 / 收入配色反转", state.reverseColors) {
             vm.setReverseColors(it)
         }
+
+        Text(text = "默认币种（只影响之后新建的账户）",
+            style = MaterialTheme.typography.labelMedium)
+        Box {
+            TextButton(onClick = { currencyExpanded = true }) {
+                Text(state.defaultCurrency, style = MaterialTheme.typography.titleMedium)
+            }
+            DropdownMenu(
+                expanded = currencyExpanded,
+                onDismissRequest = { currencyExpanded = false }
+            ) {
+                LedgerCurrency.SUPPORTED.forEach { code ->
+                    DropdownMenuItem(
+                        text = { Text(code) },
+                        onClick = { vm.setDefaultCurrency(code); currencyExpanded = false }
+                    )
+                }
+            }
+        }
+        Button(onClick = { vm.applyCurrencyToAll() }, modifier = Modifier.fillMaxWidth()) {
+            Text("把现有账户与流水统一为 ${state.defaultCurrency}")
+        }
+        Text(
+            text = "统一币种只改标签、不改金额；不会自动执行，需你点上面的按钮。",
+            style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral
+        )
 
         SectionTitle("账本")
         Button(onClick = { showCategories = true }, modifier = Modifier.fillMaxWidth()) {
