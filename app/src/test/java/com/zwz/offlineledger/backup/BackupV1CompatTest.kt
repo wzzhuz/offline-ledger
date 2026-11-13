@@ -17,13 +17,7 @@ import org.junit.Assert.assertThrows
 class BackupV1CompatTest {
 
     /** 刻意不含 templates / recurringRules 两个键，模拟 v1 导出的 JSON。 */
-    private val v1Json = "{" +
-            ""envelope":{"schemaVersion":1,"exportedAtEpochMilli":1000," +
-            ""currencyCode":"HKD","counts":{"accounts":1,"categories":0," +
-            ""records":0,"balanceAdjustments":0}}," +
-            ""payload":{"accounts":[{"id":1,"name":"微信"," +
-            ""type":"ASSET","initialBalanceCents":10000,"balanceCents":10000}]," +
-            ""categories":[],"records":[],"balanceAdjustments":[],"trash":[]}}"
+    private val v1Json = """{"envelope":{"schemaVersion":1,"exportedAtEpochMilli":1000,"currencyCode":"HKD","counts":{"accounts":1,"categories":0,"records":0,"balanceAdjustments":0}},"payload":{"accounts":[{"id":1,"name":"微信","type":"ASSET","initialBalanceCents":10000,"balanceCents":10000}],"categories":[],"records":[],"balanceAdjustments":[],"trash":[]}}"""
 
     @Test
     fun v1_backup_decodes_with_empty_new_lists() {
