@@ -346,6 +346,80 @@ AGP 8.13.0 / Kotlin 2.3.21 / Compose BOM 2026.06.00 / activity-compose 1.11.0
 SQLCipher 真机打开数据库、BiometricPrompt 真机弹窗、SAF 真机文件选择器
 仍未实测，见第 9 节测试边界。
 
+## 归档实测：4 份 MODIFIED，本仓库单次最多
+
+| | 阶段 1 | 2 | 3 | 4 | **5** |
+|---|---|---|---|---|---|
+| delta | 17 ADDED + 1 MODIFIED | 15 ADDED | 14 ADDED + 2 MODIFIED | 9 ADDED + 1 MODIFIED | **12 ADDED + 4 MODIFIED** |
+| MODIFIED 次数 | 1（补旧口径腐烂） | 0 | 2（首次按标题替换） | 1（同一 Requirement 第二次） | **4（含第三次替换同一条）** |
+| 校验脚本自误报 | 2 次（宽泛子串） | 0 | 1 次半（脚本半途异常） | 0 | **1 次（理由段引用旧原文）** |
+
+合并结果：**8 个模块 / 128 条 Requirement / 192 个 Scenario**（脚本打印实际值）。
+
+**4 份 MODIFIED 分别解决什么**：
+
+1. `reporting-ui`「四 Tab 骨架一次成型」——**第三次**也是最后一次替换。
+   前两次修掉资产页 / 统计页占位，这次把 Scenario 里残留的
+   `**GIVEN** 阶段 5 增加备份与应用锁设置` 改成不含阶段版本号的长期表述，
+   并补齐设置页的长期行为。抽象规则（「Requirement 只描述最终 SHALL，
+   过程状态写 tasks.md」）终于在正文与 Scenario 两处都守住。
+2. `backup-restore`「设置页提供临时明文导出入口」→ SAF 加密导出 / 恢复。
+3. `backup-restore`「CSV 格式约定」→ **v1 不提供 CSV**，格式约定降级为 v1.1 预留。
+4. `privacy-security`「导出文件默认加密」→ 只保留 JSON 加密，
+   CSV 条款统一为「v1 不提供」。
+
+第 4 份是对齐结论之外**写码前逐条扫 specs 时新发现**的：
+`privacy-security` 那条也含 CSV 条款，只改 `backup-restore` 会留下两处相反约束。
+宁可多一份 MODIFIED 也不留矛盾——这比「按计划交差」更重要。
+
+**CSV 归属最终收敛**：使用者拍板 v1 不做，
+`reporting-ui`「v1 范围收敛」与 `project.md`「已确认不做」清单**保持不动**，
+另外两处改为 v1.1 预留。「已确认不做」闸门没有破例，这次它真的拦住了一个功能。
+
+### ⚠️ 第 6 次校验脚本自误报，以及最终修正规则
+
+归档校验第一次跑 FAIL，报：
+
+```
+AssertionError: 旧要求原文残留于 specs/reporting-ui/spec.md :
+                 **GIVEN** 阶段 5 增加备份与应用锁设置
+```
+
+**不是真的残留**：新 MODIFIED 的「**理由**」段为了说明「为什么要第三次替换」，
+**引用了旧 Scenario 的原文**作为证据。阶段 1 归档两次自误报换来
+「只匹配旧要求精确原文、别宽泛搜子串」，但这次连精确原文都会命中——
+因为说明性引用本身就是精确原文。
+
+**最终修正**：校验时先按 `### Requirement:` 切块、剥除每块末尾的
+`**理由**：...` 段，再匹配旧原文。理由段是元信息、不是系统行为；
+剥掉它之后，真正的 Scenario 正文残留仍会被抓到，检查力度没有下降。
+沿用「FAIL 必须走第二条独立路径复核」的纪律：先确认合并与 move 已落盘、
+Requirement 总数仍是 128（**没有重复追加 ADDED**），
+再单独跑修正版校验与收尾，**没有从半途状态重跑整个归档脚本**
+（阶段 1 归档正是因为重跑导致 ADDED 重复追加，后来用远端基线重建才救回来）。
+
+这是本仓库第 6 次同类坑，前五次分别是：
+① 宽泛搜 `isDeleted = 0` 命中禁止性表述；
+② 宽泛搜 `BALANCE_ADJUST` 命中理由段；
+③ 脚本半途抛异常后未确认落盘状态；
+④ 按分支名查 tree 的最终一致性延迟误报 `远端校验: FAIL`；
+⑤ 手写常数 168 → 实测 166。
+共同模式：**检查器比被检查对象更容易出错**。
+建议上提 `my-app-workflow/踩坑清单.md` 时把「剥除理由段」与
+「FAIL 先独立复核」「半途中断不重跑」三条一起写。
+
+### 交接给出包阶段（本轮不改，留给下一 change）
+
+- `deliver-secure-backup-and-settings` 归档后 specs 基线干净，
+  出包阶段的 delta 不会与阶段 5 叠加
+- 阶段 5 已把 `check_manifest_privacy.py` 扩成 `ALLOWED_PERMISSIONS` 白名单、
+  `WRITE_METHODS` 扩到 17；出包阶段若新增 workflow 语法检查，
+  沿用「精确匹配 + 先剥注释 + 先剥理由段」的规则
+- `app/proguard-rules.pro` 仍是阶段 0 的占位文件；
+  R8 keep 规则、正式签名 Secrets、`release.yml` 全部留出包阶段
+- **v1 六个阶段至此全部归档**；之后的三条可选路线：
+  出包阶段 / 真机验收 / 阶段 6（v1.1 增强）
+
 ## 风险
 
 **残余风险 1**：`androidx.biometric:1.1.0` 传递的 fragment / activity 版本
