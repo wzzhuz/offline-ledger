@@ -28,6 +28,9 @@ import com.zwz.offlineledger.data.model.BudgetScope
 import com.zwz.offlineledger.data.model.LedgerAdjustment
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.model.LedgerCategory
+import com.zwz.offlineledger.backup.csv.CsvImportOutcome
+import com.zwz.offlineledger.backup.csv.CsvRow
+import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.engine.CategoryTree
@@ -467,6 +470,77 @@ class LedgerRepository @Inject constructor(
      * insertRecord / updateRecord / recordFromTemplate / applyDueRules /
      * recordSettlement 全部经过这里，不新开写余额的分支。
      */
+
+    /** 阶段 6c-2：导出全部未删除流水的 CSV 行（名称由 SQL JOIN 取，含币种）。 */
+    suspend fun exportCsvRows(): List<CsvRow> = recordDao.csvRows().map { r ->
+        val d = r.localDate.toString()
+        val date = if (d.length == 8) {
+            d.substring(0, 4) + "-" + d.substring(4, 6) + "-" + d.substring(6, 8)
+        } else d
+        CsvRow(
+            date = date,
+            type = r.type,
+            amountYuan = java.math.BigDecimal.valueOf(r.amountCents, 2).toPlainString(),
+            accountName = r.accountName,
+            categoryRoot = r.rootName,
+            category = r.categoryName,
+            note = r.note,
+            currencyCode = r.currencyCode
+        )
+    }
+
+    /**
+     * 阶段 6c-2：账单导入。单事务批量写入 + 末尾一次重算，
+     * 任一行解析失败整体回滚；去重按「账户 + 金额 + 日期 + 备注」，不加字段。
+     * 每条都经过 withResolvedRoot（含一级分类解析与 withCurrency 币种继承），
+     * 与 insertRecord 完全同构，不新开写余额的分支。
+     */
+    suspend fun importRecords(rows: List<CsvRow>): CsvImportOutcome = db.withTransaction {
+        val accounts = accountDao.all().filter { !it.isArchived }
+        val categories = categoryDao.all()
+        var written = 0
+        var skipped = 0
+        rows.forEach { row ->
+            val account = accounts.firstOrNull { it.name == row.accountName }
+                ?: throw IllegalArgumentException("账户不存在或已归档：" + row.accountName)
+            val root = categories.firstOrNull {
+                it.level == 0 && !it.isArchived && it.name == row.categoryRoot
+            } ?: throw IllegalArgumentException("一级分类不存在：" + row.categoryRoot)
+            val child = if (row.category.isBlank()) null else
+                categories.firstOrNull {
+                    it.level == 1 && !it.isArchived && it.parentId == root.id &&
+                        it.name == row.category
+                } ?: throw IllegalArgumentException(
+                    "二级分类不存在于「" + row.categoryRoot + "」下：" + row.category
+                )
+            val ld = row.date.replace("-", "").toIntOrNull()
+                ?: throw IllegalArgumentException("日期非法：" + row.date)
+            val amountCents = Cents.fromYuan(row.amountYuan).value
+            val type = RecordType.valueOf(row.type)
+            if (recordDao.countDuplicate(account.id, amountCents, ld, row.note) > 0) {
+                skipped++
+                return@forEach
+            }
+            val entity = RecordEntity(
+                type = type,
+                amountCents = amountCents,
+                categoryId = child?.id ?: root.id,
+                rootCategoryId = root.id,
+                fromAccountId = if (type == RecordType.EXPENSE) account.id else null,
+                toAccountId = if (type == RecordType.INCOME) account.id else null,
+                timestamp = RecurringSchedule.toEpochMilli(ld),
+                localDate = ld,
+                yearMonth = ld / 100,
+                note = row.note,
+                excludeFromStats = false
+            )
+            recordDao.insert(withResolvedRoot(entity))
+            written++
+        }
+        rebuildAllBalancesInternal()
+        CsvImportOutcome(written, skipped)
+    }
+
     private suspend fun withResolvedRoot(record: RecordEntity): RecordEntity {
         val withRoot = if (record.categoryId == null) record else {
             val map: Map<Long, LedgerCategory> = categoryDao.all().associate {

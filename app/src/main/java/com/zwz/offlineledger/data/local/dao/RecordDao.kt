@@ -77,6 +77,18 @@ data class DailyTotalRow(
     val incomeCents: Long
 )
 
+/** 阶段 6c-2：CSV 导出的 SQL 源行，名称由 JOIN 取出，不 inflate Entity。 */
+data class CsvSourceRow(
+    val type: String,
+    val amountCents: Long,
+    val localDate: Int,
+    val note: String,
+    val currencyCode: String,
+    val accountName: String,
+    val rootName: String,
+    val categoryName: String
+)
+
 @Dao
 interface RecordDao {
     @Insert suspend fun insert(r: RecordEntity): Long
@@ -163,6 +175,7 @@ interface RecordDao {
            AND (:minAmount IS NULL OR r.amountCents >= :minAmount)
            AND (:maxAmount IS NULL OR r.amountCents <= :maxAmount)
            AND (:noteQuery IS NULL OR r.note LIKE '%' || :noteQuery || '%')
+           AND (:currencyCode IS NULL OR r.currencyCode = :currencyCode)
          ORDER BY r.localDate DESC, r.id DESC
          LIMIT :limit OFFSET :offset
         """
@@ -170,7 +183,8 @@ interface RecordDao {
     suspend fun pagedFiltered(
         fromDate: Int?, toDate: Int?, accountId: Long?, type: String?,
         rootCategoryId: Long?, categoryId: Long?, minAmount: Long?,
-        maxAmount: Long?, noteQuery: String?, limit: Int, offset: Int
+        maxAmount: Long?, noteQuery: String?, currencyCode: String?,
+        limit: Int, offset: Int
     ): List<RecordRow>
 
     /** 日期头真实值：整月按日聚合，不用已加载分页数据求和。 */
@@ -182,11 +196,12 @@ interface RecordDao {
           FROM records
          WHERE yearMonth = :ym AND excludeFromStats = 0
            AND type IN ('EXPENSE', 'INCOME')
+           AND (:currencyCode IS NULL OR currencyCode = :currencyCode)
          GROUP BY localDate
          ORDER BY localDate DESC
         """
     )
-    suspend fun dailyTotals(ym: Int): List<DailyTotalRow>
+    suspend fun dailyTotals(ym: Int, currencyCode: String?): List<DailyTotalRow>
 
 
     /**
@@ -383,4 +398,41 @@ interface RecordDao {
 
     @Query("SELECT COALESCE(SUM(amountCents), 0) FROM records WHERE type = 'SETTLEMENT' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :currencyCode")
     suspend fun settlementTotalForCurrency(fromYm: Int, toYm: Int, currencyCode: String): Long
+
+    // ---------------------------------------------------------------
+    // 阶段 6c-2：CSV 明文导出与账单导入去重。
+    // 导出走一条 JOIN SQL 直接拿名称，不把 5 万条 Entity inflate 进内存。
+    // ---------------------------------------------------------------
+    @Query(
+        """
+        SELECT r.type AS type, r.amountCents AS amountCents,
+               r.localDate AS localDate, COALESCE(r.note, '') AS note,
+               r.currencyCode AS currencyCode,
+               COALESCE(a.name, '') AS accountName,
+               COALESCE(rc.name, '') AS rootName,
+               COALESCE(c.name, '') AS categoryName
+          FROM records r
+          LEFT JOIN accounts a
+            ON a.id = (CASE WHEN r.type = 'EXPENSE' THEN r.fromAccountId
+                            ELSE r.toAccountId END)
+          LEFT JOIN categories rc ON rc.id = r.rootCategoryId
+          LEFT JOIN categories c ON c.id = r.categoryId
+         ORDER BY r.localDate DESC, r.id DESC
+        """
+    )
+    suspend fun csvRows(): List<CsvSourceRow>
+
+    /** 导入去重：账户 + 金额 + 日期 + 备注，全部参数绑定，不加新字段。 */
+    @Query(
+        """
+        SELECT COUNT(*) FROM records
+         WHERE amountCents = :amountCents
+           AND localDate = :localDate
+           AND COALESCE(note, '') = :note
+           AND (fromAccountId = :accountId OR toAccountId = :accountId)
+        """
+    )
+    suspend fun countDuplicate(
+        accountId: Long, amountCents: Long, localDate: Int, note: String
+    ): Int
 }

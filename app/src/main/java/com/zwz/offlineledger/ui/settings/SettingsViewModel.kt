@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zwz.offlineledger.backup.BackupExporter
+import com.zwz.offlineledger.backup.csv.CsvCodec
+import com.zwz.offlineledger.backup.csv.CsvRow
 import com.zwz.offlineledger.backup.BackupImporter
 import com.zwz.offlineledger.backup.crypto.SecureBackupCodec
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
@@ -21,6 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** 导入前的确认计划：只有解析全通过才生成，进入此状态时不写任何数据。 */
+data class CsvImportPlan(val rows: List<CsvRow>)
+
 data class SettingsState(
     val message: String = "",
     val error: String = "",
@@ -31,7 +36,8 @@ data class SettingsState(
     val reverseColors: Boolean = false,
     val flagSecure: Boolean = false,
     val appLockEnabled: Boolean = false,
-    val hasPin: Boolean = false
+    val hasPin: Boolean = false,
+    val csvPlan: CsvImportPlan? = null
 )
 
 class SettingsViewModel(
@@ -121,6 +127,93 @@ class SettingsViewModel(
                 _state.value = _state.value.copy(
                     busy = false,
                     error = "导入失败，原账本未改动：" + (e.message ?: e.javaClass.simpleName)
+                )
+            }
+        }
+    }
+
+
+    // ---------------------------------------------------------------
+    // 阶段 6c-2：CSV 明文导出与账单导入。
+    // 隐私边界是不上传第三方，不是文件必须加密；
+    // 文件只写入用户通过 SAF 自选的位置，应用不申请任何权限。
+    // ---------------------------------------------------------------
+    fun exportCsvTo(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val rows = repository.exportCsvRows()
+                    val bytes = CsvCodec.export(rows)
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(bytes)
+                        out.flush()
+                    } ?: throw IllegalStateException("无法打开所选位置的输出流")
+                    "已导出 CSV 明文文件：${rows.size} 条流水。文件由你自行保管，应用不会上传任何数据。"
+                }
+                _state.value = _state.value.copy(busy = false, message = result)
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    busy = false,
+                    error = "导出失败：" + (e.message ?: e.javaClass.simpleName)
+                )
+            }
+        }
+    }
+
+    /** 先纯 JVM 全量解析；有错只报告，不进入写入事务。 */
+    fun readCsvPlan(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, message = "", error = "", csvPlan = null)
+            try {
+                val parsed = withContext(Dispatchers.IO) {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use {
+                        it.readBytes()
+                    } ?: throw IllegalStateException("无法打开所选文件")
+                    CsvCodec.parseImport(bytes)
+                }
+                if (!parsed.ok) {
+                    _state.value = _state.value.copy(
+                        busy = false,
+                        error = "账单文件有问题，账本未改动：\n" + parsed.errors.joinToString("\n")
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        busy = false, csvPlan = CsvImportPlan(parsed.rows)
+                    )
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    busy = false,
+                    error = "读取失败，账本未改动：" + (e.message ?: e.javaClass.simpleName)
+                )
+            }
+        }
+    }
+
+    fun cancelCsvImport() {
+        _state.value = _state.value.copy(csvPlan = null)
+    }
+
+    /** 确认后单事务批量写入；任一步失败整体回滚（Repository 内保证）。 */
+    fun confirmCsvImport() {
+        val plan = _state.value.csvPlan ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            try {
+                val outcome = withContext(Dispatchers.IO) {
+                    repository.importRecords(plan.rows)
+                }
+                _state.value = _state.value.copy(
+                    busy = false, csvPlan = null,
+                    message = "导入完成：写入 ${outcome.written} 条，" +
+                        "跳过 ${outcome.skipped} 条重复；余额已重算。"
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    busy = false, csvPlan = null,
+                    error = "导入失败，已整体回滚，账本未改动：" +
+                        (e.message ?: e.javaClass.simpleName)
                 )
             }
         }

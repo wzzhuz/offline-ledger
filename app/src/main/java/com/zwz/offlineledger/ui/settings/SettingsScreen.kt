@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -73,6 +74,13 @@ fun SettingsScreen() {
             passwordMode = PasswordMode.IMPORT
         }
     }
+    // 6c-2：CSV 明文导出与账单导入，同样走 SAF，不申请任何权限。
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri -> if (uri != null) vm.exportCsvTo(context, uri) }
+    val csvImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) vm.readCsvPlan(context, uri) }
 
     Column(
         modifier = Modifier
@@ -100,8 +108,24 @@ fun SettingsScreen() {
                 modifier = Modifier.weight(1f)
             ) { Text("从备份恢复") }
         }
+        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { csvExportLauncher.launch("offline-ledger.csv") },
+                enabled = !state.busy,
+                modifier = Modifier.weight(1f)
+            ) { Text("导出 CSV") }
+            Button(
+                onClick = {
+                    csvImportLauncher.launch(arrayOf("text/csv", "text/plain", "*/*"))
+                },
+                enabled = !state.busy,
+                modifier = Modifier.weight(1f)
+            ) { Text("导入账单") }
+        }
         Text(
-            text = "v1 不提供 CSV 导出（明文文件，列在 v1.1 清单）。",
+            text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
+                "导入使用 CSV/TSV 模板：date, type, amount, account, " +
+                "categoryRoot, category, note, currencyCode（币种列导入时按账户继承）。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral
         )
@@ -209,6 +233,25 @@ fun SettingsScreen() {
             style = MaterialTheme.typography.bodySmall,
             color = LedgerColors.Neutral,
             modifier = Modifier.padding(top = 24.dp)
+        )
+    }
+
+    state.csvPlan?.let { plan ->
+        AlertDialog(
+            onDismissRequest = { vm.cancelCsvImport() },
+            title = { Text("导入账单") },
+            text = {
+                Text(
+                    "将写入 ${plan.rows.size} 条流水（重复项自动跳过）。" +
+                        "确认后一次性写入；失败会整体回滚，账本不变。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.confirmCsvImport() }) { Text("确认写入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.cancelCsvImport() }) { Text("取消") }
+            }
         )
     }
 

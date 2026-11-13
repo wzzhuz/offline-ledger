@@ -236,6 +236,36 @@ SAF 明文导出 + 事务化批量导入 + 明细可选币种筛选 + 门禁记�
   导入失败整体回滚；明细与统计口径一致；
   **稳定版前不再为升级背负担**；错误隐私论据与阶段绑定表述彻底清掉
 
+## 实现期补充与踩坑（如实记录）
+
+1. **第 14 次检查器自误报**：`check_kotlin_strings.py` 逐行数
+   未转义双引号，奇数即判「字符串未闭合」。
+   `CsvCodec` 里 CSV 解析必需的字符字面量 `'"'` 每行贡献 1 个双引号，
+   被连报 5 行。**改写检查器风险更大**（可能漏掉真正的 `\n` 跨行字面量），
+   故改代码：用 `private const val QUOTE_CODE = 0x22` 与
+   `ch.code == QUOTE_CODE`，代码本身语义不变。
+   这是本仓库第 14 次「检查器比被检查对象更容易出错」，
+   前 13 次见各阶段归档 design.md。
+2. **第 15 次同类**：批 1a 脚本把 `dailyTotals` 的
+   Python 锚点误写成两个独立的三引号字符串（第二个没有赋值给 `old`），
+   导致替换只改 SQL 不加参数；写完前自查发现并改成显式字符串拼接。
+3. **`NumberFormatException` catch 不可达**：`Cents.fromYuan` 已把
+   `NumberFormatException` 包成 `IllegalArgumentException`，
+   同时 catch 两者会让后者永远不执行；已删掉多余分支。
+4. **`MigrationGateRelaxedTest` 的实现偏离**：写作稿说用 Kotlin 单测
+   验证门禁降级，但 `scripts/` 不在单测 classpath 上，
+   靠 `user.dir` 猜路径不可靠。改为 `check_transaction_annotations.py --self-test`
+   （脚本内自测分支）+ Kotlin 三个单测类
+   （`CsvCodecTest` / `CsvImportPlanTest` / `RecordFilterCurrencyTest`）。
+   门禁降级由 Python 自测与 CI 实际运行双重证明，不假报「Kotlin 测过」。
+5. **CSV 导出走一条 JOIN SQL**：`csvRows()` 直接取账户名与一级/二级分类名，
+   不把 5 万条 `RecordEntity` inflate 进内存；符合「面向用户的查询走 SQL」。
+   导出是天然全量操作，但仍避免对象化的内存峰值。
+6. **`RecordFilterTest` 的 `assertEquals(7, ...)` 没有改**：
+   那个构造没设 `currencyCode`，`activeCount()` 仍是 7；
+   6c-2 新增的维度验证用**相对断言**
+   `base.activeCount() + 1`，避免阶段 2 把维度数硬编码成常数再次踩坑。
+
 ## 验证
 
 - [x] 阶段 0 五项对齐结论齐全、分级判定已告知并等确认

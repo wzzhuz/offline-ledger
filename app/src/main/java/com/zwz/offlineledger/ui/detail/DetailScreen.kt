@@ -238,15 +238,10 @@ private fun MonthOverviewCard(
                 Text("支出 " + formatCents(overview.expenseCents), color = LedgerColors.ExpenseRed)
                 Text("收入 " + formatCents(overview.incomeCents), color = LedgerColors.IncomeGreen)
             }
-            // 6c-1 口径边界：明细页仍为全量，按币种筛选见统计页；一致性收尾留 6c-2。
+            // 6c-2：口径与统计页一致，展示当前筛选币种。
             Text(
-                text = "全部币种（按币种筛选请到统计页）",
-                style = MaterialTheme.typography.bodySmall,
-                color = LedgerColors.Neutral
-            )
-            // 6c-1 口径边界：明细页仍为全量，按币种筛选见统计页；一致性收尾留 6c-2。
-            Text(
-                text = "全部币种（按币种筛选请到统计页）",
+                text = overview.currencyCode?.let { "当前币种：$it · 不跨币种汇总" }
+                    ?: "全部币种（可在筛选中按币种查看）",
                 style = MaterialTheme.typography.bodySmall,
                 color = LedgerColors.Neutral
             )

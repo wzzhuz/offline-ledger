@@ -46,6 +46,7 @@ fun FilterSheet(
     var accountId by remember { mutableStateOf(initial.accountId) }
     var rootId by remember { mutableStateOf(initial.rootCategoryId) }
     var categoryId by remember { mutableStateOf(initial.categoryId) }
+    var currencyCode by remember { mutableStateOf(initial.currencyCode) }
 
     val roots = categories.filter { it.level == 0 && !it.isArchived }
     val children = categories.filter {
@@ -61,7 +62,7 @@ fun FilterSheet(
             ) {
                 Text(text = "组合筛选", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = "时间 / 账户 / 类型 / 一级·二级分类 / 金额区间 / 备注全文",
+                    text = "时间 / 账户 / 类型 / 一级·二级分类 / 金额区间 / 备注全文 / 币种",
                     style = MaterialTheme.typography.bodySmall,
                     color = LedgerColors.Neutral
                 )
@@ -120,6 +121,16 @@ fun FilterSheet(
                     )
                 }
 
+                SectionTitle("币种")
+                OptionRow(
+                    options = listOf<Pair<String, String?>>("全部币种" to null) +
+                        accounts.filter { !it.isArchived }
+                            .map { it.currencyCode }.distinct().sorted()
+                            .map { it to it },
+                    selected = currencyCode,
+                    onSelect = { currencyCode = it }
+                )
+
                 SectionTitle("金额区间（元）")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -160,7 +171,8 @@ fun FilterSheet(
                                 categoryId = categoryId,
                                 minAmountCents = parseCents(minText),
                                 maxAmountCents = parseCents(maxText),
-                                noteQuery = noteText.takeIf { it.isNotBlank() }
+                                noteQuery = noteText.takeIf { it.isNotBlank() },
+                                currencyCode = currencyCode
                             )
                         )
                         onDismiss()

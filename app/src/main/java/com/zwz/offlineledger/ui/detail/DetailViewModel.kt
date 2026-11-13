@@ -30,7 +30,9 @@ data class MonthOverview(
     val expenseCents: Long = 0L,
     val incomeCents: Long = 0L,
     /** localDate -> (支出, 收入)，整月真实聚合值，不随分页加载跳变。 */
-    val dailyTotals: Map<Int, Pair<Long, Long>> = emptyMap()
+    val dailyTotals: Map<Int, Pair<Long, Long>> = emptyMap(),
+    /** 6c-2：当前筛选币种；null = 全部币种。 */
+    val currencyCode: String? = null
 ) {
     val balanceCents: Long get() = incomeCents - expenseCents
 }
@@ -45,7 +47,8 @@ data class FilterValues(
     val categoryId: Long? = null,
     val minAmountCents: Long? = null,
     val maxAmountCents: Long? = null,
-    val noteQuery: String? = null
+    val noteQuery: String? = null,
+    val currencyCode: String? = null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -93,12 +96,21 @@ class DetailViewModel(
     }
 
     private suspend fun reload(f: RecordFilter) {
-        val expense = recordDao.totalExpense(f.yearMonth)
-        val income = recordDao.totalIncome(f.yearMonth)
-        val daily = recordDao.dailyTotals(f.yearMonth).associate {
+        val cc = f.currencyCode
+        val expense = if (cc == null) recordDao.totalExpense(f.yearMonth)
+        else recordDao.totalExpenseForCurrency(f.yearMonth, cc)
+        val income = if (cc == null) recordDao.totalIncome(f.yearMonth)
+        else recordDao.totalIncomeForCurrency(f.yearMonth, cc)
+        val daily = recordDao.dailyTotals(f.yearMonth, cc).associate {
             it.localDate to (it.expenseCents to it.incomeCents)
         }
-        _overview.value = MonthOverview(f.yearMonth, expense, income, daily)
+        _overview.value = MonthOverview(
+            yearMonth = f.yearMonth,
+            expenseCents = expense,
+            incomeCents = income,
+            dailyTotals = daily,
+            currencyCode = cc
+        )
     }
 
     fun switchMonth(deltaMonths: Int) {
@@ -121,6 +133,7 @@ class DetailViewModel(
             minAmountCents = v.minAmountCents,
             maxAmountCents = v.maxAmountCents,
             noteQuery = v.noteQuery,
+            currencyCode = v.currencyCode,
             revision = _filter.value.revision + 1
         )
     }
@@ -130,6 +143,7 @@ class DetailViewModel(
             fromDate = null, toDate = null, accountId = null, type = null,
             rootCategoryId = null, categoryId = null,
             minAmountCents = null, maxAmountCents = null, noteQuery = null,
+            currencyCode = null,
             revision = _filter.value.revision + 1
         )
     }

@@ -43,4 +43,16 @@ class RecordFilterTest {
         )
         assertEquals(7, f.activeCount())
     }
+
+    /** 6c-2 加了 currencyCode 维度，用相对断言而非手写常数。 */
+    @Test
+    fun `currency dimension is included`() {
+        val base = RecordFilter(
+            yearMonth = 202611, accountId = 1L, type = "EXPENSE",
+            rootCategoryId = 1L, categoryId = 101L,
+            minAmountCents = 100L, maxAmountCents = 9999L,
+            noteQuery = "午饭"
+        )
+        assertEquals(base.activeCount() + 1, base.copy(currencyCode = "HKD").activeCount())
+    }
 }
