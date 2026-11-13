@@ -300,6 +300,7 @@ StatsViewModel / DetailViewModel / AssetsViewModel / 对账 ViewModel 全部调�
 |---|---|---|---|
 | `43409248849` | `4b7dd144c6` | **success** | 仅 change 文档，六个静态检查 + 编译全绿 |
 | `43410274574` | `ba0c3d91ee` | **failure** | 6c-1 实现首推，挂在 `运行单元测试` |
+| `43411237592` | `71ec1523d3` | **failure** | 修硬编码常数 + 加诊断回传，拿到 3 个精确编译错误 |
 
 **本地排查先抓到一处必然失败**：`BackupV2CompatTest` 里
 `assertEquals(3, BackupSchema.CURRENT)` 是 6b 写的硬编码常数，
@@ -314,6 +315,32 @@ StatsViewModel / DetailViewModel / AssetsViewModel / 对账 ViewModel 全部调�
 
 同时补加临时诊断步骤，以便在仍有编译错误时一次拿到完整日志
 （job logs 403 老问题，用完移除步骤与 `diag/`）。
+
+## 编译错误真实根因（第 13 次检查器自误报）
+
+诊断回传拿到 3 个错误，全部指向同一个缺失字段：
+
+```
+LedgerMappers.kt:80  No parameter with name 'currencyCode' found
+LedgerMappers.kt:89  Unresolved reference 'currencyCode'
+LedgerRepository.kt:151  No parameter with name 'currencyCode' found
+```
+
+**根因**：批 1 续跑脚本用
+`done('backup/dto/BackupPayload.kt', 'val currencyCode: String = "HKD"')`
+判断「BackupRecord 已加字段」，但**同一个文件里的 `BackupAccount`
+本来就有这一行**（v1 预留的账户币种）。幂等标记误判为已完成，
+直接跳过替换，`BackupRecord` 始终没加上 `currencyCode`，
+而 Mapper 与 Repository 都已按「字段存在」写代码。
+
+这是本仓库**第 13 次「检查器比被检查对象更容易出错」**，
+也是「幂等标记必须在目标块内查找、不能全文件搜字符串」的新变体。
+修法：定位 `data class BackupRecord(` 到下一个 `\n)` 的块，
+在块内确认无字段后精确追加。
+
+**连带修掉的**：`BackupV2CompatTest` / `BackupV3CompatTest` 里
+硬编码 `assertEquals(3/4, BackupSchema.CURRENT)` 改为下界断言
+（`>= 3` / `>= 4`），下次升版本不再红。
 
 ## 验证
 

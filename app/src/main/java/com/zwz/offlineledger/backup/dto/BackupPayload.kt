@@ -29,7 +29,8 @@ data class BackupRecord(
     val fromAccountId: Long? = null, val toAccountId: Long? = null,
     val timestamp: Long, val localDate: Int, val yearMonth: Int,
     val note: String = "", val excludeFromStats: Boolean = false,
-    val linkedRecordId: Long? = null
+    val linkedRecordId: Long? = null,
+    val currencyCode: String = "HKD"
 )
 
 @Serializable

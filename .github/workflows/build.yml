@@ -62,23 +62,7 @@ jobs:
       # assembleDebug 只编译主源码，不碰 src/test。
       # 必须单独跑一次 test，否则测试文件写错了也照样「编译通过」。
       - name: 运行单元测试
-        run: |
-          set -o pipefail
-          gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-test.log
-
-      # 临时诊断：job logs 在 fine-grained PAT 下 403，失败时回传日志供 API 读取。用完即移除。
-      - name: 失败诊断回传
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p diag
-          cp /tmp/gradle-test.log diag/test.log 2>/dev/null || true
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f diag/test.log
-          git commit -m "diag: 阶段 6c-1 单测失败日志" || true
-          git push origin HEAD:main || true
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: 编译 Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon
