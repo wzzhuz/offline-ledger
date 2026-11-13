@@ -170,6 +170,8 @@ class RecordEditorViewModel(
                 s.fromAccountId == s.toAccountId -> "转出与转入账户不能相同"
                 else -> null
             }
+            // SETTLEMENT 只能从明细页对某笔支出发起，不走手工记一笔
+            RecordType.SETTLEMENT -> "报销 / 退款请从明细页对原支出发起"
         }
         if (accountError != null) return accountError
 

@@ -57,6 +57,17 @@ object ChartData {
         )
     }
 
+    /**
+     * 阶段 6b：毛支出切片按分类 id 减去 SETTLEMENT 合计，得到净支出切片。
+     * 纯展示层减法 —— 既有 6 条聚合 SQL 与 StatRules 常量一行不动。
+     * 净额 <= 0 的分类不绘制扇区（报销多于支出时双保险钳制）。
+     */
+    fun netSlices(expense: List<ChartSlice>, settlements: Map<Long, Long>): List<ChartSlice> =
+        expense.map { s ->
+            val refund = s.id?.let { settlements[it] } ?: 0L
+            s.copy(cents = (s.cents - refund).coerceAtLeast(0L))
+        }.filter { it.cents > 0L }
+
     /** 按自然月天数补齐 1..N；缺日为 0，不依赖设备时区。 */
     fun fillDailySeries(yearMonth: Int, rows: List<DailyPoint>): List<DailyPoint> {
         val (_, last) = MonthRange.of(yearMonth)

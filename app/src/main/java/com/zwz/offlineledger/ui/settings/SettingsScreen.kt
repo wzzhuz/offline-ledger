@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
+import com.zwz.offlineledger.ui.budget.BudgetManagerDialog
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.templates.TemplateManagerDialog
 import com.zwz.offlineledger.ui.theme.LedgerColors
@@ -51,6 +52,7 @@ fun SettingsScreen() {
     var showCategories by remember { mutableStateOf(false) }
     var showTrash by remember { mutableStateOf(false) }
     var showTemplates by remember { mutableStateOf(false) }
+    var showBudgets by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var thresholdInput by remember { mutableStateOf(state.thresholdYuan) }
 
@@ -167,6 +169,10 @@ fun SettingsScreen() {
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
         ) { Text("模板与周期记账（模板 / 规则 · 新增 / 归档 / 启用）") }
         Button(
+            onClick = { showBudgets = true },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        ) { Text("预算管理（总预算 / 一级 / 二级 · 新增 / 归档）") }
+        Button(
             onClick = { vm.runHealthCheck() },
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
         ) { Text("账本健康自检") }
@@ -239,6 +245,10 @@ fun SettingsScreen() {
 
     if (showTemplates) {
         TemplateManagerDialog(onDismiss = { showTemplates = false })
+    }
+
+    if (showBudgets) {
+        BudgetManagerDialog(onDismiss = { showBudgets = false })
     }
 }
 

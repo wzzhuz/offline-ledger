@@ -198,7 +198,9 @@ private fun QuickEntryForm(
 
         Text("类型", style = MaterialTheme.typography.labelMedium)
         Row {
-            RecordType.entries.filter { it != RecordType.TRANSFER || !isRule }.forEach { rt ->
+            // 显式列表：SETTLEMENT 不是可手工记的模板 / 规则类型
+            listOf(RecordType.EXPENSE, RecordType.INCOME, RecordType.TRANSFER)
+                .filter { it != RecordType.TRANSFER || !isRule }.forEach { rt ->
                 AssistChip(
                     onClick = { type = rt },
                     label = { Text(typeLabel(rt)) },
@@ -327,6 +329,8 @@ private fun typeLabel(t: RecordType): String = when (t) {
     RecordType.EXPENSE -> "支出"
     RecordType.INCOME -> "收入"
     RecordType.TRANSFER -> "转账"
+    // 表单不会传入 SETTLEMENT，但穷尽 when 必须覆盖新增枚举值
+    RecordType.SETTLEMENT -> "报销 / 退款"
 }
 
 private fun accountName(names: List<Pair<Long, String>>, id: Long?): String =

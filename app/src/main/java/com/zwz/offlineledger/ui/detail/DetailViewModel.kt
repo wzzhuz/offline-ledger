@@ -15,6 +15,7 @@ import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.paging.RecordFilter
 import com.zwz.offlineledger.data.paging.RecordPagingSource
+import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -141,5 +142,19 @@ class DetailViewModel(
     suspend fun delete(id: Long) {
         repository.deleteRecord(id)
         bumpRevision()
+    }
+
+    /** 剩余可报金额 = 原支出 − 累计已报销；非支出返回 0。 */
+    suspend fun remainingSettlement(id: Long): Long {
+        val original = recordDao.byId(id) ?: return 0L
+        if (original.type != RecordType.EXPENSE) return 0L
+        return (original.amountCents - recordDao.settlementTotalFor(id)).coerceAtLeast(0L)
+    }
+
+    /** 返回是否真的写入；超额或原记录非法时 Repository 返回 null。 */
+    suspend fun settle(id: Long, amountCents: Long): Boolean {
+        val newId = repository.recordSettlement(id, amountCents, System.currentTimeMillis())
+        if (newId != null) bumpRevision()
+        return newId != null
     }
 }

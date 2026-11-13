@@ -8,6 +8,7 @@ import com.zwz.offlineledger.data.local.Migrations
 import com.zwz.offlineledger.data.local.SeedCallback
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
+import com.zwz.offlineledger.data.local.dao.BudgetDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
@@ -55,4 +56,5 @@ object DatabaseModule {
     @Provides fun provideTrashDao(db: AppDatabase): TrashDao = db.trashDao()
     @Provides fun provideTemplateDao(db: AppDatabase): TemplateDao = db.templateDao()
     @Provides fun provideRecurringRuleDao(db: AppDatabase): RecurringRuleDao = db.recurringRuleDao()
+    @Provides fun provideBudgetDao(db: AppDatabase): BudgetDao = db.budgetDao()
 }

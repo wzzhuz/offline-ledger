@@ -7,9 +7,10 @@ import kotlinx.serialization.Serializable
  * CURRENT 随结构变化递增；MIN_SUPPORTED 表示仍能导入的最旧版本。
  */
 object BackupSchema {
-    // 阶段 6a：payload 增加模板与周期规则列表，故 CURRENT 升 2。
-    // MIN_SUPPORTED 保持 1 —— v1 备份缺这两个键时靠默认值解析成空列表。
-    const val CURRENT: Int = 2
+    // 阶段 6a 升 2；阶段 6b payload 增加 budgets、BackupRecord 增加
+    // linkedRecordId，故 CURRENT 升 3。MIN_SUPPORTED 一路保持 1：
+    // v1/v2 备份缺键时靠默认值解析成空列表 / null。
+    const val CURRENT: Int = 3
     const val MIN_SUPPORTED: Int = 1
 }
 
@@ -35,5 +36,6 @@ data class BackupCounts(
     val records: Int = 0,
     val balanceAdjustments: Int = 0,
     val templates: Int = 0,
-    val recurringRules: Int = 0
+    val recurringRules: Int = 0,
+    val budgets: Int = 0
 )

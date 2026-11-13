@@ -6,6 +6,7 @@ import com.zwz.offlineledger.backup.dto.LedgerSnapshot
 import com.zwz.offlineledger.data.local.AppDatabase
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
+import com.zwz.offlineledger.data.local.dao.BudgetDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
@@ -13,6 +14,7 @@ import com.zwz.offlineledger.data.local.dao.TemplateDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.BalanceAdjustmentEntity
+import com.zwz.offlineledger.data.local.entity.BudgetEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
 import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
@@ -22,8 +24,11 @@ import com.zwz.offlineledger.data.local.toRecordEntity
 import com.zwz.offlineledger.data.local.toEntity
 import com.zwz.offlineledger.data.local.toRecord
 import com.zwz.offlineledger.data.local.toTrash
+import com.zwz.offlineledger.data.model.BudgetScope
 import com.zwz.offlineledger.data.model.LedgerAdjustment
+import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.model.LedgerCategory
+import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.engine.CategoryTree
 import com.zwz.offlineledger.engine.LedgerEngine
 import com.zwz.offlineledger.engine.Reconciliation
@@ -57,7 +62,8 @@ class LedgerRepository @Inject constructor(
     private val adjustmentDao: BalanceAdjustmentDao,
     private val trashDao: TrashDao,
     private val templateDao: TemplateDao,
-    private val ruleDao: RecurringRuleDao
+    private val ruleDao: RecurringRuleDao,
+    private val budgetDao: BudgetDao
 ) {
     fun observeNetWorth(): Flow<Long> = accountDao.observeNetWorth()
 
@@ -131,6 +137,7 @@ class LedgerRepository @Inject constructor(
         balanceAdjustments = adjustmentDao.all().map { it.toDto() },
         templates = templateDao.all().map { it.toDto() },
         recurringRules = ruleDao.all().map { it.toDto() },
+        budgets = budgetDao.all().map { it.toDto() },
         trash = trashDao.all().map {
             com.zwz.offlineledger.backup.dto.BackupRecord(
                 id = it.originalId, type = it.type.name, amountCents = it.amountCents,
@@ -138,7 +145,8 @@ class LedgerRepository @Inject constructor(
                 fromAccountId = it.fromAccountId, toAccountId = it.toAccountId,
                 timestamp = it.timestamp, localDate = it.localDate,
                 yearMonth = it.yearMonth, note = it.note,
-                excludeFromStats = it.excludeFromStats
+                excludeFromStats = it.excludeFromStats,
+                linkedRecordId = it.linkedRecordId
             )
         },
         exportedAtEpochMilli = System.currentTimeMillis()
@@ -151,6 +159,7 @@ class LedgerRepository @Inject constructor(
         adjustmentDao.clear()
         templateDao.clear()
         ruleDao.clear()
+        budgetDao.clear()
         categoryDao.clear()
         accountDao.clear()
 
@@ -162,6 +171,7 @@ class LedgerRepository @Inject constructor(
         // 与「全量替换」语义一致（见 backup-restore delta）。
         file.payload.templates.forEach { templateDao.insert(it.toEntity()) }
         file.payload.recurringRules.forEach { ruleDao.insert(it.toEntity()) }
+        file.payload.budgets.forEach { budgetDao.insert(it.toEntity()) }
         file.payload.trash.forEach {
             trashDao.insert(it.toEntity().toTrash(System.currentTimeMillis()))
         }
@@ -342,6 +352,75 @@ class LedgerRepository @Inject constructor(
         }
         if (inserted > 0) rebuildAllBalancesInternal()
         inserted
+    }
+
+
+    // ---------------------------------------------------------------
+    // 阶段 6b：预算规则与退款/报销成对模型。
+    // 4 个写方法全部包在 db.withTransaction 内；
+    // scripts/check_transaction_annotations.py 的 WRITE_METHODS 已扩到 30。
+    // ---------------------------------------------------------------
+
+    suspend fun createBudget(b: BudgetEntity): Long = db.withTransaction {
+        validateBudget(b)
+        budgetDao.insert(b)
+    }
+
+    suspend fun updateBudget(b: BudgetEntity) = db.withTransaction {
+        validateBudget(b)
+        budgetDao.update(b)
+    }
+
+    /** 只归档不物理删；历史统计与备份不受影响。 */
+    suspend fun archiveBudget(id: Long) = db.withTransaction {
+        budgetDao.archive(id)
+    }
+
+    /**
+     * 对一笔 EXPENSE 发起退款 / 报销，生成一条 SETTLEMENT 流水。
+     * 与 insertRecord / recordFromTemplate 完全同构：
+     * withResolvedRoot -> recordDao.insert -> rebuildAllBalancesInternal。
+     * fromAccountId 留空、toAccountId 用原支出账户，
+     * 于是既有余额聚合 SQL 会把钱加回该账户，一行都不用改。
+     */
+    suspend fun recordSettlement(
+        originalId: Long,
+        amountCents: Long,
+        atEpochMilli: Long
+    ): Long? = db.withTransaction {
+        if (amountCents <= 0L) return@withTransaction null
+        val original = recordDao.byId(originalId) ?: return@withTransaction null
+        if (original.type != RecordType.EXPENSE) return@withTransaction null
+        val already = recordDao.settlementTotalFor(originalId)
+        if (already + amountCents > original.amountCents) return@withTransaction null
+        val ld = LedgerClock.fromEpochMilli(atEpochMilli)
+        val entity = RecordEntity(
+            type = RecordType.SETTLEMENT,
+            amountCents = amountCents,
+            categoryId = original.categoryId,
+            rootCategoryId = original.rootCategoryId,
+            fromAccountId = null,
+            toAccountId = original.fromAccountId,
+            timestamp = atEpochMilli,
+            localDate = ld.localDate,
+            yearMonth = ld.yearMonth,
+            note = if (original.note.isBlank()) "报销 / 退款" else "报销 / 退款：" + original.note,
+            excludeFromStats = false,
+            linkedRecordId = originalId
+        )
+        val id = recordDao.insert(withResolvedRoot(entity))
+        rebuildAllBalancesInternal()
+        id
+    }
+
+    private fun validateBudget(b: BudgetEntity) {
+        require(b.name.isNotBlank()) { "预算名不能为空" }
+        require(b.limitCents > 0L) { "预算限额必须大于 0" }
+        when (b.scope) {
+            BudgetScope.TOTAL -> require(b.categoryId == null) { "总预算不应指定分类" }
+            BudgetScope.ROOT, BudgetScope.CATEGORY ->
+                require(b.categoryId != null) { "分类预算必须指定分类" }
+        }
     }
 
     private suspend fun validateCategory(c: CategoryEntity) {

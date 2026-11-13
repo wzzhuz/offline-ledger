@@ -2,6 +2,7 @@ package com.zwz.offlineledger.data.local
 
 import com.zwz.offlineledger.backup.dto.BackupAccount
 import com.zwz.offlineledger.backup.dto.BackupAdjustment
+import com.zwz.offlineledger.backup.dto.BackupBudget
 import com.zwz.offlineledger.backup.dto.BackupCategory
 import com.zwz.offlineledger.backup.dto.BackupRecord
 import com.zwz.offlineledger.backup.dto.BackupTemplate
@@ -12,8 +13,10 @@ import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
 import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 import com.zwz.offlineledger.data.model.AccountType
+import com.zwz.offlineledger.data.model.BudgetScope
 import com.zwz.offlineledger.data.model.Cadence
 import com.zwz.offlineledger.data.model.RecordType
+import com.zwz.offlineledger.data.local.entity.BudgetEntity
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
 import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
@@ -24,7 +27,8 @@ fun RecordEntity.toTrash(deletedAt: Long): TrashEntryEntity = TrashEntryEntity(
     categoryId = categoryId, rootCategoryId = rootCategoryId,
     fromAccountId = fromAccountId, toAccountId = toAccountId,
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
-    note = note, excludeFromStats = excludeFromStats, deletedAt = deletedAt
+    note = note, excludeFromStats = excludeFromStats,
+    linkedRecordId = linkedRecordId, deletedAt = deletedAt
 )
 
 fun TrashEntryEntity.toRecord(): RecordEntity = RecordEntity(
@@ -32,7 +36,8 @@ fun TrashEntryEntity.toRecord(): RecordEntity = RecordEntity(
     categoryId = categoryId, rootCategoryId = rootCategoryId,
     fromAccountId = fromAccountId, toAccountId = toAccountId,
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
-    note = note, excludeFromStats = excludeFromStats
+    note = note, excludeFromStats = excludeFromStats,
+    linkedRecordId = linkedRecordId
 )
 
 fun AccountEntity.toDto(): BackupAccount = BackupAccount(
@@ -70,7 +75,8 @@ fun RecordEntity.toDto(): BackupRecord = BackupRecord(
     categoryId = categoryId, rootCategoryId = rootCategoryId,
     fromAccountId = fromAccountId, toAccountId = toAccountId,
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
-    note = note, excludeFromStats = excludeFromStats
+    note = note, excludeFromStats = excludeFromStats,
+    linkedRecordId = linkedRecordId
 )
 
 fun BackupRecord.toEntity(): RecordEntity = RecordEntity(
@@ -78,7 +84,8 @@ fun BackupRecord.toEntity(): RecordEntity = RecordEntity(
     categoryId = categoryId, rootCategoryId = rootCategoryId,
     fromAccountId = fromAccountId, toAccountId = toAccountId,
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
-    note = note, excludeFromStats = excludeFromStats
+    note = note, excludeFromStats = excludeFromStats,
+    linkedRecordId = linkedRecordId
 )
 
 fun BalanceAdjustmentEntity.toDto(): BackupAdjustment = BackupAdjustment(
@@ -157,3 +164,18 @@ fun RecurringRuleEntity.toRecordEntity(atEpochMilli: Long, dueLocalDate: Int): R
         note = if (note.isBlank()) name else note,
         excludeFromStats = excludeFromStats
     )
+
+// ---------------------------------------------------------------
+// 阶段 6b：预算规则 DTO 映射。
+// ---------------------------------------------------------------
+fun BudgetEntity.toDto(): BackupBudget = BackupBudget(
+    id = id, name = name, scope = scope.name, categoryId = categoryId,
+    limitCents = limitCents, sortOrder = sortOrder,
+    isArchived = isArchived, createdAt = createdAt
+)
+
+fun BackupBudget.toEntity(): BudgetEntity = BudgetEntity(
+    id = id, name = name, scope = BudgetScope.valueOf(scope),
+    categoryId = categoryId, limitCents = limitCents,
+    sortOrder = sortOrder, isArchived = isArchived, createdAt = createdAt
+)

@@ -33,7 +33,10 @@ def main() -> int:
     # 否则 dao.find('fun expenseByCategory') 会回溯到错误的 @Query。
     for marker in ['totalExpense', 'totalIncome', 'expenseByRoot',
                    'expenseByCategory', 'monthlyTrend', 'subcategoryTotalsUnderRoot',
-                   'rootTotalsInRange', 'categoryTotalsInRange', 'drillDownRows']:
+                   'rootTotalsInRange', 'categoryTotalsInRange', 'drillDownRows',
+                   # 阶段 6b 的 SETTLEMENT 聚合，同样必须带唯一口径
+                   'settlementByRootInRange', 'settlementByCategoryInRange',
+                   'settlementTotalInRange']:
         idx = dao.find('fun ' + marker)
         if idx < 0:
             problems.append('缺少统计查询 ' + marker)

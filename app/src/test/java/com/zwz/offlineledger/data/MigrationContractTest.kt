@@ -52,4 +52,28 @@ class MigrationContractTest {
         assertTrue(!both.contains("CREATE INDEX"))
         assertTrue(!both.contains("FOREIGN KEY"))
     }
+
+    @Test
+    fun migration_2_3_is_registered() {
+        assertTrue(Migrations.ALL.any { it.startVersion == 2 && it.endVersion == 3 })
+    }
+
+    @Test
+    fun create_budgets_sql_has_all_columns() {
+        val sql = Migrations.SQL_2_3_CREATE_BUDGETS
+        assertTrue(sql.contains("budgets"))
+        listOf("id", "name", "scope", "categoryId", "limitCents",
+               "sortOrder", "isArchived", "createdAt")
+            .forEach { assertTrue("缺列 $it", sql.contains("`$it`")) }
+        assertTrue(sql.contains("PRIMARY KEY AUTOINCREMENT"))
+        assertTrue(!sql.contains("FOREIGN KEY"))
+    }
+
+    @Test
+    fun alter_sql_adds_linked_record_id_to_both_tables() {
+        assertTrue(Migrations.SQL_2_3_ALTER_RECORDS.contains("records"))
+        assertTrue(Migrations.SQL_2_3_ALTER_RECORDS.contains("linkedRecordId"))
+        assertTrue(Migrations.SQL_2_3_ALTER_TRASH.contains("trash"))
+        assertTrue(Migrations.SQL_2_3_ALTER_TRASH.contains("linkedRecordId"))
+    }
 }

@@ -48,6 +48,8 @@ fun amountColor(type: RecordType): Color = when (type) {
     RecordType.EXPENSE -> LedgerColors.ExpenseRed
     RecordType.INCOME -> LedgerColors.IncomeGreen
     RecordType.TRANSFER -> LedgerColors.Neutral
+    // 报销 / 退款是收回款，按正向色显示
+    RecordType.SETTLEMENT -> LedgerColors.IncomeGreen
 }
 
 /** 金额展示：整数分 -> 元的两位小数。 */
@@ -57,4 +59,5 @@ fun signedAmount(type: RecordType, cents: Long): String = when (type) {
     RecordType.EXPENSE -> "-" + formatCents(cents)
     RecordType.INCOME -> "+" + formatCents(cents)
     RecordType.TRANSFER -> formatCents(cents)
+    RecordType.SETTLEMENT -> "+" + formatCents(cents)
 }

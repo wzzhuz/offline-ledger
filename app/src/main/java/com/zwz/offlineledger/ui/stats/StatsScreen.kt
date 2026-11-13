@@ -1,11 +1,15 @@
 package com.zwz.offlineledger.ui.stats
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -17,6 +21,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,7 +39,7 @@ fun StatsScreen() {
     val context = LocalContext.current
     val vm: StatsViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
-            StatsViewModel(ep.recordDao(), ep.categoryDao())
+            StatsViewModel(ep.recordDao(), ep.categoryDao(), ep.budgetDao())
         }
     )
     val state by vm.state.collectAsState()
@@ -49,6 +54,7 @@ fun StatsScreen() {
 
         PeriodSwitcher(state, vm)
         OverviewCard(state)
+        BudgetSection(state)
 
         val check = state.totalsCheck
         if (check != null && !check.consistent) {
@@ -56,7 +62,7 @@ fun StatsScreen() {
                 Text(
                     text = "⚠ 合计不一致：一级 " + formatCents(check.rootCents) +
                         " / 二级 " + formatCents(check.childCents) +
-                        " / 总支出 " + formatCents(check.totalCents) +
+                        " / 总净支出 " + formatCents(check.totalCents) +
                         "，差额 " + check.driftCents + " 分",
                     color = LedgerColors.ExpenseRed,
                     style = MaterialTheme.typography.bodySmall,
@@ -85,8 +91,8 @@ fun StatsScreen() {
             state.rootSlices else state.childSlices
         DonutChart(
             sectors = ChartData.sectors(slices),
-            totalCents = state.totalExpenseCents,
-            centerLabel = if (state.sliceLevel == SliceLevel.ROOT) "一级支出" else "二级支出",
+            totalCents = state.netExpenseCents,
+            centerLabel = if (state.sliceLevel == SliceLevel.ROOT) "一级净支出" else "二级净支出",
             onSectorClick = { i ->
                 val id = slices.getOrNull(i)?.id
                 if (id != null) {
@@ -226,6 +232,70 @@ private fun OverviewCard(state: StatsUiState) {
                 style = MaterialTheme.typography.titleLarge,
                 color = if (balance < 0) LedgerColors.ExpenseRed else LedgerColors.IncomeGreen
             )
+            // 阶段 6b：毛支出 / 已报销 / 净支出三者并列，避免口径混淆。
+            Text(
+                text = "已报销 / 退款 " + formatCents(state.settlementCents) +
+                    " 元  ·  净支出 " + formatCents(state.netExpenseCents) + " 元",
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.Neutral
+            )
+            Text(
+                text = "分类占比与预算进度均按净支出计算",
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.Neutral
+            )
+        }
+    }
+}
+
+/** 预算进度区：消耗来自 SQL 聚合，超支只在应用内标红，不发通知。 */
+@Composable
+private fun BudgetSection(state: StatsUiState) {
+    if (state.budgetItems.isEmpty()) return
+    SectionLabel("本月预算（按净支出）")
+    state.budgetItems.forEach { item ->
+        val p = item.progress
+        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = item.name, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = if (p.isOver)
+                            "超支 " + formatCents(p.overCents) + " 元"
+                        else
+                            "剩余 " + formatCents(p.remainingCents) + " 元",
+                        color = if (p.isOver) LedgerColors.ExpenseRed else LedgerColors.IncomeGreen,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Text(
+                    text = "已用 " + formatCents(p.spentCents) +
+                        " / 限额 " + formatCents(item.limitCents) + " 元",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LedgerColors.Neutral
+                )
+                // 自绘进度条：不依赖 LinearProgressIndicator 的跨版本 API 签名。
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(LedgerColors.Neutral.copy(alpha = 0.25f))
+                        .padding(top = 2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(p.usedRatio.coerceIn(0f, 1f))
+                            .height(6.dp)
+                            .background(
+                                if (p.isOver) LedgerColors.ExpenseRed else LedgerColors.IncomeGreen
+                            )
+                    )
+                }
+            }
         }
     }
 }

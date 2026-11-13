@@ -18,6 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.time.MonthRange
 import com.zwz.offlineledger.data.local.dao.RecordRow
 import com.zwz.offlineledger.data.model.RecordType
@@ -44,6 +47,7 @@ import com.zwz.offlineledger.ui.components.amountColor
 import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.components.signedAmount
 import com.zwz.offlineledger.ui.theme.LedgerColors
+import androidx.compose.ui.text.input.KeyboardType
 import kotlinx.coroutines.launch
 
 @Composable
@@ -67,6 +71,9 @@ fun DetailScreen(
 
     var showFilter by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<RecordRow?>(null) }
+    var settleRow by remember { mutableStateOf<RecordRow?>(null) }
+    var settleAmount by remember { mutableStateOf("") }
+    var settleError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(refreshTick) {
@@ -95,10 +102,73 @@ fun DetailScreen(
                 RecordRowCard(
                     row = row,
                     onClick = { onEdit(row.id) },
-                    onDelete = { pendingDelete = row }
+                    onDelete = { pendingDelete = row },
+                    onSettle = {
+                        scope.launch {
+                            settleAmount = Cents(vm.remainingSettlement(row.id)).toYuanString()
+                            settleError = null
+                            settleRow = row
+                        }
+                    }
                 )
             }
         }
+    }
+
+    settleRow?.let { target ->
+        AlertDialog(
+            onDismissRequest = { settleRow = null },
+            title = { Text("报销 / 退款") },
+            text = {
+                Column {
+                    Text(
+                        text = "原支出 " + formatCents(target.amountCents) +
+                            " 元；输入框已填剩余可报金额。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = settleAmount,
+                        onValueChange = { settleAmount = it },
+                        label = { Text("金额（元）") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
+                    settleError?.let {
+                        Text(
+                            text = it,
+                            color = LedgerColors.ExpenseRed,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val cents = try {
+                        Cents.fromYuan(settleAmount).value
+                    } catch (e: IllegalArgumentException) {
+                        settleError = e.message ?: "金额格式非法"
+                        return@TextButton
+                    }
+                    if (cents <= 0L) {
+                        settleError = "金额必须大于 0"
+                        return@TextButton
+                    }
+                    scope.launch {
+                        val ok = vm.settle(target.id, cents)
+                        if (ok) {
+                            settleRow = null
+                        } else {
+                            settleError = "报销失败：累计已报可能超过原支出金额"
+                        }
+                    }
+                }) { Text("确认") }
+            },
+            dismissButton = {
+                TextButton(onClick = { settleRow = null }) { Text("取消") }
+            }
+        )
     }
 
     if (showFilter) {

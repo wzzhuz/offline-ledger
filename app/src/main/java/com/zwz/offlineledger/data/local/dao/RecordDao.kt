@@ -318,4 +318,23 @@ interface RecordDao {
     suspend fun drillDownRows(
         fromYm: Int, toYm: Int, categoryId: Long, limit: Int
     ): List<DrillRow>
+
+    // ---------------------------------------------------------------
+    // 阶段 6b：SETTLEMENT 聚合。既有 6 条收支聚合 SQL 一行未动，
+    // 净支出在 ChartData 展示层做减法。三条查询都带唯一统计口径，
+    // 已纳入 check_stat_rules.py 的 marker 清单。
+    // ---------------------------------------------------------------
+
+    @Query("SELECT rootCategoryId AS categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'SETTLEMENT' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm GROUP BY rootCategoryId")
+    suspend fun settlementByRootInRange(fromYm: Int, toYm: Int): List<CategoryTotalRow>
+
+    @Query("SELECT categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'SETTLEMENT' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm GROUP BY categoryId")
+    suspend fun settlementByCategoryInRange(fromYm: Int, toYm: Int): List<CategoryTotalRow>
+
+    @Query("SELECT COALESCE(SUM(amountCents), 0) FROM records WHERE type = 'SETTLEMENT' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm")
+    suspend fun settlementTotalInRange(fromYm: Int, toYm: Int): Long
+
+    /** 累计已报销：recordSettlement 校验「累计 + 本次 <= 原支出」用。 */
+    @Query("SELECT COALESCE(SUM(amountCents), 0) FROM records WHERE type = 'SETTLEMENT' AND linkedRecordId = :originalId")
+    suspend fun settlementTotalFor(originalId: Long): Long
 }

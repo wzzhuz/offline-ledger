@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
+import com.zwz.offlineledger.data.local.dao.BudgetDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
@@ -31,6 +32,7 @@ interface LedgerEntryPoint {
     fun balanceAdjustmentDao(): BalanceAdjustmentDao
     fun templateDao(): TemplateDao
     fun recurringRuleDao(): RecurringRuleDao
+    fun budgetDao(): BudgetDao
 }
 
 object LedgerDi {

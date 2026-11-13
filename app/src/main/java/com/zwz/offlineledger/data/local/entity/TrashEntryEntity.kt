@@ -22,5 +22,7 @@ data class TrashEntryEntity(
     @ColumnInfo(name = "yearMonth") val yearMonth: Int,
     @ColumnInfo(name = "note") val note: String = "",
     @ColumnInfo(name = "excludeFromStats") val excludeFromStats: Boolean = false,
+    /** 与 records.linkedRecordId 同步，保证 SETTLEMENT 删除后恢复不丢关联。 */
+    @ColumnInfo(name = "linkedRecordId") val linkedRecordId: Long? = null,
     @ColumnInfo(name = "deletedAt") val deletedAt: Long = 0L
 )

@@ -41,5 +41,7 @@ data class RecordEntity(
     @ColumnInfo(name = "localDate") val localDate: Int,
     @ColumnInfo(name = "yearMonth") val yearMonth: Int,
     @ColumnInfo(name = "note") val note: String = "",
-    @ColumnInfo(name = "excludeFromStats") val excludeFromStats: Boolean = false
+    @ColumnInfo(name = "excludeFromStats") val excludeFromStats: Boolean = false,
+    /** 阶段 6b：SETTLEMENT 指向被冲减的原支出流水；普通流水为 null。 */
+    @ColumnInfo(name = "linkedRecordId") val linkedRecordId: Long? = null
 )
