@@ -63,7 +63,7 @@
 
 ## 8. 收尾
 
-- [ ] 8.1 同步 `design.md` / `tasks.md` 实测结果
+- [x] 8.1 同步 `design.md` / `tasks.md` 实测结果
 - [ ] 8.2 使用者确认后归档（ADDED 合并 + 1 MODIFIED 按标题替换 + 移入 archive）
 
 ## 明确留到后续（不预先打勾）

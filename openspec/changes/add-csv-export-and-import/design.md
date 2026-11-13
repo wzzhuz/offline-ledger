@@ -294,6 +294,43 @@ SAF 明文导出 + 事务化批量导入 + 明细可选币种筛选 + 门禁记�
 纯 JVM 编解码、事务导入、明细筛选、门禁降级的逻辑都未被执行到，
 因此首轮失败不能当成「设计有问题」，也不能当成「已验证」。
 
+## 第二轮 CI 与最终验证
+
+| run | commit | 结论 | 说明 |
+|---|---|---|---|
+| `43431400249` | `af40aeefca` | **failure** | 补回括号后仍挂在单测 |
+| `43432655826` | `f40a83f5d0` | **success** | 13 步全绿（诊断步骤正常 skipped） |
+
+**第二轮根因是我自己写的两个测试断言**：
+`CsvParseResult` 的语义是「任一行非法 → `errors` 非空 → 调用方按 `ok`
+整体废弃」，但**合法行仍留在 `rows` 里**（解析器不做回滚式清空）。
+测试却断言 `rows.size == 0`，于是
+`illegal_amount_reports_line_number_and_no_rows` 与
+`one_illegal_row_discards_whole_plan` 必然红。
+已改为断言 `!ok` + 错误行号，并加注释写明「调用方 MUST 按 ok 判定」。
+
+这是本仓库**第 17 次「凭印象写常数 / 断言」**
+（与阶段 1 的 147000、阶段 2 的维度 8、阶段 5 的 4 字口令同源）。
+同时做了一次全项目 Kotlin 括号平衡自查，脚本自己又误报了
+`ChartData.kt`（正则剥字符串时把注释里的括号算进去）——
+**第 18 次检查器自误报**，因该文件已通过多次 CI 编译，
+按「FAIL 走第二条独立路径复核」确认无问题，未改动。
+
+**最终验证**：
+- 六个静态检查全 PASS；`check_transaction_annotations.py --self-test` PASS
+- `testDebugUnitTest` / `assembleDebug` / `assembleRelease`（含 lintVital）/
+  签名诊断 / 制品上传 全绿
+- `offline-ledger-debug-apk` **23,703,226 B**
+- 诊断步骤与 `diag/` 已移除，远端核查无残留
+- 隐私门禁仍 PASS：无 `INTERNET`、无新增权限、无网络 SDK
+
+**验收标准逐条对照**（可自动验证的部分）：
+CSV BOM / 8 列表头 / 两位小数 / 逗号与引号转义 / TSV / 空行跳过 /
+非法行带行号 / 去重键忽略币种列 / `activeCount()` 相对断言 /
+31 写方法在事务内 / 迁移门禁降级 —— 均由纯 JVM 单测与静态检查覆盖。
+**导入事务真实回滚、SAF 选择器、Excel 打开 CSV 仍需真机实测**
+（使用者明确推迟，见第 9 节清单）。
+
 ## 验证
 
 - [x] 阶段 0 五项对齐结论齐全、分级判定已告知并等确认
@@ -303,6 +340,6 @@ SAF 明文导出 + 事务化批量导入 + 明细可选币种筛选 + 门禁记�
 - [x] 写码前实际读了设置页 / ViewModel / 备份编解码 /
   `pagedFiltered` / `RecordFilter` / PagingSource / 门禁脚本 / 待 MODIFIED 原文
 - [x] delta 每条至少一个 GIVEN/WHEN/THEN + 「理由」，1 份 MODIFIED 写完整替换文本
-- [ ] CI 全绿（写作时未完成）
-- [ ] 推送后用远端 Git Trees API 逐文件比对 blob sha
-- [ ] 使用者确认后归档本 change
+- [x] CI 全绿（`43432655826` success，13 步全绿）
+- [x] 每次推送均用远端 Git Trees API 逐文件比对 blob sha（PASS）
+- [ ] 使用者确认后归档本 change（**本轮不擅自归档**）
