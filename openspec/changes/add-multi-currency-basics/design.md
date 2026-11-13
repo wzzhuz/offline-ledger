@@ -294,6 +294,27 @@ StatsViewModel / DetailViewModel / AssetsViewModel / 对账 ViewModel 全部调�
    但预算进度若仍走全量查询，会与同页环形图口径不一致；
    实现统一走 ForCurrency 版本，且仍固定按当前选中月单月聚合。
 
+## 首轮 CI 实测（待回填）
+
+| run | commit | 结论 | 说明 |
+|---|---|---|---|
+| `43409248849` | `4b7dd144c6` | **success** | 仅 change 文档，六个静态检查 + 编译全绿 |
+| `43410274574` | `ba0c3d91ee` | **failure** | 6c-1 实现首推，挂在 `运行单元测试` |
+
+**本地排查先抓到一处必然失败**：`BackupV2CompatTest` 里
+`assertEquals(3, BackupSchema.CURRENT)` 是 6b 写的硬编码常数，
+6c-1 把 `CURRENT` 升到 4 后必然红。这是本仓库**第 12 次
+「凭印象手写常数 / 硬编码版本」**（6b 时自己刚把 `BackupEnvelopeTest`
+从 `assertEquals(1, CURRENT)` 改成只锁 `MIN_SUPPORTED`，
+转头又在新测试里硬编码了 3）。
+
+**根治方式**：两处都改成下界断言
+`assertTrue(BackupSchema.CURRENT >= 3 / >= 4)`，
+既保留「至少支持到该版本」的语义，又不会在下次升版本时再红。
+
+同时补加临时诊断步骤，以便在仍有编译错误时一次拿到完整日志
+（job logs 403 老问题，用完移除步骤与 `diag/`）。
+
 ## 验证
 
 - [x] 阶段 0 五项对齐结论齐全、分级判定已告知并等确认

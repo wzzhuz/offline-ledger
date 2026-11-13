@@ -51,6 +51,6 @@ class BackupV3CompatTest {
     @Test
     fun min_supported_stays_v1() {
         assertEquals(1, BackupSchema.MIN_SUPPORTED)
-        assertEquals(4, BackupSchema.CURRENT)
+        assertTrue(BackupSchema.CURRENT >= 4)
     }
 }
