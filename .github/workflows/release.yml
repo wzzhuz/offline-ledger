@@ -503,6 +503,39 @@ jobs:
           echo "skipped=false" >> $GITHUB_OUTPUT
           echo "path=/$PARENT/$DIR/$APK_NAME" >> $GITHUB_OUTPUT
 
+      # ---------------------------------------------------------------
+      # 构建指标制品：把「plain / minified 精确字节数 + 坚果云状态」编码进
+      # artifact 名。GitHub 的 job logs / check-runs annotations / artifact zip
+      # 在 fine-grained token 下常返回 403，但 artifacts 列表 API 能读到名字，
+      # 于是体积对比与上传状态无需下载 zip 就能核验。文件名纯 ASCII。
+      # ---------------------------------------------------------------
+      - name: 生成构建指标文件
+        if: always()
+        run: |
+          mkdir -p out
+          {
+            echo "version=${{ steps.ver.outputs.version }}"
+            echo "minify=${{ inputs.minify }}"
+            echo "plain_bytes=${{ steps.rename.outputs.plain_bytes }}"
+            echo "min_bytes=${{ steps.rename.outputs.min_bytes }}"
+            echo "saved_bytes=${{ steps.rename.outputs.saved_bytes }}"
+            echo "saved_pct=${{ steps.rename.outputs.saved_pct }}"
+            echo "nutstore_skipped=${{ steps.nutstore.outputs.skipped || 'na' }}"
+            echo "nutstore_path=${{ steps.nutstore.outputs.path || 'na' }}"
+          } > out/build-metrics.txt
+          cat out/build-metrics.txt
+
+      - name: 上传构建指标
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-ledger-metrics-v${{ steps.ver.outputs.version }}-p${{ steps.rename.outputs.plain_bytes }}-m${{ steps.rename.outputs.min_bytes }}-ns${{ steps.nutstore.outputs.skipped || 'na' }}
+          path: out/build-metrics.txt
+          retention-days: 90
+          overwrite: true
+          if-no-files-found: warn
+
       # always：坚果云那一步失败时，Summary 仍会生成。
       - name: 输出摘要
         if: always()
