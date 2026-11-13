@@ -10,7 +10,7 @@ class RecurringScheduleTest {
 
     private fun due(
         cadence: Cadence, anchor: Int, last: Int?, today: Int,
-        dom: Int = 1, dow: Int = 1, max: Int = 60
+        dom: Int = 1, dow: Int = 1, max: Int = 400
     ) = RecurringSchedule.dueDates(cadence, dom, dow, anchor, last, today, max)
 
     @Test
@@ -51,6 +51,8 @@ class RecurringScheduleTest {
 
     @Test
     fun catch_up_is_capped() {
+        // 默认窗口放宽到 400 天是为了让其它用例不被截断；
+        // 本用例显式传 60，验证「严格 60 天、含 today」。
         val d = due(Cadence.DAILY, 20200101, null, 20261113, max = 60)
         assertEquals(60, d.size)
         assertEquals(20261113, d.last())

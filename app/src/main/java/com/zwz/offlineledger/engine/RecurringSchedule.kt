@@ -33,7 +33,9 @@ object RecurringSchedule {
         } else {
             anchor
         }
-        val floor = today.minusDays(maxCatchUpDays.coerceAtLeast(1).toLong())
+        // 含 today 在内的窗口恰好是 maxCatchUpDays 天，
+        // 否则 minusDays(N) 会生成 N+1 条（含两端），与「60 天上限」语义不符。
+        val floor = today.minusDays((maxCatchUpDays.coerceAtLeast(1) - 1).toLong())
         if (cursor.isBefore(floor)) cursor = floor
 
         val out = ArrayList<Int>()
