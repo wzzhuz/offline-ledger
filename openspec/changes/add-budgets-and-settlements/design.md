@@ -300,6 +300,38 @@ val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
   既有 6 条聚合 SQL 与唯一口径常量零改动；余额算法零改动；
   零新增依赖、零新增权限、零网络行为；4 Tab 与既有交互零改动
 
+## 首轮 CI 实测：编译挂在「旧快照覆盖 rep」
+
+| run | commit | 结论 | 说明 |
+|---|---|---|---|
+| `43395589278` | `bafd19b18a` | success | 仅 change 文档，六个静态检查 + 编译全绿 |
+| `43396819705` | `ed37e62c7b` | failure | 6b 实现首推，挂在 `compileDebugKotlin` |
+| `43397590164` | `579386b16d` | failure | 加诊断回传，拿到精确错误 |
+
+**唯一编译错误**：
+`DetailScreen.kt:106 No parameter with name 'onSettle' found`。
+
+**根因是生成脚本自己的写法，不是 Kotlin 或设计问题**：批 B 脚本里
+先对 `DetailScreen.kt` 做了两次 `rep`（给 `RecordRowCard` 加参数、
+加报销按钮），但更早一步把文件内容读进了变量 `s`，
+最后又 `open(p,'w').write(s)` 把这份**旧快照**写回，
+把两次 `rep` 的结果盖掉了。调用处传了 `onSettle`，
+定义处却没有该参数，编译器立刻抓到。
+
+这是阶段 0 起「Python 拼 Kotlin」坑的一个新变体：
+以前是 `\n` 变成真实换行、以及 6a 的双重转义；
+这次是**同一文件混用「读改写 rep」与「持有旧快照后整文件写回」**。
+修法：不混用两种写法，或对每处 `rep` 做「替换后生效」校验后再继续。
+已写进本 change，建议上提踩坑清单。
+
+**诊断仍走老路**：job logs / check-runs 403，
+临时把 Gradle 日志 commit 回 `diag/test.log` 用 Contents API 读，
+用完移除步骤与文件（GITHUB_TOKEN 推的 commit 不触发新 workflow）。
+
+**这次编译只报了 1 个错**，说明新增枚举值的 5 处穷尽 `when`、
+Room KSP 处理 `version = 3` 与两张表/两列变更、
+30 个写方法、Compose 的 Budget/Detail/Stats 改动其余都编译通过了。
+
 ## 实现期补充与偏离（如实记录，不埋在注释里）
 
 1. **trash 表同步加 `linkedRecordId`**。写作稿只提了

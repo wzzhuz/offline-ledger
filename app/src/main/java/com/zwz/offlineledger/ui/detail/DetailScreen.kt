@@ -280,7 +280,8 @@ private fun DayHeader(localDate: Int, totals: Pair<Long, Long>?) {
 private fun RecordRowCard(
     row: RecordRow,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSettle: () -> Unit
 ) {
     val type = try {
         RecordType.valueOf(row.type)
@@ -313,6 +314,11 @@ private fun RecordRowCard(
                 color = amountColor(type),
                 style = MaterialTheme.typography.titleMedium
             )
+            if (type == RecordType.EXPENSE) {
+                TextButton(onClick = onSettle) {
+                    Text("报销", style = MaterialTheme.typography.labelSmall)
+                }
+            }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = "删除")
             }
