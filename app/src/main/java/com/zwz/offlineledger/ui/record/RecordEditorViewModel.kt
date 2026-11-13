@@ -168,7 +168,12 @@ class RecordEditorViewModel(
             RecordType.TRANSFER -> when {
                 s.fromAccountId == null || s.toAccountId == null -> "请选择转出与转入账户"
                 s.fromAccountId == s.toAccountId -> "转出与转入账户不能相同"
-                else -> null
+                else -> {
+                    val fc = s.fromAccountId?.let { accountDao.byId(it) }?.currencyCode
+                    val tc = s.toAccountId?.let { accountDao.byId(it) }?.currencyCode
+                    if (fc != null && tc != null && fc != tc)
+                        "转账双方币种必须一致（$fc → $tc）" else null
+                }
             }
             // SETTLEMENT 只能从明细页对某笔支出发起，不走手工记一笔
             RecordType.SETTLEMENT -> "报销 / 退款请从明细页对原支出发起"

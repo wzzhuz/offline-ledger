@@ -337,4 +337,50 @@ interface RecordDao {
     /** 累计已报销：recordSettlement 校验「累计 + 本次 <= 原支出」用。 */
     @Query("SELECT COALESCE(SUM(amountCents), 0) FROM records WHERE type = 'SETTLEMENT' AND linkedRecordId = :originalId")
     suspend fun settlementTotalFor(originalId: Long): Long
+
+    // ---------------------------------------------------------------
+    // 阶段 6c-1：按币种统计的独立查询组。
+    // 既有 12 条聚合 SQL 一行未动（避免误伤 aggregateAccountDeltas 与余额重算）；
+    // 每条都带唯一统计口径 excludeFromStats = 0 与 currencyCode 条件。
+    // 已纳入 scripts/check_stat_rules.py 的 marker 清单。
+    // ---------------------------------------------------------------
+
+    @Query("SELECT COALESCE(SUM(amountCents), 0) FROM records WHERE type = 'EXPENSE' AND excludeFromStats = 0 AND yearMonth = :ym AND currencyCode = :currencyCode")
+    suspend fun totalExpenseForCurrency(ym: Int, currencyCode: String): Long
+
+    @Query("SELECT COALESCE(SUM(amountCents), 0) FROM records WHERE type = 'INCOME' AND excludeFromStats = 0 AND yearMonth = :ym AND currencyCode = :currencyCode")
+    suspend fun totalIncomeForCurrency(ym: Int, currencyCode: String): Long
+
+    @Query("SELECT rootCategoryId AS categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'EXPENSE' AND excludeFromStats = 0 AND yearMonth = :ym AND currencyCode = :currencyCode GROUP BY rootCategoryId ORDER BY totalCents DESC")
+    suspend fun expenseByRootForCurrency(ym: Int, currencyCode: String): List<CategoryTotalRow>
+
+    @Query("SELECT categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'EXPENSE' AND excludeFromStats = 0 AND yearMonth = :ym AND currencyCode = :currencyCode GROUP BY categoryId ORDER BY totalCents DESC")
+    suspend fun expenseByCategoryForCurrency(ym: Int, currencyCode: String): List<CategoryTotalRow>
+
+    @Query("SELECT yearMonth, type, SUM(amountCents) AS totalCents FROM records WHERE type IN ('EXPENSE','INCOME') AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :currencyCode GROUP BY yearMonth, type ORDER BY yearMonth")
+    suspend fun monthlyTrendForCurrency(fromYm: Int, toYm: Int, currencyCode: String): List<MonthTotalRow>
+
+    @Query("SELECT localDate, SUM(CASE WHEN type = 'EXPENSE' THEN amountCents ELSE 0 END) AS expenseCents, SUM(CASE WHEN type = 'INCOME' THEN amountCents ELSE 0 END) AS incomeCents FROM records WHERE type IN ('EXPENSE','INCOME') AND excludeFromStats = 0 AND yearMonth = :ym AND currencyCode = :currencyCode GROUP BY localDate ORDER BY localDate")
+    suspend fun dailyTotalsForCurrency(ym: Int, currencyCode: String): List<DailyTotalRow>
+
+    @Query("SELECT rootCategoryId AS categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'EXPENSE' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :currencyCode GROUP BY rootCategoryId ORDER BY totalCents DESC")
+    suspend fun rootTotalsForCurrency(fromYm: Int, toYm: Int, currencyCode: String): List<CategoryTotalRow>
+
+    @Query("SELECT categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'EXPENSE' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :currencyCode GROUP BY categoryId ORDER BY totalCents DESC")
+    suspend fun categoryTotalsForCurrency(fromYm: Int, toYm: Int, currencyCode: String): List<CategoryTotalRow>
+
+    @Query("SELECT categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'EXPENSE' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND rootCategoryId = :rootId AND currencyCode = :currencyCode GROUP BY categoryId ORDER BY totalCents DESC")
+    suspend fun subcategoryTotalsUnderRootForCurrency(fromYm: Int, toYm: Int, rootId: Long, currencyCode: String): List<CategoryTotalRow>
+
+    @Query("SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents, r.localDate AS localDate, r.note AS note, c.name AS categoryName, c.colorHex AS categoryColorHex FROM records r LEFT JOIN categories c ON r.categoryId = c.id WHERE r.type IN ('EXPENSE','INCOME') AND r.excludeFromStats = 0 AND r.yearMonth BETWEEN :fromYm AND :toYm AND r.categoryId = :categoryId AND r.currencyCode = :currencyCode ORDER BY r.localDate DESC, r.id DESC LIMIT :limit")
+    suspend fun drillDownRowsForCurrency(fromYm: Int, toYm: Int, categoryId: Long, limit: Int, currencyCode: String): List<DrillRow>
+
+    @Query("SELECT rootCategoryId AS categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'SETTLEMENT' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :currencyCode GROUP BY rootCategoryId")
+    suspend fun settlementByRootForCurrency(fromYm: Int, toYm: Int, currencyCode: String): List<CategoryTotalRow>
+
+    @Query("SELECT categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'SETTLEMENT' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :currencyCode GROUP BY categoryId")
+    suspend fun settlementByCategoryForCurrency(fromYm: Int, toYm: Int, currencyCode: String): List<CategoryTotalRow>
+
+    @Query("SELECT COALESCE(SUM(amountCents), 0) FROM records WHERE type = 'SETTLEMENT' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :currencyCode")
+    suspend fun settlementTotalForCurrency(fromYm: Int, toYm: Int, currencyCode: String): Long
 }

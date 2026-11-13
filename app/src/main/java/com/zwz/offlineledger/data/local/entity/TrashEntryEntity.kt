@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.data.model.RecordType
 
 /** 删除 = 从 records 移入本表；主表因此永远只含有效流水，无需 isDeleted 列。 */
@@ -24,5 +25,8 @@ data class TrashEntryEntity(
     @ColumnInfo(name = "excludeFromStats") val excludeFromStats: Boolean = false,
     /** 与 records.linkedRecordId 同步，保证 SETTLEMENT 删除后恢复不丢关联。 */
     @ColumnInfo(name = "linkedRecordId") val linkedRecordId: Long? = null,
+    /** 与 records.currencyCode 同步，删除->恢复不丢币种。 */
+    @ColumnInfo(name = "currencyCode", defaultValue = "'HKD'")
+    val currencyCode: String = LedgerCurrency.DEFAULT,
     @ColumnInfo(name = "deletedAt") val deletedAt: Long = 0L
 )

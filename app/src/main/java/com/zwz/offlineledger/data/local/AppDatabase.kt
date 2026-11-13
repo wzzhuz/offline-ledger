@@ -38,7 +38,7 @@ import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
         RecurringRuleEntity::class,
         BudgetEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

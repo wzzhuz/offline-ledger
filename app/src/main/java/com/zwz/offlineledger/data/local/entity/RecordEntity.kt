@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.data.model.RecordType
 
 @Entity(
@@ -43,5 +44,8 @@ data class RecordEntity(
     @ColumnInfo(name = "note") val note: String = "",
     @ColumnInfo(name = "excludeFromStats") val excludeFromStats: Boolean = false,
     /** 阶段 6b：SETTLEMENT 指向被冲减的原支出流水；普通流水为 null。 */
-    @ColumnInfo(name = "linkedRecordId") val linkedRecordId: Long? = null
+    @ColumnInfo(name = "linkedRecordId") val linkedRecordId: Long? = null,
+    /** 阶段 6c-1：流水币种 = 关联账户币种，只是标签，不参与金额运算。 */
+    @ColumnInfo(name = "currencyCode", defaultValue = "'HKD'")
+    val currencyCode: String = LedgerCurrency.DEFAULT
 )

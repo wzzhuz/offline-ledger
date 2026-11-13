@@ -63,7 +63,7 @@ fun AssetsScreen() {
     ) {
         Text(text = "资产", style = MaterialTheme.typography.headlineMedium)
 
-        NetWorthCard(state)
+        CurrencyGroupsCard(state)
 
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -147,29 +147,59 @@ fun AssetsScreen() {
 }
 
 @Composable
-private fun NetWorthCard(state: AssetsUiState) {
+/**
+ * 阶段 6c-1：严格不混算。按币种分组列小计，
+ * MUST NOT 显示把所有币种加在一起的单一「净资产」总数。
+ */
+private fun CurrencyGroupsCard(state: AssetsUiState) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(text = "净资产", style = MaterialTheme.typography.labelLarge)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "按币种的资产小计", style = MaterialTheme.typography.labelLarge)
             Text(
-                text = formatCents(state.netWorthCents) + " 元",
-                style = MaterialTheme.typography.displaySmall,
-                color = if (state.netWorthCents < 0) LedgerColors.ExpenseRed
-                else LedgerColors.IncomeGreen
+                text = "不同币种不汇总，避免虚假精确的总数",
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.Neutral
             )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            if (state.groups.isEmpty()) {
                 Text(
-                    text = "总资产 " + formatCents(state.totalAssetsCents),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "总负债 " + formatCents(state.totalLiabilitiesCents),
+                    text = "还没有账户",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = LedgerColors.ExpenseRed
+                    color = LedgerColors.Neutral,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
+            }
+            state.groups.forEach { g ->
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = g.currencyCode + " 小计",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = formatCents(g.netCents) + " " + g.currencyCode,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (g.netCents < 0) LedgerColors.ExpenseRed
+                            else LedgerColors.IncomeGreen
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "资产 " + formatCents(g.assetsCents),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "负债 " + formatCents(g.liabilitiesCents),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LedgerColors.ExpenseRed
+                        )
+                    }
+                }
             }
         }
     }
@@ -205,7 +235,7 @@ private fun AccountCard(
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = account.name,
+                    text = account.name + " · " + account.currencyCode,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
                 )

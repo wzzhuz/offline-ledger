@@ -270,8 +270,11 @@ private fun AccountSection(
         Text(text = "转入账户", style = MaterialTheme.typography.labelLarge)
         AccountRow(visible, toId, onTo)
     } else {
+        val chosenId = if (type == RecordType.EXPENSE) fromId else toId
+        val chosenCurrency = visible.firstOrNull { it.id == chosenId }?.currencyCode
         Text(
-            text = if (type == RecordType.EXPENSE) "支出账户" else "收入账户",
+            text = (if (type == RecordType.EXPENSE) "支出账户" else "收入账户") +
+                (chosenCurrency?.let { " · $it" } ?: ""),
             style = MaterialTheme.typography.labelLarge
         )
         if (type == RecordType.EXPENSE) AccountRow(visible, fromId, onFrom)

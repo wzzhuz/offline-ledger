@@ -28,6 +28,7 @@ import com.zwz.offlineledger.data.model.BudgetScope
 import com.zwz.offlineledger.data.model.LedgerAdjustment
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.model.LedgerCategory
+import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.engine.CategoryTree
 import com.zwz.offlineledger.engine.LedgerEngine
@@ -146,7 +147,8 @@ class LedgerRepository @Inject constructor(
                 timestamp = it.timestamp, localDate = it.localDate,
                 yearMonth = it.yearMonth, note = it.note,
                 excludeFromStats = it.excludeFromStats,
-                linkedRecordId = it.linkedRecordId
+                linkedRecordId = it.linkedRecordId,
+                currencyCode = it.currencyCode
             )
         },
         exportedAtEpochMilli = System.currentTimeMillis()
@@ -406,7 +408,8 @@ class LedgerRepository @Inject constructor(
             yearMonth = ld.yearMonth,
             note = if (original.note.isBlank()) "报销 / 退款" else "报销 / 退款：" + original.note,
             excludeFromStats = false,
-            linkedRecordId = originalId
+            linkedRecordId = originalId,
+            currencyCode = original.currencyCode
         )
         val id = recordDao.insert(withResolvedRoot(entity))
         rebuildAllBalancesInternal()
@@ -459,12 +462,38 @@ class LedgerRepository @Inject constructor(
     }
 
     /** 两级分类解析：一级指向自身，二级指向父级；允许只选一级直接记账。 */
+    /**
+     * 所有写路径的统一归一化：解析一级分类 + 补齐币种 + 校验转账同币种。
+     * insertRecord / updateRecord / recordFromTemplate / applyDueRules /
+     * recordSettlement 全部经过这里，不新开写余额的分支。
+     */
     private suspend fun withResolvedRoot(record: RecordEntity): RecordEntity {
-        val id = record.categoryId ?: return record
-        val map: Map<Long, LedgerCategory> = categoryDao.all().associate {
-            it.id to LedgerCategory(it.id, it.name, it.type, it.parentId, it.level)
+        val withRoot = if (record.categoryId == null) record else {
+            val map: Map<Long, LedgerCategory> = categoryDao.all().associate {
+                it.id to LedgerCategory(it.id, it.name, it.type, it.parentId, it.level)
+            }
+            val rootId = CategoryTree.resolveRootId(record.categoryId, map)
+            record.copy(rootCategoryId = rootId)
         }
-        val rootId = CategoryTree.resolveRootId(id, map)
-        return record.copy(rootCategoryId = rootId)
+        return withCurrency(withRoot)
+    }
+
+    /**
+     * 流水币种 = 关联账户币种，只是标签，不参与金额运算。
+     * aggregateAccountDeltas() 与余额重算 MUST NOT 按币种过滤。
+     */
+    private suspend fun withCurrency(record: RecordEntity): RecordEntity {
+        val from = record.fromAccountId?.let { accountDao.byId(it) }
+        val to = record.toAccountId?.let { accountDao.byId(it) }
+        if (record.type == RecordType.TRANSFER && from != null && to != null) {
+            require(from.currencyCode == to.currencyCode) {
+                "转账双方币种必须一致（" + from.currencyCode + " → " + to.currencyCode + "）"
+            }
+        }
+        val cc = when (record.type) {
+            RecordType.EXPENSE -> from?.currencyCode
+            RecordType.INCOME, RecordType.SETTLEMENT, RecordType.TRANSFER -> to?.currencyCode
+        } ?: LedgerCurrency.DEFAULT
+        return record.copy(currencyCode = cc)
     }
 }

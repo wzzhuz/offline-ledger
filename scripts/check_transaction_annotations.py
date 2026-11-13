@@ -82,8 +82,8 @@ def main() -> int:
                 problems.append('检测到破坏性迁移：' + fn)
 
     db_text = strip_comments(open(DB_FILE, encoding='utf-8').read())
-    if 'version = 3' not in db_text:
-        problems.append('AppDatabase 版本未升到 3')
+    if 'version = 4' not in db_text:
+        problems.append('AppDatabase 版本未升到 4')
     for e in ['RecordTemplateEntity::class', 'RecurringRuleEntity::class',
               'BudgetEntity::class']:
         if e not in db_text:
@@ -91,11 +91,11 @@ def main() -> int:
 
     mig_text = open(MIG_FILE, encoding='utf-8').read()
     mig_clean = strip_comments(mig_text)
-    for m in ['Migration(1, 2)', 'Migration(2, 3)']:
+    for m in ['Migration(1, 2)', 'Migration(2, 3)', 'Migration(3, 4)']:
         if m not in mig_clean:
             problems.append('缺少 ' + m)
-    if 'arrayOf(MIGRATION_1_2, MIGRATION_2_3)' not in mig_clean:
-        problems.append('Migrations.ALL 未同时登记两段迁移')
+    if 'arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)' not in mig_clean:
+        problems.append('Migrations.ALL 未登记全部三段迁移')
     mod_text = strip_comments(open(MODULE_FILE, encoding='utf-8').read())
     if 'addMigrations(*Migrations.ALL)' not in mod_text:
         problems.append('DatabaseModule 未调用 addMigrations')
@@ -115,16 +115,20 @@ def main() -> int:
             if '`' + col + '`' not in block:
                 problems.append('%s 缺少列 %s' % (const, col))
 
-    for const, table in [
-        ('SQL_2_3_ALTER_RECORDS', 'records'),
-        ('SQL_2_3_ALTER_TRASH', 'trash'),
+    for const, table, col in [
+        ('SQL_2_3_ALTER_RECORDS', 'records', 'linkedRecordId'),
+        ('SQL_2_3_ALTER_TRASH', 'trash', 'linkedRecordId'),
+        ('SQL_3_4_ALTER_RECORDS', 'records', 'currencyCode'),
+        ('SQL_3_4_ALTER_TRASH', 'trash', 'currencyCode'),
     ]:
         block = sql_const_block(mig_text, const)
         if not block:
             problems.append('缺少 SQL 常量 ' + const)
             continue
-        if table not in block or 'linkedRecordId' not in block:
-            problems.append('%s 未给 %s 加 linkedRecordId' % (const, table))
+        if table not in block or col not in block:
+            problems.append('%s 未给 %s 加 %s' % (const, table, col))
+        if const.startswith('SQL_3_4_') and "DEFAULT 'HKD'" not in block:
+            problems.append('%s 缺少 DEFAULT HKD（NOT NULL 的 ADD COLUMN 必需）' % const)
 
     if problems:
         print('check_transaction_annotations: FAIL')
@@ -132,7 +136,7 @@ def main() -> int:
             print('  - ' + p)
         return 1
     print('check_transaction_annotations: PASS（%d 个写方法均在事务内，'
-          '两段 Migration 显式且 SQL 契约完整，无破坏性迁移）' % len(WRITE_METHODS))
+          '三段 Migration 显式且 SQL 契约完整，无破坏性迁移）' % len(WRITE_METHODS))
     return 0
 
 

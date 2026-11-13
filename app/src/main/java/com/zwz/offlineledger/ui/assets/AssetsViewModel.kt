@@ -13,11 +13,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** 阶段 6c-1：单一币种的展示小计。严格不混算，不显示跨币种净资产总数。 */
+data class CurrencyGroup(
+    val currencyCode: String,
+    val assetsCents: Long,
+    val liabilitiesCents: Long
+) {
+    val netCents: Long get() = assetsCents - liabilitiesCents
+}
+
 data class AssetsUiState(
     val accounts: List<AccountEntity> = emptyList(),
-    val netWorthCents: Long = 0L,
-    val totalAssetsCents: Long = 0L,
-    val totalLiabilitiesCents: Long = 0L
+    val groups: List<CurrencyGroup> = emptyList()
 )
 
 /** 本阶段「每阶段跑一遍导出备份」由设置页沿用，资产页只负责刷新聚合值。 */
@@ -32,19 +39,21 @@ class AssetsViewModel(
     fun reload() {
         viewModelScope.launch {
             val accounts = accountDao.all()
-            val totals = Reconciliation.displayTotals(accounts.map {
-                Reconciliation.AccountTotalsInput(
-                    balanceCents = it.balanceCents,
-                    isLiability = it.type == AccountType.LIABILITY,
-                    includeInTotal = it.includeInTotal
-                )
-            })
-            _state.value = AssetsUiState(
-                accounts = accounts,
-                netWorthCents = totals.netWorthCents,
-                totalAssetsCents = totals.totalAssetsCents,
-                totalLiabilitiesCents = totals.totalLiabilitiesCents
-            )
+            val active = accounts.filter { !it.isArchived }
+            // 按币种分组，每组单独算展示值；绝不把不同币种的 Long 分相加。
+            val groups = active.groupBy { it.currencyCode }
+                .toSortedMap()
+                .map { (cc, list) ->
+                    val totals = Reconciliation.displayTotals(list.map {
+                        Reconciliation.AccountTotalsInput(
+                            balanceCents = it.balanceCents,
+                            isLiability = it.type == AccountType.LIABILITY,
+                            includeInTotal = it.includeInTotal
+                        )
+                    })
+                    CurrencyGroup(cc, totals.totalAssetsCents, totals.totalLiabilitiesCents)
+                }
+            _state.value = AssetsUiState(accounts = accounts, groups = groups)
         }
     }
 

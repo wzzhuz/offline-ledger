@@ -39,7 +39,7 @@ fun StatsScreen() {
     val context = LocalContext.current
     val vm: StatsViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
-            StatsViewModel(ep.recordDao(), ep.categoryDao(), ep.budgetDao())
+            StatsViewModel(ep.recordDao(), ep.categoryDao(), ep.budgetDao(), ep.accountDao())
         }
     )
     val state by vm.state.collectAsState()
@@ -53,6 +53,7 @@ fun StatsScreen() {
         Text(text = "统计", style = MaterialTheme.typography.headlineMedium)
 
         PeriodSwitcher(state, vm)
+        CurrencySwitcher(state, vm)
         OverviewCard(state)
         BudgetSection(state)
 
@@ -163,6 +164,31 @@ fun StatsScreen() {
     if (state.drillRootId != null || state.drillCategoryId != null) {
         DrillDownDialog(state = state, vm = vm)
     }
+}
+
+/** 阶段 6c-1：币种切换，默认必须选中一个具体币种，不提供「全部」混算选项。 */
+@Composable
+private fun CurrencySwitcher(state: StatsUiState, vm: StatsViewModel) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        state.currencies.forEach { cc ->
+            TextButton(onClick = { vm.setCurrency(cc) }) {
+                Text(
+                    if (cc == state.currencyCode) "● $cc" else cc,
+                    color = if (cc == state.currencyCode) LedgerColors.IncomeGreen
+                    else LedgerColors.Neutral
+                )
+            }
+        }
+    }
+    Text(
+        text = "当前币种：" + state.currencyCode + " · 不跨币种汇总",
+        style = MaterialTheme.typography.bodySmall,
+        color = LedgerColors.Neutral
+    )
 }
 
 @Composable

@@ -76,4 +76,20 @@ class MigrationContractTest {
         assertTrue(Migrations.SQL_2_3_ALTER_TRASH.contains("trash"))
         assertTrue(Migrations.SQL_2_3_ALTER_TRASH.contains("linkedRecordId"))
     }
+
+    @Test
+    fun migration_3_4_is_registered() {
+        assertTrue(Migrations.ALL.any { it.startVersion == 3 && it.endVersion == 4 })
+    }
+
+    @Test
+    fun alter_3_4_sql_has_default_HKD_for_both_tables() {
+        for (sql in listOf(Migrations.SQL_3_4_ALTER_RECORDS, Migrations.SQL_3_4_ALTER_TRASH)) {
+            assertTrue(sql.contains("currencyCode"))
+            assertTrue(sql.contains("NOT NULL"))
+            assertTrue("缺 DEFAULT: $sql", sql.contains("DEFAULT 'HKD'"))
+        }
+        assertTrue(Migrations.SQL_3_4_ALTER_RECORDS.contains("records"))
+        assertTrue(Migrations.SQL_3_4_ALTER_TRASH.contains("trash"))
+    }
 }

@@ -36,7 +36,15 @@ def main() -> int:
                    'rootTotalsInRange', 'categoryTotalsInRange', 'drillDownRows',
                    # 阶段 6b 的 SETTLEMENT 聚合，同样必须带唯一口径
                    'settlementByRootInRange', 'settlementByCategoryInRange',
-                   'settlementTotalInRange']:
+                   'settlementTotalInRange',
+                   # 阶段 6c-1 的按币种查询，同样必须带唯一口径
+                   'totalExpenseForCurrency', 'totalIncomeForCurrency',
+                   'expenseByRootForCurrency', 'expenseByCategoryForCurrency',
+                   'monthlyTrendForCurrency', 'dailyTotalsForCurrency',
+                   'rootTotalsForCurrency', 'categoryTotalsForCurrency',
+                   'subcategoryTotalsUnderRootForCurrency', 'drillDownRowsForCurrency',
+                   'settlementByRootForCurrency', 'settlementByCategoryForCurrency',
+                   'settlementTotalForCurrency']:
         idx = dao.find('fun ' + marker)
         if idx < 0:
             problems.append('缺少统计查询 ' + marker)

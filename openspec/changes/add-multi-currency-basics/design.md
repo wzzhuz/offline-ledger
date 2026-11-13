@@ -267,6 +267,33 @@ StatsViewModel / DetailViewModel / AssetsViewModel / 对账 ViewModel 全部调�
   零新增依赖 / 权限 / 网络行为；4 Tab 与既有交互零改动；
   **错误隐私论据被清掉**，以后开 CSV 不再被误拦
 
+## 实现期补充与踩坑（如实记录）
+
+1. **第 9 次检查器自误报**：批 0 复核断言硬找
+   `| 6c-1 | **本批实现**`，实际闸门表是「项 / 批次 / 状态」三列，
+   批次列写的是 `| **6c-1** | **本批实现** |`。改写本身正确，
+   按「FAIL 走第二条独立路径复核」修正断言后放行。
+2. **第 10 次「凭印象传参」**：批 1 脚本把 `1` 当作
+   `rep(rel, old, new, base, count)` 的第 4 个位置参数传进去，
+   实际那是 `base`，直接 `TypeError`。这是阶段 0 起同类错的
+   第 10 次（净资产 147000 / 维度数 8 / 漏传参数 / 168→166 /
+   4 字口令 / 旧快照覆盖 rep 都算在内）。修法：`count` 一律用关键字参数。
+3. **第 11 次检查器自误报**：Mapper 断言
+   `s.count('currencyCode = currencyCode') == 4`，
+   但 `AccountEntity.toDto` / `BackupAccount.toEntity` 本来就各有 1 处，
+   实际是 6 处。改为 `>= 4`。
+   **三次都发生在同一批脚本里**，共同模式依旧是「检查器比被检查对象更容易出错」。
+4. **续跑脚本全部幂等**：每步先查标记再改，因此脚本中断两次后
+   重跑都没有重复追加 SQL 常量或 delta 内容。
+5. **实现期偏离（已写进 tasks）**：写作稿说新增 10 条 ForCurrency 查询，
+   实际落地 **13 条**（补了 `dailyTotalsForCurrency`、
+   `subcategoryTotalsUnderRootForCurrency`、`drillDownRowsForCurrency`），
+   否则月度折线、一级下钻与明细下钻仍会跨币种混算。
+   `check_stat_rules.py` marker 相应从 12 扩到 **25**。
+6. **预算消耗也按当前币种**。写作稿只说「统计页加币种筛选」，
+   但预算进度若仍走全量查询，会与同页环形图口径不一致；
+   实现统一走 ForCurrency 版本，且仍固定按当前选中月单月聚合。
+
 ## 验证
 
 - [x] 阶段 0 五项对齐结论齐全、分级判定已告知并等确认
