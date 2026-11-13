@@ -301,6 +301,27 @@ StatsViewModel / DetailViewModel / AssetsViewModel / 对账 ViewModel 全部调�
 | `43409248849` | `4b7dd144c6` | **success** | 仅 change 文档，六个静态检查 + 编译全绿 |
 | `43410274574` | `ba0c3d91ee` | **failure** | 6c-1 实现首推，挂在 `运行单元测试` |
 | `43411237592` | `71ec1523d3` | **failure** | 修硬编码常数 + 加诊断回传，拿到 3 个精确编译错误 |
+| `43412022790` | `9fd4665536` | **success** | 修复后 13 步全绿 |
+
+**最终验证**：六个静态检查、keystore 校验、`testDebugUnitTest`、
+`assembleDebug`、`assembleRelease`（含 lintVital）、签名诊断、制品上传
+全部 PASS；`offline-ledger-debug-apk` **23,670,719 B**。
+临时诊断步骤与 `diag/test.log` 已删除，远端核查无残留。
+
+### 使用者后续决策改写（必须记录，防止新会话误读本归档）
+
+> 本 change 归档后，使用者明确：「暂时不用考虑升级场景，
+> 在出一个满意的稳定版本之前不会立即使用，只会使用测试数据，
+> 数据结构完全不需要考虑升级迁移，除非我说明需要考虑升级迁移。」
+
+因此本 `design.md` 第 0 节与 `ledger-transactions` / `backup-restore` /
+`build-and-ci` 三份 delta 里关于「显式 Migration(3→4)」「`MIN_SUPPORTED = 1`
+兼容 v1/v2/v3 备份」「三段迁移静态检查」的要求，
+**自 6c-2 起按 `project.md`「稳定版前的版本策略」暂缓执行**：
+代码保留冻结、不作为后续阶段的验收条件，也不再作为否决数据结构调整的理由。
+本归档记录的是当时的决策，不回改历史文本；6c-2 用 MODIFIED 收口 specs
+里的顶层 Requirement。「迁移答疑」第 0 节的结论仍然成立且更有力——
+全新安装根本不触发迁移。
 
 **本地排查先抓到一处必然失败**：`BackupV2CompatTest` 里
 `assertEquals(3, BackupSchema.CURRENT)` 是 6b 写的硬编码常数，
@@ -352,6 +373,6 @@ LedgerRepository.kt:151  No parameter with name 'currencyCode' found
 - [x] 写码前实际读了 `currencyCode` 分布、`Migrations.ALL`、
   `BackupSchema`、`RecordDao` 全部签名、两个检查脚本、两条待 MODIFIED 原文
 - [x] delta 每条至少一个 GIVEN/WHEN/THEN + 「理由」，2 份 MODIFIED 写完整替换文本
-- [ ] CI 全绿（写作时未完成）
-- [ ] 推送后用远端 Git Trees API 逐文件比对 blob sha
-- [ ] 使用者确认后归档本 change
+- [x] CI 全绿（`43412022790` success，13 步全绿）
+- [x] 每次推送均用远端 Git Trees API 逐文件比对 blob sha（PASS）
+- [x] 归档（使用者「开始下一阶段」按一贯推荐 A 授权，本脚本执行）

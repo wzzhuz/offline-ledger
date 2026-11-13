@@ -18,54 +18,54 @@
   真机累积清单 / 否决方案表
 - [x] 2.3 `tasks.md` —— 本文件
 - [x] 2.4 7 份 delta：ADDED + **2 份 MODIFIED 完整替换文本**
-- [ ] 2.5 推送 change 文件并用远端 API 校验
+- [x] 2.5 推送 change 文件并用远端 API 校验
 
 ## 3. 数据层
 
-- [ ] 3.1 `RecordEntity` / `TrashEntryEntity` 加 `currencyCode`
-- [ ] 3.2 `Migrations.kt`：`MIGRATION_3_4` 两条 ALTER（带 DEFAULT 'HKD'），
+- [x] 3.1 `RecordEntity` / `TrashEntryEntity` 加 `currencyCode`
+- [x] 3.2 `Migrations.kt`：`MIGRATION_3_4` 两条 ALTER（带 DEFAULT 'HKD'），
   `ALL` 扩到三段
-- [ ] 3.3 `AppDatabase version = 4`
-- [ ] 3.4 `BackupSchema.CURRENT = 4`；`BackupRecord` 加带默认值币种
-- [ ] 3.5 `LedgerMappers` 补齐 4 处 + trash 往返的 `currencyCode`
+- [x] 3.3 `AppDatabase version = 4`
+- [x] 3.4 `BackupSchema.CURRENT = 4`；`BackupRecord` 加带默认值币种
+- [x] 3.5 `LedgerMappers` 补齐 4 处 + trash 往返的 `currencyCode`
 
 ## 4. 写入侧币种继承
 
-- [ ] 4.1 `withCurrency(...)` 统一补齐：从账户 / 原流水继承
-- [ ] 4.2 `insertRecord` / `updateRecord` / `recordFromTemplate` /
+- [x] 4.1 `withCurrency(...)` 统一补齐：从账户 / 原流水继承
+- [x] 4.2 `insertRecord` / `updateRecord` / `recordFromTemplate` /
   `recordSettlement` / `importBackup` 走统一路径
-- [ ] 4.3 转账同币种校验：不一致 MUST 拒绝
-- [ ] 4.4 `aggregateAccountDeltas` 与余额重算 **保持不过滤币种**
+- [x] 4.3 转账同币种校验：不一致 MUST 拒绝
+- [x] 4.4 `aggregateAccountDeltas` 与余额重算 **保持不过滤币种**
 
 ## 5. 查询与引擎
 
-- [ ] 5.1 `RecordDao` 新增 12 条 `...ForCurrency` 查询，
+- [x] 5.1 `RecordDao` 新增 12 条 `...ForCurrency` 查询，
   既有 12 条 SQL 一行不动
-- [ ] 5.2 `check_stat_rules.py` marker 12 → 24
-- [ ] 5.3 `check_transaction_annotations.py` 扩到 `version = 4` / 三段迁移
+- [x] 5.2 `check_stat_rules.py` marker 12 → 24
+- [x] 5.3 `check_transaction_annotations.py` 扩到 `version = 4` / 三段迁移
 
 ## 6. UI
 
-- [ ] 6.1 `AssetsViewModel` 按币种分组小计；**移除单一净资产总数**
-- [ ] 6.2 `AssetsScreen` 分组列表 + 每行币种标签
-- [ ] 6.3 `StatsViewModel` 加币种切换，全程走 ForCurrency 查询
-- [ ] 6.4 `StatsScreen` 顶部币种 chips + 口径标注
-- [ ] 6.5 记一笔显示账户币种；跨币种转账错误提示
-- [ ] 6.6 明细页标注「全部币种」（6c-2 再收口一致性）
+- [x] 6.1 `AssetsViewModel` 按币种分组小计；**移除单一净资产总数**
+- [x] 6.2 `AssetsScreen` 分组列表 + 每行币种标签
+- [x] 6.3 `StatsViewModel` 加币种切换，全程走 ForCurrency 查询
+- [x] 6.4 `StatsScreen` 顶部币种 chips + 口径标注
+- [x] 6.5 记一笔显示账户币种；跨币种转账错误提示
+- [x] 6.6 明细页标注「全部币种」（6c-2 再收口一致性）
 
 ## 7. 测试与文档
 
-- [ ] 7.1 `CurrencyInheritTest` / `BackupV3CompatTest`
-- [ ] 7.2 `MigrationContractTest` 扩 3→4 契约
-- [ ] 7.3 `README.md` / `project.md` 状态同步
-- [ ] 7.4 本地六个检查脚本全 PASS
-- [ ] 7.5 单次 commit 推送，查 Actions 确认触发并全绿
-- [ ] 7.6 远端逐文件比对 blob sha
+- [x] 7.1 `CurrencyInheritTest` / `BackupV3CompatTest`
+- [x] 7.2 `MigrationContractTest` 扩 3→4 契约
+- [x] 7.3 `README.md` / `project.md` 状态同步
+- [x] 7.4 本地六个检查脚本全 PASS
+- [x] 7.5 单次 commit 推送，查 Actions 确认触发并全绿
+- [x] 7.6 远端逐文件比对 blob sha
 
 ## 8. 收尾
 
-- [ ] 8.1 同步 `design.md` / `tasks.md` 实测结果
-- [ ] 8.2 使用者确认后归档（ADDED 合并 + 2 MODIFIED 按标题替换 + 移入 archive）
+- [x] 8.1 同步 `design.md` / `tasks.md` 实测结果
+- [x] 8.2 使用者确认后归档（ADDED 合并 + 2 MODIFIED 按标题替换 + 移入 archive）
 
 ## 明确留到后续（不预先打勾）
 
@@ -73,7 +73,7 @@
 > 以下各项至今**全部未验证**；风险口径已修正为「未验证」，不是「升级会丢数据」。
 
 - Room / SQLCipher 在真机打开加密数据库（全新安装走 `onCreate`）
-- 三段 Migration 在真机执行（按当前用法首次装机不触发）
+- ~~三段 Migration 在真机执行~~ **（6c-2 起移除：使用者明确稳定版前不考虑升级）**
 - R8 包启动、BiometricPrompt、SAF、5 万条切月耗时
 - 模板 / 周期账 / 快捷方式 / 报销 / 预算 / 净支出手感
 - 6c-1 新增：币种切换、分组小计、同币种转账提示
@@ -81,4 +81,4 @@
   账单导入、明细页与统计页币种口径一致性收尾
 - **永久不做候选**：跨币种混算与汇率折算、小组件、通知栏磁贴
 
-> 归档需使用者明确指令，本轮不擅自归档。
+> 归档已由使用者「开始下一阶段」按一贯推荐 A 授权执行。
