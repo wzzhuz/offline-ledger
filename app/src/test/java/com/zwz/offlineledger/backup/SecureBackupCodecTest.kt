@@ -31,8 +31,10 @@ class SecureBackupCodecTest {
 
     @Test
     fun `chinese text survives the round trip`() {
-        val blob = SecureBackupCodec.encode(json, "口令密码".toCharArray())
-        assertTrue(SecureBackupCodec.decode(blob, "口令密码".toCharArray()).contains("餐饮 食材"))
+        // 口令长度按字符数算，中文 4 字仍不足 6 位；这里用 7 字符的中文数字混合口令
+        val pass = "中文口令123"
+        val blob = SecureBackupCodec.encode(json, pass.toCharArray())
+        assertTrue(SecureBackupCodec.decode(blob, pass.toCharArray()).contains("餐饮 食材"))
     }
 
     @Test
