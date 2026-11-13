@@ -251,6 +251,41 @@ Scenario 还写「**GIVEN** 阶段 3 版本」——这是同一个坑**第二�
 `check_transaction_annotations.py` 的 `WRITE_METHODS` **保持 13 个不变**——
 阶段 4 不新增任何写方法，只读查询不该被误登记进事务清单。
 
+## 首轮 CI 实测：一次全绿（本项目首次）
+
+**commit `7e4ad2433381` / run `43347923787`**：
+五个静态检查、keystore 校验、单元测试、`assembleDebug`、
+`assembleRelease`（含 `lintVital`）、签名诊断、制品上传**全部 success**，
+产出 `offline-ledger-debug-apk` **22,712,565 bytes**（阶段 3 为 22,618,116 bytes）。
+
+这是阶段 0 以来**第一次首轮 CI 没有任何编译错误、也没有测试常数写错**。
+对比：
+
+| 阶段 | 首轮结果 |
+|---|---|
+| 0 | 挂在 `keytool -printcert -jarfile` + `bash -e` 的 grep 返回码（非编译问题） |
+| 1 | 单测净资产期望值手写成 147000（应为 247000） |
+| 2 | 4 个 import / 嵌套类引用错误 + 测试维度数写成 8 |
+| 3 | 测试构造 `LedgerSnapshot` 漏传 3 个必填参数；**主源码零编译错误** |
+| **4** | **首轮全绿，主源码与测试均零错误** |
+
+**为什么这次能做到**（值得固化的做法）：
+
+1. 写作前**实际读了** `RecordDao` / `CategoryDao` / `MonthRange` / `LedgerDi` /
+   `LedgerUiParts` 的现有定义，而不是凭印象写 API
+2. 写作稿里预判的 4 个 Canvas 风险点在**落地前就绕开**：
+   `FlowRow(ExperimentalLayoutApi)` → `Column + chunked(2)`；
+   `Color(argb: Long)` → `Color(argb.toInt())`；
+   `toSlices` 两个 `List` 重载 → 改名 `toDrillSlices`；
+   非空 `categoryId` 上多余的 `?.let` → 直接 `to`
+3. `check_kotlin_strings.py` 与逐文件字符串复核在推送前各跑一遍，
+   三引号 SQL 块未闭合检查为 0
+4. 纯 JVM `ChartDataTest` 的期望值全部按函数定义推出来，
+   没有手写一个凭印象的常数（阶段 1 / 2 都栽在这里）
+
+**注意**：这不等于真机验证。5 万条切月 / 年报聚合耗时、滚动掉帧、
+SQLCipher 真机打开数据库仍未实测，见第 6 节测试边界。
+
 ## 风险
 
 **残余风险 1**：`DrawScope.drawArc` 的 `startAngle` / `sweepAngle` 方向、
@@ -284,6 +319,9 @@ Float 只用于几何换算且不回写；`ChartDataTest` 里金额断言全用 
 - [x] 阶段 3 已按规范归档，无进行中 change 冲突
 - [x] 1 份 MODIFIED 写出完整替换文本，标题与原 Requirement 一致，不含阶段版本号
 - [x] Delta 每个 Requirement 至少一个 GIVEN / WHEN / THEN 场景 + 「理由」
-- [ ] CI 全绿（写作时未完成；实现完成后由 Actions 验证）
+- [x] CI 全绿：run 43347923787（commit 7e4ad2433381）**首轮 success**，
+  五个静态检查 / keystore 校验 / 单测 / debug APK / release(lintVital) / 签名诊断 / 制品上传 全部 success
+- [x] 推送后用远端 Git Trees API 逐文件比对 blob sha，PASS
+- [x] 产物 offline-ledger-debug-apk 22,712,565 bytes
 - [ ] 推送后用远端 Git Trees API 逐文件比对 sha
 - [ ] 使用者确认后归档本 change
