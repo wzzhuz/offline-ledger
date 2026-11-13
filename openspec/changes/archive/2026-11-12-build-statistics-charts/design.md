@@ -286,6 +286,68 @@ Scenario 还写「**GIVEN** 阶段 3 版本」——这是同一个坑**第二�
 **注意**：这不等于真机验证。5 万条切月 / 年报聚合耗时、滚动掉帧、
 SQLCipher 真机打开数据库仍未实测，见第 6 节测试边界。
 
+## 归档实测：第二次 MODIFIED，统计页占位规格债已终结
+
+阶段 3 归档识别出「统计页在阶段 4 落地前显示占位」是同一坑第二次复发，
+本 change 用 `## MODIFIED Requirements` 把「四 Tab 骨架一次成型」
+**按标题第二次整块替换**为不含阶段版本号、不含「占位」字样的长期表述，
+并补了「后续阶段不改导航」Scenario。
+
+| | 阶段 1 | 阶段 2 | 阶段 3 | 阶段 4 |
+|---|---|---|---|---|
+| delta | 17 ADDED + 1 MODIFIED（补 rotten spec） | 15 ADDED | 14 ADDED + 2 MODIFIED | **9 ADDED + 1 MODIFIED** |
+| MODIFIED 次数 | 1（补旧口径腐烂） | 0 | **2（首次按标题替换）** | **1（同一 Requirement 第二次替换）** |
+| 校验脚本自误报 | 2 次（宽泛子串） | 0 | 0 | 0 |
+| 新发现的规格债 | 旧要求被推翻没 MODIFIED | 两条阶段限定 Requirement | 统计页占位复发 | 见下 |
+
+合并结果：**8 个模块 / 116 条 Requirement / 168 个 Scenario**（脚本打印实际值）。
+「匹配旧要求精确原文」的校验规则连续三次未重犯自误报。
+
+### ⚠️ 阶段 5 必须处理的 3 处规格债（本轮不改，留给下一 change）
+
+**① 一处残留的过程状态**：替换后的「四 Tab 骨架一次成型」正文已不含阶段版本号，
+但 Scenario「后续阶段不改导航」仍写着
+`**GIVEN** 阶段 5 增加备份与应用锁设置`。按本 change 刚抽象出的规则
+（「Requirement 只描述系统最终 SHALL 做什么，过程状态写进 `tasks.md`」），
+这仍是一处残留。阶段 5 归档前 MUST 用 MODIFIED 把这个 GIVEN 改成
+不含阶段版本号的长期表述（例如「**GIVEN** 后续新增设置项」）。
+这是**第三次**为同一条 Requirement 做 MODIFIED，也是最后一次。
+
+**② 明文导出入口将被替换**：`backup-restore/spec.md` 的
+「设置页提供临时明文导出入口」写着系统 SHALL 提供「导出明文 JSON」按钮、
+界面 SHALL 标注「明文，勿外传」，并在理由里说明「阶段 5 会替换为 SAF 加密导出」。
+阶段 5 一落地，这条 Requirement 与实际行为相反，MUST 用 MODIFIED 写出完整替换文本
+（SAF 创建文档 + 口令加密导出 / SAF 打开文档 + 口令解密导入）。
+
+**③ CSV 在两处规格里口径相反（最需要拍板）**：
+
+| 位置 | 说法 |
+|---|---|
+| `reporting-ui`「v1 范围收敛」 | **CSV 导出 SHALL 列入 v1.1 清单，MUST NOT 在 v1 中悄悄加入** |
+| `backup-restore`「CSV 格式约定」 | CSV 导出 SHALL 使用 UTF-8 with BOM、金额以元为单位两位小数 |
+| `privacy-security`「导出文件默认加密」 | CSV 导出 SHALL 默认关闭，开启时 MUST 二次确认并提示明文风险 |
+| `project.md` 分阶段计划阶段 5 | 「完整备份与设置（加密导入导出、**CSV**、应用锁……）」 |
+
+`project.md` 与两个模块 spec 把 CSV 当 v1 内功能（只是默认关闭 + 二次确认），
+`reporting-ui` 却把它列进 v1.1 禁止清单。这不是「占位表述」类过程状态，
+而是**同一功能两处长期约束互相矛盾**。阶段 5 的 change 必须先拍板：
+要么按 v1.1 处理（CSV 不做，`backup-restore` / `privacy-security` 里 CSV 条款
+要用 MODIFIED 明确标注为 v1.1 预留），要么显式 MODIFIED
+`reporting-ui`「v1 范围收敛」并同步 `project.md`「已确认不做」清单。
+**不允许**不声不响地把 CSV 做进去。
+
+### 抽象规则（建议上提 `my-app-workflow/踩坑清单.md`，本轮不改那个仓库）
+
+1. delta 的 Requirement 只描述系统**最终 SHALL 做什么**；
+   「某页当前是占位」「某阶段会替换」属于 `tasks.md` / `proposal.md` 的过程状态
+2. 若确需写阶段性行为，**正文与 Scenario 都不能绑定阶段号**，
+   否则每推进一个阶段就要 MODIFIED 一次（本仓库已为「四 Tab 骨架一次成型」
+   付出两次 MODIFIED 的代价）
+3. 归档校验要同时检查「旧要求精确原文不残留」与「新要求文本已落地」，
+   前者防腐烂、后者防「只挪目录不合并」
+4. **跨模块口径冲突比同模块腐烂更隐蔽**：归档时除了逐模块校验，
+   还应扫一遍 `project.md` 的「已确认不做」与各模块 spec 是否一致
+
 ## 风险
 
 **残余风险 1**：`DrawScope.drawArc` 的 `startAngle` / `sweepAngle` 方向、
@@ -324,4 +386,4 @@ Float 只用于几何换算且不回写；`ChartDataTest` 里金额断言全用 
 - [x] 推送后用远端 Git Trees API 逐文件比对 blob sha，PASS
 - [x] 产物 offline-ledger-debug-apk 22,712,565 bytes
 - [ ] 推送后用远端 Git Trees API 逐文件比对 sha
-- [ ] 使用者确认后归档本 change
+- [x] 使用者确认后归档本 change：9 ADDED 合并 + 1 MODIFIED 按标题第二次替换 + change 移入 archive + 校验 PASS

@@ -3,7 +3,8 @@
 **纯本地、零网络权限、无广告的个人 Android 记账应用。** 知道自己的资产与支出构成，
 数据不托管给任何第三方，也不依赖长期开机的服务器或 NAS。
 
-> 状态：**阶段 0 / 1 / 2 / 3 均已归档；阶段 4 统计报表已完成，CI 首轮即全绿（run 43347923787）**。
+> 状态：**阶段 0 / 1 / 2 / 3 / 4 均已完成并归档，CI 全绿（run 43348602664）**；
+> 阶段 5 处于对齐门禁，待确认后建 change。
 > 现在能看月 / 年收支概览、一级 / 二级分类占比、下钻明细、每日支出折线与年度收支双折线。
 > 记账、明细、组合筛选、回收站恢复、净资产与对账沿用阶段 2 / 3 能力。
 > 本仓库遵循 OpenSpec 规范驱动开发，规格是唯一真理源。
@@ -216,8 +217,7 @@ offline-ledger/
 │   │   ├── reporting-ui/         4 Tab、低摩擦、万级数据性能
 │   │   └── build-and-ci/         构建工具链、CI 验证、固定签名
 │   └── changes/
-│       ├── build-statistics-charts/        进行中：阶段 4
-│       └── archive/                      已归档（初始设计 / 阶段 0 / 1 / 2 / 3）
+│       └── archive/                      已归档（初始设计 / 阶段 0 / 1 / 2 / 3 / 4）
 ├── app/src/main/java/com/zwz/offlineledger/
 │   ├── core/                 Cents / LedgerClock / LedgerCurrency
 │   ├── data/model/           纯 JVM 数据模型
@@ -251,21 +251,22 @@ offline-ledger/
 
 ## 当前进行中的改动
 
-`openspec/changes/build-statistics-charts/`（阶段 4，待归档）。
-阶段 0 / 1 / 2 / 3 均已按规范归档，8 个模块现为
-**107 条 Requirement / 145 个 Scenario**。本 change 含 **1 份 MODIFIED**：
-把「四 Tab 骨架一次成型」里残留的「统计页显示阶段 4 占位」彻底收口为
-**不含阶段版本号**的长期表述，终结「每阶段都要改占位表述」的循环。
-归档需使用者明确指令，本轮未擅自归档。
+**无**。阶段 0 / 1 / 2 / 3 / 4 均已按规范归档，
+8 个模块现为 **116 条 Requirement / 168 个 Scenario**。
+阶段 4 首次由**同一条 Requirement 的第二次 MODIFIED** 收口统计页占位。
+归档 `design.md` 记录了阶段 5 必须处理的 **3 处规格债**：
+① 「后续阶段不改导航」Scenario 仍含阶段号；② 明文导出入口将被 SAF 加密导出替换；
+③ **CSV 在 `reporting-ui`「v1 范围收敛」被列为 v1.1 禁止项，
+却在 `backup-restore` / `privacy-security` / `project.md` 阶段 5 里被视为 v1 功能**——
+两处长期约束互相矛盾，阶段 5 必须先拍板。
 
 ---
 
 ## 下一步
 
-阶段 5：完整备份与设置 —— SAF 加密导入导出、CSV、应用锁、分类管理、
-账本健康页、阈值 / 配色偏好，替换阶段 2 的临时明文导出入口。
-本 change 的 1 份 MODIFIED 需在归档阶段 4 时按标题第二次替换进 `specs/`。
-`release.yml`、正式签名 Secrets 与分发方案留到出包阶段单独提 change。
+阶段 5（对齐门禁中）：完整备份与设置 —— SAF 加密导入导出、CSV、应用锁、
+分类管理、账本健康页、阈值 / 配色偏好，替换阶段 2 的临时明文导出入口。
+阶段 5 必须先拍板 CSV 的 v1 / v1.1 归属，并用 MODIFIED 处理上述 3 处规格债。
 `release.yml`、正式签名 Secrets 与分发方案留到出包阶段单独提 change。
 
 **每阶段结束必须能编译运行并跑一遍导出备份**，禁止一次性摊开全部页面。
