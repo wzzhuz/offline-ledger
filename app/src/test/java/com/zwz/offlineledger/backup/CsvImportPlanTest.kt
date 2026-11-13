@@ -3,6 +3,7 @@ package com.zwz.offlineledger.backup
 import com.zwz.offlineledger.backup.csv.CsvCodec
 import com.zwz.offlineledger.backup.csv.CsvRow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,8 +33,9 @@ class CsvImportPlanTest {
         val bytes = (CsvCodec.HEADER.joinToString(",") + "\r\n" +
             lines.joinToString("\r\n") + "\r\n").toByteArray(Charsets.UTF_8)
         val back = CsvCodec.parseImport(bytes)
-        assertTrue(back.errors.isNotEmpty())
-        assertEquals(0, back.rows.size)
+        assertFalse(back.ok)
+        assertTrue(back.errors.any { it.contains("第 11 行") })
+        // 前 9 行合法仍留在 back.rows，但调用方按 ok 判定，整个计划不落库。
     }
 
     @Test

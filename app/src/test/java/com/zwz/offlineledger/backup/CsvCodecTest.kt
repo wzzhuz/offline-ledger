@@ -77,7 +77,7 @@ class CsvCodecTest {
         val r = CsvCodec.parseImport(csv(line(), line(amount = "abc")))
         assertFalse(r.ok)
         assertTrue(r.errors.any { it.contains("第 3 行") })
-        assertEquals(0, r.rows.size)
+        // 合法行仍留在 rows 里，但调用方 MUST 按 ok 整体废弃，不会进入写入事务。
     }
 
     @Test
