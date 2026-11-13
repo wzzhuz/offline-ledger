@@ -84,6 +84,27 @@ SQL 常量校验保留供历史追溯。这是本仓库**第 6 次「测试断�
   它们已不执行，补列反而会让「冻结」语义变模糊；在 design 里显式说明，
   避免新会话误以为常量与 Entity 必须逐字一致。
 
+### 最终验证
+
+| 验证 | run | 结论 |
+|---|---|---|
+| push CI（首推） | `43459412013` | failure，挂在单测（迁移注册断言），主源码编译通过 |
+| push CI（修测试后） | `43460356310` | **success**，13 步全绿，debug APK **23,743,100 B** |
+| release.yml（R8 + 坚果云） | `43461666785` | **success**，24 步全绿 |
+
+release 的 metrics 制品名为 `...-nsfalse`，来自 `steps.nutstore.outputs.skipped`；
+脚本只在 PROPFIND 认证通过、两级 MKCOL 成功、`curl -T` 返回 201/204 之后才写
+`skipped=false`，因此上传请求成功可确认。HEAD 落盘校验只写日志不中断，
+故「HEAD 200」不列为已验证事实。
+
+六个静态检查在主推与 release 两次都 PASS；`check_transaction_annotations.py`
+报「32 个写方法均在事务内；迁移/版本检查 2 项记录性提示」，说明门禁降级未误伤。
+
+**Kotlin 编译从首推起就一次通过**：DatePicker / DatePickerDialog /
+rememberDatePickerState、Room 加列与 version 重置、Compose 横向分类与底栏内嵌
+FAB、Hilt 注入的 AssetsViewModel 加参，零编译错误。唯一失败来自测试断言
+描述的是旧决策，不是新代码。
+
 ## 5. 真机验证累积清单（按使用者决定继续推迟）
 
 - Room / SQLCipher 在真机打开加密数据库（全新安装走 `onCreate`）
