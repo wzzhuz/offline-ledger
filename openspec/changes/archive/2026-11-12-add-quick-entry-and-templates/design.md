@@ -283,6 +283,40 @@ Room KSP 处理 `version = 2` 与两张新 Entity、Converters 的 Cadence、
 `DropdownMenu` / 静态 shortcuts 资源——**全部零编译错误**。
 这只能证明编译，不能证明真机 `Migration(1→2)` 升级成功。
 
+## 最终验证（阶段 6a 收口）
+
+| 验证 | run | 结论 |
+|---|---|---|
+| push CI：六个静态检查 / 单测 / debug APK / release lintVital / 签名诊断 | `43387774994` | **success**，13 步全绿 |
+| release.yml 验证 ①（`minify=on`，不打 tag、不传坚果云） | `43388782910` | **success** |
+| release.yml 验证 ②（同 commit 复跑） | `43389145224` | **success**，24 步全绿 |
+
+- `offline-ledger-debug-apk` 23,574,835 B；
+  最新 release run 三个 artifact：release APK（zip 11,998,947 B）、
+  `mapping.txt` 3,114,863 B、metrics 226 B。
+  **artifact 大小是压缩后 zip，不是 APK 实际体积**；真实体积以 Job Summary 为准。
+- `create_release=false` / `upload_nutstore=false` / `build_aab=false` 是本次 input，
+  对应步骤显示 skipped 属于预期，不是失败。GitHub Release 数量为 0。
+- Kotlin 编译从 `068fd4c89e` 起一次通过：Room KSP 处理 `version = 2`、
+  两张新 Entity、Cadence 转换器、26 个写方法、Compose 的 chips/TabRow/
+  DropdownMenu、静态 shortcuts 资源，零编译错误。
+
+### 真机实测由使用者明确推迟（必须记录，不能视为已通过）
+
+使用者在阶段 6a 结束后决定：**先不做真机实测，继续下一阶段，
+等完成度更高再统一装机体验**。因此以下各项**全部保持未验证**，
+本项目从未用「CI 全绿」代替过它们：
+
+- `Migration(1→2)` 从 v1 覆盖升级后数据是否完好（**本阶段最大残余风险**）
+- R8 release 包真机能否正常启动
+- SQLCipher 在真机打开加密数据库
+- BiometricPrompt 弹窗 / SAF 文件选择器
+- 5 万条切月 / 年报聚合耗时、滚动掉帧
+- 模板快选、周期补记、桌面快捷方式在真机上的手感
+
+风险随阶段累积，后续每个阶段的对齐结论都要重新列出这份清单，
+直到使用者统一装机体验为止。装新包前建议先在旧版导出一份加密备份。
+
 ## 风险
 
 **残余风险 1（最大）**：`Migration(1→2)` 在真机覆盖升级时
@@ -314,6 +348,6 @@ SQL 只两条 CREATE TABLE；静态检查核对列名；`ALL` 显式登记；
   BackupEnvelope / BackupPayload / LedgerRepository / LedgerDi /
   LedgerApp / MainActivity / SettingsScreen / Converters / 两个检查脚本
 - [x] 5 份 delta 共 12 条 ADDED，每条至少一个 GIVEN / WHEN / THEN + 「理由」
-- [ ] CI 全绿（写作时未完成）
-- [ ] 推送后用远端 Git Trees API 逐文件比对 blob sha
-- [ ] 使用者确认后归档本 change
+- [x] CI 全绿（`43387774994` / `43388782910` / `43389145224` 三次 success）
+- [x] 每次推送后均用远端 Git Trees API 逐文件比对 blob sha（PASS）
+- [x] 归档（使用者「继续下一阶段」按推荐 A 授权，本脚本执行）
