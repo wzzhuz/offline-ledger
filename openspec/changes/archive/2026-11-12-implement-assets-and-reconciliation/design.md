@@ -268,6 +268,53 @@ MODIFIED 后的「阶段边界明确」不再绑定阶段版本号，改为定�
 阶段 2 首轮有 4 个 import / 嵌套类引用错误，阶段 3 一个都没有，
 说明「先读现有 API 再写代码」与「零新增依赖」确实把风险压下来了。
 
+## 归档实测：项目首次真正执行 MODIFIED 按标题替换
+
+阶段 1 / 2 归档都只做「ADDED 追加 + 移目录」；阶段 1 曾因旧 Requirement
+没 MODIFIED 出现规格腐烂（补了一次 MODIFIED），阶段 2 归档时识别出两条
+「阶段限定 Requirement」规格债但**留给下一阶段修**。本阶段是第一次在归档时
+真正执行 `## MODIFIED Requirements` 的按标题整块替换。
+
+| 模块 | 被替换的 Requirement | 结果 |
+|---|---|---|
+| `reporting-ui` | 四 Tab 骨架一次成型 | 旧「点资产 → 显示阶段 3 占位」→ 新「显示净资产 / 总资产 / 总负债 / 账户分组」 |
+| `reconciliation` | 阶段边界明确 | 旧「阶段 2 版本没有对账入口」→ 新「明细筛选 vs 核对视图的功能归属边界」 |
+
+**合并结果**：14 条 ADDED + 2 份 MODIFIED，8 个模块合计
+**107 条 Requirement / 145 个 Scenario**（归档脚本打印的实际值）。
+归档脚本按「匹配旧要求**精确原文**」校验残留，没有重犯阶段 1 那两次
+宽泛子串搜索自误报；同时新增了「每个 Requirement 至少一个 Scenario +
+RFC2119 关键词 + 无重复标题」三条兜底。
+
+### ⚠️ 又发现一条同类规格债（阶段 4 必须处理）
+
+替换后的「四 Tab 骨架一次成型」新文本里写了：
+
+> 统计页在阶段 4 落地前 SHALL 显示明确标注「阶段 4」的占位内容。
+
+**阶段 4 一落地，这句话又会与实际行为相反**——这是同一个坑第二次复发：
+把「当前做到哪一步」写进了长期 Requirement。阶段 3 修掉了资产页占位，
+却在同一个 Requirement 里换上了统计页占位。
+
+**阶段 4 的 change 必须做的处理**（写进阶段 4 对齐结论与 design.md）：
+再写一份 `## MODIFIED Requirements`，把「四 Tab 骨架一次成型」改成
+**不含阶段版本号**的长期表述（例如「统计页 SHALL 展示月 / 年报表」），
+归档阶段 4 时按标题第二次替换。这样阶段 5 之后不再需要为占位内容反复 MODIFIED。
+
+**抽象出的规则（建议上提 `my-app-workflow/踩坑清单.md`，本轮不改那个仓库）**：
+delta 里的 Requirement 只描述系统**最终 SHALL 做什么**；
+「某页当前是占位」属于 `tasks.md` / `proposal.md` 的过程状态，
+不应进入 `specs/`。确需写阶段性行为时，Scenario 不得绑定具体阶段号，
+且下一阶段必须安排对应的 MODIFIED 收口。
+
+### 三次归档对比
+
+| | 阶段 1 | 阶段 2 | 阶段 3 |
+|---|---|---|---|
+| delta | 17 ADDED + 1 MODIFIED（补 rotten spec） | 15 ADDED | 14 ADDED + 2 MODIFIED |
+| 发现的问题 | 旧要求被推翻却没 MODIFIED | 阶段限定 Requirement（记为规格债） | **首次按标题替换 MODIFIED**，并发现同坑复发 |
+| 校验脚本 | 自误报 2 次（宽泛子串） | 0 次 | 0 次（沿用精确原文） |
+
 ## 风险
 
 **残余风险 1**：Room 2.8.4 对 `CASE` 求和列 / 可选参数短路 SQL 的绑定不接受。
@@ -302,4 +349,4 @@ MODIFIED 后的「阶段边界明确」不再绑定阶段版本号，改为定�
 - [x] 推送后用远端 Git Trees API 逐文件比对 blob sha，PASS
 - [x] 产物 offline-ledger-debug-apk 22,618,116 bytes（阶段 2 为 22,481,423 bytes）
 - [ ] 推送后用远端 Git Trees API 逐文件比对 sha
-- [ ] 使用者确认后归档本 change
+- [x] 使用者确认后归档本 change：14 ADDED 合并 + 2 MODIFIED 按标题替换 + change 移入 archive + 校验 PASS
