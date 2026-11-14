@@ -160,3 +160,23 @@ CSV 列名 / 测试 / specs / README 一次替换，历史归档与 `docs/` 快�
   零 Compose API 版本风险，`timestamp` 仍是唯一真相源，`setTime` 只换本地时分。
 - 资产线用「当前余额倒推」而非新增快照表：零表结构变更、零 Migration，
   符合「严格不混算」的既有约束。
+
+
+## 11. 第 2 批 CI 与出包实测
+
+| 项 | 结果 |
+|---|---|
+| 首推 `389a156ff2` / run `43534844564` | **failure**，挂在「运行单元测试」步骤 |
+| 根因 | `LineChart` 把点数 `n` 定义在 Canvas 的 draw lambda 内，却在 `pointerInput(n)` 引用 → `Unresolved reference: n`。属阶段 8 新加点击取值的作用域错误，不是设计问题 |
+| 修复 `e3488f0c47` / run `43535265042` | **success**（六个静态检查 / keystore / 单测 / debug APK / release lintVital / 签名诊断全绿） |
+| release `43535979533` | **success**，24 步中 plain / AAB / 创建 Release 按 input 正常 skipped；R8 编译、单测、签名诊断、APK 与 mapping 上传、**上传到坚果云 success**、指标制品全绿 |
+| 制品 | `offline-ledger-release-v0.1.0`（12,156,129 B 压缩）、`offline-ledger-mapping-v0.1.0`（3,329,247 B）、metrics 名 `...-nsfalse`（坚果云步骤未跳过且成功） |
+| 重复触发 | 502 重试导致两次 dispatch，`43536313646` cancelled、`43536435628` 已手动取消（HTTP 202），以 `43535979533` 为唯一交付包 |
+
+诊断说明：job logs 与 check-runs annotations 仍返回 403（本仓库已知限制），本次根因由
+本地复读 `LineChart.kt` 作用域定位，修复后由 CI 一次验证通过，未临时回传 `diag/`。
+
+**仍未验证**：真机覆盖安装（本批改了 `counterparty` 列名，`AppDatabase version` 仍为 1、
+无 Migration，按使用者「稳定版前不考虑升级、不需要保留测试数据」的约束，
+**新包必须卸载重装**）；R8 包真机启动、SQLCipher 开库、BiometricPrompt、SAF 选择器、
+Excel 打开 CSV、5 万条切月耗时，均按使用者决定继续推迟。
