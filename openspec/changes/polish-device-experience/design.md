@@ -236,7 +236,26 @@ Excel 打开 CSV、5 万条切月耗时，均按使用者决定继续推迟。
 本批**不改表结构、不改 `AppDatabase version`、不新增 Migration、不改备份 DTO**。
 按使用者重申的约束，后续阶段不得再以「会破坏升级 / 要写 Migration」否决数据结构调整。
 
-### 12.5 待回填
+### 12.5 实测结果
 
-CI 与出包结果在本批推送后回填；真机实测按使用者决定继续推迟，
-清单见 `tasks.md` 第 9 节。
+| 项 | 结果 |
+|---|---|
+| 首推 `8d93f234211b` / run `43582905213` | **failure**，挂在「运行单元测试」 |
+| 诊断 | job logs / check-runs 仍 403；临时在 `build.yml` 加 `if: failure()` 步骤把 Gradle 输出回传 `diag/test.log`，读完后步骤与文件均已删除，远端无残留 |
+| 根因 | `AssetsScreen` 的 `MiniAction(text, onClick, color = ...)` 里 `onClick` **不是最后一个参数**，三处写成尾随 lambda `MiniAction("↑") { ... }`，Kotlin 把 lambda 绑到 `color: Color`，报 6 条 `No value passed for parameter 'onClick'` / `actual type is () -> Unit, but Color was expected` |
+| 修复 `15c50c5afe13` | 三处改为显式第二位置参数 `MiniAction("↑", { ... })`；同时移除临时诊断步骤与 `diag/test.log` |
+| CI `43583695307` | **success**，13 步全绿（六个静态检查 / keystore / 单测 / debug APK / release lintVital / 签名诊断 / 制品上传） |
+| release `43584134091` | **success**，`minify=on`、`upload_nutstore=true`、`create_release=false`；R8 编译、mapping、APK 上传、**上传到坚果云 success**、构建指标全绿；plain / AAB / 创建 Release 按 input 正常 skipped |
+| 制品 | `offline-ledger-release-v0.1.0` 12,172,278 B（压缩后）、`offline-ledger-mapping-v0.1.0` 3,360,382 B、metrics `...-nsfalse`（坚果云步骤未跳过且成功） |
+
+本批**未改表结构**：`AppDatabase` 仍 `version = 1`、零新增 Migration、
+零新增 Gradle 依赖、零新增权限。按使用者「稳定版前不考虑升级迁移」的口径，
+本批新包**不需要卸载重装**（上一批改了 `counterparty` 列名后才需要）。
+
+**仍按使用者决定推迟的真机项**：横屏全屏页与双指缩放手感、模板填充与账户排序手感、
+R8 包启动、SQLCipher 开库、BiometricPrompt、SAF 选择器、Excel 打开 CSV、
+5 万条切月耗时。清单见 `tasks.md` 第 9.6 节。
+
+> 第 6 次「凭印象手写 / 检查器自误报」类坑：这次是 Kotlin 参数顺序与尾随 lambda
+> 语法的绑定关系，不是金额常数。写作时把 `onClick` 放中间、调用却用尾随形式，
+> 静态检查与纯 JVM 单测都覆盖不到，只能由 Kotlin 编译器发现。

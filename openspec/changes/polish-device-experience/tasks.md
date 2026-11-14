@@ -114,7 +114,8 @@
 ### 9.6 门禁与收尾
 - [x] `check_transaction_annotations.py` 写方法清单扩到 39 个，全部在事务内
 - [x] 六个静态检查本地全 PASS
-- [ ] CI 与出包结果回填（见 `design.md` 第 12.5 节）
+- [x] CI 与出包结果回填（见 `design.md` 第 12.5 节）：`43583695307` / `43584134091` 均 success，坚果云上传成功
+- [x] 临时诊断步骤与 `diag/test.log` 已移除，远端核查无残留
 - [ ] 真机实测：按使用者决定整体推迟，清单仍含 R8 启动、SQLCipher 开库、
       BiometricPrompt、SAF 选择器、Excel 打开 CSV、5 万条切月耗时、
       横屏图表与双指缩放手感、模板填充与账户排序手感
