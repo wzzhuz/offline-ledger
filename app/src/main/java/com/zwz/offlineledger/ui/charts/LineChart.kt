@@ -36,6 +36,8 @@ fun LineChart(
     onPointTap: ((Int) -> Unit)? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
+        // 阶段 8：点击取值与绘制共用同一份点数，必须定义在 Canvas lambda 之外。
+        val n = series.firstOrNull()?.values?.size ?: 0
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(bottom = 4.dp)
@@ -87,7 +89,6 @@ fun LineChart(
                 )
             }
 
-            val n = series.firstOrNull()?.values?.size ?: 0
             if (n > 0) {
                 val step = if (n > 1) (w - padX * 2f) / (n - 1) else 0f
                 series.forEach { s ->
