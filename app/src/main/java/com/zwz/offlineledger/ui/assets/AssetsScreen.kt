@@ -313,11 +313,10 @@ private fun AccountCard(
                 MiniAction("详情", onDetail)
                 MiniAction("对账", onReconcile)
                 MiniAction("编辑", onEdit)
-                MiniAction("↑") { onMove(-1) }
-                MiniAction("↓") { onMove(1) }
-                MiniAction(if (account.isArchived) "恢复" else "归档") {
-                    onArchived(!account.isArchived)
-                }
+                MiniAction("↑", { onMove(-1) })
+                MiniAction("↓", { onMove(1) })
+                MiniAction(if (account.isArchived) "恢复" else "归档",
+                    { onArchived(!account.isArchived) })
                 MiniAction("删除", onDelete, LedgerColors.ExpenseRed)
             }
         }
