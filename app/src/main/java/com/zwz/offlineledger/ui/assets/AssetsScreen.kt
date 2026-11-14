@@ -1,6 +1,8 @@
 package com.zwz.offlineledger.ui.assets
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,14 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -61,6 +61,7 @@ fun AssetsScreen() {
     var reconcileId by remember { mutableStateOf<Long?>(null) }
     var editAccount by remember { mutableStateOf<AccountEntity?>(null) }
     var editError by remember { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf<AccountEntity?>(null) }
 
     LaunchedEffect(Unit) { vm.reload() }
 
@@ -68,14 +69,14 @@ fun AssetsScreen() {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(12.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(text = "资产", style = MaterialTheme.typography.headlineMedium)
 
         CurrencyGroupsCard(state)
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -83,42 +84,50 @@ fun AssetsScreen() {
                 text = "账户（${state.accounts.count { !it.isArchived }}）",
                 style = MaterialTheme.typography.titleMedium
             )
-            TextButton(onClick = { addError = null; showAdd = true }) { Text("+ 新增账户") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { vm.toggleShowArchived() }) {
+                    Text(if (state.showArchived) "● 含已归档" else "显示已归档")
+                }
+                TextButton(onClick = { addError = null; showAdd = true }) { Text("+ 新增") }
+            }
         }
 
+        val visible = state.accounts.filter { state.showArchived || !it.isArchived }
         SectionTitle("资产账户")
-        val assets = state.accounts.filter {
-            !it.isArchived && it.type == AccountType.ASSET
-        }
+        val assets = visible.filter { it.type == AccountType.ASSET }
         if (assets.isEmpty()) EmptyHint("还没有资产账户")
         assets.forEach { account ->
             AccountCard(
                 account = account,
                 onDetail = { detailId = account.id },
                 onReconcile = { reconcileId = account.id },
-                onEdit = { editError = null; editAccount = account }
+                onEdit = { editError = null; editAccount = account },
+                onDelete = { deleting = account },
+                onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
+                onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
             )
         }
 
         SectionTitle("信用负债账户")
-        val liabilities = state.accounts.filter {
-            !it.isArchived && it.type == AccountType.LIABILITY
-        }
+        val liabilities = visible.filter { it.type == AccountType.LIABILITY }
         if (liabilities.isEmpty()) EmptyHint("还没有信用负债账户")
         liabilities.forEach { account ->
             AccountCard(
                 account = account,
                 onDetail = { detailId = account.id },
                 onReconcile = { reconcileId = account.id },
-                onEdit = { editError = null; editAccount = account }
+                onEdit = { editError = null; editAccount = account },
+                onDelete = { deleting = account },
+                onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
+                onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
             )
         }
 
         Text(
-            text = "总负债仅作展示，不参与净资产计算；净资产 = SUM(计入统计账户余额)。",
+            text = "总负债仅作展示；各币种小计 = SUM(计入统计账户余额)。",
             style = MaterialTheme.typography.bodySmall,
             color = LedgerColors.Neutral,
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier.padding(top = 10.dp)
         )
     }
 
@@ -128,12 +137,7 @@ fun AssetsScreen() {
             onConfirm = { name, type, initial, limit ->
                 scope.launch {
                     val err = vm.addAccount(name, type, initial, limit)
-                    if (err == null) {
-                        showAdd = false
-                        addError = null
-                    } else {
-                        addError = err
-                    }
+                    if (err == null) { showAdd = false; addError = null } else addError = err
                 }
             },
             errorText = addError
@@ -144,24 +148,35 @@ fun AssetsScreen() {
         EditAccountDialog(
             account = account,
             onDismiss = { editAccount = null },
-            onConfirm = { name, initial, limit, cc, include ->
+            onConfirm = { name, type, initial, limit, cc, include ->
                 scope.launch {
-                    val err = vm.editAccount(account, name, initial, limit, cc, include)
-                    if (err == null) {
-                        editAccount = null
-                        editError = null
-                    } else {
-                        editError = err
-                    }
+                    val err = vm.editAccount(account, name, type, initial, limit, cc, include)
+                    if (err == null) { editAccount = null; editError = null } else editError = err
                 }
             },
             errorText = editError
         )
     }
 
+    deleting?.let { account ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("删除账户") },
+            text = { Text("确定删除「" + account.name + "」？有流水的账户不能删除，只能归档。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { vm.deleteAccount(account.id) }
+                    deleting = null
+                }) { Text("删除", color = LedgerColors.ExpenseRed) }
+            },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("取消") } }
+        )
+    }
+
     detailId?.let { id ->
         AccountDetailDialog(
             accountId = id,
+            accountName = state.accounts.firstOrNull { it.id == id }?.name ?: "账户详情",
             onDismiss = { detailId = null },
             onChanged = { vm.reload() }
         )
@@ -177,13 +192,9 @@ fun AssetsScreen() {
 }
 
 @Composable
-/**
- * 阶段 6c-1：严格不混算。按币种分组列小计，
- * MUST NOT 显示把所有币种加在一起的单一「净资产」总数。
- */
 private fun CurrencyGroupsCard(state: AssetsUiState) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Column(modifier = Modifier.padding(12.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
             Text(text = "按币种的资产小计", style = MaterialTheme.typography.labelLarge)
             Text(
                 text = "不同币种不汇总，避免虚假精确的总数",
@@ -195,19 +206,16 @@ private fun CurrencyGroupsCard(state: AssetsUiState) {
                     text = "还没有账户",
                     style = MaterialTheme.typography.bodyMedium,
                     color = LedgerColors.Neutral,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 6.dp)
                 )
             }
             state.groups.forEach { g ->
-                Column(modifier = Modifier.padding(top = 6.dp)) {
+                Column(modifier = Modifier.padding(top = 4.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = g.currencyCode + " 小计",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        Text(text = g.currencyCode + " 小计", style = MaterialTheme.typography.titleMedium)
                         Text(
                             text = formatCents(g.netCents) + " " + g.currencyCode,
                             style = MaterialTheme.typography.titleMedium,
@@ -241,7 +249,7 @@ private fun SectionTitle(text: String) {
         text = text,
         style = MaterialTheme.typography.labelLarge,
         color = LedgerColors.Neutral,
-        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+        modifier = Modifier.padding(top = 6.dp, bottom = 1.dp)
     )
 }
 
@@ -251,28 +259,33 @@ private fun EmptyHint(text: String) {
         text = text,
         style = MaterialTheme.typography.bodySmall,
         color = LedgerColors.Neutral,
-        modifier = Modifier.padding(vertical = 4.dp)
+        modifier = Modifier.padding(vertical = 2.dp)
     )
 }
 
+/** 第三批：紧凑单行账户卡，留白压缩，操作改成小按钮一行放下。 */
 @Composable
 private fun AccountCard(
     account: AccountEntity,
     onDetail: () -> Unit,
     onReconcile: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onMove: (Int) -> Unit,
+    onArchived: (Boolean) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = account.name + " · " + account.currencyCode,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = account.name + " · " + account.currencyCode +
+                        if (account.isArchived) "（已归档）" else "",
+                    style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = formatCents(account.balanceCents) + " 元",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = formatCents(account.balanceCents),
+                    style = MaterialTheme.typography.titleSmall,
                     color = if (account.balanceCents < 0) LedgerColors.ExpenseRed
                     else LedgerColors.IncomeGreen
                 )
@@ -280,27 +293,49 @@ private fun AccountCard(
             val credit = Reconciliation.availableCredit(
                 account.creditLimitCents, account.balanceCents
             )
-            if (credit != null) {
+            val extra = listOfNotNull(
+                if (account.type == AccountType.LIABILITY) "信用负债" else null,
+                credit?.let { "可用 " + formatCents(it) },
+                if (!account.includeInTotal) "不计入净资产" else null
+            ).joinToString(" · ")
+            if (extra.isNotBlank()) {
                 Text(
-                    text = "可用额度 " + formatCents(credit) + " 元",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = extra,
+                    style = MaterialTheme.typography.labelSmall,
                     color = LedgerColors.Neutral
                 )
             }
-            if (!account.includeInTotal) {
-                Text(
-                    text = "不计入净资产",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LedgerColors.Neutral
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onDetail) { Text("详情") }
-                TextButton(onClick = onReconcile) { Text("对账") }
-                TextButton(onClick = onEdit) { Text("编辑") }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MiniAction("详情", onDetail)
+                MiniAction("对账", onReconcile)
+                MiniAction("编辑", onEdit)
+                MiniAction("↑") { onMove(-1) }
+                MiniAction("↓") { onMove(1) }
+                MiniAction(if (account.isArchived) "恢复" else "归档") {
+                    onArchived(!account.isArchived)
+                }
+                MiniAction("删除", onDelete, LedgerColors.ExpenseRed)
             }
         }
     }
+}
+
+@Composable
+private fun MiniAction(
+    text: String,
+    onClick: () -> Unit,
+    color: androidx.compose.ui.graphics.Color = LedgerColors.Neutral
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        modifier = Modifier.clickable { onClick() }.padding(vertical = 2.dp)
+    )
 }
 
 @Composable
@@ -351,9 +386,7 @@ private fun AddAccountDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                errorText?.let {
-                    Text(text = it, color = LedgerColors.ExpenseRed)
-                }
+                errorText?.let { Text(text = it, color = LedgerColors.ExpenseRed) }
             }
         },
         confirmButton = {
@@ -363,15 +396,16 @@ private fun AddAccountDialog(
     )
 }
 
-/** 阶段 7：预置账户与新建账户都能改期初余额与币种。 */
+/** 第三批：账户类型可改，解决「类型选错只能重建」。 */
 @Composable
 private fun EditAccountDialog(
     account: AccountEntity,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, String, String, Boolean) -> Unit,
+    onConfirm: (String, AccountType, String, String, String, Boolean) -> Unit,
     errorText: String?
 ) {
     var name by remember { mutableStateOf(account.name) }
+    var type by remember { mutableStateOf(account.type) }
     var initial by remember { mutableStateOf(Cents(account.initialBalanceCents).toYuanString()) }
     var limit by remember { mutableStateOf(
         account.creditLimitCents?.let { Cents(it).toYuanString() } ?: ""
@@ -389,11 +423,27 @@ private fun EditAccountDialog(
                     value = name, onValueChange = { name = it },
                     label = { Text("账户名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { type = AccountType.ASSET }) {
+                        Text(
+                            if (type == AccountType.ASSET) "● 资产账户" else "资产账户",
+                            color = if (type == AccountType.ASSET) LedgerColors.IncomeGreen
+                            else LedgerColors.Neutral
+                        )
+                    }
+                    TextButton(onClick = { type = AccountType.LIABILITY }) {
+                        Text(
+                            if (type == AccountType.LIABILITY) "● 信用负债" else "信用负债",
+                            color = if (type == AccountType.LIABILITY) LedgerColors.ExpenseRed
+                            else LedgerColors.Neutral
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = initial, onValueChange = { initial = it },
                     label = { Text("期初余额（元）") }, modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
-                if (account.type == AccountType.LIABILITY) {
+                if (type == AccountType.LIABILITY) {
                     OutlinedTextField(
                         value = limit, onValueChange = { limit = it },
                         label = { Text("信用额度（元，可空）") },
@@ -401,9 +451,7 @@ private fun EditAccountDialog(
                     )
                 }
                 Box {
-                    TextButton(onClick = { expanded = true }) {
-                        Text("币种：$currency")
-                    }
+                    TextButton(onClick = { expanded = true }) { Text("币种：$currency") }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         LedgerCurrency.SUPPORTED.forEach { code ->
                             DropdownMenuItem(
@@ -420,7 +468,7 @@ private fun EditAccountDialog(
                     )
                 }
                 Text(
-                    text = "改期初余额会按流水重新计算余额；改币种只改标签，不改金额。",
+                    text = "改期初余额或类型会按流水重新计算余额；改币种只改标签。",
                     style = MaterialTheme.typography.labelSmall,
                     color = LedgerColors.Neutral
                 )
@@ -428,7 +476,7 @@ private fun EditAccountDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(name, initial, limit, currency, include) }) {
+            Button(onClick = { onConfirm(name, type, initial, limit, currency, include) }) {
                 Text("保存")
             }
         },

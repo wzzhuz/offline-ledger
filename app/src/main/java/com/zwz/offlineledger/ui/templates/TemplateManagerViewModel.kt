@@ -69,6 +69,24 @@ class TemplateManagerViewModel(
         }
     }
 
+    /** 第三批：编辑模板（保留 id / createdAt / sortOrder）。 */
+    fun updateTemplate(t: RecordTemplateEntity) {
+        viewModelScope.launch {
+            runCatching { repository.updateTemplate(t) }
+                .onSuccess { message("已更新模板「" + t.name + "」"); refresh() }
+                .onFailure { message(it.message ?: "更新模板失败") }
+        }
+    }
+
+    /** 第三批：删除模板（草稿，不影响已生成流水）。 */
+    fun deleteTemplate(id: Long) {
+        viewModelScope.launch {
+            runCatching { repository.deleteTemplate(id) }
+                .onSuccess { message("模板已删除"); refresh() }
+                .onFailure { message(it.message ?: "删除模板失败") }
+        }
+    }
+
     fun saveRule(r: RecurringRuleEntity) {
         viewModelScope.launch {
             runCatching { repository.createRecurringRule(r) }

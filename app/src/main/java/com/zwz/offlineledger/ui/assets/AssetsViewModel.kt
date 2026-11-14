@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** 阶段 6c-1：单一币种的展示小计。严格不混算，不显示跨币种净资产总数。 */
+/** 严格不混算。按币种分组列小计，不显示跨币种净资产总数。 */
 data class CurrencyGroup(
     val currencyCode: String,
     val assetsCents: Long,
@@ -25,10 +25,11 @@ data class CurrencyGroup(
 
 data class AssetsUiState(
     val accounts: List<AccountEntity> = emptyList(),
-    val groups: List<CurrencyGroup> = emptyList()
+    val groups: List<CurrencyGroup> = emptyList(),
+    /** 第三批：归档账户不再消失，可一键显示 / 恢复。 */
+    val showArchived: Boolean = false
 )
 
-/** 本阶段「每阶段跑一遍导出备份」由设置页沿用，资产页只负责刷新聚合值。 */
 class AssetsViewModel(
     private val accountDao: AccountDao,
     private val repository: LedgerRepository,
@@ -42,7 +43,6 @@ class AssetsViewModel(
         viewModelScope.launch {
             val accounts = accountDao.all()
             val active = accounts.filter { !it.isArchived }
-            // 按币种分组，每组单独算展示值；绝不把不同币种的 Long 分相加。
             val groups = active.groupBy { it.currencyCode }
                 .toSortedMap()
                 .map { (cc, list) ->
@@ -55,8 +55,12 @@ class AssetsViewModel(
                     })
                     CurrencyGroup(cc, totals.totalAssetsCents, totals.totalLiabilitiesCents)
                 }
-            _state.value = AssetsUiState(accounts = accounts, groups = groups)
+            _state.value = _state.value.copy(accounts = accounts, groups = groups)
         }
+    }
+
+    fun toggleShowArchived() {
+        _state.value = _state.value.copy(showArchived = !_state.value.showArchived)
     }
 
     /** 返回 null 表示成功，否则是可展示的错误文案。 */
@@ -96,10 +100,11 @@ class AssetsViewModel(
         }
     }
 
-    /** 阶段 7：完整账户编辑，含期初余额与币种。改真相源后由 Repository 重算。 */
+    /** 第三批：完整账户编辑，含类型修正、期初余额与币种。改真相源后由 Repository 重算。 */
     suspend fun editAccount(
         account: AccountEntity,
         name: String,
+        type: AccountType,
         initialYuan: String,
         limitYuan: String,
         currencyCode: String,
@@ -126,10 +131,52 @@ class AssetsViewModel(
                 initialBalanceCents = initialCents,
                 currencyCode = currencyCode
             )
+            if (type != account.type) repository.updateAccountType(account.id, type)
             reload()
             null
         } catch (e: Exception) {
             e.message ?: "编辑账户失败"
         }
+    }
+
+    /** 第三批：上移 / 下移排序，顺序同步到记一笔的常用账户平铺。 */
+    suspend fun moveAccount(id: Long, delta: Int): String? {
+        val group = _state.value.accounts.filter { !it.isArchived }
+            .sortedBy { it.sortOrder }
+        val idx = group.indexOfFirst { it.id == id }
+        val target = idx + delta
+        if (idx < 0 || target !in group.indices) return null
+        val swapped = group.toMutableList().apply {
+            val a = this[idx]; this[idx] = this[target]; this[target] = a
+        }
+        return try {
+            repository.reorderAccounts(swapped.map { it.id })
+            reload()
+            null
+        } catch (e: Exception) {
+            e.message ?: "排序失败"
+        }
+    }
+
+    /** 第三批：无流水可物理删除（重建）；有流水 MUST 归档。 */
+    suspend fun deleteAccount(id: Long): String? {
+        if (accountDao.linkedRecordCount(id) > 0) {
+            return "该账户已有流水，不能删除；请用「归档」隐藏，或先清空流水"
+        }
+        return try {
+            repository.deleteAccountIfUnused(id)
+            reload()
+            null
+        } catch (e: Exception) {
+            e.message ?: "删除账户失败"
+        }
+    }
+
+    suspend fun setArchived(id: Long, archived: Boolean): String? = try {
+        repository.setAccountArchived(id, archived)
+        reload()
+        null
+    } catch (e: Exception) {
+        e.message ?: "归档状态修改失败"
     }
 }

@@ -36,6 +36,13 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- 第三批：趋势图全屏横屏页，仅内部调用，不导出、不新增权限。 -->
+        <activity
+            android:name=".ui.charts.ChartFullscreenActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.OfflineLedger" />
     </application>
 
 </manifest>

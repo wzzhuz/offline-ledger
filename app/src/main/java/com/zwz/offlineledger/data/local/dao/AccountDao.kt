@@ -64,6 +64,19 @@ interface AccountDao {
     @Query("SELECT COUNT(*) FROM records WHERE fromAccountId = :id OR toAccountId = :id")
     suspend fun linkedRecordCount(id: Long): Int
 
+    /** 第三批：账户类型可改、可归档/恢复、无流水可删、可自定义排序。 */
+    @Query("UPDATE accounts SET type = :type WHERE id = :id")
+    suspend fun updateType(id: Long, type: com.zwz.offlineledger.data.model.AccountType)
+
+    @Query("UPDATE accounts SET isArchived = :archived WHERE id = :id")
+    suspend fun setArchived(id: Long, archived: Boolean)
+
+    @Query("DELETE FROM accounts WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("UPDATE accounts SET sortOrder = :order WHERE id = :id")
+    suspend fun updateSortOrder(id: Long, order: Int)
+
     /** 阶段 8：年度资产趋势的当前余额基准，按币种、不混算。 */
     @Query("SELECT COALESCE(SUM(balanceCents), 0) FROM accounts WHERE includeInTotal = 1 AND currencyCode = :cc")
     suspend fun totalBalanceForCurrency(cc: String): Long

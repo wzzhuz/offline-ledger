@@ -6,8 +6,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -58,6 +62,8 @@ fun TemplateManagerDialog(onDismiss: () -> Unit) {
     )
     val state by vm.state.collectAsState()
     var tab by remember { mutableStateOf(0) }
+    var editing by remember { mutableStateOf<RecordTemplateEntity?>(null) }
+    var deleting by remember { mutableStateOf<RecordTemplateEntity?>(null) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -92,25 +98,38 @@ fun TemplateManagerDialog(onDismiss: () -> Unit) {
                         )
                     }
                     if (tab == 0) {
+                        Text(
+                            text = "模板是预填草稿：金额可留空，选模板后自动填充并可自由调整。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LedgerColors.Neutral
+                        )
                         if (state.templates.isEmpty()) {
-                            Text("还没有模板。在下面新增一个，之后记一笔点一下即可完成。")
+                            Text("还没有模板。在下面新增一个，之后记一笔点一下即可填充。")
                         }
-                        state.templates.forEach { t ->
+                        state.templates.filter { !it.isArchived }.forEach { t ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                val amount = if (t.amountCents > 0L)
+                                    Cents(t.amountCents).toYuanString() + " 元" else "金额待填"
                                 val path = categoryPath(t.categoryId, state.categories)
                                 Text(
-                                    text = t.name + " · " + Cents(t.amountCents).toYuanString() +
-                                        " 元" + (if (path.isBlank()) "" else " · " + path) +
-                                        if (t.isArchived) "（已归档）" else "",
+                                    text = t.name + " · " + typeLabel(t.type) + " · " + amount +
+                                        (if (path.isBlank()) "" else " · " + path),
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                                if (!t.isArchived) {
-                                    TextButton(onClick = { vm.archiveTemplate(t.id) }) {
-                                        Text("归档")
-                                    }
+                                TextButton(onClick = { editing = t }) { Text("编辑") }
+                                TextButton(onClick = { deleting = t }) {
+                                    Text("删除", color = LedgerColors.ExpenseRed)
                                 }
                             }
+                        }
+                        val archived = state.templates.count { it.isArchived }
+                        if (archived > 0) {
+                            Text(
+                                text = "已归档 $archived 个模板",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = LedgerColors.Neutral
+                            )
                         }
                     } else {
                         if (state.rules.isEmpty()) {
@@ -133,20 +152,41 @@ fun TemplateManagerDialog(onDismiss: () -> Unit) {
                     }
 
                     Text(
-                        text = if (tab == 0) "新增模板" else "新增周期规则",
+                        text = if (tab == 0)
+                            (if (editing == null) "新增模板" else "编辑模板「" + editing!!.name + "」")
+                        else "新增周期规则",
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
                     )
                     QuickEntryForm(
                         isRule = tab == 1,
+                        editing = if (tab == 0) editing else null,
                         categories = state.categories,
                         accountNames = state.accounts.map { it.id to it.name },
-                        onSubmitTemplate = { vm.saveTemplate(it) },
-                        onSubmitRule = { vm.saveRule(it) }
+                        onSubmitTemplate = { t ->
+                            if (t.id != 0L) vm.updateTemplate(t) else vm.saveTemplate(t)
+                            editing = null
+                        },
+                        onSubmitRule = { vm.saveRule(it) },
+                        onCancelEdit = { editing = null }
                     )
                 }
             }
         }
+    }
+
+    deleting?.let { t ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("删除模板") },
+            text = { Text("确定删除「" + t.name + "」？已由它生成的历史流水不受影响。") },
+            confirmButton = {
+                TextButton(onClick = { vm.deleteTemplate(t.id); deleting = null }) {
+                    Text("删除", color = LedgerColors.ExpenseRed)
+                }
+            },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("取消") } }
+        )
     }
 }
 
@@ -158,34 +198,40 @@ private fun cadenceLabel(c: Cadence): String = when (c) {
 
 /**
  * 模板与规则共用的表单。金额在提交时用 Cents.fromYuan 转 Long 分，
- * 禁止 Float / Double 参与（金额铁律）。
+ * 禁止 Float / Double 参与（金额铁律）。模板金额可留空（草稿语义）。
  */
 @Composable
 private fun QuickEntryForm(
     isRule: Boolean,
+    editing: RecordTemplateEntity?,
     categories: List<CategoryEntity>,
     accountNames: List<Pair<Long, String>>,
     onSubmitTemplate: (RecordTemplateEntity) -> Unit,
-    onSubmitRule: (RecurringRuleEntity) -> Unit
+    onSubmitRule: (RecurringRuleEntity) -> Unit,
+    onCancelEdit: () -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var amountText by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf(RecordType.EXPENSE) }
-    var categoryId by remember { mutableStateOf<Long?>(null) }
-    var fromAccountId by remember { mutableStateOf<Long?>(null) }
-    var toAccountId by remember { mutableStateOf<Long?>(null) }
-    var note by remember { mutableStateOf("") }
-    var counterpartyText by remember { mutableStateOf("") }
-    var excluded by remember { mutableStateOf(false) }
-    var cadence by remember { mutableStateOf(Cadence.MONTHLY) }
-    var dayText by remember { mutableStateOf("1") }
-    var error by remember { mutableStateOf<String?>(null) }
+    val eid = editing?.id ?: 0L
+    var name by remember(eid) { mutableStateOf(editing?.name ?: "") }
+    var amountText by remember(eid) {
+        mutableStateOf(if (editing != null && editing.amountCents > 0L)
+            Cents(editing.amountCents).toYuanString() else "")
+    }
+    var type by remember(eid) { mutableStateOf(editing?.type ?: RecordType.EXPENSE) }
+    var categoryId by remember(eid) { mutableStateOf(editing?.categoryId) }
+    var fromAccountId by remember(eid) { mutableStateOf(editing?.fromAccountId) }
+    var toAccountId by remember(eid) { mutableStateOf(editing?.toAccountId) }
+    var note by remember(eid) { mutableStateOf(editing?.note ?: "") }
+    var counterpartyText by remember(eid) { mutableStateOf(editing?.counterparty ?: "") }
+    var excluded by remember(eid) { mutableStateOf(editing?.excludeFromStats ?: false) }
+    var cadence by remember(eid) { mutableStateOf(Cadence.MONTHLY) }
+    var dayText by remember(eid) { mutableStateOf("1") }
+    var error by remember(eid) { mutableStateOf<String?>(null) }
 
     val selectedCategory = categories.firstOrNull { it.id == categoryId }
     val rootId = selectedCategory?.let { it.parentId ?: it.id }
 
-    // 阶段 7：下拉只显示与当前收支类型一致、未归档的分类；
-    // 一级在前、二级紧跟父级，标签写成「一级 / 二级」而不是孤立的「└ xxx」。
+    // 第三批：下拉只显示与当前收支类型一致、未归档的分类；
+    // 一级在前、二级紧跟父级，标签写成「一级 / 二级」。
     val visibleCategories = categories.filter { it.type == type && !it.isArchived }
     fun rootKey(c: CategoryEntity): Long =
         if (c.level == 0) c.id else (c.parentId ?: 0L)
@@ -210,7 +256,7 @@ private fun QuickEntryForm(
         )
         OutlinedTextField(
             value = amountText, onValueChange = { amountText = it },
-            label = { Text("金额（元）") },
+            label = { Text(if (isRule) "金额（元，必填）" else "金额（元，可留空，记一笔时再填）") },
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                 keyboardType = KeyboardType.Decimal
             ),
@@ -219,12 +265,18 @@ private fun QuickEntryForm(
 
         Text("类型", style = MaterialTheme.typography.labelMedium)
         Row {
-            // 显式列表：SETTLEMENT 不是可手工记的模板 / 规则类型
             listOf(RecordType.EXPENSE, RecordType.INCOME, RecordType.TRANSFER)
                 .filter { it != RecordType.TRANSFER || !isRule }.forEach { rt ->
+                val chosen = type == rt
                 AssistChip(
                     onClick = { type = rt; categoryId = null },
-                    label = { Text(typeLabel(rt)) },
+                    label = {
+                        Text(
+                            text = (if (chosen) "● " else "") + typeLabel(rt),
+                            color = if (chosen) LedgerColors.IncomeGreen
+                            else LedgerColors.Neutral
+                        )
+                    },
                     modifier = Modifier.padding(end = 6.dp)
                 )
             }
@@ -257,11 +309,14 @@ private fun QuickEntryForm(
             label = { Text("备注（可选）") },
             modifier = Modifier.fillMaxWidth(), singleLine = true
         )
-        OutlinedTextField(
-            value = counterpartyText, onValueChange = { counterpartyText = it },
-            label = { Text("收款方（可选）") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true
-        )
+        // 第三批：转账不显示交易对方；收入显示「付款方 / 来源」。
+        if (type != RecordType.TRANSFER) {
+            OutlinedTextField(
+                value = counterpartyText, onValueChange = { counterpartyText = it },
+                label = { Text(if (type == RecordType.INCOME) "付款方 / 来源（可选）" else "收款方（可选）") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("不计入收支统计", modifier = Modifier.weight(1f))
             Switch(checked = excluded, onCheckedChange = { excluded = it })
@@ -271,9 +326,16 @@ private fun QuickEntryForm(
             Text("周期", style = MaterialTheme.typography.labelMedium)
             Row {
                 Cadence.entries.forEach { c ->
+                    val chosen = cadence == c
                     AssistChip(
                         onClick = { cadence = c },
-                        label = { Text(cadenceLabel(c)) },
+                        label = {
+                            Text(
+                                text = (if (chosen) "● " else "") + cadenceLabel(c),
+                                color = if (chosen) LedgerColors.IncomeGreen
+                                else LedgerColors.Neutral
+                            )
+                        },
                         modifier = Modifier.padding(end = 6.dp)
                     )
                 }
@@ -293,13 +355,14 @@ private fun QuickEntryForm(
         }
         Button(
             onClick = {
-                val amount = try {
+                val amount = if (amountText.isBlank()) 0L else try {
                     Cents.fromYuan(amountText).value
                 } catch (e: IllegalArgumentException) {
                     error = e.message ?: "金额格式非法"; return@Button
                 }
                 if (name.isBlank()) { error = "请填名称"; return@Button }
-                if (amount <= 0L) { error = "金额必须大于 0"; return@Button }
+                if (amount < 0L) { error = "金额不能为负"; return@Button }
+                if (isRule && amount <= 0L) { error = "周期规则金额必须大于 0"; return@Button }
                 if (type != RecordType.TRANSFER && categoryId != null &&
                     visibleCategories.none { it.id == categoryId }
                 ) { error = "分类与收支类型不匹配，请重新选择"; return@Button }
@@ -337,13 +400,16 @@ private fun QuickEntryForm(
                 } else {
                     onSubmitTemplate(
                         RecordTemplateEntity(
+                            id = editing?.id ?: 0L,
                             name = name.trim(), type = type, amountCents = amount,
                             categoryId = if (type == RecordType.TRANSFER) null else categoryId,
                             rootCategoryId = if (type == RecordType.TRANSFER) null else rootId,
                             fromAccountId = if (type == RecordType.INCOME) null else fromAccountId,
                             toAccountId = if (type == RecordType.EXPENSE) null else toAccountId,
                             note = commonNote, excludeFromStats = excluded,
-                            createdAt = now, counterparty = counterpartyText.trim()
+                            sortOrder = editing?.sortOrder ?: 0,
+                            createdAt = editing?.createdAt ?: now,
+                            counterparty = counterpartyText.trim()
                         )
                     )
                 }
@@ -351,7 +417,10 @@ private fun QuickEntryForm(
                 name = ""; amountText = ""; note = ""; counterpartyText = ""
             },
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-        ) { Text(if (isRule) "保存周期规则" else "保存模板") }
+        ) { Text(if (isRule) "保存周期规则" else (if (editing == null) "保存模板" else "保存修改")) }
+        if (editing != null) {
+            TextButton(onClick = onCancelEdit) { Text("取消编辑") }
+        }
     }
 }
 
@@ -368,7 +437,6 @@ private fun typeLabel(t: RecordType): String = when (t) {
     RecordType.EXPENSE -> "支出"
     RecordType.INCOME -> "收入"
     RecordType.TRANSFER -> "转账"
-    // 表单不会传入 SETTLEMENT，但穷尽 when 必须覆盖新增枚举值
     RecordType.SETTLEMENT -> "报销 / 退款"
 }
 

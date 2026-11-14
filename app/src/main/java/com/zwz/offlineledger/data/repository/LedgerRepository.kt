@@ -268,6 +268,32 @@ class LedgerRepository @Inject constructor(
         accountDao.archiveAccount(id)
     }
 
+    /** 第三批：账户类型选错可改；改完统一重算，净资产归类随新类型生效。 */
+    suspend fun updateAccountType(id: Long, type: com.zwz.offlineledger.data.model.AccountType) =
+        db.withTransaction {
+            accountDao.updateType(id, type)
+            rebuildAllBalancesInternal()
+        }
+
+    /** 第三批：归档 / 恢复同一个入口，恢复后资产页可重新看到。 */
+    suspend fun setAccountArchived(id: Long, archived: Boolean) = db.withTransaction {
+        accountDao.setArchived(id, archived)
+        rebuildAllBalancesInternal()
+    }
+
+    /** 第三批：无流水的账户允许物理删除（重建）；有流水 MUST 走归档。 */
+    suspend fun deleteAccountIfUnused(id: Long) = db.withTransaction {
+        require(accountDao.linkedRecordCount(id) == 0) { "该账户已有流水，请改用归档" }
+        accountDao.deleteById(id)
+        rebuildAllBalancesInternal()
+    }
+
+    /** 第三批：账户自定义排序，顺序同步到记一笔的常用账户平铺。 */
+    suspend fun reorderAccounts(orderedIds: List<Long>) = db.withTransaction {
+        orderedIds.forEachIndexed { index, id -> accountDao.updateSortOrder(id, index) }
+        rebuildAllBalancesInternal()
+    }
+
     // ---------------------------------------------------------------
     // 阶段 5：分类管理。复用阶段 1 预留的 isArchived / sortOrder，
     // 零表结构变更、零 Migration。全部包在 withTransaction 内。
@@ -289,6 +315,22 @@ class LedgerRepository @Inject constructor(
         categoryDao.archive(id)
     }
 
+    /** 第三批：删除分类。有流水只归档（保护历史归属），无流水才物理删。 */
+    suspend fun deleteCategory(id: Long) = db.withTransaction {
+        if (categoryDao.linkedRecordCount(id) > 0) {
+            categoryDao.archive(id)
+        } else {
+            categoryDao.deleteById(id)
+        }
+        rebuildAllBalancesInternal()
+    }
+
+    /** 第三批：恢复已归档分类，重新出现在分类管理与记账分类网格。 */
+    suspend fun restoreCategory(id: Long) = db.withTransaction {
+        categoryDao.setArchived(id, false)
+        rebuildAllBalancesInternal()
+    }
+
     /** 批量排序，事务末尾重算兜底（排序不改账，但保持统一写路径）。 */
     suspend fun reorderCategories(orderedIds: List<Long>) = db.withTransaction {
         orderedIds.forEachIndexed { index, id -> categoryDao.updateSortOrder(id, index) }
@@ -305,19 +347,24 @@ class LedgerRepository @Inject constructor(
 
     suspend fun createTemplate(t: RecordTemplateEntity): Long = db.withTransaction {
         require(t.name.isNotBlank()) { "模板名不能为空" }
-        require(t.amountCents > 0L) { "模板金额必须大于 0" }
+        require(t.amountCents >= 0L) { "模板金额不能为负（可留空，记一笔时再填）" }
         templateDao.insert(t)
     }
 
     suspend fun updateTemplate(t: RecordTemplateEntity) = db.withTransaction {
         require(t.name.isNotBlank()) { "模板名不能为空" }
-        require(t.amountCents > 0L) { "模板金额必须大于 0" }
+        require(t.amountCents >= 0L) { "模板金额不能为负（可留空，记一笔时再填）" }
         templateDao.update(t)
     }
 
     /** 只归档不物理删；已由它生成的历史流水不受影响。 */
     suspend fun archiveTemplate(id: Long) = db.withTransaction {
         templateDao.archive(id)
+    }
+
+    /** 第三批：模板可删除。模板只是预填草稿，不关联历史流水，直接物理删。 */
+    suspend fun deleteTemplate(id: Long) = db.withTransaction {
+        templateDao.deleteById(id)
     }
 
     suspend fun reorderTemplates(orderedIds: List<Long>) = db.withTransaction {
@@ -345,6 +392,8 @@ class LedgerRepository @Inject constructor(
     suspend fun recordFromTemplate(templateId: Long, atEpochMilli: Long): Long? = db.withTransaction {
         val t = templateDao.byId(templateId) ?: return@withTransaction null
         if (t.isArchived) return@withTransaction null
+        // 模板是预填草稿，金额可留空；未填金额的模板 MUST NOT 直接生成流水。
+        if (t.amountCents <= 0L) return@withTransaction null
         val id = recordDao.insert(withResolvedRoot(t.toRecordEntity(atEpochMilli)))
         rebuildAllBalancesInternal()
         id

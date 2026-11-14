@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import com.zwz.offlineledger.ui.charts.ChartFullscreenActivity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.time.MonthRange
@@ -129,11 +130,14 @@ fun StatsScreen() {
                     }
                 }
             }
-            val max = ChartData.seriesMax(
-                listOf(
-                    state.daily.map { it.expenseCents },
-                    state.daily.map { it.incomeCents }
-                )
+            // 第三批：单线模式用该系列自己的最大值，不再与收入共用而贴底。
+            val max = ChartData.seriesMaxSingle(
+                when (state.trendMetric) {
+                    TrendMetric.EXPENSE -> state.daily.map { it.expenseCents }
+                    TrendMetric.INCOME -> state.daily.map { it.incomeCents }
+                    TrendMetric.BOTH -> state.daily.map { it.expenseCents } +
+                        state.daily.map { it.incomeCents }
+                }
             )
             val expenseSeries = LineSeries(
                 "支出", LedgerColors.ExpenseRed,
@@ -150,31 +154,70 @@ fun StatsScreen() {
             }
             LineChart(
                 series = shown,
-                xLabels = state.daily.map { it.day.toString() },
+                xLabels = state.daily.map { it.day.toString() + "日" },
+                yLabels = ChartData.yAxisLabels(max),
                 onPointTap = { idx -> pointIndex = idx; pointMode = StatsMode.MONTH }
             )
-        } else {
-            val max = ChartData.seriesMax(
-                listOf(
-                    state.monthly.map { it.expenseCents },
-                    state.monthly.map { it.incomeCents }
-                )
+            ChartZoomButton(
+                title = "每日" + metricLabel(state.trendMetric) + "趋势",
+                values = (when (state.trendMetric) {
+                    TrendMetric.EXPENSE -> state.daily.map { it.expenseCents }
+                    TrendMetric.INCOME -> state.daily.map { it.incomeCents }
+                    TrendMetric.BOTH -> state.daily.map { it.expenseCents }
+                }).toLongArray(),
+                labels = ArrayList(state.daily.map { it.day.toString() + "日" }),
+                colorName = if (state.trendMetric == TrendMetric.INCOME) "INCOME" else "EXPENSE"
             )
+        } else {
+            // 第三批：年度也能切单线，单线按自身最大值缩放。
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TrendMetric.values().forEach { m ->
+                    TextButton(onClick = { vm.setTrendMetric(m) }) {
+                        Text(
+                            if (state.trendMetric == m) "● " + metricLabel(m)
+                            else metricLabel(m),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+            val max = ChartData.seriesMaxSingle(
+                when (state.trendMetric) {
+                    TrendMetric.EXPENSE -> state.monthly.map { it.expenseCents }
+                    TrendMetric.INCOME -> state.monthly.map { it.incomeCents }
+                    TrendMetric.BOTH -> state.monthly.map { it.expenseCents } +
+                        state.monthly.map { it.incomeCents }
+                }
+            )
+            val yearExpenseSeries = LineSeries(
+                "支出", LedgerColors.ExpenseRed,
+                ChartData.normalize(state.monthly.map { it.expenseCents }, max)
+            )
+            val yearIncomeSeries = LineSeries(
+                "收入", LedgerColors.IncomeGreen,
+                ChartData.normalize(state.monthly.map { it.incomeCents }, max)
+            )
+            val shownYear = when (state.trendMetric) {
+                TrendMetric.EXPENSE -> listOf(yearExpenseSeries)
+                TrendMetric.INCOME -> listOf(yearIncomeSeries)
+                TrendMetric.BOTH -> listOf(yearExpenseSeries, yearIncomeSeries)
+            }
             LineChart(
-                series = listOf(
-                    LineSeries(
-                        "支出", LedgerColors.ExpenseRed,
-                        ChartData.normalize(state.monthly.map { it.expenseCents }, max)
-                    ),
-                    LineSeries(
-                        "收入", LedgerColors.IncomeGreen,
-                        ChartData.normalize(state.monthly.map { it.incomeCents }, max)
-                    )
-                ),
+                series = shownYear,
                 xLabels = state.monthly.map { it.month.toString() + "月" },
+                yLabels = ChartData.yAxisLabels(max),
                 onPointTap = { idx -> pointIndex = idx; pointMode = StatsMode.YEAR }
             )
-            // 阶段 8：资产线单独一张图，避免与月度收支量级差大时三线糊在一起。
+            ChartZoomButton(
+                title = "年度收支趋势（" + state.year + "）",
+                values = (when (state.trendMetric) {
+                    TrendMetric.INCOME -> state.monthly.map { it.incomeCents }
+                    else -> state.monthly.map { it.expenseCents }
+                }).toLongArray(),
+                labels = ArrayList(state.monthly.map { it.month.toString() + "月" }),
+                colorName = if (state.trendMetric == TrendMetric.INCOME) "INCOME" else "EXPENSE"
+            )
+            // 资产线单独一张图，避免与月度收支量级差大时三线糊在一起。
             SectionLabel("资产余额趋势（" + state.currencyCode + "）")
             val assetMax = ChartData.seriesMax(
                 listOf(state.assetTrend.map { kotlin.math.abs(it) })
@@ -189,7 +232,14 @@ fun StatsScreen() {
                     )
                 ),
                 xLabels = state.monthly.map { it.month.toString() + "月" },
+                yLabels = ChartData.yAxisLabels(assetMax),
                 onPointTap = { idx -> pointIndex = idx; pointMode = StatsMode.YEAR }
+            )
+            ChartZoomButton(
+                title = "资产余额趋势（" + state.currencyCode + " · " + state.year + "）",
+                values = state.assetTrend.map { it.coerceAtLeast(0L) }.toLongArray(),
+                labels = ArrayList(state.monthly.map { it.month.toString() + "月" }),
+                colorName = "ASSET"
             )
             Text(
                 text = "资产线按当前币种累计推算，不跨币种混算；点击任意图可查看具体金额。",
@@ -407,6 +457,22 @@ private fun BudgetSection(state: StatsUiState) {
             }
         }
     }
+}
+
+/** 第三批：横屏全屏放大入口；只传展示数据，不带任何数据库对象。 */
+@Composable
+private fun ChartZoomButton(
+    title: String,
+    values: LongArray,
+    labels: ArrayList<String>,
+    colorName: String
+) {
+    val context = LocalContext.current
+    TextButton(onClick = {
+        context.startActivity(
+            ChartFullscreenActivity.intentFor(context, title, values, labels, colorName)
+        )
+    }) { Text("⛶ 横屏放大", style = MaterialTheme.typography.labelSmall) }
 }
 
 @Composable

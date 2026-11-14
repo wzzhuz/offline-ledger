@@ -180,3 +180,63 @@ CSV 列名 / 测试 / specs / README 一次替换，历史归档与 `docs/` 快�
 无 Migration，按使用者「稳定版前不考虑升级、不需要保留测试数据」的约束，
 **新包必须卸载重装**）；R8 包真机启动、SQLCipher 开库、BiometricPrompt、SAF 选择器、
 Excel 打开 CSV、5 万条切月耗时，均按使用者决定继续推迟。
+
+## 12. 第 3 批：逐条查证与取舍
+
+### 12.1 查证（都读了代码）
+
+| # | 根因 |
+|---|---|
+| 1 | `TemplateManagerDialog.QuickEntryForm` 把 `amountCents` 当必填，且 `Repository.createTemplate` 有 `require(t.amountCents > 0L)`；`TemplateQuickPickBar` 点一下**直接调 `recordFromTemplate` 生成流水并关弹窗**，完全不经过表单，所以「自动填充再改」不可能。模板里金额恰是每次最可能变的字段，产品语义写反了。 |
+| 2 | `TemplateDao` 只有 `insert/updateAmount/query`，列表行没有编辑/删除菜单；类型用 `AssistChip` 但无 `selected` 态；记一笔的模板 chip 也没有选中态。 |
+| 3 | `updateAccountMeta` 不含 `type`；`archiveAccount` 只把 `isArchived` 置 1，资产页 `filter { !it.isArchived }` 后**没有任何查看入口**；`sortOrder` 字段在阶段 1 就预留了但资产页从未暴露排序。上一批如实记为「留下一批」。 |
+| 4 | `ChartData.seriesMax(series: List<List<Long>>)` 把支出与收入**合并取最大值**，收入量级大时支出线贴底；`LineChart` 竖轴只有网格线无数值、横轴固定 3 个标签。竖屏 360dp 标 12 个月必然挤，横屏才是趋势图正确容器。 |
+| 6 | `CategoryManagerDialog` 只有「归档」没有删除；新增二级分类的父级是**不滚动的横向 Row**，10 个一级被屏幕宽度截断；`SettingsViewModel.moveCategory` 已有但 UI 从未调用。 |
+| 7 | `AccountDetailDialog` 的标题取 `state.account`（`load()` 一次性快照），名称输入框又是 `remember` 初始化一次不再更新；资产页改名后两处不同步。 |
+
+### 12.2 关键取舍
+
+- **模板 = 预填草稿，不是固定账单**：`createTemplate/updateTemplate` 放宽为
+  `amountCents >= 0`，但 `recordFromTemplate` 加 `amountCents <= 0 → return null` 双保险，
+  避免草稿模板被任何路径写成 0 元流水。周期规则金额仍必须 > 0（它要自动补记）。
+- **模板选中后不再直接记账**：`TemplateQuickPickBar` 改为回调模板实体，
+  `RecordEditorViewModel.applyTemplate()` 填表单；金额留空、时间取「现在」、
+  所有字段仍可自由改。比「生成后再编辑」少一次写库，也更符合使用者描述。
+- **账户排序用上移/下移按钮，不做拖拽**：拖拽要引入 `reorderable` 之类新依赖或自写
+  `pointerInput` 手势，与「零新增依赖」冲突且首次真机手感无法验；`sortOrder` 已有，
+  按钮足够解决「10 多个账户常用置顶」。
+- **账户删除边界**：有流水 MUST 归档（历史流水外键与归属不能断），无流水才物理删。
+  改 `type` 后统一走 `rebuildAllBalancesInternal()`，净资产归类随新类型生效。
+- **图表独立缩放**：新增 `ChartData.seriesMaxSingle`，单线模式按该系列自身最大值；
+  只有显式选「两者」才共用 max（保持可比）。竖轴 5 个刻度由纯 JVM `yAxisLabels`
+  生成，不做金额运算、不回写任何金额。
+- **横屏全屏页**：新增 `ChartFullscreenActivity`，Manifest 固定 `landscape`、
+  `exported=false`，只通过 Intent 传 LongArray 金额与标签，不带数据库对象；
+  双指缩放用 `Modifier.scale` 只做视觉放大，不改 Canvas 坐标逻辑，零手势坐标风险。
+- **分类删除**：`Repository.deleteCategory` 查 `linkedRecordCount`，有流水自动降级归档，
+  无流水才物理删；配恢复入口。父级选择改「搜索 + 可滚动全量列表」，不再被
+  `DropdownMenu` 默认高度截断。
+- **详情标题单一真相源**：由资产页把实时 `account.name` 传进详情弹窗，
+  删除详情里重复的改名输入框，账户编辑只留资产页一个入口。
+
+### 12.3 否决方案
+
+| 否决 | 理由 |
+|---|---|
+| 模板金额用 0 元占位流水 + 事后编辑 | 会污染余额与统计，且违背「金额恒正」铁律 |
+| 账户拖拽排序 | 需新依赖或自写手势，首次真机无法验，收益不抵风险 |
+| 竖屏内塞 12 个月标签 | 360dp 宽必然挤成一团，横屏才是正解 |
+| 双 Y 轴强行保留两条线 | 量级差大时仍互相干扰，且实现与读图都更复杂 |
+| 任何账户都能物理删除 | 会连带断掉历史流水归属 |
+| 分类物理删除有流水的分类 | 历史统计与下钻会出现孤儿分类 |
+| 再建一个 `polish-device-experience-2` change | 前两批尚未归档，拆开会切碎同一轮装机打磨的决策史 |
+
+### 12.4 稳定版前版本策略（继续生效）
+
+本批**不改表结构、不改 `AppDatabase version`、不新增 Migration、不改备份 DTO**。
+按使用者重申的约束，后续阶段不得再以「会破坏升级 / 要写 Migration」否决数据结构调整。
+
+### 12.5 待回填
+
+CI 与出包结果在本批推送后回填；真机实测按使用者决定继续推迟，
+清单见 `tasks.md` 第 9 节。

@@ -358,6 +358,27 @@ class SettingsViewModel(
         }
     }
 
+    /** 第三批：删除分类（有流水自动归档）与恢复归档分类。 */
+    fun deleteCategory(id: Long) {
+        viewModelScope.launch {
+            try {
+                repository.deleteCategory(id)
+                loadCategories()
+                message("分类已处理：无流水则删除，有流水则归档，历史流水归属不变")
+            } catch (e: IllegalArgumentException) {
+                fail(e.message ?: "删除失败")
+            }
+        }
+    }
+
+    fun restoreCategory(id: Long) {
+        viewModelScope.launch {
+            repository.restoreCategory(id)
+            loadCategories()
+            message("分类已恢复")
+        }
+    }
+
     fun moveCategory(id: Long, delta: Int) {
         viewModelScope.launch {
             val group = _state.value.categories.filter { !it.isArchived }

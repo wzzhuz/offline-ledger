@@ -412,3 +412,10 @@ offline-ledger/
 本仓库遵循 [`wzzhuz/my-app-workflow`](https://github.com/wzzhuz/my-app-workflow) 的
 OpenSpec 规范驱动流程：**需求先对齐，再写码；改完代码，同步更新规格。**
 不依赖 OpenSpec CLI 或斜杠命令，任何 AI 工具都能读写同一份规范。
+
+## 第 3 批真机反馈（进行中 change）
+
+模板改预填草稿并可编辑删除、账户类型/排序/归档查看与删除、分类管理删除与全量父级选择、
+趋势图独立缩放 + 竖轴数值 + 横屏全屏放大、账户详情标题单一真相源。
+本批不改表结构、不新增依赖、不新增权限，详见
+`openspec/changes/polish-device-experience/`。

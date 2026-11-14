@@ -28,4 +28,8 @@ interface TemplateDao {
 
     @Query("DELETE FROM record_templates")
     suspend fun clear()
+
+    /** 第三批：模板是草稿，可物理删除。 */
+    @Query("DELETE FROM record_templates WHERE id = :id")
+    suspend fun deleteById(id: Long)
 }

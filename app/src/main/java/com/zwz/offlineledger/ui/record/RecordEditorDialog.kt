@@ -120,7 +120,7 @@ fun RecordEditorDialog(
                         .padding(horizontal = 12.dp)
                 ) {
                     if (recordId == null && templateQuickPick) {
-                        TemplateQuickPickBar(onPicked = onSaved)
+                        TemplateQuickPickBar(onTemplate = { vm.applyTemplate(it) })
                     }
                     TypeTabs(state.type) { vm.setType(it) }
 

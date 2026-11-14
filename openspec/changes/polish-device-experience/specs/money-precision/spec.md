@@ -22,3 +22,14 @@ SHALL 只作为多币种测试示例或历史默认值，MUST NOT 被当作现�
 
 **理由**：v2 设计期按「用户在香港」的错误假设写死 HKD / Asia/Hong_Kong；
 使用者实际在江苏南京。改时区只修语义，不动任何已录日期。
+
+### Requirement: 图表刻度仅为展示换算
+竖轴刻度 SHALL 由 `ChartData.yAxisLabels` 用 `BigDecimal` 把整数分格式化为元字符串，
+MUST NOT 回写任何金额、MUST NOT 参与统计求和、MUST NOT 引入浮点金额运算。
+
+**理由**：图表加数值刻度后仍要守住「金额存储与比较一律 Long 分」的铁律。
+
+#### Scenario: 刻度不回写
+- **GIVEN** 最大支出 100000 分
+- **WHEN** 生成竖轴刻度
+- **THEN** 返回 5 个元字符串且账本金额一分不变

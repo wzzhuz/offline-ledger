@@ -25,7 +25,11 @@ import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
-/** 两级分类管理：新增 / 改名 / 排序 / 归档。MUST NOT 物理删除。 */
+/**
+ * 第三批：两级分类管理。新增 / 改名 / 排序 / 删除 / 恢复。
+ * 删除有流水的分类自动降级为归档，保护历史流水归属。
+ * 二级父级用「搜索 + 可滚动全量列表」，不再被 DropdownMenu 高度截断。
+ */
 @Composable
 fun CategoryManagerDialog(
     categories: List<CategoryEntity>,
@@ -36,48 +40,56 @@ fun CategoryManagerDialog(
     var newRootType by remember { mutableStateOf(RecordType.EXPENSE) }
     var newChildName by remember { mutableStateOf("") }
     var childParentId by remember { mutableStateOf<Long?>(null) }
+    var parentQuery by remember { mutableStateOf("") }
     var renamingId by remember { mutableStateOf<Long?>(null) }
     var renameText by remember { mutableStateOf("") }
+    var deletingId by remember { mutableStateOf<Long?>(null) }
+    var showArchived by remember { mutableStateOf(false) }
 
     val roots = categories.filter { it.level == 0 && !it.isArchived }
     val children = categories.filter { it.level == 1 && !it.isArchived }
+    val archived = categories.filter { it.isArchived }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("分类管理（最多两级）") },
         text = {
             Column {
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp)) {
                     items(roots, key = { it.id }) { root ->
-                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = root.name + "（" + typeLabel(root.type) + "）",
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.weight(1f)
                                 )
+                                TextButton(onClick = { vm.moveCategory(root.id, -1) }) { Text("↑") }
+                                TextButton(onClick = { vm.moveCategory(root.id, 1) }) { Text("↓") }
                                 TextButton(onClick = {
                                     renamingId = root.id; renameText = root.name
                                 }) { Text("改名") }
-                                TextButton(onClick = { vm.archiveCategory(root.id) }) {
-                                    Text("归档", color = LedgerColors.ExpenseRed)
+                                TextButton(onClick = { deletingId = root.id }) {
+                                    Text("删除", color = LedgerColors.ExpenseRed)
                                 }
                             }
                             children.filter { it.parentId == root.id }.forEach { child ->
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(start = 16.dp)
+                                    modifier = Modifier.padding(start = 12.dp)
                                 ) {
                                     Text(
                                         text = "└ " + child.name,
                                         style = MaterialTheme.typography.bodySmall,
                                         modifier = Modifier.weight(1f)
                                     )
+                                    TextButton(onClick = { vm.moveCategory(child.id, -1) }) { Text("↑") }
+                                    TextButton(onClick = { vm.moveCategory(child.id, 1) }) { Text("↓") }
                                     TextButton(onClick = {
                                         renamingId = child.id; renameText = child.name
                                     }) { Text("改名") }
-                                    TextButton(onClick = { vm.archiveCategory(child.id) }) {
-                                        Text("归档", color = LedgerColors.ExpenseRed)
+                                    TextButton(onClick = { deletingId = child.id }) {
+                                        Text("删除", color = LedgerColors.ExpenseRed)
                                     }
                                 }
                             }
@@ -104,7 +116,7 @@ fun CategoryManagerDialog(
                 Text(
                     text = "新增一级分类",
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 10.dp)
+                    modifier = Modifier.padding(top = 8.dp)
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
@@ -129,16 +141,35 @@ fun CategoryManagerDialog(
                 Text(
                     text = "新增二级分类（类型继承父级）",
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 10.dp)
+                    modifier = Modifier.padding(top = 8.dp)
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    roots.forEach { r ->
-                        TextButton(onClick = { childParentId = r.id }) {
+                val selectedParent = roots.firstOrNull { it.id == childParentId }
+                Text(
+                    text = "父级：" + (selectedParent?.let { it.name + "（" + typeLabel(it.type) + "）" }
+                        ?: "未选，点下面列表选择"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selectedParent == null) LedgerColors.ExpenseRed
+                    else LedgerColors.IncomeGreen
+                )
+                OutlinedTextField(
+                    value = parentQuery,
+                    onValueChange = { parentQuery = it },
+                    label = { Text("搜索一级分类（可留空看全部）") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                // 全量一级分类，可滚动；不再被 DropdownMenu 的默认高度截断。
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 110.dp)) {
+                    items(roots.filter {
+                        it.name.contains(parentQuery, ignoreCase = true)
+                    }, key = { it.id }) { r ->
+                        TextButton(
+                            onClick = { childParentId = r.id },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text(
-                                if (childParentId == r.id) "●" + r.name else r.name,
+                                text = (if (childParentId == r.id) "● " else "") +
+                                    r.name + "（" + typeLabel(r.type) + "）",
                                 color = if (childParentId == r.id) LedgerColors.IncomeGreen
                                 else LedgerColors.Neutral
                             )
@@ -162,18 +193,42 @@ fun CategoryManagerDialog(
                     }) { Text("新增") }
                 }
 
-                val archived = categories.count { it.isArchived }
-                if (archived > 0) {
-                    Text(
-                        text = "已归档 $archived 个分类（仍保留在库中，历史流水归属不变）",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LedgerColors.Neutral
-                    )
+                if (archived.isNotEmpty()) {
+                    TextButton(onClick = { showArchived = !showArchived }) {
+                        Text((if (showArchived) "收起" else "展开") +
+                            "已归档分类（${archived.size}）")
+                    }
+                    if (showArchived) {
+                        archived.forEach { c ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = c.name + "（" + typeLabel(c.type) + "）",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(onClick = { vm.restoreCategory(c.id) }) { Text("恢复") }
+                            }
+                        }
+                    }
                 }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("完成") } }
     )
+
+    deletingId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { deletingId = null },
+            title = { Text("删除分类") },
+            text = { Text("无流水的分类会直接删除；已有流水的分类自动转为归档，历史流水归属不变。") },
+            confirmButton = {
+                TextButton(onClick = { vm.deleteCategory(id); deletingId = null }) {
+                    Text("确定", color = LedgerColors.ExpenseRed)
+                }
+            },
+            dismissButton = { TextButton(onClick = { deletingId = null }) { Text("取消") } }
+        )
+    }
 }
 
 private fun typeLabel(type: RecordType): String =

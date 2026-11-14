@@ -29,7 +29,11 @@ WRITE_METHODS = [
     # 阶段 6c-2
     'importRecords',
     # 阶段 7
-    'applyCurrencyToAll'
+    'applyCurrencyToAll',
+    # 第三批真机反馈
+    'deleteTemplate', 'updateAccountType', 'setAccountArchived',
+    'deleteAccountIfUnused', 'reorderAccounts',
+    'deleteCategory', 'restoreCategory'
 ]
 
 TEMPLATE_SQL_COLS = [

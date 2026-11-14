@@ -10,6 +10,7 @@ import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
+import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
 import com.zwz.offlineledger.data.model.LedgerCategory
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
@@ -112,6 +113,27 @@ class RecordEditorViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * 第三批：模板 = 预填草稿。选模板后把分类 / 账户 / 类型 / 备注 /
+     * 交易对方 / 不计入收支自动带入，金额留空（模板填了就作默认值），
+     * 日期时间用「现在」，之后每个字段都仍可自由改。
+     */
+    fun applyTemplate(t: RecordTemplateEntity) {
+        val s = _state.value
+        _state.value = s.copy(
+            type = t.type,
+            amountExpr = if (t.amountCents > 0L) Cents(t.amountCents).toYuanString() else "",
+            categoryId = t.categoryId,
+            expandedRootId = t.rootCategoryId,
+            fromAccountId = t.fromAccountId ?: s.fromAccountId,
+            toAccountId = t.toAccountId ?: s.toAccountId,
+            note = t.note,
+            counterparty = t.counterparty,
+            excludeFromStats = t.excludeFromStats,
+            timestamp = System.currentTimeMillis()
+        )
     }
 
     /** 阶段 8：切换收支类型时 MUST 重置分类，禁止支出保留收入分类。 */

@@ -73,3 +73,49 @@
 - [x] 新增只读查询 4 条、`ChartData.assetSeries` 纯 JVM 算法 + 单测
 - [ ] 自定义账户排序（上移 / 置顶）：本批未做，见 `design.md` 第 10 节，留下一批
 - [x] CI 与出包结果回填（见 `design.md` 第 11 节）
+
+## 9. 第 3 批：真机反馈（6 条）
+
+### 9.1 模板草稿语义与 CRUD
+- [x] `Repository.createTemplate/updateTemplate` 放宽金额为可空；`recordFromTemplate` 拦截 0 元草稿
+- [x] `TemplateQuickPickBar` 改为回调模板 + 选中态高亮，不再直接生成流水
+- [x] `RecordEditorViewModel.applyTemplate` 自动填充，金额留空、时间取现在、全字段可改
+- [x] 模板金额可留空（周期规则仍必填）、列表行显示类型 / 金额待填 / 分类路径
+- [x] 模板编辑 / 删除（二次确认）/ 类型 segment 高亮 / 转账不显示交易对方
+- [x] `TemplateDao.deleteById` + `Repository.deleteTemplate` + `TemplateManagerViewModel.updateTemplate`
+
+### 9.2 账户管理
+- [x] `AccountDao` 补 `updateType` / `setArchived` / `deleteById` / `updateSortOrder`
+- [x] `Repository` 补 `updateAccountType` / `setAccountArchived` / `deleteAccountIfUnused` / `reorderAccounts`
+- [x] `AssetsViewModel` 补类型修正 / 删除 / 归档恢复 / 上移下移 / 显示已归档开关
+- [x] 资产页编辑弹窗加账户类型；账户卡加详情/对账/编辑/↑/↓/归档恢复/删除
+- [x] 账户卡留白再压缩：单行名称与余额、附加信息合并一行、小按钮一行放下
+- [x] 上一批遗留的「自定义账户排序」本批兑现
+
+### 9.3 图表
+- [x] `ChartData.seriesMaxSingle` + `ChartData.yAxisLabels`（竖轴 5 个元刻度）
+- [x] `LineChart` 加 `yLabels` / `chartHeight` / `labelEvery`，横轴标签均匀铺开
+- [x] 月度与年度单线按自身最大值缩放；年度也支持支出/收入/两者切换
+- [x] 新增 `ChartFullscreenActivity`（横屏、全标签、双指视觉缩放、点击取值）
+- [x] Manifest 注册横屏 Activity（`exported=false`，零新增权限）
+- [x] 三张图各加「⛶ 横屏放大」入口
+- [x] `ChartAxisTest` 纯 JVM 单测（独立 max / 竖轴刻度 / 空与负值）
+
+### 9.4 分类管理
+- [x] `CategoryDao` 补 `deleteById` / `setArchived` / `linkedRecordCount`
+- [x] `Repository.deleteCategory`（有流水归档、无流水删除）/ `restoreCategory`
+- [x] `SettingsViewModel` 补删除与恢复；UI 接上已有的 `moveCategory`
+- [x] 父级选择改「搜索 + 可滚动全量一级列表」，不再被截断
+- [x] 已归档分类可展开恢复
+
+### 9.5 详情标题
+- [x] `AccountDetailDialog` 接收资产页实时账户名，移除重复改名输入框
+
+### 9.6 门禁与收尾
+- [x] `check_transaction_annotations.py` 写方法清单扩到 39 个，全部在事务内
+- [x] 六个静态检查本地全 PASS
+- [ ] CI 与出包结果回填（见 `design.md` 第 12.5 节）
+- [ ] 真机实测：按使用者决定整体推迟，清单仍含 R8 启动、SQLCipher 开库、
+      BiometricPrompt、SAF 选择器、Excel 打开 CSV、5 万条切月耗时、
+      横屏图表与双指缩放手感、模板填充与账户排序手感
+- [ ] 归档本 change（需使用者明确发话）

@@ -37,6 +37,7 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 @Composable
 fun AccountDetailDialog(
     accountId: Long,
+    accountName: String,
     onDismiss: () -> Unit,
     onChanged: () -> Unit
 ) {
@@ -52,17 +53,11 @@ fun AccountDetailDialog(
     LaunchedEffect(accountId) { vm.load(accountId) }
     val state by vm.state.collectAsState()
 
-    var name by remember { mutableStateOf("") }
-    var includeInTotal by remember { mutableStateOf(true) }
     var showAdjustments by remember { mutableStateOf(false) }
-    var initialized by remember { mutableStateOf(false) }
 
+    // 第三批：标题直接用资产页列表传入的实时名称，去掉详情里重复的名称输入框，
+    // 避免「详情名称栏」与列表改名后不同步。改账户统一走资产页的编辑弹窗。
     val acc = state.account
-    if (acc != null && !initialized) {
-        name = acc.name
-        includeInTotal = acc.includeInTotal
-        initialized = true
-    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -72,7 +67,7 @@ fun AccountDetailDialog(
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = acc?.name ?: "账户详情",
+                        text = accountName,
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.weight(1f)
                     )
@@ -99,22 +94,12 @@ fun AccountDetailDialog(
                     )
                 }
 
-                OutlinedTextField(
-                    value = name, onValueChange = { name = it },
-                    label = { Text("账户名称") }, modifier = Modifier.fillMaxWidth()
+                Text(
+                    text = "改名 / 类型 / 期初余额 / 币种请回到资产页点「编辑」。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LedgerColors.Neutral
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "计入净资产", modifier = Modifier.weight(1f))
-                    Switch(checked = includeInTotal, onCheckedChange = { includeInTotal = it })
-                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = {
-                        vm.updateMeta(
-                            accountId, name, includeInTotal,
-                            acc.creditLimitCents, acc.sortOrder
-                        )
-                        onChanged()
-                    }) { Text("保存修改") }
                     TextButton(onClick = {
                         vm.archive(accountId)
                         onChanged()

@@ -32,4 +32,14 @@ interface CategoryDao {
 
     @Query("UPDATE categories SET sortOrder = :order WHERE id = :id")
     suspend fun updateSortOrder(id: Long, order: Int)
+
+    /** 第三批：删除与恢复；有流水的分类由 Repository 改走归档。 */
+    @Query("DELETE FROM categories WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("UPDATE categories SET isArchived = :archived WHERE id = :id")
+    suspend fun setArchived(id: Long, archived: Boolean)
+
+    @Query("SELECT COUNT(*) FROM records WHERE categoryId = :id OR rootCategoryId = :id")
+    suspend fun linkedRecordCount(id: Long): Int
 }

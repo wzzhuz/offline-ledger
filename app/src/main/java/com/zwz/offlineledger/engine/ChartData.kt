@@ -135,9 +135,24 @@ object ChartData {
         }
     }
 
-    /** 多系列共用一个最大值，避免收入线与支出线各自缩放导致走势误读。 */
+    /** 多系列共用一个最大值，仅在显式选择「两者」对比时使用。 */
     fun seriesMax(series: List<List<Long>>): Long =
         series.flatten().maxOrNull() ?: 0L
+
+    /**
+     * 第三批：单线模式 MUST 用该系列自己的最大值缩放。
+     * 之前支出与收入共用一个 max，收入量级一大支出就贴底看不出变化。
+     */
+    fun seriesMaxSingle(values: List<Long>): Long =
+        (values.maxOrNull() ?: 0L).coerceAtLeast(0L)
+
+    /** 竖轴 5 个刻度（元，两位小数）；纯 JVM 可单测，不做金额运算。 */
+    fun yAxisLabels(maxCents: Long): List<String> {
+        if (maxCents <= 0L) return List(5) { "0.00" }
+        return (4 downTo 0).map { i ->
+            java.math.BigDecimal.valueOf(maxCents * i.toLong() / 4L, 2).toPlainString()
+        }
+    }
 
     /** Long 分 → 绘图用 0..1 比例；全 0 或负数一律 0。 */
     fun normalize(values: List<Long>, maxCents: Long): List<Float> {

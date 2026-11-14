@@ -17,26 +17,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import kotlin.math.roundToInt
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
 data class LineSeries(val label: String, val color: Color, val values: List<Float>)
 
 /**
- * 原生 Canvas 折线图：网格 + 折线 + 数据点。
- * x 轴刻度用普通 Compose Text（不依赖 TextMeasurer / drawText）。
+ * 原生 Canvas 折线图：竖轴具体数值 + 网格 + 折线 + 数据点 + 横轴标签。
  * values 已是 ChartData.normalize 算好的 0..1 比例，UI 不碰金额换算。
+ * 第三批：yLabels 显示刻度金额，chartHeight 横屏可调大，labelEvery>0 时铺满横轴标签。
  */
 @Composable
 fun LineChart(
     series: List<LineSeries>,
     xLabels: List<String>,
     modifier: Modifier = Modifier,
+    yLabels: List<String> = emptyList(),
+    chartHeight: Dp = 170.dp,
+    labelEvery: Int = 0,
     onPointTap: ((Int) -> Unit)? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        // 阶段 8：点击取值与绘制共用同一份点数，必须定义在 Canvas lambda 之外。
         val n = series.firstOrNull()?.values?.size ?: 0
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -52,81 +56,100 @@ fun LineChart(
                             strokeWidth = 4f
                         )
                     }
-                    Text(
-                        text = " " + s.label,
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    Text(text = " " + s.label, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
 
-        Canvas(
-            modifier = Modifier.fillMaxWidth().height(170.dp)
-                .pointerInput(n) {
-                    detectTapGestures { offset ->
-                        val cb = onPointTap ?: return@detectTapGestures
-                        if (n <= 0) return@detectTapGestures
-                        val step = if (n > 1) (size.width - 16f) / (n - 1) else 0f
-                        val idx = if (step > 0f)
-                            ((offset.x - 8f) / step).roundToInt().coerceIn(0, n - 1)
-                        else 0
-                        cb(idx)
+        Row(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
+            if (yLabels.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.height(chartHeight).padding(end = 4.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    yLabels.forEach {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral
+                        )
                     }
                 }
-        ) {
-            val w = size.width
-            val h = size.height
-            val padTop = 10f
-            val padBottom = 10f
-            val padX = 8f
-            val plotH = h - padTop - padBottom
-
-            for (i in 0..4) {
-                val y = padTop + plotH * i / 4f
-                drawLine(
-                    color = LedgerColors.Neutral.copy(alpha = 0.15f),
-                    start = Offset(0f, y), end = Offset(w, y), strokeWidth = 1f
-                )
             }
+            Canvas(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(chartHeight)
+                    .pointerInput(n) {
+                        detectTapGestures { offset ->
+                            val cb = onPointTap ?: return@detectTapGestures
+                            if (n <= 0) return@detectTapGestures
+                            val step = if (n > 1) (size.width - 16f) / (n - 1) else 0f
+                            val idx = if (step > 0f)
+                                ((offset.x - 8f) / step).roundToInt().coerceIn(0, n - 1)
+                            else 0
+                            cb(idx)
+                        }
+                    }
+            ) {
+                val w = size.width
+                val h = size.height
+                val padTop = 10f
+                val padBottom = 10f
+                val padX = 8f
+                val plotH = h - padTop - padBottom
 
-            if (n > 0) {
-                val step = if (n > 1) (w - padX * 2f) / (n - 1) else 0f
-                series.forEach { s ->
-                    val points = s.values.mapIndexed { idx, v ->
-                        Offset(
-                            padX + step * idx,
-                            padTop + plotH * (1f - v.coerceIn(0f, 1f))
-                        )
-                    }
-                    for (i in 0 until points.size - 1) {
-                        drawLine(
-                            color = s.color,
-                            start = points[i], end = points[i + 1],
-                            strokeWidth = 3f
-                        )
-                    }
-                    // 点太多时只画端点，避免 31 个点挤成一团
-                    if (points.size <= 15) {
-                        points.forEach { p -> drawCircle(color = s.color, radius = 3f, center = p) }
-                    } else {
-                        drawCircle(color = s.color, radius = 3f, center = points.first())
-                        drawCircle(color = s.color, radius = 3f, center = points.last())
+                for (i in 0..4) {
+                    val y = padTop + plotH * i / 4f
+                    drawLine(
+                        color = LedgerColors.Neutral.copy(alpha = 0.15f),
+                        start = Offset(0f, y), end = Offset(w, y), strokeWidth = 1f
+                    )
+                }
+
+                if (n > 0) {
+                    val step = if (n > 1) (w - padX * 2f) / (n - 1) else 0f
+                    series.forEach { s ->
+                        val points = s.values.mapIndexed { idx, v ->
+                            Offset(
+                                padX + step * idx,
+                                padTop + plotH * (1f - v.coerceIn(0f, 1f))
+                            )
+                        }
+                        for (i in 0 until points.size - 1) {
+                            drawLine(
+                                color = s.color,
+                                start = points[i], end = points[i + 1],
+                                strokeWidth = 3f
+                            )
+                        }
+                        if (points.size <= 15) {
+                            points.forEach { p -> drawCircle(color = s.color, radius = 3f, center = p) }
+                        } else {
+                            drawCircle(color = s.color, radius = 3f, center = points.first())
+                            drawCircle(color = s.color, radius = 3f, center = points.last())
+                        }
                     }
                 }
             }
         }
 
         if (xLabels.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                val shown = when {
-                    xLabels.size <= 3 -> xLabels
-                    else -> listOf(xLabels.first(), xLabels[xLabels.size / 2], xLabels.last())
+            val shown = when {
+                labelEvery > 0 -> xLabels.filterIndexed { i, _ ->
+                    i % labelEvery == 0 || i == xLabels.lastIndex
                 }
+                xLabels.size <= 3 -> xLabels
+                else -> listOf(xLabels.first(), xLabels[xLabels.size / 2], xLabels.last())
+            }
+            Row(modifier = Modifier.fillMaxWidth()) {
                 shown.forEach {
-                    Text(text = it, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
