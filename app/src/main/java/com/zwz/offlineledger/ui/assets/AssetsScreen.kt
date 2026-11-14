@@ -68,7 +68,7 @@ fun AssetsScreen() {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(12.dp)
     ) {
         Text(text = "资产", style = MaterialTheme.typography.headlineMedium)
 
@@ -182,8 +182,8 @@ fun AssetsScreen() {
  * MUST NOT 显示把所有币种加在一起的单一「净资产」总数。
  */
 private fun CurrencyGroupsCard(state: AssetsUiState) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(text = "按币种的资产小计", style = MaterialTheme.typography.labelLarge)
             Text(
                 text = "不同币种不汇总，避免虚假精确的总数",
@@ -199,7 +199,7 @@ private fun CurrencyGroupsCard(state: AssetsUiState) {
                 )
             }
             state.groups.forEach { g ->
-                Column(modifier = Modifier.padding(top = 12.dp)) {
+                Column(modifier = Modifier.padding(top = 6.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -241,7 +241,7 @@ private fun SectionTitle(text: String) {
         text = text,
         style = MaterialTheme.typography.labelLarge,
         color = LedgerColors.Neutral,
-        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
     )
 }
 
@@ -251,7 +251,7 @@ private fun EmptyHint(text: String) {
         text = text,
         style = MaterialTheme.typography.bodySmall,
         color = LedgerColors.Neutral,
-        modifier = Modifier.padding(vertical = 8.dp)
+        modifier = Modifier.padding(vertical = 4.dp)
     )
 }
 
@@ -262,8 +262,8 @@ private fun AccountCard(
     onReconcile: () -> Unit,
     onEdit: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Column(modifier = Modifier.padding(12.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = account.name + " · " + account.currencyCode,

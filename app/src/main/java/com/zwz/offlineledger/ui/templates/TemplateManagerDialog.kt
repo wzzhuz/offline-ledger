@@ -175,7 +175,7 @@ private fun QuickEntryForm(
     var fromAccountId by remember { mutableStateOf<Long?>(null) }
     var toAccountId by remember { mutableStateOf<Long?>(null) }
     var note by remember { mutableStateOf("") }
-    var payeeText by remember { mutableStateOf("") }
+    var counterpartyText by remember { mutableStateOf("") }
     var excluded by remember { mutableStateOf(false) }
     var cadence by remember { mutableStateOf(Cadence.MONTHLY) }
     var dayText by remember { mutableStateOf("1") }
@@ -258,7 +258,7 @@ private fun QuickEntryForm(
             modifier = Modifier.fillMaxWidth(), singleLine = true
         )
         OutlinedTextField(
-            value = payeeText, onValueChange = { payeeText = it },
+            value = counterpartyText, onValueChange = { counterpartyText = it },
             label = { Text("收款方（可选）") },
             modifier = Modifier.fillMaxWidth(), singleLine = true
         )
@@ -331,7 +331,7 @@ private fun QuickEntryForm(
                             dayOfMonth = if (cadence == Cadence.MONTHLY) d.coerceIn(1, 31) else 1,
                             dayOfWeek = if (cadence == Cadence.WEEKLY) d.coerceIn(1, 7) else 1,
                             anchorLocalDate = ld, createdAt = now,
-                            payee = payeeText.trim()
+                            counterparty = counterpartyText.trim()
                         )
                     )
                 } else {
@@ -343,12 +343,12 @@ private fun QuickEntryForm(
                             fromAccountId = if (type == RecordType.INCOME) null else fromAccountId,
                             toAccountId = if (type == RecordType.EXPENSE) null else toAccountId,
                             note = commonNote, excludeFromStats = excluded,
-                            createdAt = now, payee = payeeText.trim()
+                            createdAt = now, counterparty = counterpartyText.trim()
                         )
                     )
                 }
                 error = null
-                name = ""; amountText = ""; note = ""; payeeText = ""
+                name = ""; amountText = ""; note = ""; counterpartyText = ""
             },
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
         ) { Text(if (isRule) "保存周期规则" else "保存模板") }

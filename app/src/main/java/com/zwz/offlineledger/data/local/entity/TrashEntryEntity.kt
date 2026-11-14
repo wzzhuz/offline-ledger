@@ -28,8 +28,8 @@ data class TrashEntryEntity(
     /** 与 records.currencyCode 同步，删除->恢复不丢币种。 */
     @ColumnInfo(name = "currencyCode", defaultValue = "'CNY'")
     val currencyCode: String = LedgerCurrency.DEFAULT,
-    /** 与 records.payee 同步，删除->恢复不丢收款方。 */
-    @ColumnInfo(name = "payee", defaultValue = "''")
-    val payee: String = "",
+    /** 与 records.counterparty 同步，删除->恢复不丢收款方。 */
+    @ColumnInfo(name = "counterparty", defaultValue = "''")
+    val counterparty: String = "",
     @ColumnInfo(name = "deletedAt") val deletedAt: Long = 0L
 )

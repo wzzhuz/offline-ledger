@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,6 +20,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +47,8 @@ fun StatsScreen() {
         }
     )
     val state by vm.state.collectAsState()
+    var pointIndex by remember { mutableStateOf<Int?>(null) }
+    var pointMode by remember { mutableStateOf(StatsMode.MONTH) }
 
     Column(
         modifier = Modifier
@@ -111,24 +117,41 @@ fun StatsScreen() {
 
         SectionLabel(if (state.mode == StatsMode.MONTH) "每日支出趋势" else "年度收支趋势")
         if (state.mode == StatsMode.MONTH) {
+            // 阶段 8：默认只画一条线，想对比时再切「两者」。
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TrendMetric.values().forEach { m ->
+                    TextButton(onClick = { vm.setTrendMetric(m) }) {
+                        Text(
+                            if (state.trendMetric == m) "● " + metricLabel(m)
+                            else metricLabel(m),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
             val max = ChartData.seriesMax(
                 listOf(
                     state.daily.map { it.expenseCents },
                     state.daily.map { it.incomeCents }
                 )
             )
+            val expenseSeries = LineSeries(
+                "支出", LedgerColors.ExpenseRed,
+                ChartData.normalize(state.daily.map { it.expenseCents }, max)
+            )
+            val incomeSeries = LineSeries(
+                "收入", LedgerColors.IncomeGreen,
+                ChartData.normalize(state.daily.map { it.incomeCents }, max)
+            )
+            val shown = when (state.trendMetric) {
+                TrendMetric.EXPENSE -> listOf(expenseSeries)
+                TrendMetric.INCOME -> listOf(incomeSeries)
+                TrendMetric.BOTH -> listOf(expenseSeries, incomeSeries)
+            }
             LineChart(
-                series = listOf(
-                    LineSeries(
-                        "支出", LedgerColors.ExpenseRed,
-                        ChartData.normalize(state.daily.map { it.expenseCents }, max)
-                    ),
-                    LineSeries(
-                        "收入", LedgerColors.IncomeGreen,
-                        ChartData.normalize(state.daily.map { it.incomeCents }, max)
-                    )
-                ),
-                xLabels = state.daily.map { it.day.toString() }
+                series = shown,
+                xLabels = state.daily.map { it.day.toString() },
+                onPointTap = { idx -> pointIndex = idx; pointMode = StatsMode.MONTH }
             )
         } else {
             val max = ChartData.seriesMax(
@@ -148,7 +171,30 @@ fun StatsScreen() {
                         ChartData.normalize(state.monthly.map { it.incomeCents }, max)
                     )
                 ),
-                xLabels = state.monthly.map { it.month.toString() + "月" }
+                xLabels = state.monthly.map { it.month.toString() + "月" },
+                onPointTap = { idx -> pointIndex = idx; pointMode = StatsMode.YEAR }
+            )
+            // 阶段 8：资产线单独一张图，避免与月度收支量级差大时三线糊在一起。
+            SectionLabel("资产余额趋势（" + state.currencyCode + "）")
+            val assetMax = ChartData.seriesMax(
+                listOf(state.assetTrend.map { kotlin.math.abs(it) })
+            )
+            LineChart(
+                series = listOf(
+                    LineSeries(
+                        "资产余额", LedgerColors.IncomeGreen,
+                        ChartData.normalize(
+                            state.assetTrend.map { it.coerceAtLeast(0L) }, assetMax
+                        )
+                    )
+                ),
+                xLabels = state.monthly.map { it.month.toString() + "月" },
+                onPointTap = { idx -> pointIndex = idx; pointMode = StatsMode.YEAR }
+            )
+            Text(
+                text = "资产线按当前币种累计推算，不跨币种混算；点击任意图可查看具体金额。",
+                style = MaterialTheme.typography.labelSmall,
+                color = LedgerColors.Neutral
             )
         }
 
@@ -158,6 +204,37 @@ fun StatsScreen() {
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral,
             modifier = Modifier.padding(top = 12.dp)
+        )
+    }
+
+    pointIndex?.let { idx ->
+        val daily = state.daily.getOrNull(idx)
+        val month = state.monthly.getOrNull(idx)
+        val income = if (pointMode == StatsMode.MONTH)
+            daily?.incomeCents ?: 0L else month?.incomeCents ?: 0L
+        val expense = if (pointMode == StatsMode.MONTH)
+            daily?.expenseCents ?: 0L else month?.expenseCents ?: 0L
+        val title = if (pointMode == StatsMode.MONTH)
+            MonthRange.label(state.yearMonth) + " · " + (daily?.day ?: (idx + 1)) + " 日"
+        else state.year.toString() + " 年 " + (idx + 1) + " 月"
+        AlertDialog(
+            onDismissRequest = { pointIndex = null },
+            title = { Text(title) },
+            text = {
+                Column {
+                    Text("收入 " + formatCents(income) + " 元")
+                    Text("支出 " + formatCents(expense) + " 元")
+                    if (pointMode == StatsMode.YEAR) {
+                        Text(
+                            "月末资产 " +
+                                formatCents(state.assetTrend.getOrElse(idx) { 0L }) + " 元"
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { pointIndex = null }) { Text("关闭") }
+            }
         )
     }
 
@@ -232,6 +309,12 @@ private fun StatsViewModel.shift(delta: Int) {
 
 private fun StatsUiState.sliceLevelColor(level: SliceLevel) =
     if (sliceLevel == level) LedgerColors.IncomeGreen else LedgerColors.Neutral
+
+private fun metricLabel(m: TrendMetric): String = when (m) {
+    TrendMetric.EXPENSE -> "支出"
+    TrendMetric.INCOME -> "收入"
+    TrendMetric.BOTH -> "两者"
+}
 
 @Composable
 private fun OverviewCard(state: StatsUiState) {

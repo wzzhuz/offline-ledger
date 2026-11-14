@@ -22,6 +22,9 @@ import kotlinx.coroutines.launch
 enum class StatsMode { MONTH, YEAR }
 enum class SliceLevel { ROOT, CHILD }
 
+/** 阶段 8：月度趋势默认单线，避免收支量级差大时贴底看不清。 */
+enum class TrendMetric { EXPENSE, INCOME, BOTH }
+
 /** 一条预算规则的当月进度，纯展示数据。 */
 data class BudgetItem(
     val id: Long,
@@ -48,6 +51,9 @@ data class StatsUiState(
     val totalsCheck: ChartData.TotalsCheck? = null,
     val daily: List<ChartData.DailyPoint> = emptyList(),
     val monthly: List<ChartData.MonthPoint> = emptyList(),
+    /** 阶段 8：年度逐月末资产余额，按当前币种、不混算。 */
+    val assetTrend: List<Long> = emptyList(),
+    val trendMetric: TrendMetric = TrendMetric.EXPENSE,
     val drillRootId: Long? = null,
     val drillRootName: String = "",
     val drillChildren: List<ChartSlice> = emptyList(),
@@ -73,6 +79,10 @@ class StatsViewModel(
     fun setMode(mode: StatsMode) {
         _state.value = _state.value.copy(mode = mode, drillRootId = null)
         reload()
+    }
+
+    fun setTrendMetric(metric: TrendMetric) {
+        _state.value = _state.value.copy(trendMetric = metric)
     }
 
     fun setSliceLevel(level: SliceLevel) {
@@ -244,6 +254,15 @@ class StatsViewModel(
                 )
             } else emptyList()
 
+            // 阶段 8：年度资产线 = 当前余额倒推年初基准 + 逐月净变动累计。
+            // 校准记录不进资产线（量级极小且无币种归属），见 design.md。
+            val assetTrend = if (s.mode == StatsMode.YEAR) {
+                val current = accountDao.totalBalanceForCurrency(cc)
+                val deltas = recordDao.monthlyBalanceDeltaForCurrency(from, to, cc)
+                    .associate { (it.yearMonth % 100) to it.totalCents }
+                ChartData.assetSeries(current - deltas.values.sum(), deltas)
+            } else emptyList()
+
             _state.value = s.copy(
                 totalIncomeCents = totalIncome,
                 totalExpenseCents = totalExpense,
@@ -255,6 +274,7 @@ class StatsViewModel(
                 totalsCheck = check,
                 daily = daily,
                 monthly = monthly,
+                assetTrend = assetTrend,
                 loading = false
             )
         }

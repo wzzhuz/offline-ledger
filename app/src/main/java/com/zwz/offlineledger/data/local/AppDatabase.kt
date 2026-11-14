@@ -23,7 +23,7 @@ import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 /**
  * 稳定版前按使用者授权重置为 version 1、不注册任何 Migration。
  * 使用者只会用测试数据且在满意前不会长期使用，不需要保留升级路径；
- * 全新安装走 onCreate，按 Entity 直接建含 payee 列的最新表结构。
+ * 全新安装走 onCreate，按 Entity 直接建含 counterparty 列的最新表结构。
  * 三段迁移 SQL 常量保留在 Migrations.kt 供历史追溯与测试，但 ALL 为空。
  * exportSchema = false：CI 无模拟器跑不了 MigrationTestHelper。
  */

@@ -14,7 +14,7 @@ data class CsvRow(
     val note: String,
     val currencyCode: String,
     /** 阶段 7：收款方。带默认值，旧 8 列 CSV 仍能解析成空串。 */
-    val payee: String = ""
+    val counterparty: String = ""
 ) {
     /**
      * 导入去重键 = 账户 + 金额 + 日期 + 备注。

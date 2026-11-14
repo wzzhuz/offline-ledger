@@ -49,6 +49,6 @@ data class RecordEntity(
     @ColumnInfo(name = "currencyCode", defaultValue = "'CNY'")
     val currencyCode: String = LedgerCurrency.DEFAULT,
     /** 阶段 7：收款方自由文本。不是账户、不产生复式分录、不参与余额联动。 */
-    @ColumnInfo(name = "payee", defaultValue = "''")
-    val payee: String = ""
+    @ColumnInfo(name = "counterparty", defaultValue = "''")
+    val counterparty: String = ""
 )

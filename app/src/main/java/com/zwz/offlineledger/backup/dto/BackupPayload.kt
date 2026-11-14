@@ -32,7 +32,7 @@ data class BackupRecord(
     val linkedRecordId: Long? = null,
     val currencyCode: String = "HKD",
     /** 阶段 7：收款方，带默认值让旧备份仍可解析。 */
-    val payee: String = ""
+    val counterparty: String = ""
 )
 
 @Serializable

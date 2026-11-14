@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -80,12 +81,17 @@ fun RecordEditorDialog(
     val state by vm.state.collectAsState()
     val accounts by vm.accounts.collectAsState()
     val categories by vm.categories.collectAsState()
-    val payees by vm.payees.collectAsState()
+    val counterparties by vm.counterparties.collectAsState()
+    val suggestions by vm.counterpartySuggestions.collectAsState()
     var errorText by remember { mutableStateOf<String?>(null) }
     var showMore by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val localDate = LedgerClock.fromEpochMilli(state.timestamp).localDate
+    val zonedTime = java.time.Instant.ofEpochMilli(state.timestamp)
+        .atZone(LedgerClock.zoneId)
+    val timeLabel = "%02d:%02d".format(zonedTime.hour, zonedTime.minute)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -146,37 +152,45 @@ fun RecordEditorDialog(
 
                     DateRow(
                         localDate = localDate,
+                        timeLabel = timeLabel,
                         onPick = { showDatePicker = true },
+                        onPickTime = { showTimePicker = true },
                         onPrev = { vm.shiftDay(-1) },
                         onNext = { vm.shiftDay(1) },
                         onToday = { vm.setToday() }
                     )
 
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = state.note,
-                            onValueChange = { vm.setNote(it) },
-                            label = { Text("备注") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f).padding(end = 4.dp)
-                        )
-                        OutlinedTextField(
-                            value = state.payee,
-                            onValueChange = { vm.setPayee(it) },
-                            label = { Text("收款方") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f).padding(start = 4.dp)
-                        )
-                    }
-
-                    if (payees.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                        ) {
-                            payees.take(8).forEach { p ->
-                                TextButton(onClick = { vm.setPayee(p) }) {
-                                    Text(p, style = MaterialTheme.typography.labelSmall)
+                    // 阶段 8：转账不显示交易对方；收入显示「付款方 / 来源」。
+                    if (state.type != RecordType.TRANSFER) {
+                        val partyLabel = if (state.type == RecordType.INCOME)
+                            "付款方 / 来源" else "收款方"
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = state.note,
+                                onValueChange = { vm.setNote(it) },
+                                label = { Text("备注") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f).padding(end = 4.dp)
+                            )
+                            OutlinedTextField(
+                                value = state.counterparty,
+                                onValueChange = { vm.setCounterparty(it) },
+                                label = { Text(partyLabel) },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f).padding(start = 4.dp)
+                            )
+                        }
+                        val quick = if (state.counterparty.isBlank())
+                            counterparties.take(8) else suggestions
+                        if (quick.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                            ) {
+                                quick.forEach { p ->
+                                    TextButton(onClick = { vm.setCounterparty(p) }) {
+                                        Text(p, style = MaterialTheme.typography.labelSmall)
+                                    }
                                 }
                             }
                         }
@@ -221,6 +235,14 @@ fun RecordEditorDialog(
             onDismiss = { showDatePicker = false },
             onConfirm = { vm.setDate(it); showDatePicker = false }
         )
+    }
+    if (showTimePicker) {
+        showTimePicker = false
+        android.app.TimePickerDialog(
+            context,
+            { _, hour, minute -> vm.setTime(hour, minute) },
+            zonedTime.hour, zonedTime.minute, true
+        ).show()
     }
 }
 
@@ -321,6 +343,10 @@ private fun AccountStrip(
     }
 }
 
+/**
+ * 阶段 8：常用账户（ViewModel 已按最近 30 天频次排序）平铺 6 个，
+ * 其余收进「全部账户」弹层并按名称搜索；10 多个账户也不必横向拖动。
+ */
 @Composable
 private fun AccountChips(
     label: String,
@@ -328,13 +354,15 @@ private fun AccountChips(
     selectedId: Long?,
     onSelect: (Long) -> Unit
 ) {
+    var showAll by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Text(text = label, style = MaterialTheme.typography.labelSmall)
         Row(
             modifier = Modifier.weight(1f)
                 .horizontalScroll(rememberScrollState())
         ) {
-            accounts.forEach { a ->
+            accounts.take(6).forEach { a ->
                 TextButton(onClick = { onSelect(a.id) }) {
                     Text(
                         text = if (a.id == selectedId) "● ${a.name}" else a.name,
@@ -344,20 +372,51 @@ private fun AccountChips(
                     )
                 }
             }
+            TextButton(onClick = { showAll = true }) { Text("全部 ▾") }
         }
+    }
+    if (showAll) {
+        AlertDialog(
+            onDismissRequest = { showAll = false },
+            title = { Text("选择账户") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        label = { Text("搜索账户名") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        accounts.filter { it.name.contains(query, ignoreCase = true) }
+                            .forEach { a ->
+                                TextButton(
+                                    onClick = { onSelect(a.id); showAll = false },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text(a.name + " · " + a.currencyCode) }
+                            }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showAll = false }) { Text("关闭") } }
+        )
     }
 }
 
 @Composable
 private fun DateRow(
     localDate: Int,
+    timeLabel: String,
     onPick: () -> Unit,
+    onPickTime: () -> Unit,
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onToday: () -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onPick) { Text(MonthRange.dateLabel(localDate)) }
+        TextButton(onClick = onPickTime) { Text(timeLabel) }
         IconButton(onClick = onPrev) {
             Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "前一天")
         }

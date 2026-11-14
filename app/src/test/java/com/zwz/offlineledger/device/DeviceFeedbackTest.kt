@@ -40,33 +40,33 @@ class DeviceFeedbackTest {
     }
 
     @Test
-    fun csv_payee_round_trip() {
+    fun csv_counterparty_round_trip() {
         val row = CsvRow(
             date = "2026-11-13", type = "EXPENSE", amountYuan = "38.50",
             accountName = "微信", categoryRoot = "餐饮", category = "食材",
-            note = "午餐", currencyCode = "CNY", payee = "盒马"
+            note = "午餐", currencyCode = "CNY", counterparty = "盒马"
         )
         val back = CsvCodec.parseImport(CsvCodec.export(listOf(row)))
         assertTrue(back.errors.toString(), back.ok)
-        assertEquals("盒马", back.rows.single().payee)
+        assertEquals("盒马", back.rows.single().counterparty)
         assertEquals("38.50", back.rows.single().amountYuan)
     }
 
     @Test
-    fun legacy_8_column_csv_still_imports_with_empty_payee() {
+    fun legacy_8_column_csv_still_imports_with_empty_counterparty() {
         val text = "date,type,amount,account,categoryRoot,category,note,currencyCode\r\n" +
             "2026-11-13,EXPENSE,38.50,微信,餐饮,食材,午餐,CNY\r\n"
         val result = CsvCodec.parseImport(text.toByteArray(Charsets.UTF_8))
         assertTrue(result.errors.toString(), result.ok)
-        assertEquals("", result.rows.single().payee)
+        assertEquals("", result.rows.single().counterparty)
     }
 
     @Test
-    fun encrypted_backup_keeps_payee() {
+    fun encrypted_backup_keeps_counterparty() {
         val record = BackupRecord(
             id = 4L, type = "EXPENSE", amountCents = 3850L,
             timestamp = 1L, localDate = 20261113, yearMonth = 202611,
-            note = "午餐", payee = "盒马", currencyCode = "CNY"
+            note = "午餐", counterparty = "盒马", currencyCode = "CNY"
         )
         val snapshot = LedgerSnapshot(
             accounts = emptyList(),
@@ -82,15 +82,15 @@ class DeviceFeedbackTest {
         )
         val text = BackupExporter.encode(snapshot)
         val back = BackupImporter.decode(text)
-        assertEquals("盒马", back.payload.records.single().payee)
+        assertEquals("盒马", back.payload.records.single().counterparty)
         assertEquals("CNY", back.envelope.currencyCode)
     }
 
     @Test
-    fun duplicate_key_ignores_payee() {
+    fun duplicate_key_ignores_counterparty() {
         val a = CsvRow("2026-11-13", "EXPENSE", "10.00", "微信",
             "餐饮", "食材", "第1笔", "CNY", "盒马")
-        val b = a.copy(payee = "别的商户")
+        val b = a.copy(counterparty = "别的商户")
         assertEquals(a.duplicateKey(), b.duplicateKey())
     }
 }

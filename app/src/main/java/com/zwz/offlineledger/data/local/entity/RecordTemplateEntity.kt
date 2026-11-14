@@ -28,6 +28,6 @@ data class RecordTemplateEntity(
     @ColumnInfo(name = "isArchived") val isArchived: Boolean = false,
     @ColumnInfo(name = "createdAt") val createdAt: Long = 0L,
     /** 阶段 7：生成流水时带入收款方。 */
-    @ColumnInfo(name = "payee", defaultValue = "''")
-    val payee: String = ""
+    @ColumnInfo(name = "counterparty", defaultValue = "''")
+    val counterparty: String = ""
 )

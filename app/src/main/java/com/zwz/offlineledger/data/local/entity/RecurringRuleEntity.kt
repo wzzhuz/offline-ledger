@@ -36,6 +36,6 @@ data class RecurringRuleEntity(
     @ColumnInfo(name = "isEnabled") val isEnabled: Boolean = true,
     @ColumnInfo(name = "createdAt") val createdAt: Long = 0L,
     /** 阶段 7：补记流水时带入收款方。 */
-    @ColumnInfo(name = "payee", defaultValue = "''")
-    val payee: String = ""
+    @ColumnInfo(name = "counterparty", defaultValue = "''")
+    val counterparty: String = ""
 )

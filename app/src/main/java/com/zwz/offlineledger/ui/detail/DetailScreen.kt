@@ -38,6 +38,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.zwz.offlineledger.core.money.Cents
+import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
 import com.zwz.offlineledger.data.local.dao.RecordRow
 import com.zwz.offlineledger.data.model.RecordType
@@ -309,10 +310,25 @@ private fun RecordRowCard(
             Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(text = row.categoryName ?: "转账", style = MaterialTheme.typography.bodyLarge)
                 val account = row.fromAccountName ?: row.toAccountName ?: "-"
+                val timeLabel = remember(row.timestamp) {
+                    val z = java.time.Instant.ofEpochMilli(row.timestamp)
+                        .atZone(LedgerClock.zoneId)
+                    "%02d:%02d".format(z.hour, z.minute)
+                }
+                // 阶段 8：收入显示「来源」，转账不显示交易对方。
+                val party = row.counterparty.takeIf { it.isNotBlank() }
+                    ?.let { value ->
+                        when (type) {
+                            RecordType.INCOME -> "来源 $value"
+                            RecordType.TRANSFER -> null
+                            else -> "收款方 $value"
+                        }
+                    }
                 Text(
                     text = listOfNotNull(
+                        timeLabel,
                         account,
-                        row.payee.takeIf { it.isNotBlank() },
+                        party,
                         row.note.takeIf { it.isNotBlank() }
                     ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,

@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.ui.charts
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.roundToInt
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
@@ -29,7 +32,8 @@ data class LineSeries(val label: String, val color: Color, val values: List<Floa
 fun LineChart(
     series: List<LineSeries>,
     xLabels: List<String>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onPointTap: ((Int) -> Unit)? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -54,7 +58,20 @@ fun LineChart(
             }
         }
 
-        Canvas(modifier = Modifier.fillMaxWidth().height(170.dp)) {
+        Canvas(
+            modifier = Modifier.fillMaxWidth().height(170.dp)
+                .pointerInput(n) {
+                    detectTapGestures { offset ->
+                        val cb = onPointTap ?: return@detectTapGestures
+                        if (n <= 0) return@detectTapGestures
+                        val step = if (n > 1) (size.width - 16f) / (n - 1) else 0f
+                        val idx = if (step > 0f)
+                            ((offset.x - 8f) / step).roundToInt().coerceIn(0, n - 1)
+                        else 0
+                        cb(idx)
+                    }
+                }
+        ) {
             val w = size.width
             val h = size.height
             val padTop = 10f

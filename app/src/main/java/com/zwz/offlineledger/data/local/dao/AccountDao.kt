@@ -63,4 +63,8 @@ interface AccountDao {
 
     @Query("SELECT COUNT(*) FROM records WHERE fromAccountId = :id OR toAccountId = :id")
     suspend fun linkedRecordCount(id: Long): Int
+
+    /** 阶段 8：年度资产趋势的当前余额基准，按币种、不混算。 */
+    @Query("SELECT COALESCE(SUM(balanceCents), 0) FROM accounts WHERE includeInTotal = 1 AND currencyCode = :cc")
+    suspend fun totalBalanceForCurrency(cc: String): Long
 }

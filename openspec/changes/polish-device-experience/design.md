@@ -25,7 +25,7 @@ SQLCipher 打开数据库一次都没在真机验证」，不是「升级会丢�
 
 ## 2. 关键取舍
 
-- **`payee` 的落点**：`records` / `trash` / 模板 / 周期规则 / `BackupRecord` /
+- **`counterparty` 的落点**：`records` / `trash` / 模板 / 周期规则 / `BackupRecord` /
   `BackupTemplate` / `BackupRecurringRule` / `CsvRow` / `CsvSourceRow` / `RecordRow`
   全加带默认值 `""` 的字段。Kotlin data class 一律加在**参数列表末尾**，
   现有位置参数构造调用零改动。备份 DTO 加默认值让旧 JSON 仍可解析。
@@ -33,7 +33,7 @@ SQLCipher 打开数据库一次都没在真机验证」，不是「升级会丢�
   断言的历史格式语义，改了会红且没有收益；新装默认 CNY 由
   `LedgerCurrency.DEFAULT` + `SeedData` + `exportSnapshot()` 显式传值保证。
   `project.md` 明确 HKD 在历史 Scenario 中只是多币种测试示例。
-- **CSV 第 9 列 `payee` 做成可选**：导出必带，导入时缺列不报错、按空串处理，
+- **CSV 第 9 列 `counterparty` 做成可选**：导出必带，导入时缺列不报错、按空串处理，
   这样使用者上一版导出的 8 列 CSV 仍能导回来。
 - **账户编辑改期初余额**：`AccountDao.updateAccountMeta` 加两列，
   `LedgerRepository.updateAccountMeta` 末尾补一次 `rebuildAllBalancesInternal()`；
@@ -80,7 +80,7 @@ SQL 常量校验保留供历史追溯。这是本仓库**第 6 次「测试断�
   否则统计页按币种筛选会与账户不一致。
 - 记一笔的备注与收款方做成同一行两个 `OutlinedTextField`（各 weight 1f），
   比原计划的上下两行更紧凑；仍保留 `verticalScroll` 兜底，避免极小屏被裁。
-- `Migrations.kt` 的冻结 CREATE TABLE 常量**不含新增的 payee 列**——
+- `Migrations.kt` 的冻结 CREATE TABLE 常量**不含新增的 counterparty 列**——
   它们已不执行，补列反而会让「冻结」语义变模糊；在 design 里显式说明，
   避免新会话误以为常量与 Entity 必须逐字一致。
 
@@ -121,7 +121,42 @@ FAB、Hilt 注入的 AssetsViewModel 加参，零编译错误。唯一失败来�
 
 ## 6. 否决方案表
 
-见 `proposal.md` 第 5 节；另否决：把 `payee` 做成独立表（多一张表 + 外键，
+见 `proposal.md` 第 5 节；另否决：把 `counterparty` 做成独立表（多一张表 + 外键，
 零收益）、用 `ExposedDropdownMenuBox` 做收款方（Compose 版本 API 风险，
 改用 chips 更稳）、`DatePicker` 用 `System.currentTimeMillis()` 直接传
 （UTC 午夜与本地日期差一天）。
+
+
+## 10. 第 2 批真机反馈与实现期偏离
+
+使用者在阶段 7 的包上继续体验，又提交 10 条反馈。本 change 尚未归档，因此
+两批合并为**同一个 change** 落地，避免两个 change 并行导致 delta 叠加。
+
+### 字段语义（使用者明确「大胆改表结构」）
+
+`payee` 全量重命名为 `counterparty`：`records` / `trash` / 模板 / 周期规则 / 备份 DTO /
+CSV 列名 / 测试 / specs / README 一次替换，历史归档与 `docs/` 快照不动。
+`AppDatabase version` 仍为 1、`Migrations.ALL` 仍为空 —— 按使用者「稳定版前不考虑
+升级迁移、不需要保留测试数据」的约束，全新安装走 `onCreate` 直接建新列，
+**新包必须卸载重装**，无数据需要保留。
+
+### 图表口径
+
+月度改为默认单线 + 切换 chip；年度资产线**单独一张图**，不把第三条线塞进收支双线
+（量级差大时必然贴底，正是使用者反馈 4 的根因）。资产线算法：
+`当前该币种账户余额合计 − 全年逐月净变动之和 = 年初基准`，再由
+`ChartData.assetSeries` 逐月累计。净变动查询按 `currencyCode` 过滤、转账净额为 0、
+只统计 `excludeFromStats = 0`；校准记录不进资产线（量级极小且无币种字段），
+这是有意简化，已在 UI 文案注明「按当前币种累计推算，不跨币种混算」。
+点击取值用 `pointerInput + detectTapGestures` 按 x 定位最近月份，弹窗显示收入 / 支出 /
+月末资产三项 `Long` 分格式化值。
+
+### 实现期偏离（如实记录）
+
+- **自定义账户排序（上移 / 置顶）本批未做**。常用账户自动置顶 + 全部账户弹层搜索
+  已解决「10 多个账户要横向拖动」这一主要痛点；资产页手动排序需要新增 ViewModel
+  方法与 UI 按钮，为避免本批一次改动面过大留到下一批，不与「已确认」冲突。
+- 时间选择用 framework `android.app.TimePickerDialog` 而非 Material3 `TimePicker`：
+  零 Compose API 版本风险，`timestamp` 仍是唯一真相源，`setTime` 只换本地时分。
+- 资产线用「当前余额倒推」而非新增快照表：零表结构变更、零 Migration，
+  符合「严格不混算」的既有约束。

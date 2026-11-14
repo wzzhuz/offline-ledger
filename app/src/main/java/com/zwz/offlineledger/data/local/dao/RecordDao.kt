@@ -10,6 +10,12 @@ data class AccountDeltaRow(val accountId: Long, val deltaCents: Long)
 data class CategoryTotalRow(val categoryId: Long, val totalCents: Long)
 data class MonthTotalRow(val yearMonth: Int, val type: String, val totalCents: Long)
 
+/** 阶段 8：年度资产趋势的月度净变动行。 */
+data class MonthDeltaRow(val yearMonth: Int, val totalCents: Long)
+
+/** 阶段 8：账户最近使用频次，用于记账页常用账户置顶。 */
+data class AccountUsageRow(val id: Long, val uses: Int)
+
 
 /** 明细行：一次 LEFT JOIN 取回分类与账户名，避免列表渲染时逐行查库（O(n²)）。 */
 data class RecordRow(
@@ -29,7 +35,7 @@ data class RecordRow(
     val categoryColorHex: String?,
     val fromAccountName: String?,
     val toAccountName: String?,
-    val payee: String = ""
+    val counterparty: String = ""
 )
 
 /** 账户详情专属流水行。 */
@@ -88,7 +94,7 @@ data class CsvSourceRow(
     val accountName: String,
     val rootName: String,
     val categoryName: String,
-    val payee: String = ""
+    val counterparty: String = ""
 )
 
 @Dao
@@ -161,7 +167,7 @@ interface RecordDao {
                r.timestamp AS timestamp, r.localDate AS localDate,
                r.yearMonth AS yearMonth, r.note AS note,
                r.excludeFromStats AS excludeFromStats,
-               COALESCE(r.payee, '') AS payee,
+               COALESCE(r.counterparty, '') AS counterparty,
                c.name AS categoryName, c.colorHex AS categoryColorHex,
                fa.name AS fromAccountName, ta.name AS toAccountName
           FROM records r
@@ -411,7 +417,7 @@ interface RecordDao {
         SELECT r.type AS type, r.amountCents AS amountCents,
                r.localDate AS localDate, COALESCE(r.note, '') AS note,
                r.currencyCode AS currencyCode,
-               COALESCE(r.payee, '') AS payee,
+               COALESCE(r.counterparty, '') AS counterparty,
                COALESCE(a.name, '') AS accountName,
                COALESCE(rc.name, '') AS rootName,
                COALESCE(c.name, '') AS categoryName
@@ -441,9 +447,21 @@ interface RecordDao {
     ): Int
 
     /** 阶段 7：常用收款方自动补全，纯本地 DISTINCT，最多 20 个。 */
-    @Query("SELECT DISTINCT payee FROM records WHERE payee IS NOT NULL AND payee <> '' ORDER BY payee ASC LIMIT 20")
-    suspend fun distinctPayees(): List<String>
+    @Query("SELECT DISTINCT counterparty FROM records WHERE counterparty IS NOT NULL AND counterparty <> '' ORDER BY counterparty ASC LIMIT 20")
+    suspend fun distinctCounterparties(): List<String>
 
     @Query("UPDATE records SET currencyCode = :code")
     suspend fun updateAllCurrency(code: String)
+
+    /** 阶段 8：输入联想，按历史交易对方模糊匹配，纯本地 DISTINCT。 */
+    @Query("SELECT DISTINCT counterparty FROM records WHERE counterparty IS NOT NULL AND counterparty <> '' AND counterparty LIKE '%' || :q || '%' ORDER BY counterparty ASC LIMIT 10")
+    suspend fun searchCounterparties(q: String): List<String>
+
+    /** 阶段 8：指定日期之后的账户使用频次，用于记账页常用账户置顶。 */
+    @Query("SELECT accountId AS id, COUNT(*) AS uses FROM (SELECT fromAccountId AS accountId FROM records WHERE localDate >= :fromDate AND fromAccountId IS NOT NULL UNION ALL SELECT toAccountId AS accountId FROM records WHERE localDate >= :fromDate AND toAccountId IS NOT NULL) GROUP BY accountId ORDER BY uses DESC")
+    suspend fun recentAccountUsage(fromDate: Int): List<AccountUsageRow>
+
+    /** 阶段 8：年度资产趋势的月度净变动，按币种、不混算；转账天然净额为 0。 */
+    @Query("SELECT yearMonth, SUM(CASE WHEN type IN ('INCOME','SETTLEMENT') THEN amountCents WHEN type = 'EXPENSE' THEN -amountCents ELSE 0 END) AS totalCents FROM records WHERE yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :cc AND excludeFromStats = 0 GROUP BY yearMonth ORDER BY yearMonth")
+    suspend fun monthlyBalanceDeltaForCurrency(fromYm: Int, toYm: Int, cc: String): List<MonthDeltaRow>
 }

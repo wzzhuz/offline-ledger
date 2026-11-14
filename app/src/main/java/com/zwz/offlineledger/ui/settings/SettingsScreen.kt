@@ -130,8 +130,8 @@ fun SettingsScreen() {
         Text(
             text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
                 "导入使用 CSV/TSV 模板：date, type, amount, account, " +
-                "categoryRoot, category, note, currencyCode, payee" +
-                "（币种列导入时按账户继承；payee 列可选，缺列按空处理）。",
+                "categoryRoot, category, note, currencyCode, counterparty" +
+                "（币种列导入时按账户继承；counterparty 列可选，缺列按空处理）。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral
         )

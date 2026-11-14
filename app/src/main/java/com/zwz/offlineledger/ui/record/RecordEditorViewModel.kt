@@ -30,7 +30,7 @@ data class EditorState(
     val toAccountId: Long? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val note: String = "",
-    val payee: String = "",
+    val counterparty: String = "",
     val excludeFromStats: Boolean = false,
     val loaded: Boolean = false
 )
@@ -51,9 +51,11 @@ class RecordEditorViewModel(
     private val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
     val categories: StateFlow<List<CategoryEntity>> = _categories.asStateFlow()
 
-    /** 阶段 7：本地 DISTINCT 出的常用收款方，最多 20 个。 */
-    private val _payees = MutableStateFlow<List<String>>(emptyList())
-    val payees: StateFlow<List<String>> = _payees.asStateFlow()
+    /** 常用交易对方（空输入时快捷选）+ 输入联想结果。 */
+    private val _counterparties = MutableStateFlow<List<String>>(emptyList())
+    val counterparties: StateFlow<List<String>> = _counterparties.asStateFlow()
+    private val _counterpartySuggestions = MutableStateFlow<List<String>>(emptyList())
+    val counterpartySuggestions: StateFlow<List<String>> = _counterpartySuggestions.asStateFlow()
 
     /** 进程内记忆：下次打开直接预填，跨进程持久化留到阶段 5 偏好设置。 */
     private var lastAccountId: Long? = null
@@ -67,8 +69,17 @@ class RecordEditorViewModel(
             val c = categoryDao.all()
             _accounts.value = a
             _categories.value = c
-            _payees.value = runCatching { recordDao.distinctPayees() }.getOrDefault(emptyList())
-            val defaultAcc = lastAccountId ?: a.firstOrNull { !it.isArchived }?.id
+            _counterparties.value = runCatching { recordDao.distinctCounterparties() }.getOrDefault(emptyList())
+            // 阶段 8：常用账户置顶（最近 30 天流水频次），冷门账户仍可从「全部账户」弹层搜到。
+            val since = LedgerClock.fromEpochMilli(System.currentTimeMillis() - 30L * 86_400_000L).localDate
+            val rank = runCatching { recordDao.recentAccountUsage(since) }
+                .getOrDefault(emptyList()).mapIndexed { i, r -> r.id to i }.toMap()
+            val sorted = a.sortedBy { acc ->
+                if (acc.isArchived) Int.MAX_VALUE else (rank[acc.id] ?: (1000 + acc.sortOrder))
+            }
+            _accounts.value = sorted
+            _counterpartySuggestions.value = emptyList()
+            val defaultAcc = lastAccountId ?: sorted.firstOrNull { !it.isArchived }?.id
             editingId = recordId
             if (recordId == null) {
                 _state.value = EditorState(
@@ -94,7 +105,7 @@ class RecordEditorViewModel(
                         toAccountId = r.toAccountId,
                         timestamp = r.timestamp,
                         note = r.note,
-                        payee = r.payee,
+                        counterparty = r.counterparty,
                         excludeFromStats = r.excludeFromStats,
                         loaded = true
                     )
@@ -103,12 +114,21 @@ class RecordEditorViewModel(
         }
     }
 
+    /** 阶段 8：切换收支类型时 MUST 重置分类，禁止支出保留收入分类。 */
     fun setType(t: RecordType) {
         val s = _state.value
         val defaultAcc = lastAccountId ?: s.fromAccountId ?: s.toAccountId
+        val visible = _categories.value.filter {
+            !it.isArchived && it.level == 0 && it.type == t
+        }.map { it.id }
+        val current = s.categoryId?.let { id ->
+            val c = _categories.value.firstOrNull { it.id == id }
+            if (c != null && !c.isArchived && c.type == t) id else null
+        }
         _state.value = s.copy(
             type = t,
-            categoryId = if (t == RecordType.TRANSFER) null else s.categoryId,
+            categoryId = if (t == RecordType.TRANSFER) null
+            else (current ?: visible.firstOrNull()),
             expandedRootId = null,
             fromAccountId = s.fromAccountId ?: defaultAcc,
             toAccountId = s.toAccountId ?: defaultAcc
@@ -160,8 +180,23 @@ class RecordEditorViewModel(
         _state.value = _state.value.copy(note = v)
     }
 
-    fun setPayee(v: String) {
-        _state.value = _state.value.copy(payee = v)
+    /** 阶段 8：键入一两个字即从全部历史交易对方模糊联想。 */
+    fun setCounterparty(v: String) {
+        _state.value = _state.value.copy(counterparty = v)
+        viewModelScope.launch {
+            _counterpartySuggestions.value = if (v.isBlank()) emptyList()
+            else runCatching { recordDao.searchCounterparties(v.trim()) }
+                .getOrDefault(emptyList())
+        }
+    }
+
+    /** 阶段 8：非即时记账可改时分；保留已选日期。 */
+    fun setTime(hour: Int, minute: Int) {
+        val z = java.time.Instant.ofEpochMilli(_state.value.timestamp)
+            .atZone(LedgerClock.zoneId)
+        val ts = z.toLocalDate().atTime(hour, minute)
+            .atZone(LedgerClock.zoneId).toInstant().toEpochMilli()
+        _state.value = _state.value.copy(timestamp = ts)
     }
 
     /** 日历回传的是 UTC 午夜毫秒；换成同一本地日期、保留当前时分。 */
@@ -208,6 +243,13 @@ class RecordEditorViewModel(
         }
         if (accountError != null) return accountError
 
+        // 阶段 8：分类类型 MUST 与流水类型一致（模板下拉、分类网格、手工编辑共用此校验）。
+        if (s.type != RecordType.TRANSFER && s.categoryId != null) {
+            val chosen = categoryDao.all().firstOrNull { it.id == s.categoryId }
+            if (chosen == null || chosen.type != s.type) {
+                return "分类与收支类型不一致，请重新选择"
+            }
+        }
         val rootId = if (s.type == RecordType.TRANSFER) null
         else s.categoryId?.let { id ->
             val map: Map<Long, LedgerCategory> = categoryDao.all().associate {
@@ -234,7 +276,7 @@ class RecordEditorViewModel(
             yearMonth = ld.yearMonth,
             note = s.note,
             excludeFromStats = s.excludeFromStats,
-            payee = s.payee.trim()
+            counterparty = s.counterparty.trim()
         )
         return try {
             if (editingId == null) {

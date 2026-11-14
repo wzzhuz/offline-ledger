@@ -123,6 +123,18 @@ object ChartData {
     }
 
     // ---------------------------------------------------------------
+    /**
+     * 阶段 8：年初基准 + 逐月净变动 = 逐月末资产余额。
+     * 纯 JVM 累计，不查库、不混算；校准记录不进资产线（见 design.md）。
+     */
+    fun assetSeries(yearStartBalanceCents: Long, deltas: Map<Int, Long>): List<Long> {
+        var cursor = yearStartBalanceCents
+        return (1..12).map { m ->
+            cursor += deltas[m] ?: 0L
+            cursor
+        }
+    }
+
     /** 多系列共用一个最大值，避免收入线与支出线各自缩放导致走势误读。 */
     fun seriesMax(series: List<List<Long>>): Long =
         series.flatten().maxOrNull() ?: 0L

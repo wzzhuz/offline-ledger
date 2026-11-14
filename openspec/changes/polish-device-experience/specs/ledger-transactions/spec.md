@@ -2,7 +2,7 @@
 
 ### Requirement: 收款方是流水级自由文本标签
 
-`records` 与 `trash` SHALL 各有 `payee TEXT NOT NULL DEFAULT ''` 列，
+`records` 与 `trash` SHALL 各有 `counterparty TEXT NOT NULL DEFAULT ''` 列，
 模板与周期规则 SHALL 能把收款方带入生成的流水。收款方 MUST NOT 建成账户、
 MUST NOT 有外键、MUST NOT 产生任何复式分录或余额联动。
 删除后从回收站恢复 SHALL 保留收款方。
@@ -52,7 +52,7 @@ MUST NOT 有外键、MUST NOT 产生任何复式分录或余额联动。
 
 - **GIVEN** 设备未装过本应用
 - **WHEN** 首次打开
-- **THEN** 走 `onCreate` 按 Entity 建库，含 `payee` 列
+- **THEN** 走 `onCreate` 按 Entity 建库，含 `counterparty` 列
 - **AND** 不执行任何迁移 SQL
 
 #### Scenario: 覆盖安装需卸载

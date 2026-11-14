@@ -3,7 +3,7 @@
 ### Requirement: 真机反馈批次的静态检查与单测
 
 本批次 SHALL 保持六个静态检查全 PASS，且 SHALL 新增纯 JVM 单测覆盖
-默认币种 / 时区、`payee` 在备份与 CSV 的往返、以及 8 列旧 CSV 兼容。
+默认币种 / 时区、`counterparty` 在备份与 CSV 的往返、以及 8 列旧 CSV 兼容。
 CI 编译通过 MUST NOT 被表述为「可覆盖升级」或「真机已验证」。
 
 #### Scenario: 检查全绿

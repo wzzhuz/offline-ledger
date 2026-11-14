@@ -152,7 +152,7 @@ class LedgerRepository @Inject constructor(
                 excludeFromStats = it.excludeFromStats,
                 linkedRecordId = it.linkedRecordId,
                 currencyCode = it.currencyCode,
-                payee = it.payee
+                counterparty = it.counterparty
             )
         },
         exportedAtEpochMilli = System.currentTimeMillis(),
@@ -433,7 +433,7 @@ class LedgerRepository @Inject constructor(
             excludeFromStats = false,
             linkedRecordId = originalId,
             currencyCode = original.currencyCode,
-            payee = original.payee
+            counterparty = original.counterparty
         )
         val id = recordDao.insert(withResolvedRoot(entity))
         rebuildAllBalancesInternal()
@@ -507,7 +507,7 @@ class LedgerRepository @Inject constructor(
             category = r.categoryName,
             note = r.note,
             currencyCode = r.currencyCode,
-            payee = r.payee
+            counterparty = r.counterparty
         )
     }
 
@@ -555,7 +555,7 @@ class LedgerRepository @Inject constructor(
                 yearMonth = ld / 100,
                 note = row.note,
                 excludeFromStats = false,
-                payee = row.payee
+                counterparty = row.counterparty
             )
             recordDao.insert(withResolvedRoot(entity))
             written++
