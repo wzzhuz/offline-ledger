@@ -64,17 +64,6 @@ jobs:
       - name: 运行单元测试
         run: gradle testDebugUnitTest --stacktrace --no-daemon
 
-      - name: 诊断日志回传（临时）
-        if: failure()
-        run: |
-          mkdir -p diag
-          gradle testDebugUnitTest --stacktrace --no-daemon > diag/test.log 2>&1 || true
-          git config user.email "ci@local"
-          git config user.name "ci"
-          git add -f diag/test.log
-          git commit -m "diag: 回传失败日志" || true
-          git push origin HEAD:main || true
-
       - name: 编译 Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon
 

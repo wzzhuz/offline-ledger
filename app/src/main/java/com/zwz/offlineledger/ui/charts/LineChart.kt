@@ -1,6 +1,5 @@
 package com.zwz.offlineledger.ui.charts
 
-import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -13,15 +12,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.zwz.offlineledger.engine.ChartData
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import kotlin.math.roundToInt
@@ -47,6 +50,7 @@ fun LineChart(
     selectedIndex: Int? = null,
     onPointTap: ((Int) -> Unit)? = null
 ) {
+    val textMeasurer = rememberTextMeasurer()
     Column(modifier = modifier.fillMaxWidth()) {
         val n = series.firstOrNull()?.values?.size ?: 0
         Row(
@@ -142,20 +146,25 @@ fun LineChart(
                         val marked = ChartData.annotationIndices(
                             series.first().values, selectedIndex, annotateAll
                         )
-                        val paint = Paint().apply {
-                            color = LedgerColors.Neutral.toArgb()
-                            textSize = 10.dp.toPx()
-                            textAlign = Paint.Align.CENTER
-                            isAntiAlias = true
-                        }
+                        val labelStyle = TextStyle(
+                            color = LedgerColors.Neutral,
+                            fontSize = 10.sp
+                        )
                         val pts = series.first().values.mapIndexed { idx, v ->
                             Offset(padX + step * idx, padTop + plotH * (1f - v.coerceIn(0f, 1f)))
                         }
                         marked.forEach { idx ->
                             val label = valueLabels.getOrNull(idx) ?: return@forEach
                             val p = pts.getOrNull(idx) ?: return@forEach
-                            val ty = if (p.y < 30f) p.y + 18f else p.y - 8f
-                            drawContext.canvas.nativeCanvas.drawText(label, p.x, ty, paint)
+                            val layout = textMeasurer.measure(label, labelStyle)
+                            val maxX = (w - layout.size.width.toFloat()).coerceAtLeast(0f)
+                            val tx = (p.x - layout.size.width / 2f).coerceIn(0f, maxX)
+                            val ty = if (p.y < 30f) {
+                                (p.y + 8f).coerceAtLeast(0f)
+                            } else {
+                                (p.y - layout.size.height.toFloat() - 6f).coerceAtLeast(0f)
+                            }
+                            drawText(layout, topLeft = Offset(tx, ty))
                         }
                     }
                 }
