@@ -236,7 +236,7 @@ Job Summary 打印体积与差值。`app/proguard-rules.pro` 补齐了
 `kotlinx.serialization` / Room / Hilt / SQLCipher JNI / 枚举 / 备份 DTO
 的 keep 规则，R8 开启时 `mapping.txt` 作为制品上传。
 
-**版本号**：`defaultVersionName = "0.1.0"` 是唯一手动维护点，
+**版本号**：`defaultVersionName = "0.1.1"` 是唯一手动维护点，
 `versionCode` 由 `major*10000 + minor*100 + patch` 推导（不再恒为 1）。
 CI 可用 `-PversionNameOverride` 覆盖并**传进 Gradle**，不回写文件。
 

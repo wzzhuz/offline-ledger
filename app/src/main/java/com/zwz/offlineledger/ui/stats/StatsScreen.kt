@@ -152,10 +152,17 @@ fun StatsScreen() {
                 TrendMetric.INCOME -> listOf(incomeSeries)
                 TrendMetric.BOTH -> listOf(expenseSeries, incomeSeries)
             }
+            val monthValues = when (state.trendMetric) {
+                TrendMetric.EXPENSE -> state.daily.map { it.expenseCents }
+                TrendMetric.INCOME -> state.daily.map { it.incomeCents }
+                TrendMetric.BOTH -> state.daily.map { it.expenseCents }
+            }
             LineChart(
                 series = shown,
                 xLabels = state.daily.map { it.day.toString() + "日" },
                 yLabels = ChartData.yAxisLabels(max),
+                valueLabels = monthValues.map { formatCents(it) },
+                selectedIndex = if (pointMode == StatsMode.MONTH) pointIndex else null,
                 onPointTap = { idx -> pointIndex = idx; pointMode = StatsMode.MONTH }
             )
             ChartZoomButton(
@@ -202,10 +209,17 @@ fun StatsScreen() {
                 TrendMetric.INCOME -> listOf(yearIncomeSeries)
                 TrendMetric.BOTH -> listOf(yearExpenseSeries, yearIncomeSeries)
             }
+            val yearValues = when (state.trendMetric) {
+                TrendMetric.EXPENSE -> state.monthly.map { it.expenseCents }
+                TrendMetric.INCOME -> state.monthly.map { it.incomeCents }
+                TrendMetric.BOTH -> state.monthly.map { it.expenseCents }
+            }
             LineChart(
                 series = shownYear,
                 xLabels = state.monthly.map { it.month.toString() + "月" },
                 yLabels = ChartData.yAxisLabels(max),
+                valueLabels = yearValues.map { formatCents(it) },
+                selectedIndex = if (pointMode == StatsMode.YEAR) pointIndex else null,
                 onPointTap = { idx -> pointIndex = idx; pointMode = StatsMode.YEAR }
             )
             ChartZoomButton(
@@ -233,6 +247,8 @@ fun StatsScreen() {
                 ),
                 xLabels = state.monthly.map { it.month.toString() + "月" },
                 yLabels = ChartData.yAxisLabels(assetMax),
+                valueLabels = state.assetTrend.map { formatCents(it.coerceAtLeast(0L)) },
+                selectedIndex = if (pointMode == StatsMode.YEAR) pointIndex else null,
                 onPointTap = { idx -> pointIndex = idx; pointMode = StatsMode.YEAR }
             )
             ChartZoomButton(

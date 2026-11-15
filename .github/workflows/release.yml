@@ -192,6 +192,13 @@ jobs:
         run: |
           VER="${{ steps.ver.outputs.version }}"
           cd out
+          SHORT="${{ github.sha }}"
+          SHORT="${SHORT:0:8}"
+          # 第 4 批：文件名带短 commit sha。同名覆盖会让使用者下载到旧包却看不出来。
+          for f in *.apk; do
+            [ -e "$f" ] || continue
+            mv "$f" "${f%.apk}-${SHORT}.apk"
+          done
           ls -lh
           {
             echo "| 文件 | 大小 | SHA256 前 16 位 |"
@@ -203,16 +210,17 @@ jobs:
           echo "files=$(ls *.apk | tr '\n' ' ')" >> $GITHUB_OUTPUT
 
           # 单文件名：both 时优先取 R8 包用于 Release 附件与坚果云
-          APK="offline-ledger-v${VER}-minified.apk"
-          [ -f "$APK" ] || APK="offline-ledger-v${VER}-plain.apk"
+          APK=$(ls *-minified-*.apk 2>/dev/null | head -1)
+          [ -n "$APK" ] || APK=$(ls *-plain-*.apk 2>/dev/null | head -1)
+          [ -n "$APK" ] || APK=$(ls *.apk | head -1)
           echo "apk_name=$APK" >> $GITHUB_OUTPUT
           echo "sha256=$(sha256sum "$APK" | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           echo "size=$(du -h "$APK" | cut -f1)" >> $GITHUB_OUTPUT
 
           # 体积对比（both 才有意义）
-          PLAIN="offline-ledger-v${VER}-plain.apk"
-          MIN="offline-ledger-v${VER}-minified.apk"
-          if [ -f "$PLAIN" ] && [ -f "$MIN" ]; then
+          PLAIN=$(ls *-plain-*.apk 2>/dev/null | head -1)
+          MIN=$(ls *-minified-*.apk 2>/dev/null | head -1)
+          if [ -n "$PLAIN" ] && [ -n "$MIN" ]; then
             P=$(stat -c%s "$PLAIN"); M=$(stat -c%s "$MIN")
             D=$(( P - M ))
             PCT=$(awk -v p="$P" -v m="$M" 'BEGIN { printf "%.1f", (p-m)*100/p }')

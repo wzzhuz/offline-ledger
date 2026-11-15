@@ -1,330 +1,62 @@
 package com.zwz.offlineledger.ui.settings
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.zwz.offlineledger.core.currency.LedgerCurrency
-import com.zwz.offlineledger.core.prefs.LedgerPrefs
-import com.zwz.offlineledger.ui.budget.BudgetManagerDialog
-import com.zwz.offlineledger.ui.ledgerFactory
-import com.zwz.offlineledger.ui.templates.TemplateManagerDialog
 import com.zwz.offlineledger.ui.theme.LedgerColors
-import com.zwz.offlineledger.ui.trash.TrashScreen
 
+/**
+ * 第 4 批：设置页重排为分组列表 → 二级页。
+ * 不再把十几个 Button、输入框、下拉堆在一屏；每组只留一行入口。
+ * 4 Tab 导航结构不变，设置仍是第 4 个 Tab。
+ */
 @Composable
-fun SettingsScreen() {
-    val context = LocalContext.current
-    val vm: SettingsViewModel = viewModel(
-        factory = ledgerFactory(context) { ep ->
-            SettingsViewModel(ep.ledgerRepository(), ep.categoryDao(), LedgerPrefs(context))
-        }
-    )
-    val state by vm.state.collectAsState()
-
-    var pendingUri by remember { mutableStateOf<Uri?>(null) }
-    var passwordMode by remember { mutableStateOf<PasswordMode?>(null) }
-    var showCategories by remember { mutableStateOf(false) }
-    var showTrash by remember { mutableStateOf(false) }
-    var showTemplates by remember { mutableStateOf(false) }
-    var showBudgets by remember { mutableStateOf(false) }
-    var pinInput by remember { mutableStateOf("") }
-    var thresholdInput by remember { mutableStateOf(state.thresholdYuan) }
-    var currencyExpanded by remember { mutableStateOf(false) }
-
-    // SAF：CreateDocument / OpenDocument 均不申请任何存储权限。
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        if (uri != null) {
-            pendingUri = uri
-            passwordMode = PasswordMode.EXPORT
-        }
-    }
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            pendingUri = uri
-            passwordMode = PasswordMode.IMPORT
-        }
-    }
-    // 6c-2：CSV 明文导出与账单导入，同样走 SAF，不申请任何权限。
-    val csvExportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri -> if (uri != null) vm.exportCsvTo(context, uri) }
-    val csvImportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> if (uri != null) vm.readCsvPlan(context, uri) }
-
+fun SettingsScreen(onOpen: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(text = "设置", style = MaterialTheme.typography.headlineMedium)
-
-        SectionTitle("数据与备份")
         Text(
-            text = "备份由你选择保存位置，口令加密后写出；应用不申请任何存储或网络权限。",
+            text = "按分组进入各自页面；所有数据只存在本机。",
             style = MaterialTheme.typography.bodySmall,
             color = LedgerColors.Neutral
         )
-        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { exportLauncher.launch("offline-ledger-backup.olbk") },
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text("导出加密备份") }
-            Button(
-                onClick = { importLauncher.launch(arrayOf("application/octet-stream", "*/*")) },
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text("从备份恢复") }
-        }
-        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { csvExportLauncher.launch("offline-ledger.csv") },
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text("导出 CSV") }
-            Button(
-                onClick = {
-                    csvImportLauncher.launch(arrayOf("text/csv", "text/plain", "*/*"))
-                },
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text("导入账单") }
-        }
-        Text(
-            text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
-                "导入使用 CSV/TSV 模板：date, type, amount, account, " +
-                "categoryRoot, category, note, currencyCode, counterparty" +
-                "（币种列导入时按账户继承；counterparty 列可选，缺列按空处理）。",
-            style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral
-        )
 
-        SectionTitle("安全")
-        SettingSwitch("应用锁（冷启动与后台恢复）", state.appLockEnabled) {
-            vm.setAppLock(it)
-        }
-        Text(
-            text = "开启前必须先设置 PIN；生物识别不可用时用 PIN 解锁。",
-            style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = pinInput,
-                onValueChange = { pinInput = it.filter(Char::isDigit) },
-                label = { Text(if (state.hasPin) "重设 PIN（4–12 位数字）" else "设置 PIN") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = KeyboardType.NumberPassword
-                ),
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = {
-                if (pinInput.isNotBlank()) {
-                    vm.setPin(pinInput)
-                    pinInput = ""
-                }
-            }) { Text("保存") }
-        }
-        if (state.hasPin) {
-            TextButton(onClick = { vm.clearPin() }) {
-                Text("清除 PIN（同时关闭应用锁）", color = LedgerColors.ExpenseRed)
-            }
-        }
-        SettingSwitch("最近任务防泄露（FLAG_SECURE）", state.flagSecure) {
-            vm.setFlagSecure(it)
-        }
+        SettingGroupCard(
+            title = "数据与备份",
+            summary = "加密备份 / CSV 明文导出 / 账单导入"
+        ) { onOpen("backup") }
+        SettingGroupCard(
+            title = "安全",
+            summary = "应用锁 / PIN / 最近任务防泄露"
+        ) { onOpen("security") }
+        SettingGroupCard(
+            title = "偏好",
+            summary = "对账阈值 / 配色 / 默认币种"
+        ) { onOpen("prefs") }
+        SettingGroupCard(
+            title = "账本",
+            summary = "分类 / 模板 / 预算 / 回收站 / 健康自检"
+        ) { onOpen("ledger") }
 
-        SectionTitle("偏好")
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = thresholdInput,
-                onValueChange = { thresholdInput = it; vm.setThresholdYuan(it) },
-                label = { Text("对账尾差阈值（元，默认 1.00）") },
-                singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = KeyboardType.Decimal
-                ),
-                modifier = Modifier.weight(1f)
-            )
-        }
-        SettingSwitch("支出 / 收入配色反转", state.reverseColors) {
-            vm.setReverseColors(it)
-        }
-
-        Text(text = "默认币种（只影响之后新建的账户）",
-            style = MaterialTheme.typography.labelMedium)
-        Box {
-            TextButton(onClick = { currencyExpanded = true }) {
-                Text(state.defaultCurrency, style = MaterialTheme.typography.titleMedium)
-            }
-            DropdownMenu(
-                expanded = currencyExpanded,
-                onDismissRequest = { currencyExpanded = false }
-            ) {
-                LedgerCurrency.SUPPORTED.forEach { code ->
-                    DropdownMenuItem(
-                        text = { Text(code) },
-                        onClick = { vm.setDefaultCurrency(code); currencyExpanded = false }
-                    )
-                }
-            }
-        }
-        Button(onClick = { vm.applyCurrencyToAll() }, modifier = Modifier.fillMaxWidth()) {
-            Text("把现有账户与流水统一为 ${state.defaultCurrency}")
-        }
-        Text(
-            text = "统一币种只改标签、不改金额；不会自动执行，需你点上面的按钮。",
-            style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral
-        )
-
-        SectionTitle("账本")
-        Button(onClick = { showCategories = true }, modifier = Modifier.fillMaxWidth()) {
-            Text("分类管理（两级 · 新增 / 改名 / 排序 / 归档）")
-        }
-        Button(
-            onClick = { showTemplates = true },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-        ) { Text("模板与周期记账（模板 / 规则 · 新增 / 归档 / 启用）") }
-        Button(
-            onClick = { showBudgets = true },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-        ) { Text("预算管理（总预算 / 一级 / 二级 · 新增 / 归档）") }
-        Button(
-            onClick = { vm.runHealthCheck() },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-        ) { Text("账本健康自检") }
-        if (state.healthText.isNotBlank()) {
-            Text(text = state.healthText, style = MaterialTheme.typography.bodySmall)
-        }
-        Button(
-            onClick = { showTrash = true },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-        ) { Text("回收站") }
-
-        if (state.message.isNotBlank()) {
-            Card(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                Text(
-                    text = state.message,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(12.dp)
-                )
-            }
-        }
-        if (state.error.isNotBlank()) {
-            Text(
-                text = state.error,
-                color = LedgerColors.ExpenseRed,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 12.dp)
-            )
-        }
-
+        SectionTitle("关于")
         Text(
             text = "隐私基线：不声明 INTERNET 权限 · 关闭系统自动备份并排除数据库 · " +
                 "SQLCipher 加密数据库 · 口令由 Android Keystore 保管 · " +
                 "备份口令不落盘，与数据库口令完全独立。",
             style = MaterialTheme.typography.bodySmall,
-            color = LedgerColors.Neutral,
-            modifier = Modifier.padding(top = 24.dp)
+            color = LedgerColors.Neutral
         )
-    }
-
-    state.csvPlan?.let { plan ->
-        AlertDialog(
-            onDismissRequest = { vm.cancelCsvImport() },
-            title = { Text("导入账单") },
-            text = {
-                Text(
-                    "将写入 ${plan.rows.size} 条流水（重复项自动跳过）。" +
-                        "确认后一次性写入；失败会整体回滚，账本不变。"
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { vm.confirmCsvImport() }) { Text("确认写入") }
-            },
-            dismissButton = {
-                TextButton(onClick = { vm.cancelCsvImport() }) { Text("取消") }
-            }
-        )
-    }
-
-    passwordMode?.let { mode ->
-        BackupPasswordDialog(
-            mode = mode,
-            onDismiss = { passwordMode = null; pendingUri = null },
-            onConfirm = { pass ->
-                val uri = pendingUri
-                if (uri != null) {
-                    if (mode == PasswordMode.EXPORT) vm.exportTo(context, uri, pass)
-                    else vm.importFrom(context, uri, pass)
-                }
-                passwordMode = null
-                pendingUri = null
-            }
-        )
-    }
-
-    if (showCategories) {
-        CategoryManagerDialog(
-            categories = state.categories,
-            vm = vm,
-            onDismiss = { showCategories = false }
-        )
-    }
-
-    if (showTrash) {
-        TrashScreen(
-            onDismiss = { showTrash = false },
-            onChanged = { vm.message("回收站已变更；如恢复了流水，返回明细即可刷新。") }
-        )
-    }
-
-    if (showTemplates) {
-        TemplateManagerDialog(onDismiss = { showTemplates = false })
-    }
-
-    if (showBudgets) {
-        BudgetManagerDialog(onDismiss = { showBudgets = false })
     }
 }
 
@@ -333,17 +65,7 @@ private fun SectionTitle(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
+        color = LedgerColors.Neutral,
         modifier = Modifier.padding(top = 20.dp, bottom = 6.dp)
     )
-}
-
-@Composable
-private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
-    }
 }

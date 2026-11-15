@@ -32,9 +32,8 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 import com.zwz.offlineledger.ui.theme.LedgerTheme
 
 /**
- * 第三批：趋势图横屏全屏页。Manifest 固定 landscape，
- * 竖屏 360dp 塞 12 个月标签必然挤，横屏才是趋势图的正确容器。
- * 双指缩放只做视觉放大（Modifier.scale），不改 Canvas 坐标逻辑。
+ * 横屏全屏页：Manifest 固定 landscape，竖屏 360dp 塞 12 个月标签必然挤。
+ * 第 4 批：横屏全量常驻点数值，竖屏只标关键三点。
  */
 class ChartFullscreenActivity : ComponentActivity() {
 
@@ -106,6 +105,9 @@ private fun FullscreenChart(
             yLabels = ChartData.yAxisLabels(max),
             chartHeight = 300.dp,
             labelEvery = 1,
+            valueLabels = values.map { formatCents(it) },
+            annotateAll = true,
+            selectedIndex = tapped,
             onPointTap = { tapped = it },
             modifier = Modifier
                 .fillMaxWidth()
@@ -117,7 +119,7 @@ private fun FullscreenChart(
                 }
         )
         Text(
-            text = "点击任意数据点查看具体金额；横轴标签按全量铺开。",
+            text = "每个点常驻显示金额；点击数据点也可查看明细。横轴标签全量铺开。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral
         )

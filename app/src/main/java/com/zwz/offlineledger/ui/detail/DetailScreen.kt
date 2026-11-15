@@ -1,24 +1,29 @@
 package com.zwz.offlineledger.ui.detail
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,11 +34,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
@@ -42,13 +50,11 @@ import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
 import com.zwz.offlineledger.data.local.dao.RecordRow
 import com.zwz.offlineledger.data.model.RecordType
-import com.zwz.offlineledger.ui.ledgerFactory
-import com.zwz.offlineledger.ui.components.CategoryIcon
 import com.zwz.offlineledger.ui.components.amountColor
 import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.components.signedAmount
+import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
-import androidx.compose.ui.text.input.KeyboardType
 import kotlinx.coroutines.launch
 
 @Composable
@@ -71,6 +77,7 @@ fun DetailScreen(
     val categories by vm.categories.collectAsState()
 
     var showFilter by remember { mutableStateOf(false) }
+    var actionRow by remember { mutableStateOf<RecordRow?>(null) }
     var pendingDelete by remember { mutableStateOf<RecordRow?>(null) }
     var settleRow by remember { mutableStateOf<RecordRow?>(null) }
     var settleAmount by remember { mutableStateOf("") }
@@ -100,18 +107,57 @@ fun DetailScreen(
                 if (previous == null || previous.localDate != row.localDate) {
                     DayHeader(row.localDate, overview.dailyTotals[row.localDate])
                 }
-                RecordRowCard(
-                    row = row,
-                    onClick = { onEdit(row.id) },
-                    onDelete = { pendingDelete = row },
-                    onSettle = {
-                        scope.launch {
-                            settleAmount = Cents(vm.remainingSettlement(row.id)).toYuanString()
-                            settleError = null
-                            settleRow = row
-                        }
+                RecordRowCard(row = row, onClick = { actionRow = row })
+            }
+        }
+    }
+
+    // 第 4 批：行内不再塞报销 / 删除按钮，改为点击行弹出动作菜单，
+    // 让四列网格保持整齐；编辑 / 报销 / 删除仍各走原有事务路径。
+    actionRow?.let { target ->
+        val t = try {
+            RecordType.valueOf(target.type)
+        } catch (e: IllegalArgumentException) {
+            RecordType.TRANSFER
+        }
+        Dialog(onDismissRequest = { actionRow = null }) {
+            Surface(shape = RoundedCornerShape(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = target.categoryName ?: "转账",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = formatCents(target.amountCents) + " 元",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = LedgerColors.Neutral
+                    )
+                    TextButton(
+                        onClick = { actionRow = null; onEdit(target.id) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("编辑") }
+                    if (t == RecordType.EXPENSE) {
+                        TextButton(
+                            onClick = {
+                                actionRow = null
+                                scope.launch {
+                                    settleAmount = Cents(vm.remainingSettlement(target.id)).toYuanString()
+                                    settleError = null
+                                    settleRow = target
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("报销 / 退款") }
                     }
-                )
+                    TextButton(
+                        onClick = { actionRow = null; pendingDelete = target },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("删除", color = LedgerColors.ExpenseRed) }
+                    TextButton(
+                        onClick = { actionRow = null },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("取消") }
+                }
             }
         }
     }
@@ -217,58 +263,69 @@ private fun MonthOverviewCard(
     onNext: () -> Unit,
     onFilter: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPrev) {
-                    Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "上个月")
-                }
-                Text(
-                    text = MonthRange.label(overview.yearMonth),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = onNext) {
-                    Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "下个月")
-                }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onPrev) {
+                Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "上个月")
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("支出 " + formatCents(overview.expenseCents), color = LedgerColors.ExpenseRed)
-                Text("收入 " + formatCents(overview.incomeCents), color = LedgerColors.IncomeGreen)
-            }
-            // 6c-2：口径与统计页一致，展示当前筛选币种。
             Text(
-                text = overview.currencyCode?.let { "当前币种：$it · 不跨币种汇总" }
-                    ?: "全部币种（可在筛选中按币种查看）",
-                style = MaterialTheme.typography.bodySmall,
-                color = LedgerColors.Neutral
+                text = MonthRange.label(overview.yearMonth),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "结余 " + formatCents(overview.balanceCents),
-                    color = if (overview.balanceCents < 0) LedgerColors.ExpenseRed
-                    else LedgerColors.IncomeGreen
-                )
-                TextButton(onClick = onFilter) {
-                    Text(if (activeFilterCount > 0) "筛选 ($activeFilterCount)" else "筛选")
-                }
+            IconButton(onClick = onNext) {
+                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "下个月")
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("支出 " + formatCents(overview.expenseCents), color = LedgerColors.ExpenseRed)
+            Text("收入 " + formatCents(overview.incomeCents), color = LedgerColors.IncomeGreen)
+        }
+        Text(
+            text = overview.currencyCode?.let { "当前币种：$it · 不跨币种汇总" }
+                ?: "全部币种（可在筛选中按币种查看）",
+            style = MaterialTheme.typography.bodySmall,
+            color = LedgerColors.Neutral
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "结余 " + formatCents(overview.balanceCents),
+                color = if (overview.balanceCents < 0) LedgerColors.ExpenseRed
+                else LedgerColors.IncomeGreen
+            )
+            TextButton(onClick = onFilter) {
+                Text(if (activeFilterCount > 0) "筛选 ($activeFilterCount)" else "筛选")
             }
         }
     }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(LedgerColors.Neutral.copy(alpha = 0.12f))
+    )
 }
 
 @Composable
 private fun DayHeader(localDate: Int, totals: Pair<Long, Long>?) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = MonthRange.dateLabel(localDate),
@@ -284,70 +341,84 @@ private fun DayHeader(localDate: Int, totals: Pair<Long, Long>?) {
     }
 }
 
+/**
+ * 第 4 批：固定四列网格（时间 / 分类·对方 / 账户 / 金额），统一行高与细分割线，
+ * 去掉卡片堆叠与阴影。信息密度上来了，空白才不是「没内容」的空白。
+ */
 @Composable
-private fun RecordRowCard(
-    row: RecordRow,
-    onClick: () -> Unit,
-    onDelete: () -> Unit,
-    onSettle: () -> Unit
-) {
+private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
     val type = try {
         RecordType.valueOf(row.type)
     } catch (e: IllegalArgumentException) {
         RecordType.TRANSFER
     }
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CategoryIcon(row.categoryName, row.categoryColorHex)
-            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(text = row.categoryName ?: "转账", style = MaterialTheme.typography.bodyLarge)
-                val account = row.fromAccountName ?: row.toAccountName ?: "-"
-                val timeLabel = remember(row.timestamp) {
-                    val z = java.time.Instant.ofEpochMilli(row.timestamp)
-                        .atZone(LedgerClock.zoneId)
-                    "%02d:%02d".format(z.hour, z.minute)
-                }
-                // 阶段 8：收入显示「来源」，转账不显示交易对方。
-                val party = row.counterparty.takeIf { it.isNotBlank() }
-                    ?.let { value ->
-                        when (type) {
-                            RecordType.INCOME -> "来源 $value"
-                            RecordType.TRANSFER -> null
-                            else -> "收款方 $value"
-                        }
-                    }
-                Text(
-                    text = listOfNotNull(
-                        timeLabel,
-                        account,
-                        party,
-                        row.note.takeIf { it.isNotBlank() }
-                    ).joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LedgerColors.Neutral
-                )
-            }
-            Text(
-                text = signedAmount(type, row.amountCents),
-                color = amountColor(type),
-                style = MaterialTheme.typography.titleMedium
-            )
-            if (type == RecordType.EXPENSE) {
-                TextButton(onClick = onSettle) {
-                    Text("报销", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "删除")
-            }
+    val timeLabel = remember(row.timestamp) {
+        val z = java.time.Instant.ofEpochMilli(row.timestamp).atZone(LedgerClock.zoneId)
+        "%02d:%02d".format(z.hour, z.minute)
+    }
+    val account = row.fromAccountName ?: row.toAccountName ?: "-"
+    val party = row.counterparty.takeIf { it.isNotBlank() }?.let { value ->
+        when (type) {
+            RecordType.INCOME -> "来源 " + value
+            RecordType.TRANSFER -> null
+            else -> "收款方 " + value
         }
     }
+    val sub = listOfNotNull(party, row.note.takeIf { it.isNotBlank() }).joinToString(" · ")
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = timeLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral,
+            modifier = Modifier.width(40.dp)
+        )
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 8.dp)) {
+            Text(
+                text = row.categoryName ?: "转账",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (sub.isNotEmpty()) {
+                Text(
+                    text = sub,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Text(
+            text = account,
+            style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(64.dp)
+        )
+        Text(
+            text = signedAmount(type, row.amountCents),
+            color = amountColor(type),
+            style = MaterialTheme.typography.titleSmall,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            modifier = Modifier.width(92.dp)
+        )
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .height(1.dp)
+            .background(LedgerColors.Neutral.copy(alpha = 0.10f))
+    )
 }

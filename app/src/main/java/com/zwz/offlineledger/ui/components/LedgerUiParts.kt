@@ -16,43 +16,34 @@ import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /**
- * 分类图标用 colorHex 画圆 + 中文首字。
- * 刻意不把 iconName 反射映射到 ImageVector：预置数据有 30 个图标名，
- * 任一在当前 Compose BOM 的图标集里不存在就会让整份映射表编译失败。
+ * 第 4 批：分类标识统一为「中性单色圆 + 中文首字」。
+ * colorHex 字段仍保留在 Entity / 备份 / 环形图里（扇区需要颜色区分），
+ * 但明细与记一笔的分类标识不再按分类上色：6~7 种颜色跳，列表一眼看过去不整齐。
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun CategoryIcon(name: String?, colorHex: String?, size: Int = 40) {
-    val bg = parseColor(colorHex)
     Box(
         modifier = Modifier
             .size(size.dp)
-            .background(bg, CircleShape),
+            .background(LedgerColors.Neutral.copy(alpha = 0.10f), CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = name?.take(1) ?: "?",
-            color = Color.White,
+            color = LedgerColors.Neutral,
             style = MaterialTheme.typography.bodyMedium
         )
     }
-}
-
-private fun parseColor(hex: String?): Color = try {
-    if (hex == null) LedgerColors.Neutral
-    else Color(android.graphics.Color.parseColor(hex))
-} catch (e: IllegalArgumentException) {
-    LedgerColors.Neutral
 }
 
 fun amountColor(type: RecordType): Color = when (type) {
     RecordType.EXPENSE -> LedgerColors.ExpenseRed
     RecordType.INCOME -> LedgerColors.IncomeGreen
     RecordType.TRANSFER -> LedgerColors.Neutral
-    // 报销 / 退款是收回款，按正向色显示
     RecordType.SETTLEMENT -> LedgerColors.IncomeGreen
 }
 
-/** 金额展示：整数分 -> 元的两位小数。 */
 fun formatCents(cents: Long): String = Cents(cents).toYuanString()
 
 fun signedAmount(type: RecordType, cents: Long): String = when (type) {

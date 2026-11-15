@@ -1,5 +1,6 @@
 package com.zwz.offlineledger.ui.charts
 
+import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -16,19 +17,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
+import com.zwz.offlineledger.engine.ChartData
 import com.zwz.offlineledger.ui.theme.LedgerColors
+import kotlin.math.roundToInt
 
 data class LineSeries(val label: String, val color: Color, val values: List<Float>)
 
 /**
- * 原生 Canvas 折线图：竖轴具体数值 + 网格 + 折线 + 数据点 + 横轴标签。
- * values 已是 ChartData.normalize 算好的 0..1 比例，UI 不碰金额换算。
- * 第三批：yLabels 显示刻度金额，chartHeight 横屏可调大，labelEvery>0 时铺满横轴标签。
+ * 原生 Canvas 折线图：竖轴刻度 + 折线 + 数据点 + 横轴标签 + 常驻点数值。
+ * values 是 ChartData.normalize 算好的 0..1 比例，UI 不碰金额换算；
+ * valueLabels 由调用方按原始金额传入（元，两位小数）。
+ * 第 4 批：竖屏常驻标峰值 / 末点 / 选中点，横屏 annotateAll 全量标。
  */
 @Composable
 fun LineChart(
@@ -38,6 +42,9 @@ fun LineChart(
     yLabels: List<String> = emptyList(),
     chartHeight: Dp = 170.dp,
     labelEvery: Int = 0,
+    valueLabels: List<String> = emptyList(),
+    annotateAll: Boolean = false,
+    selectedIndex: Int? = null,
     onPointTap: ((Int) -> Unit)? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -94,7 +101,7 @@ fun LineChart(
             ) {
                 val w = size.width
                 val h = size.height
-                val padTop = 10f
+                val padTop = 22f
                 val padBottom = 10f
                 val padX = 8f
                 val plotH = h - padTop - padBottom
@@ -128,6 +135,27 @@ fun LineChart(
                         } else {
                             drawCircle(color = s.color, radius = 3f, center = points.first())
                             drawCircle(color = s.color, radius = 3f, center = points.last())
+                        }
+                    }
+
+                    if (valueLabels.isNotEmpty()) {
+                        val marked = ChartData.annotationIndices(
+                            series.first().values, selectedIndex, annotateAll
+                        )
+                        val paint = Paint().apply {
+                            color = LedgerColors.Neutral.toArgb()
+                            textSize = 10.dp.toPx()
+                            textAlign = Paint.Align.CENTER
+                            isAntiAlias = true
+                        }
+                        val pts = series.first().values.mapIndexed { idx, v ->
+                            Offset(padX + step * idx, padTop + plotH * (1f - v.coerceIn(0f, 1f)))
+                        }
+                        marked.forEach { idx ->
+                            val label = valueLabels.getOrNull(idx) ?: return@forEach
+                            val p = pts.getOrNull(idx) ?: return@forEach
+                            val ty = if (p.y < 30f) p.y + 18f else p.y - 8f
+                            drawContext.canvas.nativeCanvas.drawText(label, p.x, ty, paint)
                         }
                     }
                 }

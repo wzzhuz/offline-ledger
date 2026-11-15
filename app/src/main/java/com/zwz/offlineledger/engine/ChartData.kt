@@ -12,6 +12,27 @@ import kotlin.math.abs
  */
 object ChartData {
 
+    /**
+     * 第 4 批：折线图常驻数值标注的点集合。
+     * 竖屏只标峰值 / 末点 / 当前选中点（31 天或 12 月全标会糊成一团），
+     * 横屏全屏页 annotateAll 全量标。纯 JVM，金额换算不在这里做。
+     */
+    fun annotationIndices(
+        values: List<Float>,
+        selectedIndex: Int?,
+        annotateAll: Boolean
+    ): Set<Int> {
+        if (values.isEmpty()) return emptySet()
+        if (annotateAll) return values.indices.toSet()
+        val out = LinkedHashSet<Int>()
+        val peak = values.indices.maxByOrNull { values[it] } ?: -1
+        if (peak >= 0 && values[peak] > 0f) out.add(peak)
+        out.add(values.lastIndex)
+        selectedIndex?.let { if (it in values.indices) out.add(it) }
+        return out
+    }
+
+
     data class ChartSlice(
         val id: Long?,
         val name: String,
