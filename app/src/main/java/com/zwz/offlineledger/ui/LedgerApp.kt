@@ -1,6 +1,8 @@
 package com.zwz.offlineledger.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -33,8 +35,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.zwz.offlineledger.ui.assets.AssetsScreen
-import com.zwz.offlineledger.ui.budget.BudgetManagerDialog
+import com.zwz.offlineledger.ui.budget.BudgetManagerScreen
 import com.zwz.offlineledger.ui.detail.DetailScreen
+import com.zwz.offlineledger.ui.detail.DetailViewModel
 import com.zwz.offlineledger.ui.record.RecordEditorDialog
 import com.zwz.offlineledger.ui.settings.BackupSettingsScreen
 import com.zwz.offlineledger.ui.settings.CategoryManagerScreen
@@ -43,7 +46,7 @@ import com.zwz.offlineledger.ui.settings.PreferenceSettingsScreen
 import com.zwz.offlineledger.ui.settings.SecuritySettingsScreen
 import com.zwz.offlineledger.ui.settings.SettingsScreen
 import com.zwz.offlineledger.ui.stats.StatsScreen
-import com.zwz.offlineledger.ui.templates.TemplateManagerDialog
+import com.zwz.offlineledger.ui.templates.TemplateManagerScreen
 import com.zwz.offlineledger.ui.trash.TrashScreen
 
 private data class TabSpec(val route: String, val label: String, val icon: ImageVector)
@@ -65,6 +68,17 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
     var showEditor by remember { mutableStateOf(startWithRecordEntry) }
     var editorRecordId by remember { mutableStateOf<Long?>(null) }
     var refreshTick by remember { mutableStateOf(0) }
+
+    // 第 5 批：ViewModel 与滚动状态提升到 Activity 作用域。
+    // 切到资产页核对再回来时，筛选条件与列表位置都保留，不用重设、不用重滚。
+    val detailVm: DetailViewModel = viewModel(
+        factory = ledgerFactory(context) { ep ->
+            DetailViewModel(
+                ep.recordDao(), ep.accountDao(), ep.categoryDao(), ep.ledgerRepository()
+            )
+        }
+    )
+    val detailListState = rememberLazyListState()
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -131,6 +145,8 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
             composable("detail") {
                 DetailScreen(
                     refreshTick = refreshTick,
+                    vm = detailVm,
+                    listState = detailListState,
                     onEdit = { id -> openEditor(id) }
                 )
             }
@@ -152,8 +168,8 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
             composable("trash") {
                 TrashScreen(onBack = { goBack() }, onChanged = { })
             }
-            composable("templates") { TemplateManagerDialog(onDismiss = { goBack() }) }
-            composable("budgets") { BudgetManagerDialog(onDismiss = { goBack() }) }
+            composable("templates") { TemplateManagerScreen(onBack = { goBack() }) }
+            composable("budgets") { BudgetManagerScreen(onBack = { goBack() }) }
         }
     }
 

@@ -25,6 +25,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -180,8 +182,9 @@ fun RecordEditorDialog(
                                 modifier = Modifier.weight(1f).padding(start = 4.dp)
                             )
                         }
-                        val quick = if (state.counterparty.isBlank())
-                            counterparties.take(8) else suggestions
+                        // 第 5 批：空输入不再平铺最近 chips，输入后才联想，减少首屏噪音。
+                        val quick: List<String> = if (state.counterparty.isBlank())
+                            emptyList() else suggestions
                         if (quick.isNotEmpty()) {
                             Row(
                                 modifier = Modifier.fillMaxWidth()
@@ -246,19 +249,21 @@ fun RecordEditorDialog(
     }
 }
 
+/** 第 5 批：三个凸起 Button 换成平铺 TabRow，少一层视觉重量。 */
 @Composable
 private fun TypeTabs(current: RecordType, onSelect: (RecordType) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf(
-            "支出" to RecordType.EXPENSE,
-            "收入" to RecordType.INCOME,
-            "转账" to RecordType.TRANSFER
-        ).forEach { (label, type) ->
-            Button(
+    val items = listOf(
+        "支出" to RecordType.EXPENSE,
+        "收入" to RecordType.INCOME,
+        "转账" to RecordType.TRANSFER
+    )
+    TabRow(selectedTabIndex = items.indexOfFirst { it.second == current }.coerceAtLeast(0)) {
+        items.forEach { (label, type) ->
+            Tab(
+                selected = current == type,
                 onClick = { onSelect(type) },
-                modifier = Modifier.weight(1f),
-                enabled = current != type
-            ) { Text(label) }
+                text = { Text(label) }
+            )
         }
     }
 }
@@ -331,24 +336,24 @@ private fun AccountStrip(
 ) {
     val visible = accounts.filter { !it.isArchived }
     if (type == RecordType.TRANSFER) {
-        AccountChips("转出", visible, fromId, onFrom)
-        AccountChips("转入", visible, toId, onTo)
+        AccountPicker("转出", visible, fromId, onFrom)
+        AccountPicker("转入", visible, toId, onTo)
     } else {
         val chosenId = if (type == RecordType.EXPENSE) fromId else toId
         val cc = visible.firstOrNull { it.id == chosenId }?.currencyCode
         val label = (if (type == RecordType.EXPENSE) "支出账户" else "收入账户") +
             (cc?.let { " · $it" } ?: "")
-        AccountChips(label, visible, chosenId,
+        AccountPicker(label, visible, chosenId,
             if (type == RecordType.EXPENSE) onFrom else onTo)
     }
 }
 
 /**
- * 阶段 8：常用账户（ViewModel 已按最近 30 天频次排序）平铺 6 个，
- * 其余收进「全部账户」弹层并按名称搜索；10 多个账户也不必横向拖动。
+ * 第 5 批：不再平铺 6 个账户 chips，首屏只显示当前选中账户；
+ * 点开进「全部账户」弹层搜索选择，长账户名（含卡号后缀）完整显示。
  */
 @Composable
-private fun AccountChips(
+private fun AccountPicker(
     label: String,
     accounts: List<AccountEntity>,
     selectedId: Long?,
@@ -356,23 +361,19 @@ private fun AccountChips(
 ) {
     var showAll by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+    val chosen = accounts.firstOrNull { it.id == selectedId }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+    ) {
         Text(text = label, style = MaterialTheme.typography.labelSmall)
-        Row(
-            modifier = Modifier.weight(1f)
-                .horizontalScroll(rememberScrollState())
-        ) {
-            accounts.take(6).forEach { a ->
-                TextButton(onClick = { onSelect(a.id) }) {
-                    Text(
-                        text = if (a.id == selectedId) "● ${a.name}" else a.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (a.id == selectedId) LedgerColors.IncomeGreen
-                        else LedgerColors.Neutral
-                    )
-                }
-            }
-            TextButton(onClick = { showAll = true }) { Text("全部 ▾") }
+        TextButton(onClick = { showAll = true }) {
+            Text(
+                text = chosen?.let { "● ${it.name}" } ?: "选择账户 ▾",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (chosen != null) LedgerColors.IncomeGreen else LedgerColors.Neutral,
+                maxLines = 1
+            )
         }
     }
     if (showAll) {
@@ -384,7 +385,7 @@ private fun AccountChips(
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        label = { Text("搜索账户名") },
+                        label = { Text("搜索账户名（含卡号后缀）") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )

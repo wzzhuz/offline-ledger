@@ -46,11 +46,15 @@ import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.model.Cadence
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.ledgerFactory
+import com.zwz.offlineledger.ui.settings.SettingsPageTopBar
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
-/** 设置页入口。Dialog 内两个 Tab，不改 4 Tab 底部导航。 */
+/**
+ * 第 5 批：管理类页面统一为独立全屏页，与分类管理风格一致；
+ * 不再套一层「很大的 Dialog」，避免风格割裂。
+ */
 @Composable
-fun TemplateManagerDialog(onDismiss: () -> Unit) {
+fun TemplateManagerScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: TemplateManagerViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
@@ -65,113 +69,99 @@ fun TemplateManagerDialog(onDismiss: () -> Unit) {
     var editing by remember { mutableStateOf<RecordTemplateEntity?>(null) }
     var deleting by remember { mutableStateOf<RecordTemplateEntity?>(null) }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "模板与周期记账",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f).padding(start = 16.dp)
-                    )
-                    TextButton(onClick = onDismiss) { Text("关闭") }
+    Column(modifier = Modifier.fillMaxSize()) {
+        SettingsPageTopBar("模板与周期记账", onBack)
+        TabRow(selectedTabIndex = tab) {
+            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("模板") })
+            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("周期规则") })
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            if (state.message.isNotBlank()) {
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LedgerColors.Neutral,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+            if (tab == 0) {
+                Text(
+                    text = "模板是预填草稿：金额可留空，选模板后自动填充并可自由调整。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LedgerColors.Neutral
+                )
+                if (state.templates.isEmpty()) {
+                    Text("还没有模板。在下面新增一个，之后记一笔点一下即可填充。")
                 }
-                TabRow(selectedTabIndex = tab) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("模板") })
-                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("周期规则") })
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(12.dp)
-                ) {
-                    if (state.message.isNotBlank()) {
+                state.templates.filter { !it.isArchived }.forEach { t ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val amount = if (t.amountCents > 0L)
+                            Cents(t.amountCents).toYuanString() + " 元" else "金额待填"
+                        val path = categoryPath(t.categoryId, state.categories)
                         Text(
-                            text = state.message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = LedgerColors.Neutral,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            text = t.name + " · " + typeLabel(t.type) + " · " + amount +
+                                (if (path.isBlank()) "" else " · " + path),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium
                         )
-                    }
-                    if (tab == 0) {
-                        Text(
-                            text = "模板是预填草稿：金额可留空，选模板后自动填充并可自由调整。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = LedgerColors.Neutral
-                        )
-                        if (state.templates.isEmpty()) {
-                            Text("还没有模板。在下面新增一个，之后记一笔点一下即可填充。")
-                        }
-                        state.templates.filter { !it.isArchived }.forEach { t ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val amount = if (t.amountCents > 0L)
-                                    Cents(t.amountCents).toYuanString() + " 元" else "金额待填"
-                                val path = categoryPath(t.categoryId, state.categories)
-                                Text(
-                                    text = t.name + " · " + typeLabel(t.type) + " · " + amount +
-                                        (if (path.isBlank()) "" else " · " + path),
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                TextButton(onClick = { editing = t }) { Text("编辑") }
-                                TextButton(onClick = { deleting = t }) {
-                                    Text("删除", color = LedgerColors.ExpenseRed)
-                                }
-                            }
-                        }
-                        val archived = state.templates.count { it.isArchived }
-                        if (archived > 0) {
-                            Text(
-                                text = "已归档 $archived 个模板",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = LedgerColors.Neutral
-                            )
-                        }
-                    } else {
-                        if (state.rules.isEmpty()) {
-                            Text("还没有周期规则。房租、工资、话费、订阅可用它自动补记。")
-                        }
-                        state.rules.forEach { r ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = r.name + " · " + Cents(r.amountCents).toYuanString() +
-                                        " 元 · " + cadenceLabel(r.cadence),
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Switch(
-                                    checked = r.isEnabled,
-                                    onCheckedChange = { vm.setRuleEnabled(r.id, it) }
-                                )
-                            }
+                        TextButton(onClick = { editing = t }) { Text("编辑") }
+                        TextButton(onClick = { deleting = t }) {
+                            Text("删除", color = LedgerColors.ExpenseRed)
                         }
                     }
-
+                }
+                val archived = state.templates.count { it.isArchived }
+                if (archived > 0) {
                     Text(
-                        text = if (tab == 0)
-                            (if (editing == null) "新增模板" else "编辑模板「" + editing!!.name + "」")
-                        else "新增周期规则",
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                        text = "已归档 $archived 个模板",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LedgerColors.Neutral
                     )
-                    QuickEntryForm(
-                        isRule = tab == 1,
-                        editing = if (tab == 0) editing else null,
-                        categories = state.categories,
-                        accountNames = state.accounts.map { it.id to it.name },
-                        onSubmitTemplate = { t ->
-                            if (t.id != 0L) vm.updateTemplate(t) else vm.saveTemplate(t)
-                            editing = null
-                        },
-                        onSubmitRule = { vm.saveRule(it) },
-                        onCancelEdit = { editing = null }
-                    )
+                }
+            } else {
+                if (state.rules.isEmpty()) {
+                    Text("还没有周期规则。房租、工资、话费、订阅可用它自动补记。")
+                }
+                state.rules.forEach { r ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = r.name + " · " + Cents(r.amountCents).toYuanString() +
+                                " 元 · " + cadenceLabel(r.cadence),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Switch(
+                            checked = r.isEnabled,
+                            onCheckedChange = { vm.setRuleEnabled(r.id, it) }
+                        )
+                    }
                 }
             }
+
+            Text(
+                text = if (tab == 0)
+                    (if (editing == null) "新增模板" else "编辑模板「" + editing!!.name + "」")
+                else "新增周期规则",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+            )
+            QuickEntryForm(
+                isRule = tab == 1,
+                editing = if (tab == 0) editing else null,
+                categories = state.categories,
+                accountNames = state.accounts.map { it.id to it.name },
+                onSubmitTemplate = { t ->
+                    if (t.id != 0L) vm.updateTemplate(t) else vm.saveTemplate(t)
+                    editing = null
+                },
+                onSubmitRule = { vm.saveRule(it) },
+                onCancelEdit = { editing = null }
+            )
         }
     }
 

@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -59,17 +63,11 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun DetailScreen(
-    refreshTick: Int = 0,
+    refreshTick: Int,
+    vm: DetailViewModel,
+    listState: LazyListState,
     onEdit: (Long) -> Unit
 ) {
-    val context = LocalContext.current
-    val vm: DetailViewModel = viewModel(
-        factory = ledgerFactory(context) { ep ->
-            DetailViewModel(
-                ep.recordDao(), ep.accountDao(), ep.categoryDao(), ep.ledgerRepository()
-            )
-        }
-    )
     val pagingItems = vm.pagingData.collectAsLazyPagingItems()
     val overview by vm.overview.collectAsState()
     val filter by vm.filter.collectAsState()
@@ -97,7 +95,7 @@ fun DetailScreen(
             onFilter = { showFilter = true }
         )
 
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
             items(
                 count = pagingItems.itemCount,
                 key = pagingItems.itemKey { it.id }
@@ -342,8 +340,8 @@ private fun DayHeader(localDate: Int, totals: Pair<Long, Long>?) {
 }
 
 /**
- * 第 4 批：固定四列网格（时间 / 分类·对方 / 账户 / 金额），统一行高与细分割线，
- * 去掉卡片堆叠与阴影。信息密度上来了，空白才不是「没内容」的空白。
+ * 第 5 批：按真机对账习惯重排——收款方/来源为主行，分类降为小字；
+ * 左侧方向箭头区分支出 / 收入 / 转账；账户名不再被 64dp 截断。
  */
 @Composable
 private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
@@ -357,54 +355,89 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
         "%02d:%02d".format(z.hour, z.minute)
     }
     val account = row.fromAccountName ?: row.toAccountName ?: "-"
-    val party = row.counterparty.takeIf { it.isNotBlank() }?.let { value ->
-        when (type) {
-            RecordType.INCOME -> "来源 " + value
-            RecordType.TRANSFER -> null
-            else -> "收款方 " + value
-        }
+    val category = row.categoryName ?: "转账"
+    val party = row.counterparty.takeIf { it.isNotBlank() }
+    val primary = when {
+        type == RecordType.TRANSFER -> "转账"
+        party != null -> party
+        else -> category
     }
-    val sub = listOfNotNull(party, row.note.takeIf { it.isNotBlank() }).joinToString(" · ")
+    val partyTag = when {
+        type == RecordType.TRANSFER -> null
+        party == null -> null
+        type == RecordType.INCOME -> "来源"
+        else -> "收款方"
+    }
+    val secondary = listOfNotNull(
+        category.takeIf { primary != category },
+        row.note.takeIf { it.isNotBlank() && it != primary }
+    ).joinToString(" · ")
+    val accent = when (type) {
+        RecordType.EXPENSE -> LedgerColors.ExpenseRed
+        RecordType.INCOME -> LedgerColors.IncomeGreen
+        RecordType.TRANSFER -> MaterialTheme.colorScheme.primary
+        RecordType.SETTLEMENT -> LedgerColors.IncomeGreen
+    }
+    val arrow = when (type) {
+        RecordType.EXPENSE -> "←"
+        RecordType.INCOME -> "→"
+        RecordType.TRANSFER -> "⇄"
+        RecordType.SETTLEMENT -> "↩"
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
+            .heightIn(min = 60.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = timeLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral,
-            modifier = Modifier.width(40.dp)
-        )
-        Column(modifier = Modifier.weight(1f).padding(horizontal = 8.dp)) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .background(accent, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
-                text = row.categoryName ?: "转账",
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                text = arrow,
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge
             )
-            if (sub.isNotEmpty()) {
+        }
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = sub,
+                    text = primary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (partyTag != null) {
+                    Text(
+                        text = " " + partyTag,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LedgerColors.Neutral
+                    )
+                }
+            }
+            if (secondary.isNotEmpty()) {
+                Text(
+                    text = secondary,
                     style = MaterialTheme.typography.labelSmall,
                     color = LedgerColors.Neutral,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            Text(
+                text = timeLabel + " · " + account,
+                style = MaterialTheme.typography.labelSmall,
+                color = LedgerColors.Neutral,
+                maxLines = 2
+            )
         }
-        Text(
-            text = account,
-            style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.width(64.dp)
-        )
         Text(
             text = signedAmount(type, row.amountCents),
             color = amountColor(type),

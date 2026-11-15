@@ -60,7 +60,7 @@ internal fun settingsVm(): SettingsViewModel {
 }
 
 @Composable
-internal fun SettingsPageTopBar(title: String, onBack: () -> Unit) {
+fun SettingsPageTopBar(title: String, onBack: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -129,6 +129,7 @@ fun BackupSettingsScreen(onBack: () -> Unit) {
 
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
     var passwordMode by remember { mutableStateOf<PasswordMode?>(null) }
+    var showCsvHelp by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -190,13 +191,32 @@ fun BackupSettingsScreen(onBack: () -> Unit) {
             ) { Text("导入账单") }
         }
         Text(
-            text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
-                "导入使用 CSV/TSV 模板：date, type, amount, account, " +
-                "categoryRoot, category, note, currencyCode, counterparty" +
-                "（币种列导入时按账户继承；counterparty 列可选，缺列按空处理）。",
+            text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral
         )
+        TextButton(onClick = { showCsvHelp = !showCsvHelp }) {
+            Text(if (showCsvHelp) "收起导入字段说明" else "查看导入字段说明与示例")
+        }
+        if (showCsvHelp) {
+            Text(
+                text = "首行必须是表头，逗号或制表符分隔，列顺序固定：\n" +
+                    "date 日期 YYYY-MM-DD（必填）\n" +
+                    "type 类型：EXPENSE 支出 / INCOME 收入（必填）\n" +
+                    "amount 金额：元，可带两位小数（必填）\n" +
+                    "account 账户名：需与 App 内账户名完全一致（必填）\n" +
+                    "categoryRoot 一级分类名（可选）\n" +
+                    "category 二级分类名（可选）\n" +
+                    "note 备注（可选）\n" +
+                    "currencyCode 币种：CNY / HKD / USD，留空按账户继承（可选）\n" +
+                    "counterparty 收款方或付款方（可选，缺列按空处理）\n" +
+                    "示例：2026-11-15,EXPENSE,38.50,中国银行7375,餐饮,正餐,午餐,CNY,好优特生活超市\n" +
+                    "导入前整体校验，任何一行不合法都不写入；" +
+                    "按「账户 + 金额 + 日期 + 备注」自动跳过重复流水。",
+                style = MaterialTheme.typography.labelSmall,
+                color = LedgerColors.Neutral
+            )
+        }
         if (state.message.isNotBlank()) {
             Text(text = state.message, style = MaterialTheme.typography.bodySmall)
         }

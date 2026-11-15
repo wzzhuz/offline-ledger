@@ -37,11 +37,14 @@ import com.zwz.offlineledger.data.local.entity.BudgetEntity
 import com.zwz.offlineledger.data.model.BudgetScope
 import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.ledgerFactory
+import com.zwz.offlineledger.ui.settings.SettingsPageTopBar
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
-/** 设置页入口。Dialog 内列表 + 新增 + 归档，不改 4 Tab 导航。 */
+/**
+ * 第 5 批：预算管理改为独立全屏页，与分类管理 / 模板管理风格一致。
+ */
 @Composable
-fun BudgetManagerDialog(onDismiss: () -> Unit) {
+fun BudgetManagerScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: BudgetManagerViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
@@ -52,64 +55,50 @@ fun BudgetManagerDialog(onDismiss: () -> Unit) {
     )
     val state by vm.state.collectAsState()
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        SettingsPageTopBar("预算管理", onBack)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            if (state.message.isNotBlank()) {
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LedgerColors.Neutral
+                )
+            }
+            Text(
+                text = "规则对每个自然月生效；统计页按当月净支出显示进度。",
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.Neutral,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            if (state.budgets.isEmpty()) {
+                Text("还没有预算。在下面新增一条，例如「餐饮 1000 元」。")
+            }
+            state.budgets.forEach { b ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "预算管理",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f).padding(start = 16.dp)
-                    )
-                    TextButton(onClick = onDismiss) { Text("关闭") }
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(12.dp)
-                ) {
-                    if (state.message.isNotBlank()) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = state.message,
+                            text = b.name + " · " + scopeLabel(b.scope) +
+                                if (b.isArchived) "（已归档）" else "",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "每月限额 " + formatCents(b.limitCents) + " 元",
                             style = MaterialTheme.typography.bodySmall,
                             color = LedgerColors.Neutral
                         )
                     }
-                    Text(
-                        text = "规则对每个自然月生效；统计页按当月净支出显示进度。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = LedgerColors.Neutral,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    if (state.budgets.isEmpty()) {
-                        Text("还没有预算。在下面新增一条，例如「餐饮 1000 元」。")
+                    if (!b.isArchived) {
+                        TextButton(onClick = { vm.archive(b.id) }) { Text("归档") }
                     }
-                    state.budgets.forEach { b ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = b.name + " · " + scopeLabel(b.scope) +
-                                        if (b.isArchived) "（已归档）" else "",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Text(
-                                    text = "每月限额 " + formatCents(b.limitCents) + " 元",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = LedgerColors.Neutral
-                                )
-                            }
-                            if (!b.isArchived) {
-                                TextButton(onClick = { vm.archive(b.id) }) { Text("归档") }
-                            }
-                        }
-                    }
-                    BudgetForm(categories = state.categories, onSubmit = { vm.save(it) })
                 }
             }
+            BudgetForm(categories = state.categories, onSubmit = { vm.save(it) })
         }
     }
 }
