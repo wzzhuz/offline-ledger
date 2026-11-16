@@ -141,7 +141,7 @@
 - [x] 二级页隐藏底栏，4 Tab 主路由结构不变
 - [x] `defaultVersionName` 升 `0.1.1`；release 产物名带短 commit sha，不再同名覆盖
 - [x] 六个静态检查本地预跑
-- [ ] CI 与 release 实测回填（本节末尾补）
+- [x] CI 与 release 实测回填（见本节末尾）（本节末尾补）
 - [ ] 真机观感复核：6.73 寸四列是否齐、点数值是否互相压住、横屏全标密度
 
 
@@ -243,3 +243,20 @@
 - [ ] CI 与 release 实测回填
 - [ ] 真机观感复核：输入框高度、底色选中态、点标签打开全量、展开区是否免上滑
 - [ ] 归档本 change（待使用者明确发话）
+
+### 第 8 批实测（2026-11-16）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `13e8370326c5`（7 文件）→ 修复 `e9d0023fbaff` |
+| 首推 CI `43817564955` | **failure**，挂在「运行单元测试」：误给 `OutlinedTextField` 加 `contentPadding`，解析到 `TextFieldValue` 重载 |
+| 诊断 | job logs 403，临时回传 `diag/unit.log` 读取；步骤与文件已移除，远端核查无残留 |
+| push CI `43818652907` | **success**，17 步全绿（六个静态检查 / 单测 / debug APK / release lintVital / 签名诊断） |
+| release `43819646011` | **success**，23 步 success、5 步按 input 正常 skipped，R8 编译、坚果云上传、mapping / metrics 齐全 |
+| 制品 | `offline-ledger-release-v0.1.5` 12,188,882 B；`mapping-v0.1.5` 3,415,945 B；`metrics-v0.1.5-p-m-nsfalse` 270 B |
+| 坚果云 | 步骤 success 且 `skipped=false`；HEAD 落盘校验只写日志不中断，不等同已验证 HEAD 200 |
+| 上一轮遗漏 | `ef6d00f61e46` 的 CI `43799880234` 实为 failure（挂在「检出代码」，仅文档 commit），已如实写入 `design.md` |
+
+**修复要点**：三个输入框统一 `Modifier.height(48.dp)` 取代 `contentPadding`，
+删除 `PaddingValues` import。这是本项目首次因新增 Material3 命名参数触发重载解析问题，
+根因与回退顺序已写进 `design.md`「第 8 批首轮失败」。
