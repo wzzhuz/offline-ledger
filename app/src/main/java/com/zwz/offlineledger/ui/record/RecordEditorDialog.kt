@@ -17,8 +17,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -98,6 +96,7 @@ fun RecordEditorDialog(
     var showTimePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val localDate = LedgerClock.fromEpochMilli(state.timestamp).localDate
+    val todayLocalDate = LedgerClock.fromEpochMilli(System.currentTimeMillis()).localDate
     val zonedTime = java.time.Instant.ofEpochMilli(state.timestamp)
         .atZone(LedgerClock.zoneId)
     val timeLabel = "%02d:%02d".format(zonedTime.hour, zonedTime.minute)
@@ -138,6 +137,16 @@ fun RecordEditorDialog(
                         style = MaterialTheme.typography.displaySmall,
                         modifier = Modifier.padding(vertical = 6.dp)
                     )
+                    // 第 7 批：日期时间是自解释的元数据，不再占一行网格标签，
+                    // 也不再与金额挤同一行（长金额会挤压右侧）。金额保住视觉锚点。
+                    DateTimeRow(
+                        localDate = localDate,
+                        timeLabel = timeLabel,
+                        isToday = localDate == todayLocalDate,
+                        onPick = { showDatePicker = true },
+                        onPickTime = { showTimePicker = true },
+                        onToday = { vm.setToday() }
+                    )
                     FormDivider()
 
                     if (state.type != RecordType.TRANSFER) {
@@ -164,36 +173,17 @@ fun RecordEditorDialog(
                         )
                     }
 
-                    FormRow("日期") {
-                        DateRow(
-                            localDate = localDate,
-                            timeLabel = timeLabel,
-                            onPick = { showDatePicker = true },
-                            onPickTime = { showTimePicker = true },
-                            onPrev = { vm.shiftDay(-1) },
-                            onNext = { vm.shiftDay(1) },
-                            onToday = { vm.setToday() }
-                        )
-                    }
-
-                    // 阶段 8：转账不显示交易对方；收入显示「付款方 / 来源」。
+                    // 第 7 批：交易对方仍仅支出 / 收入显示；备注移到「更多」后
+                    // 转账也能用（还信用卡、转生活费等），只是不显示对方。
                     if (state.type != RecordType.TRANSFER) {
                         val partyLabel = if (state.type == RecordType.INCOME)
                             "付款方 / 来源" else "收款方"
-                        FormRow("备注") {
-                            OutlinedTextField(
-                                value = state.note,
-                                onValueChange = { vm.setNote(it) },
-                                label = { Text("可选") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
                         FormRow("对方") {
                             OutlinedTextField(
                                 value = state.counterparty,
                                 onValueChange = { vm.setCounterparty(it) },
-                                label = { Text(partyLabel) },
+                                placeholder = { Text(partyLabel) },
+                                textStyle = MaterialTheme.typography.bodyMedium,
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -215,10 +205,31 @@ fun RecordEditorDialog(
                         }
                     }
 
+                    // 第 7 批：备注是低频项，默认收进「更多」；编辑已有备注的流水
+                    // 在按钮上显示摘要，点开即可改，旧内容绝不会看不见。
+                    val noteSummary = if (state.note.length > 18)
+                        state.note.take(18) + "…" else state.note
                     TextButton(onClick = { showMore = !showMore }) {
-                        Text(if (showMore) "收起" else "更多")
+                        Text(
+                            text = when {
+                                showMore -> "收起"
+                                noteSummary.isBlank() -> "更多（备注 · 不计入收支）"
+                                else -> "备注：$noteSummary · 更多"
+                            },
+                            style = MaterialTheme.typography.labelMedium
+                        )
                     }
                     if (showMore) {
+                        FormRow("备注") {
+                            OutlinedTextField(
+                                value = state.note,
+                                onValueChange = { vm.setNote(it) },
+                                placeholder = { Text("补充这笔账的说明（可选）") },
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(text = "不计入收支", modifier = Modifier.weight(1f))
                             Switch(
@@ -430,26 +441,35 @@ private fun AccountQuickRow(
     }
 }
 
+/**
+ * 第 7 批：无标签副行，日期与时间本身自解释。去掉 ‹ › 两个箭头，
+ * 「今天」只在当前不是今天时出现，常态下这一行只有「11月16日 14:30」。
+ */
 @Composable
-private fun DateRow(
+private fun DateTimeRow(
     localDate: Int,
     timeLabel: String,
+    isToday: Boolean,
     onPick: () -> Unit,
     onPickTime: () -> Unit,
-    onPrev: () -> Unit,
-    onNext: () -> Unit,
     onToday: () -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = onPick) { Text(MonthRange.dateLabel(localDate)) }
-        TextButton(onClick = onPickTime) { Text(timeLabel) }
-        IconButton(onClick = onPrev) {
-            Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "前一天")
+        TextButton(onClick = onPick) {
+            Text(MonthRange.dateLabel(localDate), style = MaterialTheme.typography.bodyMedium)
         }
-        IconButton(onClick = onNext) {
-            Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "后一天")
+        TextButton(onClick = onPickTime) {
+            Text(timeLabel, style = MaterialTheme.typography.bodyMedium)
         }
-        TextButton(onClick = onToday) { Text("今天") }
+        if (!isToday) {
+            TextButton(onClick = onToday) {
+                Text(
+                    "今天",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral
+                )
+            }
+        }
     }
 }
 
@@ -518,14 +538,14 @@ private const val QUICK_COUNT = 4
 @Composable
 private fun FormRow(label: String, content: @Composable () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.bodyMedium,
             color = LedgerColors.Neutral,
-            modifier = Modifier.width(52.dp).padding(top = 12.dp)
+            modifier = Modifier.width(52.dp).padding(top = 14.dp)
         )
         Column(modifier = Modifier.weight(1f)) { content() }
     }
