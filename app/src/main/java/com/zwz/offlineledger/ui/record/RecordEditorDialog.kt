@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
@@ -185,9 +184,9 @@ fun RecordEditorDialog(
                                 placeholder = { Text(partyLabel) },
                                 textStyle = MaterialTheme.typography.bodyMedium,
                                 singleLine = true,
-                                // 第 8 批：默认 contentPadding 为浮动 label 预留了上下空间，
-                                // 我们已用 placeholder，收紧后输入框明显变矮。
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                // 第 8 批：无 label（已改 placeholder）时用固定 48dp 收紧
+                                // 默认的 56dp 高度。注意：Material3 的 contentPadding 参数
+                                // 只存在于 TextFieldValue 重载，String 版加它会解析到错误重载。
                                 // 仅在有内容时出现，一键清空，不必用输入法逐字删除。
                                 trailingIcon = {
                                     if (state.counterparty.isNotEmpty()) {
@@ -207,7 +206,7 @@ fun RecordEditorDialog(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
                             )
                             // 第 6 批：空输入列最近常用，输入后改联想；快捷区上限可数。
                             val quick: List<String> = if (state.counterparty.isBlank())
@@ -267,10 +266,7 @@ fun RecordEditorDialog(
                                     placeholder = { Text("可选") },
                                     textStyle = MaterialTheme.typography.bodyMedium,
                                     singleLine = true,
-                                    contentPadding = PaddingValues(
-                                        horizontal = 12.dp, vertical = 6.dp
-                                    ),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f).height(48.dp)
                                 )
                                 Text(
                                     text = "不计入",
@@ -470,10 +466,7 @@ private fun AccountStrip(
                         placeholder = { Text("搜索账户名（含卡号后缀）") },
                         textStyle = MaterialTheme.typography.bodyMedium,
                         singleLine = true,
-                        contentPadding = PaddingValues(
-                            horizontal = 12.dp, vertical = 6.dp
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
                     )
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         accounts.filter { it.name.contains(query, ignoreCase = true) }

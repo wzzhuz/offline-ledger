@@ -478,3 +478,33 @@ R8 包启动、SQLCipher 开库、BiometricPrompt、SAF 选择器、Excel 打开
 - 六个静态检查本地预跑 PASS。
 - 真机未验项继续累积：本批 6.73 寸观感、BiometricPrompt、SAF 选择器、
   Excel 打开 CSV、5 万条切月耗时。R8 启动与 SQLCipher 开库已在连续装机中通过。
+
+### 第 8 批首轮失败：contentPadding 重载陷阱
+
+首推 `13e8370326c5` 的 push CI `43817564955` 挂在「运行单元测试」，
+10 条 `e:` 报错里 3 条是 `None of the following candidates is applicable:
+actual type is 'String', but 'TextFieldValue' was expected`，
+其余 `Unresolved reference 'it'` / `@Composable invocations can only happen...`
+全是级联误报。
+
+根因：为了收紧输入框留白，给 `OutlinedTextField` 加了 `contentPadding` 命名参数。
+当前 Material3 里该参数只在 **`value: TextFieldValue`** 重载上提供，
+`value: String` 重载没有；编译器于是把 `state.counterparty` 往另一个重载上套，
+`onValueChange` 也随之变成 `(TextFieldValue) -> Unit`，后面的 lambda 全部报错。
+
+修复：**退回 `Modifier.height(48.dp)`**（第 8 批对齐门禁里预留的低风险改法），
+三个输入框（对方 / 备注 / 账户搜索）统一去掉 `contentPadding`，
+删掉不再使用的 `PaddingValues` import。`placeholder` 仍在，48dp 单行不裁切。
+
+这是本项目第 8 次「凭印象手写」类坑，也是首次因**新增 Material3 参数**触发的重载解析问题。
+教训写死：写 Compose 代码时，`String` 与 `TextFieldValue` 两个重载的参数集并不相同，
+新增命名参数前 MUST 先确认它属于哪个重载；`BasicTextField` +
+`OutlinedTextFieldDefaults.DecorationBox` 是更精确但风险更高的方案，留到真机反馈确实还不够矮时再上。
+
+诊断仍走老路：job logs / check-runs annotations 403，临时在 `build.yml` 把
+`gradle testDebugUnitTest` 输出回传 `diag/unit.log` 读取，用完步骤与文件都已移除。
+
+**另发现一处上轮遗漏**：上一轮文档回填 commit `ef6d00f61e46` 触发的 CI
+`43799880234` 其实是 **failure**（挂在「检出代码」），而我上轮只说「查询时还在跑」、
+没回头核。该 run 与代码无关（仅文档 commit、检出步骤失败），后续已由新 commit 的 CI 覆盖，
+但如实记在这里，避免把「没查」当成「通过」。
