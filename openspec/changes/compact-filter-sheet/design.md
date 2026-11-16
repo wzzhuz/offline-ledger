@@ -147,3 +147,26 @@ M3 `DatePicker` 的 `selectedDateMillis` 按 **UTC 午夜**计。若用 `Asia/Sh
   placeholder 对比度、DatePicker 弹窗观感、`FilterChip` 底色是否够清楚 → 必须由使用者装机看一眼
 - 累积未验清单（BiometricPrompt / SAF / Excel CSV / 5 万条切月耗时等）由指南 §8 继承，
   不因本批归档或出包被改写成「已通过」
+
+
+## 9. 实测回填（第 11 批）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `0e5d1ada719e`（14 个文件：7 源码 + 版本号 + 活文档 + change 四件套） |
+| push CI | `43857699177` **success**，17 步全绿，**首轮 Kotlin 编译零错误** |
+| 六个静态检查 | 本地与 CI 全 PASS；`check_transaction_annotations.py` 的 2 项迁移提示按「稳定版前暂缓」为记录性，不失败 |
+| release | `43858676724` **success**，23 步绿 / 5 步按 input 跳过（plain、AAB、创建 Release 未触发；lint 开启） |
+| 坚果云 | 步骤 `completed success`；metrics 制品名 `nsfalse` 表示 `skipped=false`（认证 / 建目录 / PUT 均未失败）。**HEAD 落盘校验只写日志不中断，不当作已验证 HEAD 200** |
+| 制品 | `offline-ledger-release-v0.1.8` 12,199,500 B；`mapping-v0.1.8` 3,436,220 B；`metrics-v0.1.8-p-m-nsfalse` 269 B |
+| 版本号 | `defaultVersionName = 0.1.8`，产物名带版本，**不再同名覆盖旧包** |
+| 零结构变更 | `AppDatabase` 仍 `version = 1`，无 Migration、无新增依赖 / 权限，Manifest 仍无 `INTERNET` → 覆盖安装即可 |
+
+**首轮零编译错误的原因**（指南 §6.1 第三次奏效）：动码前先写了本文件 §1 根因、§3 已证伪结论、§6 三级回退顺序；
+直接复用 `RecordEditorDialog.kt` 已验证的输入框写法；推送前本地粗扫了 import 清单与括号平衡。
+`FilterChip` 在 360dp 下用 `weight(1f)` 平分，避免 4 个 chip 溢出被裁——这是推送前主动补的一处风险点，
+不是 CI 报出来的。
+
+**未验证（必须由使用者装机确认）**：6.73 寸上 9 个维度是否真的一屏放得下、10+ 账户长名在全量弹层里是否完整、
+placeholder 对比度、`FilterChip` 底色是否清楚、`DatePickerDialog` 弹窗观感、切 Tab 返回后条件与滚动位置保持。
+累积未验清单（BiometricPrompt / SAF / Excel CSV / 5 万条切月耗时等）由活文档 §8 继承，不因本批出包改写。

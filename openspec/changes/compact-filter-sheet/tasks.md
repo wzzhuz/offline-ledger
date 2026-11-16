@@ -40,12 +40,12 @@
 - [x] `defaultVersionName` 0.1.7 → 0.1.8
 - [x] 活文档追加第 11 批记录、更新 §8 继承状态
 - [x] 六个静态检查本地全 PASS
-- [ ] Git Trees API 单次 commit 推送（不逐文件 PUT，避免触发 28 次 CI）
-- [ ] 查 push CI 结果；红则按 `design.md` §6 回退顺序单处修复
-- [ ] 重跑 `release.yml`（minify=on / upload_nutstore=true / create_release=false），
+- [x] Git Trees API 单次 commit 推送（不逐文件 PUT，避免触发 28 次 CI）
+- [x] 查 push CI 结果；红则按 `design.md` §6 回退顺序单处修复
+- [x] 重跑 `release.yml`（minify=on / upload_nutstore=true / create_release=false），
       查 24 步结果与制品
-- [ ] 按**最终 commit sha** 逐文件比对远端 blob sha；无 `diag/` 残留、无 token 明文
-- [ ] 回报真实 commit sha + run id（可点开核），不编造
+- [x] 按**最终 commit sha** 逐文件比对远端 blob sha；无 `diag/` 残留、无 token 明文
+- [x] 回报真实 commit sha + run id（可点开核），不编造
 
 ## 6. 真机（使用者执行，沙盒验不了）
 - [ ] 6.73 寸上一屏是否真的放得下 9 个维度
