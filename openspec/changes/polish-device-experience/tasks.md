@@ -205,6 +205,22 @@
 - [x] 金额仍独占一行，不与日期时间挤同行
 - [x] `defaultVersionName` 升 `0.1.4`
 - [x] 六个静态检查本地预跑
-- [ ] CI 与 release 实测回填
+- [x] CI 与 release 实测回填（见本节末尾）
 - [ ] 真机观感复核：6.73 寸上副行是否顺眼、placeholder 灰字对比度、备注摘要可读性
 - [ ] 归档本 change（待使用者明确发话）
+
+### 第 7 批实测（2026-11-16）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `f91755dc6bf1`（6 文件） |
+| push CI `43798086780` | **success**（六个静态检查 / 单测 / debug APK / release lintVital / 签名诊断） |
+| release `43798567009` | **success**，28 步全绿，R8 编译、坚果云上传、mapping / metrics 制品齐全 |
+| 制品 | `offline-ledger-release-v0.1.4` 12,186,083 B；`mapping-v0.1.4` 3,399,506 B；`metrics-v0.1.4-p-m-nsfalse` 271 B |
+| 坚果云 | 步骤 success 且 `skipped=false`；HEAD 落盘校验只写日志不中断，不等同已验证 HEAD 200 |
+| 上一轮尾巴 | `502c1880c583` 触发的仅文档 CI `43792659009` 也 success |
+| 静态检查 | 六个脚本本地预跑与 CI 均 PASS，首轮无编译错误 |
+
+**本批无「改一处漏一处」复发**：写作前先读了 `RecordEditorDialog.kt` 的
+金额区 / 日期行 / 备注段 / `FormRow` / import 清单，并核对 `Icons` 仍用于关闭按钮，
+只删两个 `KeyboardArrow` import。第 6 批那次缺失 `Box` import 未重演。

@@ -435,3 +435,9 @@ R8 包启动、SQLCipher 开库、BiometricPrompt、SAF 选择器、Excel 打开
   （public 方法未调用不会编译报错，留作后续可能的快捷入口）。
 - 真机未验项继续累积：本批 6.73 寸观感、BiometricPrompt、SAF 选择器、
   Excel 打开 CSV、5 万条切月耗时。R8 启动与 SQLCipher 开库已在连续装机中通过。
+
+### 第 7 批实测
+
+- push CI `43798086780` 与 release `43798567009` 均 success，首轮无编译错误。
+- 三个 v0.1.4 制品齐全，坚果云 `nsfalse`；上一轮文档 commit 的 CI `43792659009` 也全绿。
+- 第 6 批「新增组件漏 import」未复发：本批先核对了 import 清单再删箭头图标引用。
