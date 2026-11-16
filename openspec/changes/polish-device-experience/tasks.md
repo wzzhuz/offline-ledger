@@ -303,6 +303,22 @@
 - [x] 补充模板两行紧贴 / 32dp / label 居中约束与 Scenario
 - [x] 新增「记一笔各表单行高度量级一致」Requirement（2 个 Scenario）
 - [x] `defaultVersionName` 升 `0.1.7`；六个静态检查本地预跑
-- [ ] CI 与 release 实测回填
+- [x] CI 与 release 实测回填（见本节末尾）
 - [ ] 真机观感复核：四行是否齐、placeholder 是否完整、最近交易方是否一次点中、模板两行是否紧贴
 - [ ] 归档本 change（待使用者明确发话）
+
+### 第 10 批实测（2026-11-16）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `50bc97a5458d`（7 文件） |
+| push CI `43832963132` | **success**，13 步全绿，**首轮无编译错误**（六个静态检查 / 单测 / debug APK / release lintVital / 签名诊断） |
+| release `43834020179` | **success**，23 步 success、5 步按 input 正常 skipped，R8 编译、坚果云上传、mapping / metrics 齐全 |
+| 制品 | `offline-ledger-release-v0.1.7` 12,189,039 B；`mapping-v0.1.7` 3,416,765 B；`metrics-v0.1.7-p-m-nsfalse` 271 B |
+| 坚果云 | 步骤 success 且 `skipped=false`；HEAD 落盘校验只写日志不中断，不等同已验证 HEAD 200 |
+| 上一轮尾巴 | `7ee1f0acaa4b` 触发的 `43828954733` 也 success |
+
+**首轮无编译错误**：`heightIn` 是 `foundation.layout` 的既有 API（只补一个 import），
+`FormRow` 新增的 `centerLabel` 带默认值 false，5 处既有调用全部用 trailing lambda、
+未受参数位置变化影响；`FilterChip.height(32.dp)` 与 `Box + clickable` 都是已验证写法。
+「动手前先写根因与已证伪清单」的做法连续第二批奏效，未复发「凭印象手写」。
