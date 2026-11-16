@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
@@ -189,9 +190,9 @@ fun RecordEditorDialog(
                                 },
                                 textStyle = MaterialTheme.typography.bodyMedium,
                                 singleLine = true,
-                                // 第 9 批：回默认高度。固定 48dp 会裁掉 placeholder
-                                //（默认 contentPadding 是给浮动 label 预留的，与 24dp 行高相加超框）；
-                                // 紧凑度改由下方联想 chips 行收紧来补。
+                                // 第 10 批：heightIn(min=40.dp) 只降官方 56dp 下限、
+                                // 不设上限，内容自撑 → 不裁 placeholder，也与其他行齐。
+                                // 固定 height(48dp) 会裁切（第 8 批已证伪），勿重试。
                                 // 仅在有内容时出现，一键清空，不必用输入法逐字删除。
                                 trailingIcon = {
                                     if (state.counterparty.isNotEmpty()) {
@@ -211,28 +212,33 @@ fun RecordEditorDialog(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                             )
                             // 第 6 批：空输入列最近常用，输入后改联想；快捷区上限可数。
                             val quick: List<String> = if (state.counterparty.isBlank())
                                 counterparties.take(QUICK_COUNT) else suggestions.take(QUICK_COUNT)
                             if (quick.isNotEmpty()) {
-                                // 第 9 批：TextButton 默认 48dp，改紧凑可点文字，
-                                // 把输入框回到默认高度多出的 8dp 补回来。
+                                // 第 10 批：第 9 批压成 28dp 裸 Text 是降噪过头，
+                                // 点击区太小易误点。改 40dp Box + labelMedium。
                                 Row(
                                     modifier = Modifier.fillMaxWidth()
                                         .horizontalScroll(rememberScrollState()),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     quick.forEach { p ->
-                                        Text(
-                                            text = p,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = LedgerColors.Neutral,
+                                        Box(
                                             modifier = Modifier
+                                                .heightIn(min = 40.dp)
                                                 .clickable { vm.setCounterparty(p) }
-                                                .padding(horizontal = 8.dp, vertical = 6.dp)
-                                        )
+                                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = p,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = LedgerColors.Neutral
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -284,7 +290,7 @@ fun RecordEditorDialog(
                                     },
                                     textStyle = MaterialTheme.typography.bodyMedium,
                                     singleLine = true,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f).heightIn(min = 40.dp)
                                 )
                                 Text(
                                     text = "不计入",
@@ -489,7 +495,7 @@ private fun AccountStrip(
                         },
                         textStyle = MaterialTheme.typography.bodyMedium,
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                     )
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         accounts.filter { it.name.contains(query, ignoreCase = true) }
@@ -644,6 +650,7 @@ private const val QUICK_COUNT = 4
 fun FormRow(
     label: String,
     onRowClick: (() -> Unit)? = null,
+    centerLabel: Boolean = false,
     content: @Composable () -> Unit
 ) {
     Row(
@@ -651,10 +658,11 @@ fun FormRow(
             .fillMaxWidth()
             .then(onRowClick?.let { Modifier.clickable(onClick = it) } ?: Modifier)
             .padding(vertical = 1.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = if (centerLabel) Alignment.CenterVertically else Alignment.Top
     ) {
         Row(
-            modifier = Modifier.width(52.dp).padding(top = 12.dp),
+            modifier = Modifier.width(52.dp)
+                .then(if (centerLabel) Modifier else Modifier.padding(top = 12.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(

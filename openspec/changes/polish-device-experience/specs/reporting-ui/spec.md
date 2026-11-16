@@ -424,8 +424,10 @@ MUST NOT 带「日期」标签、MUST NOT 与金额挤同一行。
 交易对方、备注与账户搜索三个输入框的 placeholder SHALL 与输入文字、
 表单标签统一为 `bodyMedium`，SHALL NOT 使用 placeholder 默认的 `bodyLarge`。
 输入框 SHALL NOT 设置固定 `height` 或 `contentPadding`：
-MUST 使用组件默认高度与默认内边距的组合，SHALL NOT 裁切 placeholder 文字下半部分。
-紧凑度 SHALL 由联想 chips 行的收紧来补，SHALL NOT 靠压缩输入框自身。
+SHALL 用 `Modifier.heightIn(min = 40.dp)` 覆盖官方
+`OutlinedTextFieldDefaults.MinHeight = 56.dp` 这个无条件下限
+（`heightIn` 只降下限、不设上限、内容自撑，故 SHALL NOT 裁切 placeholder 文字下半部分）。
+紧凑度 SHALL 由各行高度量级统一来补，SHALL NOT 靠固定高度压缩输入框自身。
 输入框 SHALL 在**有内容时**显示尾部清空图标，点击 SHALL 立即清空内容，
 清空图标 SHALL NOT 把输入框重新撑到 `IconButton` 的默认 48dp 高度。
 空内容时 SHALL NOT 显示清空图标。
@@ -449,6 +451,7 @@ MUST 使用组件默认高度与默认内边距的组合，SHALL NOT 裁切 plac
 - **GIVEN** 对方 / 备注 / 账户搜索三处输入框
 - **WHEN** 均未输入
 - **THEN** 三处占位文字均完整显示且同为 `bodyMedium`，无一处裁切
+- **AND** 三处均用 `heightIn(min = 40.dp)`，实际高度约 44dp 而非默认 56dp
 
 #### Scenario: 选中态用底色
 - **GIVEN** 账户与模板快捷栏
@@ -477,6 +480,9 @@ selectable chip 的选中态本就是填充容器色；据此把这几处一次�
 模板区 SHALL NOT 使用 `horizontalScroll`，SHALL NOT 出现「需要左右拖动才能看到第 5 个模板」。
 模板栏 SHALL 复用与账户行相同的 `FormRow`（含 52dp 标签列、`›` 指示器、细分割线、
 整行点击），SHALL NOT 作为游离在网格外的顶层块。
+两行之间 SHALL NOT 有额外留白（SHALL NOT 对末行也施加行间 padding）；
+模板 chip SHALL 固定 `32.dp` 高度，SHALL NOT 被最小交互尺寸撑高；
+两行内容时「模板 ›」标签 SHALL 垂直居中，单行内容时其他行 SHALL NOT 改变对齐。
 
 #### Scenario: 六个模板一眼看全
 - **GIVEN** 用户有 6 个常用模板
@@ -489,6 +495,40 @@ selectable chip 的选中态本就是填充容器色；据此把这几处一次�
 - **WHEN** 查看模板区
 - **THEN** 名称单行省略、chip 宽度仍与其他两个等宽，两行不串位
 
+#### Scenario: 两行紧贴且标签居中
+- **GIVEN** 用户有 6 个常用模板
+- **WHEN** 查看模板区
+- **THEN** 两行 chip 均为 32dp 且行间无多余留白，「模板 ›」标签在两行间垂直居中
+
 **理由**：使用者第 9 批真机反馈「模板改成 6 个，但是实际在一行，还是要拖动选择更多」。
 第 8 批只加数量没改容器；使用者提出的「2 行 + 左边『模板』点开更多」同时解决了
 拖动与入口占位置，还补上第 6 批「统一网格」漏掉的模板栏。
+
+### Requirement: 记一笔各表单行高度量级一致
+
+「记一笔」各表单行的内容高度 SHALL 落在 **32–44dp** 区间：
+`OutlinedTextField` SHALL 用 `heightIn(min = 40.dp)` 覆盖 56dp 下限，
+`FilterChip` 快捷项 SHALL 固定 32dp，最近交易方等自定义可点项 SHALL
+用 `heightIn(min = 40.dp)` 的容器承载。任一行内容 SHALL NOT 比相邻行高出 12dp 以上。
+
+自定义可点击项 SHALL NOT 只由裸 `Text + clickable` 构成（约 28dp，点击区过小易误点）；
+其字号 SHALL NOT 低于 `labelMedium`。**SHALL NOT 以「简洁 / 降噪」为由把可点区域压到
+40dp 以下**（本项目已三次因该理由回摆）。
+
+#### Scenario: 四行看着齐
+- **GIVEN** 用户打开记一笔，模板 / 账户 / 对方 / 最近交易方均有内容
+- **WHEN** 纵览整个表单区
+- **THEN** 四行内容高度均在 32–44dp，无一行明显凸出或凹陷
+- **AND** placeholder 完整不裁、一键清空图标仍在
+
+#### Scenario: 最近交易方一次点中
+- **GIVEN** 交易对方输入框为空，下方显示最近常用项
+- **WHEN** 点其中一个交易方
+- **THEN** 一次点击即填入，SHALL NOT 出现点不中或误触相邻项
+- **AND** 该项点击区不低于 40dp，字号为 `labelMedium`
+
+**理由**：使用者第 10 批真机反馈「模板两行留白偏大、最近交易方偏小容易误点、
+输入框比其他行大很多」。三条同根：第 6 批只统一了标签列与左边界，
+未统一行内容高度量级（56 / 32 / 28dp）。第 8 批固定 `height` 裁切、
+第 9 批退回默认 56dp 又过大；官方允许用 `heightIn` 覆盖 `MinHeight`，
+只降下限不设上限，是唯一同时满足「不裁 + 不齐」的解。

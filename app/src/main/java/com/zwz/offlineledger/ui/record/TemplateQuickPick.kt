@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -53,10 +54,11 @@ fun TemplateQuickPickBar(onTemplate: (RecordTemplateEntity) -> Unit) {
         onTemplate(t)
     }
 
-    FormRow("模板", onRowClick = { showAll = true }) {
+    FormRow("模板", onRowClick = { showAll = true }, centerLabel = true) {
         val quick = templates.take(QUICK_TEMPLATES)
         quick.chunked(TEMPLATES_PER_ROW).forEach { rowItems ->
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)) {
+            // 第 10 批：去掉无差别的行间 padding（末行也加），两行紧贴。
+            Row(modifier = Modifier.fillMaxWidth()) {
                 rowItems.forEach { t ->
                     FilterChip(
                         selected = selectedId == t.id,
@@ -70,7 +72,7 @@ fun TemplateQuickPickBar(onTemplate: (RecordTemplateEntity) -> Unit) {
                             )
                         },
                         leadingIcon = {},
-                        modifier = Modifier.weight(1f).padding(end = 4.dp)
+                        modifier = Modifier.weight(1f).padding(end = 4.dp).height(32.dp)
                     )
                 }
                 // 不足 3 个补空位，保证两行等宽对齐。

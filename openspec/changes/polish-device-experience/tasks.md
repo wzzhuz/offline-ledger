@@ -292,3 +292,17 @@
 `contentPadding`（第 8 批已证伪）、不选 `BasicTextField` 自绘路线，
 直接回到「默认高度 + placeholder 显式字号 + 联想 chips 收紧」，
 `FormRow` 去 private 供同包复用也避免了新组件。第 8 批「凭印象手写」坑未复发。
+
+## 第 10 批（v0.1.7）
+
+- [x] 动手前先把根因、第 9 批措辞订正与「简洁 ≠ 砍触摸目标」写进 `design.md`
+- [x] 三处输入框 `Modifier.heightIn(min = 40.dp)`，保留显式 `bodyMedium` placeholder
+- [x] 联想项改 `Box(heightIn(min=40.dp) + clickable + Center)`，字号 `labelMedium`
+- [x] 模板行间 padding 归零、chip 固定 32dp、`FormRow` 增 `centerLabel`（默认 false）
+- [x] 修订第 9 批「MUST 使用默认高度」Requirement 与「三个输入框一致」Scenario
+- [x] 补充模板两行紧贴 / 32dp / label 居中约束与 Scenario
+- [x] 新增「记一笔各表单行高度量级一致」Requirement（2 个 Scenario）
+- [x] `defaultVersionName` 升 `0.1.7`；六个静态检查本地预跑
+- [ ] CI 与 release 实测回填
+- [ ] 真机观感复核：四行是否齐、placeholder 是否完整、最近交易方是否一次点中、模板两行是否紧贴
+- [ ] 归档本 change（待使用者明确发话）

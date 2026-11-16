@@ -17,7 +17,7 @@ plugins {
 // versionCode 由版本名推导（major*10000 + minor*100 + patch），
 // 不再恒为 1 —— 否则系统判不出新旧、装不上覆盖升级。
 // ---------------------------------------------------------------
-val defaultVersionName = "0.1.6"
+val defaultVersionName = "0.1.7"
 
 fun versionCodeFrom(name: String): Int {
     val parts = name.removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }

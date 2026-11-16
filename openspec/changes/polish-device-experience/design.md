@@ -588,3 +588,73 @@ change 尚未归档，**直接修订这两条 Requirement 与其 Scenario**（�
 - 三个 v0.1.6 制品齐全，坚果云 `nsfalse`；无 `diag/` 残留（本批无需临时诊断）。
 - 「动手前先写根因 + 回退顺序」这条做法有效：第 8 批的重载陷阱与「凭印象手写」均未复发，
   建议后续批次沿用。
+
+## 第 10 批：统一记一笔各表单行高度量级（v0.1.7）
+
+### 先写根因，再动手
+
+使用者真机反馈三条：模板两行留白偏大、最近交易方偏小容易误点、输入框比其他行大很多。
+**三条其实是同一个病**：第 6 批「统一表单网格」只统一了标签列宽度、左边界与细分割线，
+**没有统一行内容的高度量级**。
+
+| 行 | 容器 | 默认高度 |
+|---|---|---|
+| 对方 / 备注 / 账户搜索输入 | `OutlinedTextField` | **56dp**（官方 `OutlinedTextFieldDefaults.MinHeight = 56.dp`） |
+| 模板 / 账户快捷项 | `FilterChip` | **32dp**（M3 设计系统基线，非本项目 bug） |
+| 最近交易方 | 裸 `Text + clickable` | **约 28dp**（`labelSmall` 16dp + 上下 6dp） |
+
+落差 28dp，一眼就不齐。第 8、9 批一直在跟「固定高度」较劲，没换对工具：
+
+- 第 8 批 `Modifier.height(48.dp)` 是**固定值**，小于「默认内边距 + 24dp 行高」，
+  placeholder 下半被裁。
+- 第 9 批退回默认 56dp，不裁了，但输入框重新比别行大一圈。
+
+**官方文档明确**：`MinHeight = 56.dp` 是「default min height」，
+「you can override it by applying `Modifier.heightIn` directly on a text field」。
+`heightIn(min = 40.dp)` 只降**下限**、不设上限，内容会自己撑开，
+**不会裁切**——这正是第 8 批该用而没用的那个工具。
+
+### 订正第 9 批 design.md 的一处措辞
+
+第 9 批写「默认 contentPadding 是给浮动 label 预留的，与 24dp 行高相加超框」。
+不够准确：主因是 `MinHeight = 56.dp` 这个**无条件下限**（与有没有 label 无关），
+无 label 时 M3 反而会用较小的 contentPadding。历史决策段保留不改，在此订正，
+避免后续会话又被这句话带偏去动 `contentPadding`（第 8 批已证伪那条路）。
+
+### 长期约束：简洁 ≠ 把触摸目标砍小
+
+这是**第三次「降噪过头」的回摆**：
+第 5 批砍掉快捷 chips、第 8 批压输入框、第 9 批把 48dp `TextButton`
+换成 28dp 裸 `Text`。M3 的 `minimumInteractiveComponentSize` 只影响 layout，
+系统虽会在触摸层扩展，但不能指望它救一个 28dp 的自定义 `clickable`。
+**往后不得以「简洁」为由把可点区域压到 40dp 以下。**
+
+### 落地与回退顺序
+
+1. 输入框：三处统一 `Modifier.heightIn(min = 40.dp)`（实际由内容撑到约 44dp）。
+   placeholder 仍显式 `bodyMedium`，不清空图标逻辑。
+2. 联想项：每项包 `Box(heightIn(min = 40.dp) + clickable + Center)`，
+   字号 `labelSmall` → `labelMedium`。视觉仍紧凑，点击区够。
+3. 模板：行间 `padding(bottom = 2.dp)` 去掉（末行也无差别加），
+   chip 显式 `height(32.dp)` 防止任何最小交互尺寸撑高，
+   `FormRow` 增可选 `centerLabel` 参数，仅模板行传 true 让标签在两行间垂直居中。
+   **不改其他行的对齐**（默认值 false）。
+4. 三类行内容都落进 32–44dp，落差从 28dp 压到 12dp，网格才算真正收口。
+
+已证伪、不得重试：`Modifier.height(固定值)`（第 8 批裁切）、
+`contentPadding` 命名参数（String 重载解析陷阱）、
+`BasicTextField + DecorationBox` 自绘（要接管光标/焦点/清空，风险不值当）。
+
+### 规格一致性
+
+第 9 批 delta「MUST 使用组件默认高度」与本批相反 → **直接修订该条 Requirement**；
+「模板快捷区两行铺开」补充行间距 / 32dp / label 居中约束；
+新增一条独立可测的「记一笔各表单行高度量级一致」Requirement。
+change 未归档，全部直接改文本，不新增 MODIFIED、不留矛盾表述。
+
+### 边界
+
+- 零表结构变更 → 覆盖安装即可；零新增依赖 / 权限；Manifest 仍无 `INTERNET`。
+- 模板仍两行、不回横滚；placeholder 仍不裁；一键清空仍可用。
+- 真机未验项继续累积：本批观感、BiometricPrompt、SAF 选择器、
+  Excel 打开 CSV、5 万条切月耗时。
