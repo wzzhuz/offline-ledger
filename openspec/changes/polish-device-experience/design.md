@@ -399,3 +399,11 @@ R8 包启动、SQLCipher 开库、BiometricPrompt、SAF 选择器、Excel 打开
   `AccountType.entries` 由 Kotlin 2.3.21 提供。
 - 真机未验项继续累积：BiometricPrompt、SAF 选择器、Excel 打开 CSV、5 万条切月耗时、
   本批 6.73 寸上网格与快捷 chips 的观感。R8 启动与 SQLCipher 开库已在连续装机中通过。
+
+### 第 6 批实测
+
+- 首轮 CI 红：`FormDivider` 使用 `Box` 未 import（`43790357640` 挂在单测步骤，
+  实为 Kotlin 编译失败）；补 import 后 `43790793701` 全绿。
+- release `43791495549` 全绿，三个 v0.1.3 制品齐全，坚果云 `nsfalse`。
+- 这再次说明本地六个静态检查查不出缺失 import，编译必须由 Actions 证明；
+  不把「静态检查全绿」当成「编译通过」。

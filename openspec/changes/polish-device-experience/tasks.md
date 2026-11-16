@@ -175,6 +175,21 @@
       （复用 Repository 既有 `reorderTemplates` 事务）
 - [x] `defaultVersionName` 升 `0.1.3`
 - [x] 六个静态检查本地预跑
-- [ ] CI 与 release 实测回填
+- [x] CI 与 release 实测回填（见本节末尾）
 - [ ] 真机观感复核：6.73 寸上网格是否齐、快捷 chips 是否够用又不乱
 - [ ] 归档本 change（待使用者明确发话）
+
+### 第 6 批实测（2026-11-16）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `86f0a6e5dcc4`（17 文件）、`3566c4b8a27e`（补 `Box` import） |
+| 首轮 CI `43790357640` | **failure**，挂在「运行单元测试」步骤：新增 `FormDivider` 用了 `Box` 但未 import，Kotlin 编译失败 |
+| 修复后 CI `43790793701` | **success**（六个静态检查 / 单测 / debug APK / release lintVital / 签名诊断） |
+| release `43791495549` | **success**，28 步全绿，R8 编译、坚果云上传、mapping / metrics 制品齐全 |
+| 制品 | `offline-ledger-release-v0.1.3` 12,185,783 B；`mapping-v0.1.3` 3,398,193 B；`metrics-v0.1.3-p-m-nsfalse` 272 B |
+| 坚果云 | 步骤 success 且 `skipped=false`（认证 / 两级 MKCOL / curl -T 均未失败）；HEAD 落盘校验只写日志不中断，不等同已验证 HEAD 200 |
+| 静态检查 | 六个脚本本地预跑与 CI 均 PASS |
+
+**踩坑记录**：本项目第 7 次「改一处漏一处」类错误——新增组件用了 `Box` 却没补 import。
+`check_kotlin_strings.py` 只查字符串转义，查不出缺失 import；这类只能由 CI 编译兜底。
