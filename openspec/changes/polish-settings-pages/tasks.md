@@ -49,11 +49,11 @@
 
 - [x] 六个静态检查本地全 PASS
 - [x] Git Trees API 单次 commit 推送（不逐文件 PUT）
-- [ ] 查 push CI 结果；红则按 `design.md` §3.3 回退顺序单处修复
-- [ ] 重跑 `release.yml`（minify=on / upload_nutstore=true / create_release=false），
+- [x] 查 push CI 结果；红则按 `design.md` §3.3 回退顺序单处修复
+- [x] 重跑 `release.yml`（minify=on / upload_nutstore=true / create_release=false），
       产 `offline-ledger-release-v0.1.9` + mapping + metrics
-- [ ] 按**最终 commit sha** 逐文件比对远端 blob sha；无 `diag/` 残留、无 token 明文
-- [ ] 回报真实 commit sha + run id（可点开核），不编造
+- [x] 按**最终 commit sha** 逐文件比对远端 blob sha；无 `diag/` 残留、无 token 明文
+- [x] 回报真实 commit sha + run id（可点开核），不编造
 
 ## 9. 真机复核（使用者，按决定继续推迟累积）
 

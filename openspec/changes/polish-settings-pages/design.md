@@ -154,3 +154,31 @@ TopBar 右侧固定「+」`IconButton`，点开**同一 composable 内切换编�
 备份格式 / `schemaVersion` / 4 Tab / NavHost 路由图 / DAO 与写方法 / 金额铁律 /
 统计口径 / `release.yml` 全部不动。R8 启动与 SQLCipher 开库已由连续装机实际通过；
 其余真机未验清单由指南 §8 继承，不因本批出包改写。
+
+## 8. 实测回填（第 12 批）
+
+| 项 | 结果 |
+|---|---|
+| 前批归档 | `compact-filter-sheet` 3 ADDED + 4 MODIFIED 合并 + move + 校验 PASS（221 Req / 384 Scenario） |
+| 代码 commit | `e15db82beb16`（25 更新 + 6 删除：归档 move + 4 管理页 + 全仓写法统一 + 新 change 四件套 + specs 合并） |
+| push CI | `43867480282` **success**，17 步全绿，**首轮 Kotlin 编译零错误** |
+| 六个静态检查 | 本地与 CI 全 PASS；迁移 2 项按「稳定版前暂缓」为记录性提示 |
+| release | `43868660461` **success**，23 步绿 / 5 步按 input 跳过（plain、AAB、创建 Release 未触发；lint 开启） |
+| 坚果云 | 步骤 `completed success`；metrics 名 `nsfalse` 表示 `skipped=false`（认证 / 建目录 / PUT 均未失败）。**HEAD 落盘校验只写日志不中断，不当作已验证 HEAD 200** |
+| 制品 | `offline-ledger-release-v0.1.9` 12,202,522 B；`mapping-v0.1.9` 3,447,379 B；`metrics-v0.1.9-p-m-nsfalse` 271 B；debug APK 23,950,946 B |
+| 版本号 | `defaultVersionName = 0.1.9`，产物名带版本，不同名覆盖旧包 |
+| 零结构变更 | `AppDatabase` 仍 `version = 1`，无 Migration、无新增依赖 / 权限，Manifest 仍无 `INTERNET` → 覆盖安装即可 |
+
+**首轮零编译错误**（连续第 3 批）：动码前先写 §1 根因 / §2 全局扫描 / §3.3 三级回退顺序；
+4 个管理页整体重写时只复用已核实的 ViewModel 方法签名；推送前用「逐 OutlinedTextField 块」
+与「逐文件 import 粗扫」两条独立路径自检，并按 §4 走第三条路径复核校验器误报。
+新写文件花括号 / 圆括号均平衡，无 `diag/` 残留。
+
+**顺带检查「其他页面」的最终结论**：全仓 36 个 UI 文件扫描后，
+`● ` 文字前缀 9 处全部清零（含首次扫描漏掉的 4 处字符串插值）；
+管理类浮动 `label` 18 处改 `placeholder`；操作型浮层 10 处**有意保留**并写进 §2.1 与指南 §7.2；
+预算页虽未被点名但因同结构一并收口。范围决策记录已并入活文档 §7.2。
+
+**未验证（必须由使用者装机确认）**：6.73 寸上 30 分类 / 20 模板时「+」是否固定可见、
+编辑视图进出与既有项回填、回收站一屏可见条数、`⋯` 菜单与 `FilterChip` 底色观感。
+累积未验清单（BiometricPrompt / SAF / Excel CSV / 5 万条切月耗时等）由活文档 §8 继承，不因本批出包改写。
