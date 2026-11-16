@@ -21,14 +21,17 @@ data class RecordFilter(
     val maxAmountCents: Long? = null,
     val noteQuery: String? = null,
     /** 阶段 6c-2：null = 全部币种；选中后列表与日合计只统计该币种。 */
-    val currencyCode: String? = null
+    val currencyCode: String? = null,
+    /** 第 11 批：交易对方模糊匹配；null = 不过滤。 */
+    val counterpartyQuery: String? = null
 ) {
     fun effectiveFromDate(): Int = fromDate ?: MonthRange.of(yearMonth).first
     fun effectiveToDate(): Int = toDate ?: MonthRange.of(yearMonth).second
 
     fun activeCount(): Int = listOf(
         fromDate, toDate, accountId, type, rootCategoryId,
-        categoryId, minAmountCents, maxAmountCents, noteQuery, currencyCode
+        categoryId, minAmountCents, maxAmountCents, noteQuery, currencyCode,
+        counterpartyQuery
     ).count { it != null }
 
     fun bumped(): RecordFilter = copy(revision = revision + 1)

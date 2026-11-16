@@ -185,6 +185,8 @@ interface RecordDao {
            AND (:maxAmount IS NULL OR r.amountCents <= :maxAmount)
            AND (:noteQuery IS NULL OR r.note LIKE '%' || :noteQuery || '%')
            AND (:currencyCode IS NULL OR r.currencyCode = :currencyCode)
+           AND (:counterpartyQuery IS NULL
+                OR COALESCE(r.counterparty, '') LIKE '%' || :counterpartyQuery || '%')
          ORDER BY r.localDate DESC, r.id DESC
          LIMIT :limit OFFSET :offset
         """
@@ -193,7 +195,7 @@ interface RecordDao {
         fromDate: Int?, toDate: Int?, accountId: Long?, type: String?,
         rootCategoryId: Long?, categoryId: Long?, minAmount: Long?,
         maxAmount: Long?, noteQuery: String?, currencyCode: String?,
-        limit: Int, offset: Int
+        counterpartyQuery: String?, limit: Int, offset: Int
     ): List<RecordRow>
 
     /** 日期头真实值：整月按日聚合，不用已加载分页数据求和。 */
@@ -449,6 +451,14 @@ interface RecordDao {
     /** 阶段 7：常用收款方自动补全，纯本地 DISTINCT，最多 20 个。 */
     @Query("SELECT DISTINCT counterparty FROM records WHERE counterparty IS NOT NULL AND counterparty <> '' ORDER BY counterparty ASC LIMIT 20")
     suspend fun distinctCounterparties(): List<String>
+
+    /**
+     * 第 11 批：筛选面板交易对方联想，纯本地 DISTINCT、不带 LIMIT。
+     * 与 distinctCounterparties / searchCounterparties 分开，避免记一笔的
+     * 「最近 20 个」口径被误用到筛选面板的全量匹配上。
+     */
+    @Query("SELECT DISTINCT counterparty FROM records WHERE counterparty IS NOT NULL AND counterparty <> '' ORDER BY counterparty ASC")
+    suspend fun allCounterparties(): List<String>
 
     @Query("UPDATE records SET currencyCode = :code")
     suspend fun updateAllCurrency(code: String)

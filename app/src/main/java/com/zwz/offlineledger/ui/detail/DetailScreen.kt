@@ -73,6 +73,8 @@ fun DetailScreen(
     val filter by vm.filter.collectAsState()
     val accounts by vm.accounts.collectAsState()
     val categories by vm.categories.collectAsState()
+    /** 第 11 批：筛选面板交易对方联想的全量候选。 */
+    val counterparties by vm.counterparties.collectAsState()
 
     var showFilter by remember { mutableStateOf(false) }
     var actionRow by remember { mutableStateOf<RecordRow?>(null) }
@@ -221,6 +223,7 @@ fun DetailScreen(
             initial = filter,
             accounts = accounts,
             categories = categories,
+            counterparties = counterparties,
             onApply = { vm.applyFilter(it) },
             onClear = { vm.clearFilter() },
             onDismiss = { showFilter = false }

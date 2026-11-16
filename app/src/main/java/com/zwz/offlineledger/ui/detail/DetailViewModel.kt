@@ -48,7 +48,9 @@ data class FilterValues(
     val minAmountCents: Long? = null,
     val maxAmountCents: Long? = null,
     val noteQuery: String? = null,
-    val currencyCode: String? = null
+    val currencyCode: String? = null,
+    /** 第 11 批：交易对方模糊匹配，与 pagedFiltered 参数一一对应。 */
+    val counterpartyQuery: String? = null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -89,9 +91,14 @@ class DetailViewModel(
     private val _categories = MutableStateFlow<List<CategoryEntity>>(emptyList())
     val categories: StateFlow<List<CategoryEntity>> = _categories.asStateFlow()
 
+    /** 第 11 批：筛选面板交易对方联想的全量候选，纯本地 DISTINCT。 */
+    private val _counterparties = MutableStateFlow<List<String>>(emptyList())
+    val counterparties: StateFlow<List<String>> = _counterparties.asStateFlow()
+
     init {
         viewModelScope.launch { _accounts.value = accountDao.all() }
         viewModelScope.launch { _categories.value = categoryDao.all() }
+        viewModelScope.launch { _counterparties.value = recordDao.allCounterparties() }
         viewModelScope.launch { _filter.collect { f -> reload(f) } }
     }
 
@@ -134,6 +141,7 @@ class DetailViewModel(
             maxAmountCents = v.maxAmountCents,
             noteQuery = v.noteQuery,
             currencyCode = v.currencyCode,
+            counterpartyQuery = v.counterpartyQuery,
             revision = _filter.value.revision + 1
         )
     }
@@ -143,7 +151,7 @@ class DetailViewModel(
             fromDate = null, toDate = null, accountId = null, type = null,
             rootCategoryId = null, categoryId = null,
             minAmountCents = null, maxAmountCents = null, noteQuery = null,
-            currencyCode = null,
+            currencyCode = null, counterpartyQuery = null,
             revision = _filter.value.revision + 1
         )
     }
@@ -151,6 +159,8 @@ class DetailViewModel(
     /** 写操作成功后由外部调用，递增 revision 触发 flatMapLatest 重建 Pager。 */
     fun bumpRevision() {
         _filter.value = _filter.value.bumped()
+        // 新记一笔可能带来新的交易对方，刷新筛选面板的联想候选。
+        viewModelScope.launch { _counterparties.value = recordDao.allCounterparties() }
     }
 
     suspend fun delete(id: Long) {

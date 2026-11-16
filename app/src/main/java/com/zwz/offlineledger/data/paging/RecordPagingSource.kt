@@ -28,6 +28,7 @@ class RecordPagingSource(
                 maxAmount = filter.maxAmountCents,
                 noteQuery = filter.noteQuery,
                 currencyCode = filter.currencyCode,
+                counterpartyQuery = filter.counterpartyQuery,
                 limit = params.loadSize,
                 offset = offset
             )
