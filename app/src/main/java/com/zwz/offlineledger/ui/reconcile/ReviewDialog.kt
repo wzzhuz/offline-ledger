@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -71,31 +72,27 @@ fun ReviewDialog(
                         "锚点后" to null, "近 7 天" to 7,
                         "近 30 天" to 30, "近 90 天" to 90
                     ).forEach { (label, days) ->
-                        TextButton(onClick = { vm.setRange(days) }) {
-                            Text(
-                                text = if (state.rangeDays == days) "● $label" else label,
-                                color = if (state.rangeDays == days) LedgerColors.IncomeGreen
-                                else LedgerColors.Neutral
-                            )
-                        }
+                        FilterChip(
+                            selected = state.rangeDays == days,
+                            onClick = { vm.setRange(days) },
+                            label = { Text(label) }
+                        )
                     }
                 }
 
                 SectionLabel("金额反查（元）")
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Reconciliation.LookupMode.values().forEach { mode ->
-                        TextButton(onClick = { vm.setMode(mode) }) {
-                            val label = when (mode) {
-                                Reconciliation.LookupMode.EXACT -> "等于"
-                                Reconciliation.LookupMode.RANGE -> "区间"
-                                Reconciliation.LookupMode.APPROX -> "近似 ±1"
-                            }
-                            Text(
-                                text = if (state.lookupMode == mode) "● $label" else label,
-                                color = if (state.lookupMode == mode) LedgerColors.IncomeGreen
-                                else LedgerColors.Neutral
-                            )
+                        val label = when (mode) {
+                            Reconciliation.LookupMode.EXACT -> "等于"
+                            Reconciliation.LookupMode.RANGE -> "区间"
+                            Reconciliation.LookupMode.APPROX -> "近似 ±1"
                         }
+                        FilterChip(
+                            selected = state.lookupMode == mode,
+                            onClick = { vm.setMode(mode) },
+                            label = { Text(label) }
+                        )
                     }
                 }
                 if (state.lookupMode == Reconciliation.LookupMode.RANGE) {

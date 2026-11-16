@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
@@ -61,8 +62,16 @@ internal fun settingsVm(): SettingsViewModel {
     return vm
 }
 
+/**
+ * 第 12 批：可选 onAdd 让管理类二级页把「新增」固定在 TopBar，
+ * 不随列表条目增多而下移。其余 6 个二级页不传该参数，零影响。
+ */
 @Composable
-fun SettingsPageTopBar(title: String, onBack: () -> Unit) {
+fun SettingsPageTopBar(
+    title: String,
+    onBack: () -> Unit,
+    onAdd: (() -> Unit)? = null
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -70,7 +79,16 @@ fun SettingsPageTopBar(title: String, onBack: () -> Unit) {
         IconButton(onClick = onBack) {
             Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "返回")
         }
-        Text(text = title, style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.weight(1f)
+        )
+        if (onAdd != null) {
+            IconButton(onClick = onAdd) {
+                Icon(Icons.Filled.Add, contentDescription = "新增")
+            }
+        }
     }
 }
 

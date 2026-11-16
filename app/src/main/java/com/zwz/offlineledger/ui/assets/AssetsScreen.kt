@@ -18,6 +18,8 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -90,9 +92,11 @@ fun AssetsScreen() {
                 style = MaterialTheme.typography.titleMedium
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { vm.toggleShowArchived() }) {
-                    Text(if (state.showArchived) "● 含已归档" else "显示已归档")
-                }
+                FilterChip(
+                    selected = state.showArchived,
+                    onClick = { vm.toggleShowArchived() },
+                    label = { Text("含已归档") }
+                )
                 TextButton(onClick = { addError = null; showAdd = true }) { Text("+ 新增") }
             }
         }
@@ -346,37 +350,35 @@ private fun AddAccountDialog(
         text = {
             Column {
                 OutlinedTextField(
+                    textStyle = MaterialTheme.typography.bodyMedium,
                     value = name, onValueChange = { name = it },
-                    label = { Text("账户名称") }, modifier = Modifier.fillMaxWidth()
+                    placeholder = { Text("账户名称", style = MaterialTheme.typography.bodyMedium) }, modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                 )
                 Column {
                     AccountType.entries.chunked(2).forEach { pair ->
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             pair.forEach { t ->
-                                AssistChip(
+                                FilterChip(
+                                    selected = type == t,
                                     onClick = { type = t },
-                                    label = {
-                                        Text(
-                                            (if (type == t) "● " else "") + t.displayName(),
-                                            color = if (type == t) LedgerColors.IncomeGreen
-                                            else LedgerColors.Neutral
-                                        )
-                                    }
+                                    label = { Text(t.displayName()) }
                                 )
                             }
                         }
                     }
                 }
                 OutlinedTextField(
+                    textStyle = MaterialTheme.typography.bodyMedium,
                     value = initial, onValueChange = { initial = it },
-                    label = { Text("期初余额（元，默认 0）") },
-                    modifier = Modifier.fillMaxWidth()
+                    placeholder = { Text("期初余额（元，默认 0）", style = MaterialTheme.typography.bodyMedium) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                 )
                 if (type == AccountType.LIABILITY) {
                     OutlinedTextField(
-                        value = limit, onValueChange = { limit = it },
-                        label = { Text("信用额度（元，可空）") },
-                        modifier = Modifier.fillMaxWidth()
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                    value = limit, onValueChange = { limit = it },
+                        placeholder = { Text("信用额度（元，可空）", style = MaterialTheme.typography.bodyMedium) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                     )
                 }
                 errorText?.let { Text(text = it, color = LedgerColors.ExpenseRed) }
@@ -413,36 +415,34 @@ private fun EditAccountDialog(
         text = {
             Column {
                 OutlinedTextField(
+                    textStyle = MaterialTheme.typography.bodyMedium,
                     value = name, onValueChange = { name = it },
-                    label = { Text("账户名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                    placeholder = { Text("账户名称", style = MaterialTheme.typography.bodyMedium) }, modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp), singleLine = true
                 )
                 Column {
                     AccountType.entries.chunked(2).forEach { pair ->
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             pair.forEach { t ->
-                                AssistChip(
+                                FilterChip(
+                                    selected = type == t,
                                     onClick = { type = t },
-                                    label = {
-                                        Text(
-                                            (if (type == t) "● " else "") + t.displayName(),
-                                            color = if (type == t) LedgerColors.IncomeGreen
-                                            else LedgerColors.Neutral
-                                        )
-                                    }
+                                    label = { Text(t.displayName()) }
                                 )
                             }
                         }
                     }
                 }
                 OutlinedTextField(
+                    textStyle = MaterialTheme.typography.bodyMedium,
                     value = initial, onValueChange = { initial = it },
-                    label = { Text("期初余额（元）") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                    placeholder = { Text("期初余额（元）", style = MaterialTheme.typography.bodyMedium) }, modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp), singleLine = true
                 )
                 if (type == AccountType.LIABILITY) {
                     OutlinedTextField(
-                        value = limit, onValueChange = { limit = it },
-                        label = { Text("信用额度（元，可空）") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                    value = limit, onValueChange = { limit = it },
+                        placeholder = { Text("信用额度（元，可空）", style = MaterialTheme.typography.bodyMedium) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp), singleLine = true
                     )
                 }
                 Box {

@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -81,18 +82,16 @@ fun StatsScreen() {
 
         SectionLabel("支出分类占比")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { vm.setSliceLevel(SliceLevel.ROOT) }) {
-                Text(
-                    if (state.sliceLevel == SliceLevel.ROOT) "● 按大类" else "按大类",
-                    color = state.sliceLevelColor(SliceLevel.ROOT)
-                )
-            }
-            TextButton(onClick = { vm.setSliceLevel(SliceLevel.CHILD) }) {
-                Text(
-                    if (state.sliceLevel == SliceLevel.CHILD) "● 按小类" else "按小类",
-                    color = state.sliceLevelColor(SliceLevel.CHILD)
-                )
-            }
+            FilterChip(
+                selected = state.sliceLevel == SliceLevel.ROOT,
+                onClick = { vm.setSliceLevel(SliceLevel.ROOT) },
+                label = { Text("按大类") }
+            )
+            FilterChip(
+                selected = state.sliceLevel == SliceLevel.CHILD,
+                onClick = { vm.setSliceLevel(SliceLevel.CHILD) },
+                label = { Text("按小类") }
+            )
         }
 
         val slices = if (state.sliceLevel == SliceLevel.ROOT)
@@ -121,13 +120,11 @@ fun StatsScreen() {
             // 阶段 8：默认只画一条线，想对比时再切「两者」。
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TrendMetric.values().forEach { m ->
-                    TextButton(onClick = { vm.setTrendMetric(m) }) {
-                        Text(
-                            if (state.trendMetric == m) "● " + metricLabel(m)
-                            else metricLabel(m),
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
+                    FilterChip(
+                        selected = state.trendMetric == m,
+                        onClick = { vm.setTrendMetric(m) },
+                        label = { Text(metricLabel(m)) }
+                    )
                 }
             }
             // 第三批：单线模式用该系列自己的最大值，不再与收入共用而贴底。
@@ -179,13 +176,11 @@ fun StatsScreen() {
             // 第三批：年度也能切单线，单线按自身最大值缩放。
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TrendMetric.values().forEach { m ->
-                    TextButton(onClick = { vm.setTrendMetric(m) }) {
-                        Text(
-                            if (state.trendMetric == m) "● " + metricLabel(m)
-                            else metricLabel(m),
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
+                    FilterChip(
+                        selected = state.trendMetric == m,
+                        onClick = { vm.setTrendMetric(m) },
+                        label = { Text(metricLabel(m)) }
+                    )
                 }
             }
             val max = ChartData.seriesMaxSingle(
@@ -318,13 +313,11 @@ private fun CurrencySwitcher(state: StatsUiState, vm: StatsViewModel) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         state.currencies.forEach { cc ->
-            TextButton(onClick = { vm.setCurrency(cc) }) {
-                Text(
-                    if (cc == state.currencyCode) "● $cc" else cc,
-                    color = if (cc == state.currencyCode) LedgerColors.IncomeGreen
-                    else LedgerColors.Neutral
-                )
-            }
+            FilterChip(
+                selected = cc == state.currencyCode,
+                onClick = { vm.setCurrency(cc) },
+                label = { Text(cc) }
+            )
         }
     }
     Text(
@@ -342,20 +335,16 @@ private fun PeriodSwitcher(state: StatsUiState, vm: StatsViewModel) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick = { vm.setMode(StatsMode.MONTH) }) {
-                Text(
-                    if (state.mode == StatsMode.MONTH) "● 月度" else "月度",
-                    color = if (state.mode == StatsMode.MONTH) LedgerColors.IncomeGreen
-                    else LedgerColors.Neutral
-                )
-            }
-            TextButton(onClick = { vm.setMode(StatsMode.YEAR) }) {
-                Text(
-                    if (state.mode == StatsMode.YEAR) "● 年度" else "年度",
-                    color = if (state.mode == StatsMode.YEAR) LedgerColors.IncomeGreen
-                    else LedgerColors.Neutral
-                )
-            }
+            FilterChip(
+                selected = state.mode == StatsMode.MONTH,
+                onClick = { vm.setMode(StatsMode.MONTH) },
+                label = { Text("月度") }
+            )
+            FilterChip(
+                selected = state.mode == StatsMode.YEAR,
+                onClick = { vm.setMode(StatsMode.YEAR) },
+                label = { Text("年度") }
+            )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { vm.shift(-1) }) { Text("◀") }

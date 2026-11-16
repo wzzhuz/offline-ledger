@@ -5,20 +5,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -35,8 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.time.LedgerClock
@@ -50,9 +51,16 @@ import com.zwz.offlineledger.ui.settings.SettingsPageTopBar
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /**
- * 第 5 批：管理类页面统一为独立全屏页，与分类管理风格一致；
- * 不再套一层「很大的 Dialog」，避免风格割裂。
+ * 第 5 批：管理类页面统一为独立全屏页，不再套「很大的 Dialog」。
+ * 第 12 批：再改为「TopBar 固定 + 入口 + LazyColumn 纯列表 + 编辑独立视图」，
+ * 解决「模板越多新增表单越往下移」与局部留白；并同步全仓已统一写法
+ * （placeholder 输入框 / FilterChip 底色 / 下拉限高+搜索）。
  */
+private data class TemplateEditorState(
+    val isRule: Boolean,
+    val editing: RecordTemplateEntity? = null
+)
+
 @Composable
 fun TemplateManagerScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -66,104 +74,64 @@ fun TemplateManagerScreen(onBack: () -> Unit) {
     )
     val state by vm.state.collectAsState()
     var tab by remember { mutableStateOf(0) }
-    var editing by remember { mutableStateOf<RecordTemplateEntity?>(null) }
+    var editor by remember { mutableStateOf<TemplateEditorState?>(null) }
     var deleting by remember { mutableStateOf<RecordTemplateEntity?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        SettingsPageTopBar("模板与周期记账", onBack)
-        TabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("模板") })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("周期规则") })
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            if (state.message.isNotBlank()) {
-                Text(
-                    text = state.message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LedgerColors.Neutral,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+        SettingsPageTopBar(
+            title = when {
+                editor == null -> "模板与周期记账"
+                editor!!.editing != null -> "编辑模板"
+                else -> "新增"
+            },
+            onBack = {
+                if (editor != null) editor = null else onBack()
+            },
+            onAdd = if (editor == null) {
+                { editor = TemplateEditorState(isRule = tab == 1) }
+            } else null
+        )
+        if (editor == null) {
+            TabRow(selectedTabIndex = tab) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("模板") })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("周期规则") })
             }
-            if (tab == 0) {
+            TemplateList(
+                tab = tab,
+                state = state,
+                vm = vm,
+                onEdit = { editor = TemplateEditorState(isRule = false, editing = it) },
+                onDelete = { deleting = it },
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            val e = editor!!
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
                 Text(
-                    text = "模板是预填草稿：金额可留空，选模板后自动填充并可自由调整。",
+                    text = if (e.isRule)
+                        "周期规则会自动写入流水，金额与账户必填。"
+                    else "模板是预填草稿：金额可留空，选模板后自动填充并可自由调整。",
                     style = MaterialTheme.typography.bodySmall,
                     color = LedgerColors.Neutral
                 )
-                if (state.templates.isEmpty()) {
-                    Text("还没有模板。在下面新增一个，之后记一笔点一下即可填充。")
-                }
-                state.templates.filter { !it.isArchived }.forEach { t ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val amount = if (t.amountCents > 0L)
-                            Cents(t.amountCents).toYuanString() + " 元" else "金额待填"
-                        val path = categoryPath(t.categoryId, state.categories)
-                        Text(
-                            text = t.name + " · " + typeLabel(t.type) + " · " + amount +
-                                (if (path.isBlank()) "" else " · " + path),
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        TextButton(onClick = { vm.moveTemplate(t.id, -1) }) { Text("↑") }
-                        TextButton(onClick = { vm.moveTemplate(t.id, 1) }) { Text("↓") }
-                        TextButton(onClick = { editing = t }) { Text("编辑") }
-                        TextButton(onClick = { deleting = t }) {
-                            Text("删除", color = LedgerColors.ExpenseRed)
-                        }
-                    }
-                }
-                val archived = state.templates.count { it.isArchived }
-                if (archived > 0) {
-                    Text(
-                        text = "已归档 $archived 个模板",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LedgerColors.Neutral
-                    )
-                }
-            } else {
-                if (state.rules.isEmpty()) {
-                    Text("还没有周期规则。房租、工资、话费、订阅可用它自动补记。")
-                }
-                state.rules.forEach { r ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = r.name + " · " + Cents(r.amountCents).toYuanString() +
-                                " 元 · " + cadenceLabel(r.cadence),
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Switch(
-                            checked = r.isEnabled,
-                            onCheckedChange = { vm.setRuleEnabled(r.id, it) }
-                        )
-                    }
-                }
+                QuickEntryForm(
+                    isRule = e.isRule,
+                    editing = if (e.isRule) null else e.editing,
+                    categories = state.categories,
+                    accountNames = state.accounts.map { it.id to it.name },
+                    onSubmitTemplate = { t ->
+                        if (t.id != 0L) vm.updateTemplate(t) else vm.saveTemplate(t)
+                        editor = null
+                    },
+                    onSubmitRule = { r -> vm.saveRule(r); editor = null },
+                    onCancelEdit = { editor = null }
+                )
             }
-
-            Text(
-                text = if (tab == 0)
-                    (if (editing == null) "新增模板" else "编辑模板「" + editing!!.name + "」")
-                else "新增周期规则",
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
-            )
-            QuickEntryForm(
-                isRule = tab == 1,
-                editing = if (tab == 0) editing else null,
-                categories = state.categories,
-                accountNames = state.accounts.map { it.id to it.name },
-                onSubmitTemplate = { t ->
-                    if (t.id != 0L) vm.updateTemplate(t) else vm.saveTemplate(t)
-                    editing = null
-                },
-                onSubmitRule = { vm.saveRule(it) },
-                onCancelEdit = { editing = null }
-            )
         }
     }
 
@@ -182,6 +150,104 @@ fun TemplateManagerScreen(onBack: () -> Unit) {
     }
 }
 
+/* ------------------------------------------------------------------ */
+/* 纯列表：LazyColumn + 每行一个「⋯」菜单；周期规则行保留启用 Switch        */
+/* ------------------------------------------------------------------ */
+@Composable
+private fun TemplateList(
+    tab: Int,
+    state: TemplateManagerState,
+    vm: TemplateManagerViewModel,
+    onEdit: (RecordTemplateEntity) -> Unit,
+    onDelete: (RecordTemplateEntity) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        if (state.message.isNotBlank()) {
+            item {
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LedgerColors.Neutral,
+                    modifier = Modifier.padding(vertical = 6.dp)
+                )
+            }
+        }
+        if (tab == 0) {
+            val active = state.templates.filter { !it.isArchived }
+            if (active.isEmpty()) {
+                item { Text("还没有模板。点右上角 + 新增一个。", modifier = Modifier.padding(vertical = 6.dp)) }
+            }
+            items(active, key = { it.id }) { t ->
+                var menu by remember { mutableStateOf(false) }
+                val amount = if (t.amountCents > 0L)
+                    Cents(t.amountCents).toYuanString() + " 元" else "金额待填"
+                val path = categoryPath(t.categoryId, state.categories)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                ) {
+                    Text(
+                        text = t.name + " · " + typeLabel(t.type) + " · " + amount +
+                            (if (path.isBlank()) "" else " · " + path),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1
+                    )
+                    IconButton(onClick = { menu = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text("上移") },
+                            onClick = { menu = false; vm.moveTemplate(t.id, -1) })
+                        DropdownMenuItem(text = { Text("下移") },
+                            onClick = { menu = false; vm.moveTemplate(t.id, 1) })
+                        DropdownMenuItem(text = { Text("编辑") },
+                            onClick = { menu = false; onEdit(t) })
+                        DropdownMenuItem(
+                            text = { Text("删除", color = LedgerColors.ExpenseRed) },
+                            onClick = { menu = false; onDelete(t) }
+                        )
+                    }
+                }
+            }
+            val archived = state.templates.count { it.isArchived }
+            if (archived > 0) {
+                item {
+                    Text(
+                        text = "已归档 $archived 个模板",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LedgerColors.Neutral,
+                        modifier = Modifier.padding(vertical = 6.dp)
+                    )
+                }
+            }
+        } else {
+            if (state.rules.isEmpty()) {
+                item { Text("还没有周期规则。点右上角 + 新增。", modifier = Modifier.padding(vertical = 6.dp)) }
+            }
+            items(state.rules, key = { it.id }) { r ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                ) {
+                    Text(
+                        text = r.name + " · " + Cents(r.amountCents).toYuanString() +
+                            " 元 · " + cadenceLabel(r.cadence),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1
+                    )
+                    Switch(
+                        checked = r.isEnabled,
+                        onCheckedChange = { vm.setRuleEnabled(r.id, it) }
+                    )
+                }
+            }
+        }
+    }
+}
+
 private fun cadenceLabel(c: Cadence): String = when (c) {
     Cadence.DAILY -> "每天"
     Cadence.WEEKLY -> "每周"
@@ -191,6 +257,8 @@ private fun cadenceLabel(c: Cadence): String = when (c) {
 /**
  * 模板与规则共用的表单。金额在提交时用 Cents.fromYuan 转 Long 分，
  * 禁止 Float / Double 参与（金额铁律）。模板金额可留空（草稿语义）。
+ * 第 12 批：浮动 label → placeholder + bodyMedium + heightIn(min=40)；
+ * 选中态由 AssistChip + 文字前缀改为 FilterChip 底色；下拉限高 + 搜索。
  */
 @Composable
 private fun QuickEntryForm(
@@ -225,12 +293,9 @@ private fun QuickEntryForm(
     // 第三批：下拉只显示与当前收支类型一致、未归档的分类；
     // 一级在前、二级紧跟父级，标签写成「一级 / 二级」。
     val visibleCategories = categories.filter { it.type == type && !it.isArchived }
-    fun rootKey(c: CategoryEntity): Long =
-        if (c.level == 0) c.id else (c.parentId ?: 0L)
+    fun rootKey(c: CategoryEntity): Long = if (c.level == 0) c.id else (c.parentId ?: 0L)
     val orderedCategories = visibleCategories.sortedWith(
-        compareBy<CategoryEntity> { rootKey(it) }
-            .thenBy { it.level }
-            .thenBy { it.sortOrder }
+        compareBy<CategoryEntity> { rootKey(it) }.thenBy { it.level }.thenBy { it.sortOrder }
     )
     val categoryOptions = orderedCategories.map { c ->
         val label = if (c.level == 1) {
@@ -241,37 +306,27 @@ private fun QuickEntryForm(
     }
 
     Column {
-        OutlinedTextField(
+        ManagerTextField(
             value = name, onValueChange = { name = it },
-            label = { Text("名称（如 午餐 / 房租）") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true
+            placeholder = "名称（如 午餐 / 房租）"
         )
-        OutlinedTextField(
+        ManagerTextField(
             value = amountText, onValueChange = { amountText = it },
-            label = { Text(if (isRule) "金额（元，必填）" else "金额（元，可留空，记一笔时再填）") },
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                keyboardType = KeyboardType.Decimal
-            ),
-            modifier = Modifier.fillMaxWidth(), singleLine = true
+            placeholder = if (isRule) "金额（元，必填）" else "金额（元，可留空，记一笔时再填）",
+            keyboardType = KeyboardType.Decimal
         )
 
         Text("类型", style = MaterialTheme.typography.labelMedium)
         Row {
             listOf(RecordType.EXPENSE, RecordType.INCOME, RecordType.TRANSFER)
                 .filter { it != RecordType.TRANSFER || !isRule }.forEach { rt ->
-                val chosen = type == rt
-                AssistChip(
-                    onClick = { type = rt; categoryId = null },
-                    label = {
-                        Text(
-                            text = (if (chosen) "● " else "") + typeLabel(rt),
-                            color = if (chosen) LedgerColors.IncomeGreen
-                            else LedgerColors.Neutral
-                        )
-                    },
-                    modifier = Modifier.padding(end = 6.dp)
-                )
-            }
+                    FilterChip(
+                        selected = type == rt,
+                        onClick = { type = rt; categoryId = null },
+                        label = { Text(typeLabel(rt)) },
+                        modifier = Modifier.padding(end = 6.dp)
+                    )
+                }
         }
 
         if (type != RecordType.TRANSFER) {
@@ -296,17 +351,15 @@ private fun QuickEntryForm(
             )
         }
 
-        OutlinedTextField(
+        ManagerTextField(
             value = note, onValueChange = { note = it },
-            label = { Text("备注（可选）") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true
+            placeholder = "备注（可选）"
         )
         // 第三批：转账不显示交易对方；收入显示「付款方 / 来源」。
         if (type != RecordType.TRANSFER) {
-            OutlinedTextField(
+            ManagerTextField(
                 value = counterpartyText, onValueChange = { counterpartyText = it },
-                label = { Text(if (type == RecordType.INCOME) "付款方 / 来源（可选）" else "收款方（可选）") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true
+                placeholder = if (type == RecordType.INCOME) "付款方 / 来源（可选）" else "收款方（可选）"
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -318,27 +371,19 @@ private fun QuickEntryForm(
             Text("周期", style = MaterialTheme.typography.labelMedium)
             Row {
                 Cadence.entries.forEach { c ->
-                    val chosen = cadence == c
-                    AssistChip(
+                    FilterChip(
+                        selected = cadence == c,
                         onClick = { cadence = c },
-                        label = {
-                            Text(
-                                text = (if (chosen) "● " else "") + cadenceLabel(c),
-                                color = if (chosen) LedgerColors.IncomeGreen
-                                else LedgerColors.Neutral
-                            )
-                        },
+                        label = { Text(cadenceLabel(c)) },
                         modifier = Modifier.padding(end = 6.dp)
                     )
                 }
             }
-            OutlinedTextField(
+            ManagerTextField(
                 value = dayText, onValueChange = { dayText = it },
-                label = { Text(if (cadence == Cadence.MONTHLY) "每月几号（1-31）" else "每周几（1=周一..7=周日）") },
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = KeyboardType.Number
-                ),
-                modifier = Modifier.fillMaxWidth(), singleLine = true
+                placeholder = if (cadence == Cadence.MONTHLY) "每月几号（1-31）"
+                else "每周几（1=周一..7=周日）",
+                keyboardType = KeyboardType.Number
             )
         }
 
@@ -418,6 +463,29 @@ private fun QuickEntryForm(
     }
 }
 
+/** 第 12 批：管理类表单统一 placeholder + bodyMedium + heightIn(min)，不裁占位文字。 */
+@Composable
+private fun ManagerTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = {
+            Text(placeholder, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+        },
+        textStyle = MaterialTheme.typography.bodyMedium,
+        singleLine = true,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = keyboardType
+        ),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+    )
+}
+
 /** 模板列表行用：把分类 id 还原成「一级 / 二级」可读路径。 */
 private fun categoryPath(id: Long?, categories: List<CategoryEntity>): String {
     val c = categories.firstOrNull { it.id == id } ?: return ""
@@ -437,6 +505,7 @@ private fun typeLabel(t: RecordType): String = when (t) {
 private fun accountName(names: List<Pair<Long, String>>, id: Long?): String =
     names.firstOrNull { it.first == id }?.second ?: "未选"
 
+/** 第 12 批：下拉限高 + 搜索，20+ 分类 / 10+ 账户不再无限下拉。 */
 @Composable
 private fun DropdownSelector(
     label: String,
@@ -444,14 +513,28 @@ private fun DropdownSelector(
     onSelect: (Long) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val matched = options.filter { it.second.contains(query, ignoreCase = true) }
     Box {
-        TextButton(onClick = { expanded = true }) { Text(label) }
+        TextButton(onClick = { expanded = true }) { Text(label, maxLines = 1) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { (id, text) ->
-                DropdownMenuItem(
-                    text = { Text(text) },
-                    onClick = { onSelect(id); expanded = false }
-                )
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("搜索") },
+                textStyle = MaterialTheme.typography.bodyMedium,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).heightIn(min = 40.dp)
+            )
+            Column(
+                modifier = Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())
+            ) {
+                matched.forEach { (id, text) ->
+                    DropdownMenuItem(
+                        text = { Text(text, maxLines = 1) },
+                        onClick = { onSelect(id); expanded = false; query = "" }
+                    )
+                }
             }
         }
     }
