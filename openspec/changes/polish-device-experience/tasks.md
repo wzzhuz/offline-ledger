@@ -260,3 +260,19 @@
 **修复要点**：三个输入框统一 `Modifier.height(48.dp)` 取代 `contentPadding`，
 删除 `PaddingValues` import。这是本项目首次因新增 Material3 命名参数触发重载解析问题，
 根因与回退顺序已写进 `design.md`「第 8 批首轮失败」。
+
+## 第 9 批（v0.1.6）
+
+- [x] 动手前先把两条根因与三级回退顺序写进 `design.md`
+- [x] 三处 placeholder 显式 `bodyMedium`，账户搜索文案缩短为「搜索账户名」
+- [x] 去掉三处 `height(48.dp)` 回默认高度，根治 placeholder 裁切
+- [x] 联想 chips 由 48dp `TextButton` 改紧凑可点文字，补回高度
+- [x] `FormRow` / `FormDivider` 去 `private`，供同包模板文件复用
+- [x] 模板栏改 `FormRow("模板 ›")` 整行可点，删「更多模板」chip
+- [x] 6 个模板 `chunked(3)` 两行等宽铺开、文字单行省略、不足补空位
+- [x] 修订第 6 / 第 8 批 delta 中与之矛盾的两条 Requirement 与 Scenario
+- [x] 新增「模板快捷区两行铺开且不横向滚动」Requirement
+- [x] `defaultVersionName` 升 `0.1.6`；六个静态检查本地预跑
+- [ ] CI 与 release 实测回填
+- [ ] 真机观感复核：placeholder 是否完整、两行模板是否挤、点「模板 ›」是否顺手
+- [ ] 归档本 change（待使用者明确发话）

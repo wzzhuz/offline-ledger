@@ -514,3 +514,70 @@ actual type is 'String', but 'TextFieldValue' was expected`，
 - push CI `43818652907` 与 release `43819646011` 均 success；首推 `43817564955` 的编译错误已按上文修复。
 - 三个 v0.1.5 制品齐全，坚果云 `nsfalse`；`diag/unit.log` 与临时诊断步骤均已清除。
 - 第 6 批「缺失 `Box` import」未复发，但出现了新的「重载解析」类错误，已登记为第 8 次「凭印象手写」坑。
+
+## 第 9 批：修复 v0.1.5 的输入框裁切 + 模板两行铺开（v0.1.6）
+
+### 先写根因，再动手
+
+使用者真机反馈两条，都是第 8 批自己引入的回归：
+
+**① placeholder 下半部分被输入框遮挡。**
+不是单纯「字号没调」，是两层叠加：
+
+- `placeholder = { Text(partyLabel) }` 里的 `Text` 未指定 style。
+  Material3 官方明确 placeholder 默认用 `Typography.bodyLarge`（16.sp / 24dp 行高），
+  而 `textStyle = bodyMedium` 只作用于输入文字，**管不到 placeholder**。三处
+  （对方 / 备注 / 账户搜索）全是裸 `Text`。
+- `OutlinedTextField` 的 `contentPadding` 默认按「有没有 label」计算，是给浮动 label
+  预留的。第 8 批删了 `label` 又强加 `Modifier.height(48.dp)`，固定高度
+  小于「默认内边距 + 24dp 行高」，文字被边框裁掉。社区反复记录过：
+  「even with smaller font size」照样裁，因为裁的是 padding 不是字号。
+
+**所以只改字号不够，必须同时处理高度或 padding。**
+
+回退顺序（写死，避免第 9 次「凭印象手写」）：
+
+1. **首选（本批采用）**：去掉固定 `height(48.dp)` 回组件默认高度
+   + 三处 placeholder 显式 `bodyMedium`。默认高度与默认 padding 是配套值，
+   是唯一保证不裁的组合。紧凑度靠把联想 chips 行从 48dp `TextButton`
+   改成紧凑可点文字补回来。
+2. 备选（未采用）：`BasicTextField + OutlinedTextFieldDefaults.DecorationBox`
+   精确控制 `contentPadding`。第 8 批 `design.md` 原本预留了这条路，
+   但要自己接管边框、焦点态、尾部清空图标，且刚踩过
+   `String` / `TextFieldValue` 重载坑，首轮 CI 风险高，不值当。
+3. 已证伪（第 8 批）：给 `String` 版 `OutlinedTextField` 直接加
+   `contentPadding` 命名参数 → 解析到 `TextFieldValue` 重载，10 条级联报错。
+
+**② 模板 6 个仍单行要拖动。**
+第 8 批把数量 4→6 却没改容器，仍是
+`Row(horizontalScroll) { 6 chip + 更多模板 chip }`，360dp 屏放不下。
+使用者的方案（2 行 + 左边「模板 ›」整行点开更多）比第 8 批更好，
+而且顺带补上一块历史欠账：**模板栏是记一笔里唯一没进 `FormRow` 网格的顶层块**，
+第 6 批说「同区域不混用」其实一直没覆盖它。
+
+### 落地
+
+- `FormRow` / `FormDivider` 去掉 `private`（Kotlin top-level 去 private 即 public，
+  同包 `ui.record` 可直接调用），模板栏复用完全同构的网格行，不动组件可见性以外的东西。
+- `TemplateQuickPickBar` 改 `FormRow("模板", onRowClick = { showAll = true })`，
+  6 个模板 `chunked(3)` 两行、每行 3 个 `Modifier.weight(1f)` 等宽 `FilterChip`，
+  文字 `maxLines = 1 + Ellipsis`，不足 3 个的槽位补 `Spacer(weight)` 保持两行对齐。
+  删掉「更多模板 ▾」chip，全量只由「模板 ›」整行触发，与「账户 ›」一致。
+- 沿用项目第 4 批起的 `Column + chunked` 写法，不用 `FlowRow`
+  （虽然 Compose 1.4 已转正，但引入新布局组件与 import 是额外风险）。
+- 三处 placeholder 统一 `bodyMedium`；账户搜索文案缩短为「搜索账户名」；
+  联想 chips 由 48dp `TextButton` 改紧凑可点文字。
+
+### 规格一致性
+
+第 6 批 delta 的「统一表单网格与有上限的快捷区」写「模板最多 6 个 / 其余进更多弹层」，
+第 8 批 delta 写「用收紧的 `contentPadding`」——两条都与第 9 批实际行为相反。
+change 尚未归档，**直接修订这两条 Requirement 与其 Scenario**（不新增 MODIFIED、
+不留矛盾文本），并新增一条独立可测的「模板快捷区两行铺开」Requirement。
+沿用阶段 1 归档那次「规格腐烂」教训。
+
+### 边界
+
+- 零表结构变更 → 覆盖安装即可；零新增依赖 / 权限；Manifest 仍无 `INTERNET`。
+- 真机未验项继续累积：本批观感、BiometricPrompt、SAF 选择器、
+  Excel 打开 CSV、5 万条切月耗时。

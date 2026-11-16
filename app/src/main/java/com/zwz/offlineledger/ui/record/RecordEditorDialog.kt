@@ -181,12 +181,17 @@ fun RecordEditorDialog(
                             OutlinedTextField(
                                 value = state.counterparty,
                                 onValueChange = { vm.setCounterparty(it) },
-                                placeholder = { Text(partyLabel) },
+                                placeholder = {
+                                    Text(
+                                        partyLabel,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                },
                                 textStyle = MaterialTheme.typography.bodyMedium,
                                 singleLine = true,
-                                // 第 8 批：无 label（已改 placeholder）时用固定 48dp 收紧
-                                // 默认的 56dp 高度。注意：Material3 的 contentPadding 参数
-                                // 只存在于 TextFieldValue 重载，String 版加它会解析到错误重载。
+                                // 第 9 批：回默认高度。固定 48dp 会裁掉 placeholder
+                                //（默认 contentPadding 是给浮动 label 预留的，与 24dp 行高相加超框）；
+                                // 紧凑度改由下方联想 chips 行收紧来补。
                                 // 仅在有内容时出现，一键清空，不必用输入法逐字删除。
                                 trailingIcon = {
                                     if (state.counterparty.isNotEmpty()) {
@@ -206,20 +211,28 @@ fun RecordEditorDialog(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                                modifier = Modifier.fillMaxWidth()
                             )
                             // 第 6 批：空输入列最近常用，输入后改联想；快捷区上限可数。
                             val quick: List<String> = if (state.counterparty.isBlank())
                                 counterparties.take(QUICK_COUNT) else suggestions.take(QUICK_COUNT)
                             if (quick.isNotEmpty()) {
+                                // 第 9 批：TextButton 默认 48dp，改紧凑可点文字，
+                                // 把输入框回到默认高度多出的 8dp 补回来。
                                 Row(
                                     modifier = Modifier.fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState())
+                                        .horizontalScroll(rememberScrollState()),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     quick.forEach { p ->
-                                        TextButton(onClick = { vm.setCounterparty(p) }) {
-                                            Text(p, style = MaterialTheme.typography.labelSmall)
-                                        }
+                                        Text(
+                                            text = p,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = LedgerColors.Neutral,
+                                            modifier = Modifier
+                                                .clickable { vm.setCounterparty(p) }
+                                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                                        )
                                     }
                                 }
                             }
@@ -263,10 +276,15 @@ fun RecordEditorDialog(
                                 OutlinedTextField(
                                     value = state.note,
                                     onValueChange = { vm.setNote(it) },
-                                    placeholder = { Text("可选") },
+                                    placeholder = {
+                                        Text(
+                                            "可选",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    },
                                     textStyle = MaterialTheme.typography.bodyMedium,
                                     singleLine = true,
-                                    modifier = Modifier.weight(1f).height(48.dp)
+                                    modifier = Modifier.weight(1f)
                                 )
                                 Text(
                                     text = "不计入",
@@ -463,10 +481,15 @@ private fun AccountStrip(
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = { Text("搜索账户名（含卡号后缀）") },
+                        placeholder = {
+                            Text(
+                                "搜索账户名",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
                         textStyle = MaterialTheme.typography.bodyMedium,
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         accounts.filter { it.name.contains(query, ignoreCase = true) }
@@ -618,7 +641,7 @@ private fun CalculatorKeypad(onKey: (String) -> Unit) {
 private const val QUICK_COUNT = 4
 
 @Composable
-private fun FormRow(
+fun FormRow(
     label: String,
     onRowClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
@@ -653,7 +676,7 @@ private fun FormRow(
 }
 
 @Composable
-private fun FormDivider() {
+fun FormDivider() {
     Box(
         modifier = Modifier.fillMaxWidth().height(1.dp)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
