@@ -240,7 +240,7 @@
 - [x] 修订第 6 批 delta 里「三类各最多 4 个」与「更多弹层入口」两处，避免归档后矛盾
 - [x] 清理两个未使用 import；六个静态检查本地预跑
 - [x] `defaultVersionName` 升 `0.1.5`
-- [ ] CI 与 release 实测回填
+- [x] CI 与 release 实测回填（见本节末尾）
 - [ ] 真机观感复核：输入框高度、底色选中态、点标签打开全量、展开区是否免上滑
 - [ ] 归档本 change（待使用者明确发话）
 
@@ -276,3 +276,19 @@
 - [ ] CI 与 release 实测回填
 - [ ] 真机观感复核：placeholder 是否完整、两行模板是否挤、点「模板 ›」是否顺手
 - [ ] 归档本 change（待使用者明确发话）
+
+### 第 9 批实测（2026-11-16）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `2cfffdd5e92e`（7 文件） |
+| push CI `43826282328` | **success**，17 步全绿，**首轮无编译错误**（六个静态检查 / 单测 / debug APK / release lintVital / 签名诊断） |
+| release `43826971267` | **success**，23 步 success、5 步按 input 正常 skipped，R8 编译、坚果云上传、mapping / metrics 齐全 |
+| 制品 | `offline-ledger-release-v0.1.6` 12,189,327 B；`mapping-v0.1.6` 3,415,985 B；`metrics-v0.1.6-p-m-nsfalse` 270 B |
+| 坚果云 | 步骤 success 且 `skipped=false`；HEAD 落盘校验只写日志不中断，不等同已验证 HEAD 200 |
+| 上一轮尾巴 | `3d4b282dae40` 触发的 `43820891800` 也 success |
+
+**首轮无编译错误**，得益于动手前先写根因与三级回退顺序：明确弃用
+`contentPadding`（第 8 批已证伪）、不选 `BasicTextField` 自绘路线，
+直接回到「默认高度 + placeholder 显式字号 + 联想 chips 收紧」，
+`FormRow` 去 private 供同包复用也避免了新组件。第 8 批「凭印象手写」坑未复发。
