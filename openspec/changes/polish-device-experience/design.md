@@ -441,3 +441,40 @@ R8 包启动、SQLCipher 开库、BiometricPrompt、SAF 选择器、Excel 打开
 - push CI `43798086780` 与 release `43798567009` 均 success，首轮无编译错误。
 - 三个 v0.1.4 制品齐全，坚果云 `nsfalse`；上一轮文档 commit 的 CI `43792659009` 也全绿。
 - 第 6 批「新增组件漏 import」未复发：本批先核对了 import 清单再删箭头图标引用。
+
+## 第 8 批：记一笔省空间与减操作（v0.1.5）
+
+使用者反馈「最新版已经更好了」，本批仍是窄幅微调，不重排网格、
+不动三个快捷区机制、不动分类与账户结构、不改表结构。
+
+### 逐条评估与取舍
+
+| 反馈 | 落地 | 判断 |
+|---|---|---|
+| 1 输入框太大 / 要叉号 | `contentPadding = PaddingValues(horizontal=12.dp, vertical=6.dp)` 收紧默认留白；有内容时尾部 `Icons.Filled.Close`，点击 `vm.setCounterparty("")` | 默认内边距是给浮动 label 预留的，我们已改 placeholder，纯属浪费；Material 明确 clear-text 尾部图标「有文本时显示、点击清空」。清空区用 36dp `Box + clickable` 而非 `IconButton`，否则 48dp 最小交互尺寸会把刚压下去的框重新撑高 |
+| 2 `● ` 改底色 | 账户与模板统一改 `FilterChip(selected = ...)` + `leadingIcon = {}` | M3 selectable chip 的选中态本就是填充 `secondaryContainer`；文字前缀属自造控件且平白占 2 字符。`leadingIcon = {}` 抑制默认勾选图标，避免反而更宽 |
+| 3 点「账户」标签打开更多 | **做整行可点，不只做标签可点**：`FormRow` 增可选 `onRowClick`，账户行整行 `clickable`，标签渲染「账户 ›」；删掉「更多账户」chip | 只把点击绑在「账户」两字上过不了三关：灰字标签视觉上是说明、TalkBack 不暴露 button 语义、约 32dp 宽远低于 48dp 触摸目标。钱迹官方是独立的「选择账户」选项；随手记是「账户 现金(CNY) >」整行可点。整行可点既纳入了标签，又保住可发现性与触摸面积，还省掉一个 chip |
+| 5 模板说明小字 | 删掉，`QUICK_TEMPLATES` 4 → 6 | 模板怎么用属于创建模板时的引导，不该常驻记一笔首屏；省出的一行确实按使用者建议多给了 2 个模板位 |
+| 6 「不计入收支」要上滑 | 「更多」入口 48dp `TextButton` → 紧凑 `clickable Row` + `⌄/⌃`；展开区把备注输入与开关合并进**同一个 `FormRow` 的一行** | 原来展开区 = `FormRow("备注")` 一行 + 开关一行，共增两行高度。合并后只增一行，且左边界仍与网格对齐；叠加金额/行距/模板栏的留白收紧，展开后无需上滑 |
+
+### 顺带统一的
+
+- 账户弹层搜索框 `label` → `placeholder` + 收紧 `contentPadding`，与对方输入框一致。
+- 转账模式「转出 ›」「转入 ›」各自打开对应账户选择（全量弹层状态提升到 `AccountStrip`），
+  不再依赖两行各自持有一份 `showAll`。
+- 金额 `padding(vertical: 6→4)`、`FormRow` 行距 `2→1`、模板栏 `4→2`。
+
+### 规格一致性
+
+第 6 批 delta 的「记一笔采用统一表单网格与有上限的快捷区」原写「三类各最多 4 个」
+与「其余 MUST 进『更多』弹层」。第 8 批把模板改 6 个、账户入口改成标签整行点击，
+若只追加新 Requirement，归档后 specs 会同时存在两条相反要求。故**直接修订同一 change
+内那条 Requirement 与其 Scenario**（change 尚未归档，delta 不是已发布基线），
+不新增 MODIFIED、也不留矛盾文本。这是阶段 1 归档那次「规格腐烂」教训的沿用。
+
+### 边界
+
+- 零表结构变更 → 覆盖安装即可；零新增依赖 / 权限；Manifest 仍无 `INTERNET`。
+- 六个静态检查本地预跑 PASS。
+- 真机未验项继续累积：本批 6.73 寸观感、BiometricPrompt、SAF 选择器、
+  Excel 打开 CSV、5 万条切月耗时。R8 启动与 SQLCipher 开库已在连续装机中通过。

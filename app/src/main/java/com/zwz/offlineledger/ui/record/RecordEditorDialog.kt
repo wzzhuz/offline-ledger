@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -18,11 +20,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -135,7 +137,7 @@ fun RecordEditorDialog(
                     Text(
                         text = if (state.amountExpr.isBlank()) "0.00" else state.amountExpr,
                         style = MaterialTheme.typography.displaySmall,
-                        modifier = Modifier.padding(vertical = 6.dp)
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                     // 第 7 批：日期时间是自解释的元数据，不再占一行网格标签，
                     // 也不再与金额挤同一行（长金额会挤压右侧）。金额保住视觉锚点。
@@ -162,16 +164,14 @@ fun RecordEditorDialog(
                         }
                     }
 
-                    FormRow("账户") {
-                        AccountStrip(
-                            type = state.type,
-                            accounts = accounts,
-                            fromId = state.fromAccountId,
-                            toId = state.toAccountId,
-                            onFrom = { vm.setFromAccount(it) },
-                            onTo = { vm.setToAccount(it) }
-                        )
-                    }
+                    AccountStrip(
+                        type = state.type,
+                        accounts = accounts,
+                        fromId = state.fromAccountId,
+                        toId = state.toAccountId,
+                        onFrom = { vm.setFromAccount(it) },
+                        onTo = { vm.setToAccount(it) }
+                    )
 
                     // 第 7 批：交易对方仍仅支出 / 收入显示；备注移到「更多」后
                     // 转账也能用（还信用卡、转生活费等），只是不显示对方。
@@ -185,6 +185,28 @@ fun RecordEditorDialog(
                                 placeholder = { Text(partyLabel) },
                                 textStyle = MaterialTheme.typography.bodyMedium,
                                 singleLine = true,
+                                // 第 8 批：默认 contentPadding 为浮动 label 预留了上下空间，
+                                // 我们已用 placeholder，收紧后输入框明显变矮。
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                // 仅在有内容时出现，一键清空，不必用输入法逐字删除。
+                                trailingIcon = {
+                                    if (state.counterparty.isNotEmpty()) {
+                                        // 用 36dp 紧凑点击区而非 48dp IconButton，
+                                        // 否则清空图标本身会把输入框重新撑高。
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .clickable { vm.setCounterparty("") },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.Close,
+                                                contentDescription = "清空收款方",
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                },
                                 modifier = Modifier.fillMaxWidth()
                             )
                             // 第 6 批：空输入列最近常用，输入后改联想；快捷区上限可数。
@@ -209,33 +231,57 @@ fun RecordEditorDialog(
                     // 在按钮上显示摘要，点开即可改，旧内容绝不会看不见。
                     val noteSummary = if (state.note.length > 18)
                         state.note.take(18) + "…" else state.note
-                    TextButton(onClick = { showMore = !showMore }) {
+                    // 第 8 批：TextButton 默认 48dp，改成紧凑可点行省出高度；
+                    // 行尾 ⌄/⌃ 让「可展开」可见。
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showMore = !showMore }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             text = when {
                                 showMore -> "收起"
                                 noteSummary.isBlank() -> "更多（备注 · 不计入收支）"
                                 else -> "备注：$noteSummary · 更多"
                             },
-                            style = MaterialTheme.typography.labelMedium
+                            style = MaterialTheme.typography.labelMedium,
+                            color = LedgerColors.Neutral,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = if (showMore) "⌃" else "⌄",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral
                         )
                     }
                     if (showMore) {
+                        // 备注与「不计入收支」合并进同一个 FormRow 的一行：
+                        // 左边界仍对齐，展开只增加一行，无需上滑。
                         FormRow("备注") {
-                            OutlinedTextField(
-                                value = state.note,
-                                onValueChange = { vm.setNote(it) },
-                                placeholder = { Text("补充这笔账的说明（可选）") },
-                                textStyle = MaterialTheme.typography.bodyMedium,
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "不计入收支", modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = state.excludeFromStats,
-                                onCheckedChange = { vm.setExclude(it) }
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(
+                                    value = state.note,
+                                    onValueChange = { vm.setNote(it) },
+                                    placeholder = { Text("可选") },
+                                    textStyle = MaterialTheme.typography.bodyMedium,
+                                    singleLine = true,
+                                    contentPadding = PaddingValues(
+                                        horizontal = 12.dp, vertical = 6.dp
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "不计入",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = LedgerColors.Neutral
+                                )
+                                Switch(
+                                    checked = state.excludeFromStats,
+                                    onCheckedChange = { vm.setExclude(it) }
+                                )
+                            }
                         }
                     }
 
@@ -352,6 +398,12 @@ private fun CategoryStrip(
     }
 }
 
+/**
+ * 第 8 批：账户行整块可点，「账户 ›」标签即可打开全量选择，
+ * 删掉原先占位置的「更多 ▾」chip。选中态由 FilterChip 底色表达，
+ * 不再用「● 」文字前缀。全量弹层与搜索状态提升到本层，
+ * 转账时「转出 ›」「转入 ›」各自打开对应选择。
+ */
 @Composable
 private fun AccountStrip(
     type: RecordType,
@@ -362,82 +414,119 @@ private fun AccountStrip(
     onTo: (Long) -> Unit
 ) {
     val visible = accounts.filter { !it.isArchived }
-    if (type == RecordType.TRANSFER) {
-        AccountQuickRow("转出", visible, fromId, onFrom)
-        AccountQuickRow("转入", visible, toId, onTo)
-    } else {
-        val chosenId = if (type == RecordType.EXPENSE) fromId else toId
-        AccountQuickRow("", visible, chosenId,
-            if (type == RecordType.EXPENSE) onFrom else onTo)
-    }
-}
-
-/**
- * 第 6 批：常用账户（ViewModel 已按最近 30 天频次排序）平铺 QUICK_COUNT 个，
- * 其余进「更多」弹层按名称搜索。标签不再写「支出账户 · CNY」这类长文本，
- * 币种只在弹层里显示，避免占用表单宽度。
- */
-@Composable
-private fun AccountQuickRow(
-    tag: String,
-    accounts: List<AccountEntity>,
-    selectedId: Long?,
-    onSelect: (Long) -> Unit
-) {
-    var showAll by remember { mutableStateOf(false) }
+    // 0 = 支出/转出，1 = 收入/转入；null = 关闭
+    var pickerTarget by remember { mutableStateOf<Int?>(null) }
     var query by remember { mutableStateOf("") }
-    if (tag.isNotEmpty()) {
-        Text(text = tag, style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral)
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        accounts.take(QUICK_COUNT).forEach { a ->
-            val chosen = a.id == selectedId
-            AssistChip(
-                onClick = { onSelect(a.id) },
-                label = {
-                    Text(
-                        (if (chosen) "● " else "") + a.name,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                },
-                modifier = Modifier.padding(end = 4.dp)
+
+    FormRow("账户", onRowClick = { query = ""; pickerTarget = 0 }) {
+        if (type == RecordType.TRANSFER) {
+            AccountQuickRow(
+                tag = "转出",
+                accounts = visible,
+                selectedId = fromId,
+                onSelect = onFrom,
+                onShowAll = { query = ""; pickerTarget = 0 }
+            )
+            AccountQuickRow(
+                tag = "转入",
+                accounts = visible,
+                selectedId = toId,
+                onSelect = onTo,
+                onShowAll = { query = ""; pickerTarget = 1 }
+            )
+        } else {
+            val chosenId = if (type == RecordType.EXPENSE) fromId else toId
+            val onSelect = if (type == RecordType.EXPENSE) onFrom else onTo
+            AccountQuickRow(
+                tag = "",
+                accounts = visible,
+                selectedId = chosenId,
+                onSelect = onSelect,
+                onShowAll = { query = ""; pickerTarget = 0 }
             )
         }
-        AssistChip(
-            onClick = { showAll = true },
-            label = { Text("更多 ▾", style = MaterialTheme.typography.labelSmall) }
-        )
     }
-    if (showAll) {
+
+    val target = pickerTarget
+    if (target != null) {
+        val onSelect: (Long) -> Unit = when {
+            type == RecordType.TRANSFER -> if (target == 0) onFrom else onTo
+            type == RecordType.EXPENSE -> onFrom
+            else -> onTo
+        }
+        val title = when {
+            type == RecordType.TRANSFER && target == 1 -> "转入账户"
+            type == RecordType.TRANSFER -> "转出账户"
+            else -> "全部账户"
+        }
         AlertDialog(
-            onDismissRequest = { showAll = false },
-            title = { Text("全部账户") },
+            onDismissRequest = { pickerTarget = null },
+            title = { Text(title) },
             text = {
                 Column {
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        label = { Text("搜索账户名（含卡号后缀）") },
+                        placeholder = { Text("搜索账户名（含卡号后缀）") },
+                        textStyle = MaterialTheme.typography.bodyMedium,
                         singleLine = true,
+                        contentPadding = PaddingValues(
+                            horizontal = 12.dp, vertical = 6.dp
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         accounts.filter { it.name.contains(query, ignoreCase = true) }
                             .forEach { a ->
                                 TextButton(
-                                    onClick = { onSelect(a.id); showAll = false },
+                                    onClick = { onSelect(a.id); pickerTarget = null },
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text(a.name + " · " + a.currencyCode) }
                             }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showAll = false }) { Text("关闭") } }
+            confirmButton = {
+                TextButton(onClick = { pickerTarget = null }) { Text("关闭") }
+            }
         )
+    }
+}
+
+@Composable
+private fun AccountQuickRow(
+    tag: String,
+    accounts: List<AccountEntity>,
+    selectedId: Long?,
+    onSelect: (Long) -> Unit,
+    onShowAll: () -> Unit
+) {
+    if (tag.isNotEmpty()) {
+        Text(
+            text = "$tag ›",
+            style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onShowAll)
+                .padding(vertical = 6.dp)
+        )
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        accounts.take(QUICK_COUNT).forEach { a ->
+            FilterChip(
+                selected = a.id == selectedId,
+                onClick = { onSelect(a.id) },
+                label = {
+                    Text(a.name, style = MaterialTheme.typography.labelSmall)
+                },
+                leadingIcon = {},
+                modifier = Modifier.padding(end = 4.dp)
+            )
+        }
     }
 }
 
@@ -536,17 +625,35 @@ private fun CalculatorKeypad(onKey: (String) -> Unit) {
 private const val QUICK_COUNT = 4
 
 @Composable
-private fun FormRow(label: String, content: @Composable () -> Unit) {
+private fun FormRow(
+    label: String,
+    onRowClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(onRowClick?.let { Modifier.clickable(onClick = it) } ?: Modifier)
+            .padding(vertical = 1.dp),
         verticalAlignment = Alignment.Top
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = LedgerColors.Neutral,
-            modifier = Modifier.width(52.dp).padding(top = 14.dp)
-        )
+        Row(
+            modifier = Modifier.width(52.dp).padding(top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = LedgerColors.Neutral
+            )
+            if (onRowClick != null) {
+                Text(
+                    text = "›",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral
+                )
+            }
+        }
         Column(modifier = Modifier.weight(1f)) { content() }
     }
     FormDivider()
