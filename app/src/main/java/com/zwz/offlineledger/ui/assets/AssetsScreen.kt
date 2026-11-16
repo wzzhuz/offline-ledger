@@ -1,5 +1,6 @@
 package com.zwz.offlineledger.ui.assets
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,10 +8,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +41,7 @@ import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.model.AccountType
+import com.zwz.offlineledger.data.model.displayName
 import com.zwz.offlineledger.engine.Reconciliation
 import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.ledgerFactory
@@ -93,34 +98,21 @@ fun AssetsScreen() {
         }
 
         val visible = state.accounts.filter { state.showArchived || !it.isArchived }
-        SectionTitle("资产账户")
-        val assets = visible.filter { it.type == AccountType.ASSET }
-        if (assets.isEmpty()) EmptyHint("还没有资产账户")
-        assets.forEach { account ->
-            AccountCard(
-                account = account,
-                onDetail = { detailId = account.id },
-                onReconcile = { reconcileId = account.id },
-                onEdit = { editError = null; editAccount = account },
-                onDelete = { deleting = account },
-                onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
-                onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
-            )
-        }
-
-        SectionTitle("信用负债账户")
-        val liabilities = visible.filter { it.type == AccountType.LIABILITY }
-        if (liabilities.isEmpty()) EmptyHint("还没有信用负债账户")
-        liabilities.forEach { account ->
-            AccountCard(
-                account = account,
-                onDetail = { detailId = account.id },
-                onReconcile = { reconcileId = account.id },
-                onEdit = { editError = null; editAccount = account },
-                onDelete = { deleting = account },
-                onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
-                onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
-            )
+        AccountType.entries.forEach { type ->
+            SectionTitle(type.displayName())
+            val group = visible.filter { it.type == type }
+            if (group.isEmpty()) EmptyHint("还没有" + type.displayName() + "账户")
+            group.forEach { account ->
+                AccountCard(
+                    account = account,
+                    onDetail = { detailId = account.id },
+                    onReconcile = { reconcileId = account.id },
+                    onEdit = { editError = null; editAccount = account },
+                    onDelete = { deleting = account },
+                    onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
+                    onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
+                )
+            }
         }
 
         Text(
@@ -294,7 +286,7 @@ private fun AccountCard(
                 account.creditLimitCents, account.balanceCents
             )
             val extra = listOfNotNull(
-                if (account.type == AccountType.LIABILITY) "信用负债" else null,
+                if (account.type != AccountType.ASSET) account.type.displayName() else null,
                 credit?.let { "可用 " + formatCents(it) },
                 if (!account.includeInTotal) "不计入净资产" else null
             ).joinToString(" · ")
@@ -357,20 +349,22 @@ private fun AddAccountDialog(
                     value = name, onValueChange = { name = it },
                     label = { Text("账户名称") }, modifier = Modifier.fillMaxWidth()
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { type = AccountType.ASSET }) {
-                        Text(
-                            if (type == AccountType.ASSET) "● 资产账户" else "资产账户",
-                            color = if (type == AccountType.ASSET) LedgerColors.IncomeGreen
-                            else LedgerColors.Neutral
-                        )
-                    }
-                    TextButton(onClick = { type = AccountType.LIABILITY }) {
-                        Text(
-                            if (type == AccountType.LIABILITY) "● 信用负债" else "信用负债",
-                            color = if (type == AccountType.LIABILITY) LedgerColors.ExpenseRed
-                            else LedgerColors.Neutral
-                        )
+                Column {
+                    AccountType.entries.chunked(2).forEach { pair ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            pair.forEach { t ->
+                                AssistChip(
+                                    onClick = { type = t },
+                                    label = {
+                                        Text(
+                                            (if (type == t) "● " else "") + t.displayName(),
+                                            color = if (type == t) LedgerColors.IncomeGreen
+                                            else LedgerColors.Neutral
+                                        )
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
                 OutlinedTextField(
@@ -422,20 +416,22 @@ private fun EditAccountDialog(
                     value = name, onValueChange = { name = it },
                     label = { Text("账户名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { type = AccountType.ASSET }) {
-                        Text(
-                            if (type == AccountType.ASSET) "● 资产账户" else "资产账户",
-                            color = if (type == AccountType.ASSET) LedgerColors.IncomeGreen
-                            else LedgerColors.Neutral
-                        )
-                    }
-                    TextButton(onClick = { type = AccountType.LIABILITY }) {
-                        Text(
-                            if (type == AccountType.LIABILITY) "● 信用负债" else "信用负债",
-                            color = if (type == AccountType.LIABILITY) LedgerColors.ExpenseRed
-                            else LedgerColors.Neutral
-                        )
+                Column {
+                    AccountType.entries.chunked(2).forEach { pair ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            pair.forEach { t ->
+                                AssistChip(
+                                    onClick = { type = t },
+                                    label = {
+                                        Text(
+                                            (if (type == t) "● " else "") + t.displayName(),
+                                            color = if (type == t) LedgerColors.IncomeGreen
+                                            else LedgerColors.Neutral
+                                        )
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
                 OutlinedTextField(

@@ -109,6 +109,8 @@ fun TemplateManagerScreen(onBack: () -> Unit) {
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodyMedium
                         )
+                        TextButton(onClick = { vm.moveTemplate(t.id, -1) }) { Text("↑") }
+                        TextButton(onClick = { vm.moveTemplate(t.id, 1) }) { Text("↓") }
                         TextButton(onClick = { editing = t }) { Text("编辑") }
                         TextButton(onClick = { deleting = t }) {
                             Text("删除", color = LedgerColors.ExpenseRed)
@@ -281,14 +283,14 @@ private fun QuickEntryForm(
         }
         if (type != RecordType.INCOME) {
             DropdownSelector(
-                label = "转出账户：" + accountName(accountNames, fromAccountId),
+                label = "转出账户（可留空）：" + accountName(accountNames, fromAccountId),
                 options = accountNames,
                 onSelect = { fromAccountId = it }
             )
         }
         if (type != RecordType.EXPENSE) {
             DropdownSelector(
-                label = "转入账户：" + accountName(accountNames, toAccountId),
+                label = "转入账户（可留空）：" + accountName(accountNames, toAccountId),
                 options = accountNames,
                 onSelect = { toAccountId = it }
             )
@@ -356,13 +358,15 @@ private fun QuickEntryForm(
                 if (type != RecordType.TRANSFER && categoryId != null &&
                     visibleCategories.none { it.id == categoryId }
                 ) { error = "分类与收支类型不匹配，请重新选择"; return@Button }
-                if (type == RecordType.EXPENSE && fromAccountId == null) {
+                // 第 6 批：模板是草稿，账户字段全部可选，生成时用默认账户兜底；
+                // 周期规则会自动写入流水，仍 MUST 要求账户完整。
+                if (isRule && type == RecordType.EXPENSE && fromAccountId == null) {
                     error = "请选择转出账户"; return@Button
                 }
-                if (type == RecordType.INCOME && toAccountId == null) {
+                if (isRule && type == RecordType.INCOME && toAccountId == null) {
                     error = "请选择转入账户"; return@Button
                 }
-                if (type == RecordType.TRANSFER &&
+                if (isRule && type == RecordType.TRANSFER &&
                     (fromAccountId == null || toAccountId == null || fromAccountId == toAccountId)
                 ) {
                     error = "转账需选择两个不同的账户"; return@Button

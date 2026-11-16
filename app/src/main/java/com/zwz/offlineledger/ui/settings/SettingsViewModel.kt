@@ -11,7 +11,9 @@ import com.zwz.offlineledger.backup.BackupImporter
 import com.zwz.offlineledger.backup.crypto.SecureBackupCodec
 import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
+import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
+import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
@@ -39,12 +41,15 @@ data class SettingsState(
     val appLockEnabled: Boolean = false,
     val hasPin: Boolean = false,
     val csvPlan: CsvImportPlan? = null,
-    val defaultCurrency: String = LedgerCurrency.DEFAULT
+    val defaultCurrency: String = LedgerCurrency.DEFAULT,
+    val accounts: List<AccountEntity> = emptyList(),
+    val defaultAccountId: Long = 0L
 )
 
 class SettingsViewModel(
     private val repository: LedgerRepository,
     private val categoryDao: CategoryDao,
+    private val accountDao: AccountDao,
     private val prefs: LedgerPrefs
 ) : ViewModel() {
 
@@ -54,6 +59,25 @@ class SettingsViewModel(
     init {
         refreshPrefs()
         loadCategories()
+        loadAccounts()
+    }
+
+    private fun loadAccounts() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                accounts = accountDao.all(),
+                defaultAccountId = prefs.defaultAccountId
+            )
+        }
+    }
+
+    /** 第 6 批：默认账户只作记一笔与模板填充的兜底，不自动改已有流水。 */
+    fun setDefaultAccountId(id: Long) {
+        prefs.defaultAccountId = id
+        _state.value = _state.value.copy(
+            defaultAccountId = id,
+            message = if (id == 0L) "已清除默认账户" else "默认账户已更新"
+        )
     }
 
     fun refreshPrefs() {

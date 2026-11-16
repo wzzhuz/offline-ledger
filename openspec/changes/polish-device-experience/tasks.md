@@ -156,3 +156,25 @@
 - [x] 版本号 0.1.2
 - [ ] 真机验收（继续按使用者决定推迟）
 - [ ] 归档本 change（待使用者明确发话）
+
+## 第 6 批（v0.1.3）
+
+- [x] 竞品与规范查证：钱迹官方记账界面文档 / 无障碍说明、iCost 模板文档、
+      钱迹·鲨鱼记账·随手记三张记一笔截图、Material Design Text fields 规范
+- [x] 记一笔统一 `FormRow` 网格：固定 52dp 标签列 + 细分割线；
+      同区域只用 `OutlinedTextField` 一种输入容器，左侧边界一致
+- [x] 「分类 / 账户 / 日期 / 备注 / 对方」五行全部走 `FormRow`；
+      「支出账户 · CNY」长标签删除，币种只在账户弹层里显示
+- [x] 恢复三个快捷区，各 4 个 + 「更多」弹层：最近收款方（输入后改联想）、
+      常用账户（按最近 30 天频次）、常用模板（按 sortOrder）
+- [x] `AccountType` 扩为 4 类；资产页由 2 组写死改为 `AccountType.entries` 循环 4 组；
+      新增 / 编辑账户类型选择同步 4 类
+- [x] `LedgerPrefs.defaultAccountId` + 偏好页「默认账户」下拉；
+      `RecordEditorViewModel` 预填与 `save()` 双重兜底
+- [x] 模板表单账户字段全部可选（周期规则仍必填）；模板管理加 ↑↓ 排序
+      （复用 Repository 既有 `reorderTemplates` 事务）
+- [x] `defaultVersionName` 升 `0.1.3`
+- [x] 六个静态检查本地预跑
+- [ ] CI 与 release 实测回填
+- [ ] 真机观感复核：6.73 寸上网格是否齐、快捷 chips 是否够用又不乱
+- [ ] 归档本 change（待使用者明确发话）

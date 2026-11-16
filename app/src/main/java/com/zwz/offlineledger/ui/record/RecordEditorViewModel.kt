@@ -3,6 +3,7 @@ package com.zwz.offlineledger.ui.record
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zwz.offlineledger.core.money.Cents
+import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
@@ -40,7 +41,8 @@ class RecordEditorViewModel(
     private val recordDao: RecordDao,
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
-    private val repository: LedgerRepository
+    private val repository: LedgerRepository,
+    private val prefs: LedgerPrefs
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditorState())
@@ -80,7 +82,11 @@ class RecordEditorViewModel(
             }
             _accounts.value = sorted
             _counterpartySuggestions.value = emptyList()
-            val defaultAcc = lastAccountId ?: sorted.firstOrNull { !it.isArchived }?.id
+            // 第 6 批：偏好默认账户优先，其次进程内记忆，最后按常用频次取第一个。
+            val prefAcc = prefs.defaultAccountId.takeIf { id ->
+                id > 0L && a.any { it.id == id && !it.isArchived }
+            }
+            val defaultAcc = prefAcc ?: lastAccountId ?: sorted.firstOrNull { !it.isArchived }?.id
             editingId = recordId
             if (recordId == null) {
                 _state.value = EditorState(
@@ -238,7 +244,21 @@ class RecordEditorViewModel(
 
     /** 返回 null 表示保存成功，否则返回可直接展示给用户的错误文案。 */
     suspend fun save(): String? {
-        val s = _state.value
+        // 第 6 批：模板全字段可选，未指定账户用「默认账户 / 常用首个」兜底，
+        // 保证流水永远挂在账户上，余额联动与重算才有意义。
+        var s = _state.value
+        val fallback = prefs.defaultAccountId.takeIf { id ->
+            id > 0L && _accounts.value.any { it.id == id && !it.isArchived }
+        } ?: _accounts.value.firstOrNull { !it.isArchived }?.id
+        if (fallback != null) {
+            val alt = _accounts.value.firstOrNull { !it.isArchived && it.id != fallback }?.id
+            s = s.copy(
+                fromAccountId = s.fromAccountId ?: fallback,
+                toAccountId = s.toAccountId
+                    ?: (if (s.type == RecordType.TRANSFER) alt else fallback)
+            )
+            _state.value = s
+        }
         // 纯数字输入直接转分；不再经过表达式求值器（真机反馈：不需要运算符）。
         val amountCents = try {
             Cents.fromYuan(s.amountExpr.trim()).value

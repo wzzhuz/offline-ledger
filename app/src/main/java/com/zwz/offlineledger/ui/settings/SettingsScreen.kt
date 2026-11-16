@@ -42,7 +42,7 @@ fun SettingsScreen(onOpen: (String) -> Unit) {
         ) { onOpen("security") }
         SettingGroupCard(
             title = "偏好",
-            summary = "对账阈值 / 配色 / 默认币种"
+            summary = "对账阈值 / 配色 / 默认币种 / 默认账户"
         ) { onOpen("prefs") }
         SettingGroupCard(
             title = "账本",

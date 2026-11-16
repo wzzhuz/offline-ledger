@@ -1,5 +1,6 @@
 package com.zwz.offlineledger.ui.record
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,6 +19,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -46,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
 import com.zwz.offlineledger.data.local.entity.AccountEntity
@@ -73,7 +78,8 @@ fun RecordEditorDialog(
     val vm: RecordEditorViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
             RecordEditorViewModel(
-                ep.recordDao(), ep.accountDao(), ep.categoryDao(), ep.ledgerRepository()
+                ep.recordDao(), ep.accountDao(), ep.categoryDao(),
+                ep.ledgerRepository(), LedgerPrefs(context)
             )
         }
     )
@@ -131,68 +137,77 @@ fun RecordEditorDialog(
                         style = MaterialTheme.typography.displaySmall,
                         modifier = Modifier.padding(vertical = 6.dp)
                     )
+                    FormDivider()
 
                     if (state.type != RecordType.TRANSFER) {
-                        CategoryStrip(
-                            categories = categories,
+                        FormRow("分类") {
+                            CategoryStrip(
+                                categories = categories,
+                                type = state.type,
+                                selectedId = state.categoryId,
+                                expandedRootId = state.expandedRootId,
+                                onSelect = { id, root -> vm.selectCategory(id, root) },
+                                onKeepRoot = { vm.setExpandedRoot(null) }
+                            )
+                        }
+                    }
+
+                    FormRow("账户") {
+                        AccountStrip(
                             type = state.type,
-                            selectedId = state.categoryId,
-                            expandedRootId = state.expandedRootId,
-                            onSelect = { id, root -> vm.selectCategory(id, root) },
-                            onKeepRoot = { vm.setExpandedRoot(null) }
+                            accounts = accounts,
+                            fromId = state.fromAccountId,
+                            toId = state.toAccountId,
+                            onFrom = { vm.setFromAccount(it) },
+                            onTo = { vm.setToAccount(it) }
                         )
                     }
 
-                    AccountStrip(
-                        type = state.type,
-                        accounts = accounts,
-                        fromId = state.fromAccountId,
-                        toId = state.toAccountId,
-                        onFrom = { vm.setFromAccount(it) },
-                        onTo = { vm.setToAccount(it) }
-                    )
-
-                    DateRow(
-                        localDate = localDate,
-                        timeLabel = timeLabel,
-                        onPick = { showDatePicker = true },
-                        onPickTime = { showTimePicker = true },
-                        onPrev = { vm.shiftDay(-1) },
-                        onNext = { vm.shiftDay(1) },
-                        onToday = { vm.setToday() }
-                    )
+                    FormRow("日期") {
+                        DateRow(
+                            localDate = localDate,
+                            timeLabel = timeLabel,
+                            onPick = { showDatePicker = true },
+                            onPickTime = { showTimePicker = true },
+                            onPrev = { vm.shiftDay(-1) },
+                            onNext = { vm.shiftDay(1) },
+                            onToday = { vm.setToday() }
+                        )
+                    }
 
                     // 阶段 8：转账不显示交易对方；收入显示「付款方 / 来源」。
                     if (state.type != RecordType.TRANSFER) {
                         val partyLabel = if (state.type == RecordType.INCOME)
                             "付款方 / 来源" else "收款方"
-                        Row(modifier = Modifier.fillMaxWidth()) {
+                        FormRow("备注") {
                             OutlinedTextField(
                                 value = state.note,
                                 onValueChange = { vm.setNote(it) },
-                                label = { Text("备注") },
+                                label = { Text("可选") },
                                 singleLine = true,
-                                modifier = Modifier.weight(1f).padding(end = 4.dp)
+                                modifier = Modifier.fillMaxWidth()
                             )
+                        }
+                        FormRow("对方") {
                             OutlinedTextField(
                                 value = state.counterparty,
                                 onValueChange = { vm.setCounterparty(it) },
                                 label = { Text(partyLabel) },
                                 singleLine = true,
-                                modifier = Modifier.weight(1f).padding(start = 4.dp)
-                            )
-                        }
-                        // 第 5 批：空输入不再平铺最近 chips，输入后才联想，减少首屏噪音。
-                        val quick: List<String> = if (state.counterparty.isBlank())
-                            emptyList() else suggestions
-                        if (quick.isNotEmpty()) {
-                            Row(
                                 modifier = Modifier.fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
-                            ) {
-                                quick.forEach { p ->
-                                    TextButton(onClick = { vm.setCounterparty(p) }) {
-                                        Text(p, style = MaterialTheme.typography.labelSmall)
+                            )
+                            // 第 6 批：空输入列最近常用，输入后改联想；快捷区上限可数。
+                            val quick: List<String> = if (state.counterparty.isBlank())
+                                counterparties.take(QUICK_COUNT) else suggestions.take(QUICK_COUNT)
+                            if (quick.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState())
+                                ) {
+                                    quick.forEach { p ->
+                                        TextButton(onClick = { vm.setCounterparty(p) }) {
+                                            Text(p, style = MaterialTheme.typography.labelSmall)
+                                        }
                                     }
                                 }
                             }
@@ -336,50 +351,59 @@ private fun AccountStrip(
 ) {
     val visible = accounts.filter { !it.isArchived }
     if (type == RecordType.TRANSFER) {
-        AccountPicker("转出", visible, fromId, onFrom)
-        AccountPicker("转入", visible, toId, onTo)
+        AccountQuickRow("转出", visible, fromId, onFrom)
+        AccountQuickRow("转入", visible, toId, onTo)
     } else {
         val chosenId = if (type == RecordType.EXPENSE) fromId else toId
-        val cc = visible.firstOrNull { it.id == chosenId }?.currencyCode
-        val label = (if (type == RecordType.EXPENSE) "支出账户" else "收入账户") +
-            (cc?.let { " · $it" } ?: "")
-        AccountPicker(label, visible, chosenId,
+        AccountQuickRow("", visible, chosenId,
             if (type == RecordType.EXPENSE) onFrom else onTo)
     }
 }
 
 /**
- * 第 5 批：不再平铺 6 个账户 chips，首屏只显示当前选中账户；
- * 点开进「全部账户」弹层搜索选择，长账户名（含卡号后缀）完整显示。
+ * 第 6 批：常用账户（ViewModel 已按最近 30 天频次排序）平铺 QUICK_COUNT 个，
+ * 其余进「更多」弹层按名称搜索。标签不再写「支出账户 · CNY」这类长文本，
+ * 币种只在弹层里显示，避免占用表单宽度。
  */
 @Composable
-private fun AccountPicker(
-    label: String,
+private fun AccountQuickRow(
+    tag: String,
     accounts: List<AccountEntity>,
     selectedId: Long?,
     onSelect: (Long) -> Unit
 ) {
     var showAll by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val chosen = accounts.firstOrNull { it.id == selectedId }
+    if (tag.isNotEmpty()) {
+        Text(text = tag, style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral)
+    }
     Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, style = MaterialTheme.typography.labelSmall)
-        TextButton(onClick = { showAll = true }) {
-            Text(
-                text = chosen?.let { "● ${it.name}" } ?: "选择账户 ▾",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (chosen != null) LedgerColors.IncomeGreen else LedgerColors.Neutral,
-                maxLines = 1
+        accounts.take(QUICK_COUNT).forEach { a ->
+            val chosen = a.id == selectedId
+            AssistChip(
+                onClick = { onSelect(a.id) },
+                label = {
+                    Text(
+                        (if (chosen) "● " else "") + a.name,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                },
+                modifier = Modifier.padding(end = 4.dp)
             )
         }
+        AssistChip(
+            onClick = { showAll = true },
+            label = { Text("更多 ▾", style = MaterialTheme.typography.labelSmall) }
+        )
     }
     if (showAll) {
         AlertDialog(
             onDismissRequest = { showAll = false },
-            title = { Text("选择账户") },
+            title = { Text("全部账户") },
             text = {
                 Column {
                     OutlinedTextField(
@@ -480,4 +504,37 @@ private fun CalculatorKeypad(onKey: (String) -> Unit) {
             }
         }
     }
+}
+
+
+/**
+ * 第 6 批：统一表单网格。固定 52dp 标签列 + 一条细分割线，
+ * 左侧边界完全一致；同区域只用 OutlinedTextField 一种输入容器，
+ * 不再混用带框输入框 / 无边界 TextButton / AssistChip 直接铺在根 Column。
+ */
+private const val QUICK_COUNT = 4
+
+@Composable
+private fun FormRow(label: String, content: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = LedgerColors.Neutral,
+            modifier = Modifier.width(52.dp).padding(top = 12.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) { content() }
+    }
+    FormDivider()
+}
+
+@Composable
+private fun FormDivider() {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    )
 }

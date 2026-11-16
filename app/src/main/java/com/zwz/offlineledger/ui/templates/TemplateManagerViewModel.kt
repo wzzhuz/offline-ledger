@@ -95,6 +95,25 @@ class TemplateManagerViewModel(
         }
     }
 
+    /** 第 6 批：模板顺序可调，复用 Repository 既有 reorderTemplates 单事务。 */
+    fun moveTemplate(id: Long, delta: Int) {
+        viewModelScope.launch {
+            val all = _state.value.templates
+            val active = all.filter { !it.isArchived }
+            val i = active.indexOfFirst { it.id == id }
+            val j = i + delta
+            if (i < 0 || j < 0 || j >= active.size) return@launch
+            val reordered = active.toMutableList().apply {
+                val moved = removeAt(i)
+                add(j, moved)
+            }.map { it.id }
+            val archived = all.filter { it.isArchived }.map { it.id }
+            runCatching { repository.reorderTemplates(reordered + archived) }
+                .onSuccess { refresh() }
+                .onFailure { message(it.message ?: "调整顺序失败") }
+        }
+    }
+
     fun setRuleEnabled(id: Long, enabled: Boolean) {
         viewModelScope.launch {
             runCatching { repository.setRuleEnabled(id, enabled) }

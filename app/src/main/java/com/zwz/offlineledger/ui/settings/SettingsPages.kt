@@ -53,7 +53,9 @@ internal fun settingsVm(): SettingsViewModel {
     val context = LocalContext.current
     val vm: SettingsViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
-            SettingsViewModel(ep.ledgerRepository(), ep.categoryDao(), LedgerPrefs(context))
+            SettingsViewModel(
+                ep.ledgerRepository(), ep.categoryDao(), ep.accountDao(), LedgerPrefs(context)
+            )
         }
     )
     return vm
@@ -328,6 +330,7 @@ fun PreferenceSettingsScreen(onBack: () -> Unit) {
     val state by vm.state.collectAsState()
     var thresholdInput by remember { mutableStateOf(state.thresholdYuan) }
     var currencyExpanded by remember { mutableStateOf(false) }
+    var accountExpanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -372,6 +375,40 @@ fun PreferenceSettingsScreen(onBack: () -> Unit) {
         }
         Text(
             text = "统一币种只改标签、不改金额；不会自动执行，需你点上面的按钮。",
+            style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral
+        )
+        Text(
+            text = "默认账户（记一笔与模板未指定账户时使用）",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(top = 12.dp)
+        )
+        val chosenAccount = state.accounts.firstOrNull { it.id == state.defaultAccountId }
+        Box {
+            TextButton(onClick = { accountExpanded = true }) {
+                Text(
+                    chosenAccount?.name ?: "未设置",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            DropdownMenu(
+                expanded = accountExpanded,
+                onDismissRequest = { accountExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("未设置（自动取第一个常用账户）") },
+                    onClick = { vm.setDefaultAccountId(0L); accountExpanded = false }
+                )
+                state.accounts.filter { !it.isArchived }.forEach { a ->
+                    DropdownMenuItem(
+                        text = { Text(a.name + " · " + a.currencyCode) },
+                        onClick = { vm.setDefaultAccountId(a.id); accountExpanded = false }
+                    )
+                }
+            }
+        }
+        Text(
+            text = "模板里的账户可以留空；记账时会用这里选的默认账户补上。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral
         )
