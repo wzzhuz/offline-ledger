@@ -442,16 +442,67 @@ class SettingsViewModel(
         }
     }
 
+    /** 排序作用域：支出/收入 + 一级/二级 + 所属父级。二级只在自己一级内排。 */
+    private fun groupKey(c: CategoryEntity) =
+        Triple<RecordType, Int, Long?>(c.type, c.level, c.parentId)
+
+    /**
+     * 第 15 批：修「排序点了没反应」的真 bug。
+     * 原实现把全部未归档分类（一级+二级、支出+收入）当成一个数组交换相邻项，
+     * UI 过滤出 roots / children 后常常什么都没变。
+     * 现在按 (type, level, parentId) 分组：组内用新顺序，组间保持原 sortOrder 相对次序，
+     * 拼成全量 id 列表一次性写入 0..n-1。DAO 与表结构一字不动。
+     */
+    private suspend fun persistWithGroup(
+        newGroupIds: List<Long>,
+        key: Triple<RecordType, Int, Long?>
+    ) {
+        val all = _state.value.categories
+        val active = all.filter { !it.isArchived }.sortedBy { it.sortOrder }
+        val rebuilt = mutableListOf<Long>()
+        val seen = mutableSetOf<Triple<RecordType, Int, Long?>>()
+        active.forEach { c ->
+            val k = groupKey(c)
+            if (k !in seen) {
+                seen += k
+                if (k == key) rebuilt.addAll(newGroupIds)
+                else rebuilt.addAll(active.filter { groupKey(it) == k }.map { it.id })
+            }
+        }
+        repository.reorderCategories(rebuilt + all.filter { it.isArchived }.map { it.id })
+    }
+
     fun moveCategory(id: Long, delta: Int) {
         viewModelScope.launch {
-            val group = _state.value.categories.filter { !it.isArchived }
+            val cur = _state.value.categories.firstOrNull { it.id == id } ?: return@launch
+            if (cur.isArchived) return@launch
+            val key = groupKey(cur)
+            val group = _state.value.categories
+                .filter { !it.isArchived && groupKey(it) == key }
+                .sortedBy { it.sortOrder }
             val idx = group.indexOfFirst { it.id == id }
             val target = idx + delta
             if (idx < 0 || target !in group.indices) return@launch
             val swapped = group.toMutableList().apply {
                 val a = this[idx]; this[idx] = this[target]; this[target] = a
             }
-            repository.reorderCategories(swapped.map { it.id })
+            persistWithGroup(swapped.map { it.id }, key)
+            loadCategories()
+        }
+    }
+
+    /** 第 15 批：一级拖拽落库，只替换当前收支类型的一级组。 */
+    fun commitRootOrder(orderedRootIds: List<Long>, type: RecordType) {
+        viewModelScope.launch {
+            val all = _state.value.categories
+            val byId = all.associateBy { it.id }
+            val key = Triple<RecordType, Int, Long?>(type, 0, null)
+            val valid = orderedRootIds.mapNotNull { byId[it] }
+                .filter { !it.isArchived && it.level == 0 && it.type == type }
+                .map { it.id }
+            val tail = all.filter { !it.isArchived && it.level == 0 && it.type == type }
+                .map { it.id }.filter { it !in valid }
+            persistWithGroup(valid + tail, key)
             loadCategories()
         }
     }

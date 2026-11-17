@@ -2,6 +2,8 @@ package com.zwz.offlineledger.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +40,22 @@ fun CategoryIcon(name: String?, colorHex: String?, size: Int = 40) {
             style = MaterialTheme.typography.bodyMedium
         )
     }
+}
+
+/**
+ * 第 15 批：全站列表分割线的**单一来源**。
+ * 1dp / Neutral 0.10；水平内缩由调用方提供（明细页 16dp；
+ * 外层已带 12dp 的列表页补 4dp，视觉基准统一为距屏幕 16dp）。
+ * MUST NOT 在各页各画一遍 Box，避免颜色 / 厚度 / 内缩漂移。
+ */
+@Composable
+fun ListDivider(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(LedgerColors.Neutral.copy(alpha = 0.10f))
+    )
 }
 
 fun amountColor(type: RecordType): Color = when (type) {

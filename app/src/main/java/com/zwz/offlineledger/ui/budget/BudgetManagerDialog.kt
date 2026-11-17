@@ -40,6 +40,7 @@ import com.zwz.offlineledger.data.local.entity.BudgetEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.BudgetScope
 import com.zwz.offlineledger.ui.components.formatCents
+import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.settings.SettingsPageTopBar
 import com.zwz.offlineledger.ui.theme.LedgerColors
@@ -140,6 +141,7 @@ private fun BudgetList(
                     }
                 }
             }
+            ListDivider(Modifier.padding(horizontal = 4.dp))
         }
     }
 }

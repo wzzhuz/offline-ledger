@@ -32,22 +32,23 @@ fun SettingsScreen(onOpen: (String) -> Unit) {
             color = LedgerColors.Neutral
         )
 
+        // 第 15 批：按使用频率重排（账本 → 数据与备份 → 偏好 → 安全 → 关于）。
+        SettingGroupCard(
+            title = "账本",
+            summary = "分类 / 模板 / 预算 / 回收站 / 健康自检"
+        ) { onOpen("ledger") }
         SettingGroupCard(
             title = "数据与备份",
             summary = "加密备份 / CSV 明文导出 / 账单导入"
         ) { onOpen("backup") }
         SettingGroupCard(
-            title = "安全",
-            summary = "应用锁 / PIN / 最近任务防泄露"
-        ) { onOpen("security") }
-        SettingGroupCard(
             title = "偏好",
             summary = "对账阈值 / 配色 / 默认币种 / 默认账户"
         ) { onOpen("prefs") }
         SettingGroupCard(
-            title = "账本",
-            summary = "分类 / 模板 / 预算 / 回收站 / 健康自检"
-        ) { onOpen("ledger") }
+            title = "安全",
+            summary = "应用锁 / PIN / 最近任务防泄露"
+        ) { onOpen("security") }
 
         SectionTitle("关于")
         Text(

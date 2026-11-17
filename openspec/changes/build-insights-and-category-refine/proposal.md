@@ -57,3 +57,35 @@
 **影响模块**：`reporting-ui`（主）、`category-stats`（主）、`privacy-security`（隐私模式）、
 `build-and-ci`（静态检查与版本）、`money-precision` / `ledger-transactions` / `backup-restore` 只读。
 **不与三条铁律或「已确认不做」冲突。**
+
+---
+
+# 第 15 批补充对齐（v0.2.2 · 使用者真机反馈）
+
+### ① 要解决什么
+把「分割线 / 行高 / 内边距」从逐页手感升级成**全站规范**；修掉排序
+「点了没反应」的真 bug（作用域错误）；一级分类拖拽补齐顺滑度；设置分组按使用频率排序。
+
+### ② 改 / 不改
+**改**：`ListDivider` 共享组件 + 明细 / 分类 / 资产 / 模板 / 预算 / 回收站六页、
+一级标题加重与 chip 自适应、`moveCategory` / `moveAccount` 分组、一级拖手柄、
+设置页卡片顺序、3 份 MODIFIED、活文档 §7.5 / §8、版本 0.2.2。
+**不改**：表结构 / 备份格式 / DAO 查询 / 4 Tab / NavHost / 金额铁律 / 统计口径 /
+Manifest / `release.yml` / 折叠展开态 `rememberSaveable` / 中性单色圆 / 隐私模式。
+
+### ③ 关键约束
+零表结构 → 覆盖安装即可；`sortOrder` 作用域 MUST 含 `type`，MUST NOT 跨父级交换；
+拖拽 MUST 长按触发、稳定 `key`、**零新增依赖/权限**；可点区 ≥40dp；
+细线颜色 / 厚度 MUST 单一来源；六个静态检查全过；动手前先写 `design.md` 根因与回退顺序。
+
+### ④ 验收
+① 六页分割线 / 内边距视觉一致，资产账户不再 1dp 贴片；② 一级名称显著重于 chip、
+短 chip 边框随文本收缩；③ 一级下移只换一级、二级下移只在本一级内换、账户按类型交换；
+④ 长按一级可拖动换位且重开页面顺序仍存；⑤ 设置页顺序为
+账本→数据与备份→偏好→安全→关于；⑥ 归档校验 3 份 MODIFIED 按标题替换；
+⑦ CI 全绿、v0.2.2、远端 sha PASS、无 token 明文。
+
+### ⑤ 被否决
+`dragAndDropSource` 做列表重排；引入 `reorderable` 库；二级 chips 拖拽；
+只给分类页加线；管理页行高一刀切 60dp；只改设置页代码不改 spec；
+只追加 ADDED；为紧凑删回收站信息或压触摸区。

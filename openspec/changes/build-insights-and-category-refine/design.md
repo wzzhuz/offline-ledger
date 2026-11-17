@@ -127,3 +127,101 @@ BeeCount 的 `analytics_content.dart` 用 `BeeSurface` 把每个结论装进独�
 规避「保存 `MutableState` 包装对象」的 saver 版本依赖，回退顺序第 2 条未用上。
 `nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
 **不当作已验证 HEAD 200**。真机观感与累积未验清单仍按使用者决定整体推迟。
+
+---
+
+# 第 15 批 · 全站列表规范 / 排序作用域 / 一级拖拽（v0.2.2）
+
+## 0. 动手前根因（指南 §6.1）
+
+**① 一级之间边界不清**：`CategoryRootRow` 无任何分割线，只有 `heightIn(min = 44.dp)`；
+展开 chips 与下一个一级之间仅 `padding(bottom = 6.dp)`。明细页基准是
+`fillMaxWidth + padding(horizontal=16.dp) + height(1.dp) + Neutral 0.10f`
+（`DetailScreen.kt` 内联 Box）。五个列表页各自画或压根不画 → 风格漂移。
+**这是第 11~14 批「老页面写法同步」的第三次外推**：统一网格不止左边界（§2.3），
+连「行与行之间的边界」也要单一来源。
+
+**② 一级显小 / chip 边框过长**：一级 `bodyMedium` + `labelSmall` 副行，二级
+`FilterChip` 有填充底色且 M3 默认 label 字重更显眼，视觉重量被拉开；chip 用
+`Modifier.weight(1f)` 三列等宽 + 补空 `Box(weight(1f))`，短名也被拉成整列宽。
+
+**③ 排序不生效（真 bug，不是手感）**：`SettingsViewModel.moveCategory` 把
+**全部未归档分类**（一级+二级、支出+收入）当一个数组交换相邻项，
+`reorderCategories` 再按全局下标写 `sortOrder`，而 UI 先按 `type + level` 过滤出
+`roots`、按 `parentId` 过滤出 `children` → 点一级「下移」常常只是和某个二级或
+收入分类换了位置，`roots` 顺序纹丝不动。全局数组写法在
+`AssetsViewModel.moveAccount` 同样存在（资产页按 `AccountType` 分组后也会「点了没反应」）。
+
+**④ 资产页压缩过头**：`Card(padding(vertical = 1.dp))` + 内部
+`padding(horizontal=10.dp, vertical=3.dp)`，账户卡几乎贴在一起，边界靠 1dp 间距表达。
+
+**⑤ 拖拽**：Compose **没有内置列表重排组件**；`dragAndDropSource/Target` 是跨应用
+传 `ClipData` 的协议（把图片拖进另一个 App），不是列表内换位。第三方
+`reorderable` 库要新增依赖，且社区普遍踩「拖拽后 UI 不更新」
+（`mutableStateListOf` / 稳定 `key` 绑定）的坑。采用零依赖 scoped 实现：
+只在**一级行**加长按手柄，`pointerInput { detectDragGesturesAfterLongPress }` +
+`draggedId` / `graphicsLayer` 位移 + 稳定 `key`，松手一次性把显式 `sortOrder` 落库。
+**首版限制（如实记录）**：拖拽中不做实时让位动画、不做边缘自动滚动；
+被拖行跟随手指，松手后按累计位移计算目标下标一次性重排。二级仍是 chips 网格，
+保留操作弹层的上移 / 下移（已修作用域），不对 chips 做拖拽换位。
+
+**⑥ 设置页顺序**：现状 `数据与备份 → 安全 → 偏好 → 账本 → 关于`，
+按使用者给的使用频率改为 `账本 → 数据与备份 → 偏好 → 安全 → 关于`。
+`reporting-ui` 一条 Requirement 把分组顺序写死，只改代码会留下规格与实现相反
+→ 按指南 §5 用 MODIFIED 整块替换。
+
+## 1. 实现结构
+
+| 层 | 文件 | 做法 |
+|---|---|---|
+| 共享组件 | `ui/components/LedgerUiParts.kt` | 新增 `ListDivider(modifier)`：1dp / Neutral 0.10，**水平内缩由调用方给** |
+| 明细 | `DetailScreen.kt` | 内联 Box → `ListDivider(Modifier.padding(horizontal = 16.dp))`，保持基准不变 |
+| 分类 / 模板 / 预算 / 回收站 | 各自列表 | 外层 `padding(horizontal = 12.dp)`，调用时补 `4.dp` → 视觉基准统一 16dp |
+| 资产 | `AssetsScreen.kt` | 账户卡 1dp → 4dp 组距 + 8dp 行内边距 + `ListDivider`；Card 外层再包一层 Column |
+| 分类 | `CategoryManagerDialog.kt` | 一级 `titleSmall + SemiBold`；chip 去 `weight` 改 `widthIn(max=150.dp)` 自适应、label 显式 `bodyMedium`；一级行长按拖手柄 |
+| 分类 VM | `SettingsViewModel.kt` | `groupKey = (type, level, parentId)`；`persistWithGroup()` 组内重排 + 组间保持原序，一次性写全量 id；新增 `commitRootOrder()` |
+| 账户 VM | `AssetsViewModel.kt` | `moveAccount` 作用域改为 `AccountType`，同模式按组重建 |
+| 设置 | `SettingsScreen.kt` | 四张 `SettingGroupCard` 顺序调整 |
+| 版本 | `app/build.gradle.kts` | `0.2.1 → 0.2.2` |
+
+**零表结构变更 / 零 Migration / 零新增依赖 / 零新增权限**；`CategoryDao`、备份 DTO、
+统计口径、金额铁律、4 Tab、NavHost、`release.yml` 全部不动。排序仍走已有
+`reorderCategories` / `reorderAccounts` 事务（含末尾重算），`WRITE_METHODS` 不变。
+
+## 2. 全站列表规范（写进活文档 §7.5，后续页面直接抄）
+
+- **分割线**：`ListDivider()` 单一来源；1dp、`Neutral.copy(alpha = 0.10f)`、距屏幕 **16dp**
+  （明细外层 0 → 传 16dp；其余列表外层 12dp → 传 4dp）
+- **行高分档**：明细 60dp（四列网格）、资产 56dp（账户卡）、管理页 44dp（单行 + ⋯ 菜单）
+- **水平内边距**：行内容 16dp 基准；MUST NOT 用多个 48dp `TextButton` 横排撑高
+- **可点区** ≥40dp（指南 §7，第三次「降噪过头」的硬约束）
+- **选中态** `FilterChip` 容器底色，MUST NOT 用 `● ` 前缀
+
+> 已知不完美：外层 12dp 与补 4dp 是务实取舍，避免为对齐把五个页面的每一行
+> 内边距全部重写。后续若统一外层为 0，只需把各页 `ListDivider` 调用改成 16dp，
+> 组件本身不动。
+
+## 3. 三级回退顺序（首轮 CI 若红，每次只改一处单独推送）
+
+1. **拖拽编译错**（最可能：`graphicsLayer` / `detectDragGesturesAfterLongPress` /
+   `rememberUpdatedState` / `Icons.Filled.Menu` 的 import 或 API 签名）
+   → 先退回「保留上移 / 下移，去掉 `dragModifier` 与 `pointerInput`」，功能不丢、先保绿。
+2. **`widthIn` / `FontWeight` / `ListDivider` import 漏项** → 按编译器点名补 import，
+   一次只补一组。
+3. **VM 分组逻辑编译错**（`Triple` 类型推断、`suspend` 作用域）→ 显式写
+   `Triple<RecordType, Int, Long?>` 与 `private suspend fun`，不改 DAO。
+
+## 4. 被否决的方案
+
+- `dragAndDropSource/Target` 做列表内重排（跨应用协议，用错场景）
+- 引入 `reorderable` / `sh.calvin.reorderable` 等第三方库（破零依赖基线）
+- 二级 chips 也做拖拽换位（网格拖动手感差，且会让折叠态密度回退）
+- 只给分类页加线、其余页不动（第 12 批「老页面写法同步」已证伪）
+- 把管理页行高统一拉到 60dp（又松回两屏）
+- 只改设置页代码不改 spec / 只追加 ADDED 制造两份清单（指南 §5）
+- 为紧凑删回收站信息或压触摸区到 40dp 以下
+
+### 实测回填
+
+（推送后写：commit sha / push CI run id / release run id / 制品大小 / 首轮失败根因 /
+真机未验清单继承）

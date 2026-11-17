@@ -50,6 +50,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.zwz.offlineledger.core.money.Cents
+import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
 import com.zwz.offlineledger.data.local.dao.RecordRow
@@ -450,11 +451,5 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
             modifier = Modifier.width(92.dp)
         )
     }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(1.dp)
-            .background(LedgerColors.Neutral.copy(alpha = 0.10f))
-    )
+    ListDivider(Modifier.padding(horizontal = 16.dp))
 }

@@ -33,6 +33,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import com.zwz.offlineledger.ui.components.ListDivider
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
@@ -47,6 +57,8 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
  * 第 14 批：一级默认折叠、点一级展开二级 chips、点二级 chip 弹操作
  * （改名 / 删除 / 上移 / 下移 / 看流水）；展开态用 rememberSaveable 保存。
  * 第 12/13 批的 TopBar 固定 + 惰性列表 + 编辑独立视图骨架一字未回退。
+ * 第 15 批：一级之间统一 ListDivider、一级标题加粗、二级 chip 按文本自适应、
+ * 一级行长按拖手柄重排（零新增依赖，松手一次性落库）。
  */
 private data class CategoryEditorState(
     val mode: String,                 // "add" | "rename"
@@ -126,6 +138,7 @@ fun CategoryManagerScreen(onBack: () -> Unit) {
                 onDelete = { deletingId = it },
                 onMove = { id, delta -> vm.moveCategory(id, delta) },
                 onRestore = { vm.restoreCategory(it) },
+                onCommitOrder = { ids -> vm.commitRootOrder(ids, catType) },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -207,9 +220,10 @@ private fun CategoryList(
     onDelete: (Long) -> Unit,
     onMove: (Long, Int) -> Unit,
     onRestore: (Long) -> Unit,
+    onCommitOrder: (List<Long>) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val roots = categories.filter {
+    val rootsBase = categories.filter {
         it.level == 0 && !it.isArchived && it.type == catType
     }
     val children = categories.filter {
@@ -219,57 +233,123 @@ private fun CategoryList(
     // 第 14 批：点二级 chip 弹一个操作 Dialog，五项操作一个不丢。
     var actionChild by remember { mutableStateOf<CategoryEntity?>(null) }
 
+    // 第 15 批：一级拖拽排序。本地顺序是可观察状态，松手一次性提交落库；
+    // item 用 id 稳定 key；零新增依赖，不用跨应用 dragAndDrop API。
+    val rootKey = rootsBase.joinToString(",") { it.id.toString() }
+    var orderedRootIds by remember { mutableStateOf(rootsBase.map { it.id }) }
+    LaunchedEffect(rootKey) { orderedRootIds = rootsBase.map { it.id } }
+    val roots = orderedRootIds.mapNotNull { id -> rootsBase.firstOrNull { it.id == id } }
+    var draggingId by remember { mutableStateOf<Long?>(null) }
+    var dragOffset by remember { mutableStateOf(0f) }
+    val rowPx = with(LocalDensity.current) { 56.dp.toPx() }
+    val commitState = rememberUpdatedState(onCommitOrder)
+
     LazyColumn(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         item {
             Text(
                 text = "最多两级；点一级展开二级，点二级可编辑；笔数含二级。删除有流水的分类自动转归档。",
                 style = MaterialTheme.typography.bodySmall,
                 color = LedgerColors.Neutral,
-                modifier = Modifier.padding(vertical = 6.dp)
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
             )
         }
         roots.forEach { root ->
             val expanded = root.id in expandedRoots
             val childList = children.filter { it.parentId == root.id }
             item(key = "root-" + root.id) {
-                CategoryRootRow(
-                    label = root.name,
-                    childCount = childList.size,
-                    countText = (counts[root.id] ?: 0).toString() + " 笔（含二级）",
-                    expanded = expanded,
-                    onToggle = { onToggleExpand(root.id) },
-                    onOpen = { onOpen(root.id, root.name) },
-                    onMoveUp = { onMove(root.id, -1) },
-                    onMoveDown = { onMove(root.id, 1) },
-                    onRename = { onRename(root.id, root.name) },
-                    onDelete = { onDelete(root.id) }
-                )
-            }
-            if (expanded) {
-                item(key = "children-" + root.id) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 12.dp, top = 2.dp, bottom = 6.dp)
-                    ) {
-                        childList.chunked(3).forEach { group ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                horizontalArrangement =
-                                    androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
-                            ) {
-                                group.forEach { child ->
-                                    FilterChip(
-                                        selected = false,
-                                        onClick = { actionChild = child },
-                                        label = { Text(child.name, maxLines = 1) },
-                                        modifier = Modifier.weight(1f)
-                                    )
+                val isDragging = draggingId == root.id
+                val from = orderedRootIds.indexOf(root.id)
+                // 只在手柄上接管长按拖拽，列表本身的滚动不受影响。
+                val dragModifier = Modifier.pointerInput(root.id) {
+                    var acc = 0f
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = {
+                            draggingId = root.id
+                            acc = 0f
+                            dragOffset = 0f
+                        },
+                        onDrag = { change, delta ->
+                            change.consume()
+                            acc += delta.y
+                            dragOffset = acc
+                        },
+                        onDragEnd = {
+                            val steps = (acc / rowPx).toInt()
+                            val to = (from + steps).coerceIn(0, orderedRootIds.lastIndex)
+                            draggingId = null
+                            dragOffset = 0f
+                            if (steps != 0 && to != from) {
+                                val next = orderedRootIds.toMutableList().apply {
+                                    add(to, removeAt(from))
                                 }
-                                // 补空位保持三列对齐，末尾不足 3 个也不偏移。
-                                repeat(3 - group.size) { Box(modifier = Modifier.weight(1f)) }
+                                orderedRootIds = next
+                                commitState.value(next)
+                            }
+                        },
+                        onDragCancel = {
+                            draggingId = null
+                            dragOffset = 0f
+                        }
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            if (isDragging) {
+                                translationY = dragOffset
+                                shadowElevation = 6.dp.toPx()
+                                alpha = 0.94f
                             }
                         }
+                ) {
+                    Column {
+                        CategoryRootRow(
+                            label = root.name,
+                            childCount = childList.size,
+                            countText = (counts[root.id] ?: 0).toString() + " 笔（含二级）",
+                            expanded = expanded,
+                            onToggle = { onToggleExpand(root.id) },
+                            onOpen = { onOpen(root.id, root.name) },
+                            onMoveUp = { onMove(root.id, -1) },
+                            onMoveDown = { onMove(root.id, 1) },
+                            onRename = { onRename(root.id, root.name) },
+                            onDelete = { onDelete(root.id) },
+                            dragModifier = dragModifier
+                        )
+                        if (expanded) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 12.dp, top = 2.dp, bottom = 6.dp)
+                            ) {
+                                childList.chunked(3).forEach { group ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                        horizontalArrangement =
+                                            androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        group.forEach { child ->
+                                            FilterChip(
+                                                selected = false,
+                                                onClick = { actionChild = child },
+                                                label = {
+                                                    Text(
+                                                        child.name,
+                                                        maxLines = 1,
+                                                        style = MaterialTheme.typography.bodyMedium
+                                                    )
+                                                },
+                                                // 第 15 批：按文本自适应，短名不再被拉成整列宽；
+                                                // widthIn(max) 防超长名占满一行，40dp 触摸区由 M3 保障。
+                                                modifier = Modifier.widthIn(max = 150.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        ListDivider(Modifier.padding(horizontal = 4.dp))
                     }
                 }
             }
@@ -351,7 +431,8 @@ private fun CategoryRootRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    dragModifier: Modifier = Modifier
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -373,7 +454,11 @@ private fun CategoryRootRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = LedgerColors.Neutral
                     )
-                    Text(text = label, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
                 Text(
                     text = childCount.toString() + " 二级分类 · " + countText,
@@ -381,6 +466,17 @@ private fun CategoryRootRow(
                     color = LedgerColors.Neutral
                 )
             }
+        }
+        // 第 15 批：长按拖手柄；只在手柄上接管拖拽，滚动不误触。
+        Box(
+            modifier = dragModifier.size(40.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.Menu,
+                contentDescription = "长按拖动排序",
+                tint = LedgerColors.Neutral
+            )
         }
         IconButton(onClick = onOpen) {
             Text("›", style = MaterialTheme.typography.titleMedium)

@@ -58,3 +58,27 @@ BiometricPrompt 弹窗、SAF 文件选择器、Excel 打开 CSV 是否乱码 / �
 | 推送插曲 | 首次增量脚本跳过点开头路径，误删 `.github/` 与 `.gitignore`；force-push 回原 HEAD 并用「不跳过点路径 + 误删保护断言」重建，未触发 CI、未影响最终产物 |
 
 `nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，**不当作已验证 HEAD 200**。
+
+## 第 15 批（v0.2.2，同一 change 内）
+
+- [ ] 1. `LedgerUiParts.kt` 新增 `ListDivider()` 单一来源
+- [ ] 2. 明细页内联分割 Box 换成 `ListDivider()`，视觉基准保持 16dp
+- [ ] 3. 分类 / 模板 / 预算 / 回收站四页补 `ListDivider`，风格对齐明细
+- [ ] 4. 资产页账户卡 1dp 贴片 → 4dp 组距 + 8dp 内边距 + 分割线
+- [ ] 5. 分类一级 `titleSmall + SemiBold`，二级 chip 按文本自适应 + `widthIn(max)`
+- [ ] 6. `SettingsViewModel.moveCategory` 改 `(type, level, parentId)` 分组作用域
+- [ ] 7. `SettingsViewModel` 新增 `commitRootOrder()` 供拖拽落库
+- [ ] 8. `AssetsViewModel.moveAccount` 改按 `AccountType` 分组（同类 bug）
+- [ ] 9. 分类一级行加零依赖长按拖手柄（稳定 key + 松手一次性落库）
+- [ ] 10. 设置页分组顺序改 账本 → 数据与备份 → 偏好 → 安全 → 关于
+- [ ] 11. 3 份 MODIFIED 按标题整块替换（2× reporting-ui + 1× category-stats）
+- [ ] 12. 活文档 §7.5 / §8 更新；版本号 0.2.2
+- [ ] 13. 六个静态检查本地全 PASS + 大括号 / import 粗检
+- [ ] 14. 单次 commit 推送 + 按 commit sha 远端逐文件校验
+- [ ] 15. 查 push CI；若红按 `design.md` 三级回退顺序修复
+- [ ] 16. 手动触发 `release.yml`（minify=on / upload_nutstore=true）并查结果
+- [ ] 17. 回填实测；真机未验清单继承
+
+## 第 15 批实测
+
+（推送后回填）

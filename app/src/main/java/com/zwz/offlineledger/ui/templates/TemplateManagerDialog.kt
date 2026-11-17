@@ -46,6 +46,7 @@ import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
 import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.model.Cadence
 import com.zwz.offlineledger.data.model.RecordType
+import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.settings.SettingsPageTopBar
 import com.zwz.offlineledger.ui.theme.LedgerColors
@@ -210,6 +211,7 @@ private fun TemplateList(
                         )
                     }
                 }
+                ListDivider(Modifier.padding(horizontal = 4.dp))
             }
             val archived = state.templates.count { it.isArchived }
             if (archived > 0) {

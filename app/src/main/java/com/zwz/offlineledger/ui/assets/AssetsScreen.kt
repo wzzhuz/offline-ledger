@@ -46,6 +46,7 @@ import com.zwz.offlineledger.data.model.AccountType
 import com.zwz.offlineledger.data.model.displayName
 import com.zwz.offlineledger.engine.Reconciliation
 import com.zwz.offlineledger.ui.components.formatCents
+import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import com.zwz.offlineledger.ui.reconcile.ReconcileDialog
@@ -270,8 +271,10 @@ private fun AccountCard(
     onMove: (Int) -> Unit,
     onArchived: (Boolean) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)) {
+    // 第 15 批：1dp 贴片 → 统一 4dp 组距 + 8dp 行内边距 + 细分割线。
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = account.name + " · " + account.currencyCode +
@@ -316,6 +319,8 @@ private fun AccountCard(
                 MiniAction("删除", onDelete, LedgerColors.ExpenseRed)
             }
         }
+        }
+        ListDivider(Modifier.padding(horizontal = 4.dp))
     }
 }
 

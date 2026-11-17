@@ -139,9 +139,16 @@ class AssetsViewModel(
         }
     }
 
-    /** 第三批：上移 / 下移排序，顺序同步到记一笔的常用账户平铺。 */
+    /**
+     * 第 15 批：排序作用域改为「账户类型」，与资产页 4 组分组一致。
+     * 原实现把全部未归档账户当一个数组，跨组交换后 UI 看起来「点了没反应」，
+     * 与分类管理是同一个全局数组 bug。
+     */
     suspend fun moveAccount(id: Long, delta: Int): String? {
-        val group = _state.value.accounts.filter { !it.isArchived }
+        val all = _state.value.accounts
+        val cur = all.firstOrNull { it.id == id } ?: return null
+        if (cur.isArchived) return null
+        val group = all.filter { !it.isArchived && it.type == cur.type }
             .sortedBy { it.sortOrder }
         val idx = group.indexOfFirst { it.id == id }
         val target = idx + delta
@@ -149,8 +156,20 @@ class AssetsViewModel(
         val swapped = group.toMutableList().apply {
             val a = this[idx]; this[idx] = this[target]; this[target] = a
         }
+        val active = all.filter { !it.isArchived }.sortedBy { it.sortOrder }
+        val rebuilt = mutableListOf<Long>()
+        val seen = mutableSetOf<AccountType>()
+        active.forEach { a ->
+            if (a.type !in seen) {
+                seen += a.type
+                rebuilt.addAll(
+                    if (a.type == cur.type) swapped.map { it.id }
+                    else active.filter { it.type == a.type }.map { it.id }
+                )
+            }
+        }
         return try {
-            repository.reorderAccounts(swapped.map { it.id })
+            repository.reorderAccounts(rebuilt + all.filter { it.isArchived }.map { it.id })
             reload()
             null
         } catch (e: Exception) {

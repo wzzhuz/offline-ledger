@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
@@ -113,12 +114,7 @@ fun TrashScreen(onBack: () -> Unit, onChanged: () -> Unit) {
                         )
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(LedgerColors.Neutral.copy(alpha = 0.10f))
-                )
+                ListDivider(Modifier.padding(horizontal = 4.dp))
             }
         }
     }
