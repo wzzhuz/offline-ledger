@@ -28,6 +28,8 @@ WRITE_METHODS = [
     'createBudget', 'updateBudget', 'archiveBudget', 'recordSettlement',
     # 阶段 6c-2
     'importRecords',
+    # 第 22 批 Firefly III 迁移
+    'importFirefly',
     # 阶段 7
     'applyCurrencyToAll',
     # 第三批真机反馈

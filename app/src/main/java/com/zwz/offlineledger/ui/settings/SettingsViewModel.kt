@@ -7,6 +7,12 @@ import androidx.lifecycle.viewModelScope
 import com.zwz.offlineledger.backup.BackupExporter
 import com.zwz.offlineledger.backup.csv.CsvCodec
 import com.zwz.offlineledger.backup.csv.CsvRow
+import com.zwz.offlineledger.backup.csv.FireflyAccountChoice
+import com.zwz.offlineledger.backup.csv.FireflyCategoryChoice
+import com.zwz.offlineledger.backup.csv.FireflyCsvCodec
+import com.zwz.offlineledger.backup.csv.FireflyImportOutcome
+import com.zwz.offlineledger.backup.csv.FireflyMapping
+import com.zwz.offlineledger.backup.csv.FireflyPlan
 import com.zwz.offlineledger.backup.BackupImporter
 import com.zwz.offlineledger.backup.crypto.SecureBackupCodec
 import com.zwz.offlineledger.core.currency.LedgerCurrency
@@ -32,6 +38,14 @@ import kotlinx.coroutines.withContext
 /** 导入前的确认计划：只有解析全通过才生成，进入此状态时不写任何数据。 */
 data class CsvImportPlan(val rows: List<CsvRow>)
 
+/** 第 22 批：Firefly III 导入预览状态，进入此状态时不写任何数据。 */
+data class FireflyImportState(
+    val plan: FireflyPlan,
+    val accounts: List<FireflyAccountChoice>,
+    val categories: List<FireflyCategoryChoice>,
+    val overwriteOpening: Boolean = false
+)
+
 data class SettingsState(
     val message: String = "",
     val error: String = "",
@@ -44,6 +58,7 @@ data class SettingsState(
     val appLockEnabled: Boolean = false,
     val hasPin: Boolean = false,
     val csvPlan: CsvImportPlan? = null,
+    val firefly: FireflyImportState? = null,
     val defaultCurrency: String = LedgerCurrency.DEFAULT,
     val accounts: List<AccountEntity> = emptyList(),
     val defaultAccountId: Long = 0L,
@@ -286,6 +301,138 @@ class SettingsViewModel(
                 _state.value = _state.value.copy(
                     busy = false, csvPlan = null,
                     error = "导入失败，已整体回滚，账本未改动：" +
+                        (e.message ?: e.javaClass.simpleName)
+                )
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // 第 22 批：Firefly III 6.6.x 导出迁移。
+    // 解析与计划生成都在纯 JVM 层；确认前零写入，确认后单事务。
+    fun readFireflyPlan(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                busy = true, message = "", error = "", firefly = null
+            )
+            try {
+                val parsed = withContext(Dispatchers.IO) {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use {
+                        it.readBytes()
+                    } ?: throw IllegalStateException("无法打开所选文件")
+                    FireflyCsvCodec.parse(bytes)
+                }
+                if (!parsed.ok) {
+                    _state.value = _state.value.copy(
+                        busy = false,
+                        error = "Firefly III 导出文件有问题，账本未改动：" +
+                            parsed.errors.take(12).joinToString("；")
+                    )
+                    return@launch
+                }
+                val plan = withContext(Dispatchers.Default) {
+                    FireflyCsvCodec.buildPlan(parsed)
+                }
+                val existingAccounts = withContext(Dispatchers.IO) {
+                    accountDao.all().filter { !it.isArchived }
+                }
+                val existingCategories = withContext(Dispatchers.IO) {
+                    categoryDao.all().filter { !it.isArchived }
+                }
+                val accountChoices = plan.accountNames.map { name ->
+                    val hit = existingAccounts.firstOrNull { it.name == name }
+                    FireflyAccountChoice(
+                        sourceName = name,
+                        targetName = hit?.name ?: "",
+                        isNew = hit == null,
+                        type = hit?.type?.name
+                            ?: FireflyCsvCodec.inferAccountType(name)
+                    )
+                }
+                val categoryChoices = plan.categoryKeys.map { ck ->
+                    val rootHit = existingCategories.firstOrNull {
+                        it.level == 0 && it.type.name == ck.type && it.name == ck.root
+                    }
+                    FireflyCategoryChoice(
+                        key = ck.key(),
+                        root = ck.root,
+                        child = ck.child,
+                        type = ck.type,
+                        targetRoot = rootHit?.name ?: "",
+                        skip = false
+                    )
+                }
+                _state.value = _state.value.copy(
+                    busy = false,
+                    firefly = FireflyImportState(plan, accountChoices, categoryChoices)
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    busy = false,
+                    error = "读取失败，账本未改动：" + (e.message ?: e.javaClass.simpleName)
+                )
+            }
+        }
+    }
+
+    fun updateFireflyAccount(choice: FireflyAccountChoice) {
+        val cur = _state.value.firefly ?: return
+        _state.value = _state.value.copy(
+            firefly = cur.copy(
+                accounts = cur.accounts.map {
+                    if (it.sourceName == choice.sourceName) choice else it
+                }
+            )
+        )
+    }
+
+    fun updateFireflyCategory(choice: FireflyCategoryChoice) {
+        val cur = _state.value.firefly ?: return
+        _state.value = _state.value.copy(
+            firefly = cur.copy(
+                categories = cur.categories.map {
+                    if (it.key == choice.key) choice else it
+                }
+            )
+        )
+    }
+
+    fun setFireflyOverwriteOpening(value: Boolean) {
+        val cur = _state.value.firefly ?: return
+        _state.value = _state.value.copy(firefly = cur.copy(overwriteOpening = value))
+    }
+
+    fun cancelFireflyImport() {
+        _state.value = _state.value.copy(firefly = null)
+    }
+
+    fun confirmFireflyImport() {
+        val cur = _state.value.firefly ?: return
+        val mapping = FireflyMapping(
+            accounts = cur.accounts.associateBy { it.sourceName },
+            categories = cur.categories.associateBy { it.key },
+            overwriteOpeningForExisting = cur.overwriteOpening
+        )
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            try {
+                val outcome: FireflyImportOutcome = withContext(Dispatchers.IO) {
+                    repository.importFirefly(cur.plan, mapping)
+                }
+                loadCategories()
+                loadAccounts()
+                _state.value = _state.value.copy(
+                    busy = false, firefly = null,
+                    message = "Firefly III 迁移完成：写入 " + outcome.written +
+                        " 条流水、跳过 " + outcome.skipped + " 条重复；新建 " +
+                        outcome.newAccounts + " 个账户 / " + outcome.newCategories +
+                        " 个分类；期初余额应用 " + outcome.openingsApplied +
+                        " 条、跳过 " + outcome.openingsSkipped + " 条；余额已重算。"
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    busy = false,
+                    error = "迁移失败，已整体回滚，账本未改动：" +
                         (e.message ?: e.javaClass.simpleName)
                 )
             }

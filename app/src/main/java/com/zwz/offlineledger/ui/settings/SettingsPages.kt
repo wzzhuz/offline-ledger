@@ -143,7 +143,10 @@ private fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolean
 
 // --------------------------------------------------------------- 数据与备份
 @Composable
-fun BackupSettingsScreen(onBack: () -> Unit) {
+fun BackupSettingsScreen(
+    onBack: () -> Unit,
+    onOpenFirefly: () -> Unit = {}
+) {
     val context = LocalContext.current
     val vm = settingsVm()
     val state by vm.state.collectAsState()
@@ -211,8 +214,14 @@ fun BackupSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier.weight(1f)
             ) { Text("导入账单") }
         }
+        Button(
+            onClick = onOpenFirefly,
+            enabled = !state.busy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("导入 Firefly III 导出（CSV）") }
         Text(
-            text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。",
+            text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
+                "Firefly III 迁移会先给出账户与分类的映射预览，确认后才写入。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral
         )

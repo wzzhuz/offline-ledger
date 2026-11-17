@@ -113,7 +113,7 @@ object CsvCodec {
         } else s
 
     /** 逐字符状态机：正确处理引号内的逗号、双引号转义与换行。 */
-    private fun parseRows(text: String, delim: Char): List<List<String>> {
+    internal fun parseRows(text: String, delim: Char): List<List<String>> {
         val rows = mutableListOf<List<String>>()
         val row = mutableListOf<String>()
         val field = StringBuilder()

@@ -41,6 +41,7 @@ import com.zwz.offlineledger.ui.detail.DetailViewModel
 import com.zwz.offlineledger.ui.record.RecordEditorDialog
 import com.zwz.offlineledger.ui.settings.BackupSettingsScreen
 import com.zwz.offlineledger.ui.settings.CategoryManagerScreen
+import com.zwz.offlineledger.ui.settings.FireflyImportScreen
 import com.zwz.offlineledger.ui.settings.LedgerSettingsScreen
 import com.zwz.offlineledger.ui.settings.PreferenceSettingsScreen
 import com.zwz.offlineledger.ui.settings.SecuritySettingsScreen
@@ -157,7 +158,13 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
             composable("settings") {
                 SettingsScreen(onOpen = { route -> navController.navigate(route) })
             }
-            composable("backup") { BackupSettingsScreen(onBack = { goBack() }) }
+            composable("backup") {
+                BackupSettingsScreen(
+                    onBack = { goBack() },
+                    onOpenFirefly = { navController.navigate("firefly") }
+                )
+            }
+            composable("firefly") { FireflyImportScreen(onBack = { goBack() }) }
             composable("security") { SecuritySettingsScreen(onBack = { goBack() }) }
             composable("prefs") { PreferenceSettingsScreen(onBack = { goBack() }) }
             composable("ledger") {

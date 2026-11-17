@@ -39,7 +39,7 @@ fun SettingsScreen(onOpen: (String) -> Unit) {
         ) { onOpen("ledger") }
         SettingGroupCard(
             title = "数据与备份",
-            summary = "加密备份 / CSV 明文导出 / 账单导入"
+            summary = "加密备份 / CSV 明文导出 / 账单导入 / Firefly III 迁移"
         ) { onOpen("backup") }
         SettingGroupCard(
             title = "偏好",

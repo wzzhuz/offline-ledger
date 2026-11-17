@@ -24,12 +24,17 @@ import com.zwz.offlineledger.data.local.toRecordEntity
 import com.zwz.offlineledger.data.local.toEntity
 import com.zwz.offlineledger.data.local.toRecord
 import com.zwz.offlineledger.data.local.toTrash
+import com.zwz.offlineledger.data.model.AccountType
 import com.zwz.offlineledger.data.model.BudgetScope
 import com.zwz.offlineledger.data.model.LedgerAdjustment
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.model.LedgerCategory
 import com.zwz.offlineledger.backup.csv.CsvImportOutcome
 import com.zwz.offlineledger.backup.csv.CsvRow
+import com.zwz.offlineledger.backup.csv.FireflyKind
+import com.zwz.offlineledger.backup.csv.FireflyMapping
+import com.zwz.offlineledger.backup.csv.FireflyPlan
+import com.zwz.offlineledger.backup.csv.FireflyImportOutcome
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.time.LedgerClock
@@ -611,6 +616,171 @@ class LedgerRepository @Inject constructor(
         }
         rebuildAllBalancesInternal()
         CsvImportOutcome(written, skipped)
+    }
+
+    /**
+     * 第 22 批：Firefly III 6.6.x transactions.csv 迁移。
+     * 单事务：按需新建账户 / 两级分类 -> 批量写流水 -> 末尾重算余额。
+     * 零表结构变更；去重靠 note 里的 ff3:<journal_id> 前缀。
+     * 映射到已有账户时默认不覆盖其期初余额，需显式授权才改。
+     */
+    suspend fun importFirefly(
+        plan: FireflyPlan,
+        mapping: FireflyMapping
+    ): FireflyImportOutcome = db.withTransaction {
+        val existingAccounts = accountDao.all()
+        val existingCategories = categoryDao.all()
+        val accountIds = HashMap<String, Long>()
+        var newAccounts = 0
+        var openingsApplied = 0
+        var openingsSkipped = 0
+
+        val openingBySource = HashMap<String, Long>()
+        plan.entries.filter { it.kind == FireflyKind.OPENING }.forEach { e ->
+            val cents = Cents.fromYuan(e.amountYuan).value
+            openingBySource[e.accountName] = (openingBySource[e.accountName] ?: 0L) + cents
+        }
+
+        plan.accountNames.forEach { name ->
+            val choice = mapping.accounts[name]
+            val targetName = choice?.targetName.orEmpty()
+            if (targetName.isNotBlank()) {
+                val hit = existingAccounts.firstOrNull { it.name == targetName }
+                    ?: throw IllegalArgumentException("账户映射目标不存在：" + targetName)
+                accountIds[name] = hit.id
+                val opening = openingBySource[name]
+                if (opening != null) {
+                    if (mapping.overwriteOpeningForExisting && targetName == name) {
+                        accountDao.update(hit.copy(initialBalanceCents = opening))
+                        openingsApplied++
+                    } else {
+                        openingsSkipped++
+                    }
+                }
+            } else {
+                val type = try {
+                    AccountType.valueOf(choice?.type ?: "ASSET")
+                } catch (e: IllegalArgumentException) {
+                    AccountType.ASSET
+                }
+                val opening = openingBySource[name] ?: 0L
+                val id = accountDao.insert(
+                    AccountEntity(
+                        name = name,
+                        type = type,
+                        initialBalanceCents = opening,
+                        currencyCode = "CNY",
+                        includeInTotal = true,
+                        sortOrder = existingAccounts.size + newAccounts
+                    )
+                )
+                accountIds[name] = id
+                newAccounts++
+                if (openingBySource.containsKey(name)) openingsApplied++
+            }
+        }
+
+        val categoryIds = HashMap<String, Pair<Long, Long?>>()
+        val createdRoots = HashMap<String, CategoryEntity>()
+        val createdChildren = HashMap<String, Long>()
+        var newCategories = 0
+        plan.categoryKeys.forEach { ck ->
+            val choice = mapping.categories[ck.key()]
+            if (choice != null && choice.skip) return@forEach
+            val type = RecordType.valueOf(ck.type)
+            val rootName = choice?.targetRoot?.takeIf { it.isNotBlank() } ?: ck.root
+            val rootKey = ck.type + "|" + rootName
+            val resolvedRoot: CategoryEntity =
+                existingCategories.firstOrNull {
+                    it.level == 0 && !it.isArchived && it.type == type && it.name == rootName
+                } ?: createdRoots[rootKey] ?: run {
+                    val id = categoryDao.insert(
+                        CategoryEntity(
+                            name = rootName, type = type, level = 0, parentId = null,
+                            sortOrder = existingCategories.size + newCategories
+                        )
+                    )
+                    val created = CategoryEntity(
+                        id = id, name = rootName, type = type, level = 0
+                    )
+                    createdRoots[rootKey] = created
+                    newCategories++
+                    created
+                }
+            var childId: Long? = null
+            if (ck.child.isNotBlank()) {
+                val childKey = rootKey + "|" + ck.child
+                val hit = existingCategories.firstOrNull {
+                    it.level == 1 && !it.isArchived && it.type == type &&
+                        it.parentId == resolvedRoot.id && it.name == ck.child
+                }
+                childId = hit?.id ?: createdChildren[childKey] ?: run {
+                    val id = categoryDao.insert(
+                        CategoryEntity(
+                            name = ck.child, type = type, level = 1,
+                            parentId = resolvedRoot.id,
+                            sortOrder = existingCategories.size + newCategories
+                        )
+                    )
+                    createdChildren[childKey] = id
+                    newCategories++
+                    id
+                }
+            }
+            categoryIds[ck.key()] = Pair(resolvedRoot.id, childId)
+        }
+
+        var written = 0
+        var skipped = 0
+        plan.entries.forEach { e ->
+            if (e.kind == FireflyKind.OPENING || e.kind == FireflyKind.SKIPPED) {
+                return@forEach
+            }
+            val accId = accountIds[e.accountName]
+                ?: throw IllegalArgumentException("账户未映射：" + e.accountName)
+            val toId = e.toAccountName?.let { accountIds[it] }
+            if (e.kind == FireflyKind.TRANSFER && toId == null) {
+                throw IllegalArgumentException("转账转入账户未映射：" + (e.toAccountName ?: ""))
+            }
+            val amountCents = Cents.fromYuan(e.amountYuan).value
+            if (amountCents <= 0L) {
+                throw IllegalArgumentException("第 " + e.lineNo + " 行金额必须大于 0")
+            }
+            if (recordDao.countDuplicate(accId, amountCents, e.localDate, e.note) > 0) {
+                skipped++
+                return@forEach
+            }
+            val pair = categoryIds[e.categoryKey]
+            val type = when (e.kind) {
+                FireflyKind.EXPENSE -> RecordType.EXPENSE
+                FireflyKind.INCOME -> RecordType.INCOME
+                FireflyKind.TRANSFER -> RecordType.TRANSFER
+                else -> throw IllegalArgumentException("不支持的迁移类型")
+            }
+            val entity = RecordEntity(
+                type = type,
+                amountCents = amountCents,
+                categoryId = pair?.second ?: pair?.first,
+                rootCategoryId = pair?.first,
+                fromAccountId = if (type == RecordType.EXPENSE || type == RecordType.TRANSFER) {
+                    accId
+                } else null,
+                toAccountId = if (type == RecordType.INCOME) accId else toId,
+                timestamp = e.epochMilli,
+                localDate = e.localDate,
+                yearMonth = e.yearMonth,
+                note = e.note,
+                excludeFromStats = false,
+                counterparty = e.counterparty
+            )
+            recordDao.insert(withResolvedRoot(entity))
+            written++
+        }
+        rebuildAllBalancesInternal()
+        FireflyImportOutcome(
+            written, skipped, newAccounts, newCategories,
+            openingsApplied, openingsSkipped
+        )
     }
 
     private suspend fun withResolvedRoot(record: RecordEntity): RecordEntity {
