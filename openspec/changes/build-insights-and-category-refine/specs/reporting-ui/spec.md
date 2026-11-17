@@ -168,13 +168,17 @@ MUST NOT 一刀切；可点区 MUST ≥40dp。资产页账户行 SHALL 与明细
 MUST NOT 用 `Card` 底色 / 阴影或 1dp 间距表达边界（第 16 批修正：第 15 批只
 补了分割线、没拆 Card，卡片内边距仍把内容往里收一圈，视觉量级小于明细页）。
 
-**全站排序交互统一（第 16 批）**：分类一级、分类二级 chips、资产账户、模板
-SHALL 共用 `ui/components/ReorderSupport.kt` 的 `rememberReorderDrag`；
-拖动中 SHALL 实时重排让位、松手一次性落库；上移 / 下移 SHALL 保留为
-无障碍兜底，MUST NOT 作为主入口；零新增依赖、零表结构变更。
-**第 17 批修订**：四处拖拽期间父滚动容器 SHALL 禁用用户滚动并配套边缘自动滚动，
-MUST NOT 只禁不滚；跨行阈值 SHALL 由 `onSizeChanged` 实测单行行高得出；
-分类二级 `WrapRow` SHALL 默认左对齐、占满父宽、行尾留白在右。
+**全站排序交互统一（第 20 批整块修订）**：分类一级、资产账户、模板 SHALL 共用
+`sh.calvin.reorderable:reorderable:3.1.0`（Apache-2.0、纯 UI 库、无运行时网络行为）
+与 `ui/components/ReorderListSupport.kt`；资产页 SHALL 改 `LazyColumn`，
+MUST NOT 用 `Column + verticalScroll`。库 SHALL 负责拖动中 `animateItem()` 让位补间、
+长按窗口、pointer pass、边缘按距离变速自动滚动；业务层 SHALL 只在 `onMove` 改内存
+顺序、松手一次性落库。分类二级 chips 为网格，SHALL 保留自研 `WrapRow` 自适应布局
+与操作弹层上移 / 下移；上移 / 下移同时 SHALL 保留为无障碍兜底，
+MUST NOT 作为主入口。`WrapRow` SHALL 默认左对齐、占满父宽、行尾留白在右。
+依赖取舍按 2026-11-17 使用者澄清：判断标准是「是否默认回传厂商且用户不可控」，
+不是「依赖数量」；仍 MUST 记录坐标、许可证与传递依赖审计，仍 MUST NOT 引入
+广告 / 埋点 / 崩溃上报 / 远程配置 SDK。零表结构变更。
 
 #### Scenario: 分类增多不推走入口
 

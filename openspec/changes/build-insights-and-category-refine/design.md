@@ -492,3 +492,80 @@ chip 内 label 又是 M3 默认居中。改法：显式 `horizontalAlignment` �
 升 `0.2.5` SHALL 留到代码接入完成、真机可验之后，避免出现「版本号升了但行为没变」的错位。
 **如实限制**：CI 全绿只证明**库能编译进项目**，不证明拖拽手感变好——
 手势替换尚未写一行 Kotlin。真机项继续由活文档 §8 继承。
+
+
+---
+
+## 第 20 批（B）：接入 reorderable 3.1.0，删除自研拖拽手势层
+
+### 为什么换
+
+第 15-18 批连续四轮真机验不过：第 15 批松手才整列跳变；第 16 批改成
+「拖动跨行即时重排」但无补间；第 17 批补「禁用父滚动 + 边缘自动滚动 + 实测行高」，
+资产页仍报「上下移动同时触发屏幕滚动，拖动事件被释放」；第 18 批定位到根因是
+`anyDragging` 只在长按成功后才置 true，长按等待窗口里父 `verticalScroll` 已抢到
+pointer，禁用滚动的代码永远执行不到。这是**平台级手势知识**，不是逻辑 bug，
+继续自研的边际成本已超过一次依赖引入。
+
+订正一处错误结论：第 16 批把 `Unresolved reference 'animateItem'` 记成
+「本 BOM 无 `animateItem`」。官方 Lazy lists 文档明确有该 API，且库 3.1.0 的
+`LazyItemScope.ReorderableItem` 默认参数就是 `Modifier.animateItem()`；当时更可能是
+在普通 `Column`（无 `LazyItemScope`）里调用或 import 作用域不对。这条不再作为
+「Compose 做不到补间」的依据。
+
+### 依赖与边界
+
+`implementation("sh.calvin.reorderable:reorderable:3.1.0")`，Apache-2.0，
+Maven Central。第 19 批已由 CI 验证与 Compose BOM `2026.06.00` / Kotlin `2.3.21`
+无冲突，传递依赖仅 kotlin-stdlib-common 与 compose runtime/animation/foundation，
+无网络客户端。Gradle 依赖只在构建期解析，App 仍不声明 `INTERNET`、无网络请求；
+按使用者 2026-11-17 澄清，红线是「默认回传厂商且用户不可控」，
+不是权限与依赖数量的形式禁令。
+
+### 实现
+
+- 新增 `ui/components/ReorderListSupport.kt`：`KeyedReorderState` 把库 `onMove` 的
+  `LazyListItemInfo.key` 映射回业务 id；拖动中只改内存 `ids`（库要求 `onMove` 返回前
+  列表已更新，否则等 layoutInfo 两帧直到 1s 超时），松手 `onDragStopped` 调
+  `commit()` 一次性落库；ViewModel reload 推来的新顺序由 `sync()` 在「未脏」时同步。
+- `ReorderSupport.kt` 只保留 `WrapRow`（二级 chips 网格仍自研、稳定 `Layout` API），
+  删掉 `ReorderDragState` / `rememberReorderDrag` / `ReorderHandle` / `ReorderBounds`
+  及全部 `pointerInput` / `scrollable` / 实测行高代码。
+- 资产页 `Column + verticalScroll` → `LazyColumn`（库边缘滚动仅支持 Lazy 容器），
+  头部 / 4 个分组标题 / 底部说明为普通 `item`，账户为 `ReorderableItem`；
+  已归档账户不参与拖拽。新增 `AssetsViewModel.commitAccountOrderAll` 全量写回，
+  未在列表中的账户按 `sortOrder` 追加，MUST NOT 丢项。
+- 分类一级、模板列表同样接 `ReorderableItem` + `longPressDraggableHandle`，
+  key 统一为 `"<prefix>-<id>"`，与父 `items(key=...)` 一致；
+  `Modifier.longPressDraggableHandle` 是 `ReorderableCollectionItemScope` 成员扩展，
+  MUST 在 `ReorderableItem` content 内先取出为局部 `val` 再传给子组件
+  （内部 `Row {}` 会换 receiver）。
+- 二级 chips 保留 `WrapRow` 左对齐 + 点击弹操作 Dialog（改名 / 删除 / 上移 /
+  下移 / 看流水），⋮ 菜单的上移下移同时是 TalkBack 兜底。
+
+### 已知限制（如实记录）
+
+- 资产页 4 个 `AccountType` 分组共用一个 `LazyColumn` / 一个 reorderable state；
+  跨组拖动时 `onMove` 仍按 key 交换全局 ids，落库后各组的分段结构由 UI 分组渲染
+  保证，但组内顺序的视觉反馈不如「组内独立 state」直观。真机若明显别扭，
+  再按「分组各自 ReorderableColumn（无边缘滚动）」方案评估。
+- 库为单一维护者项目（约 97% 提交集中 1 人），Apache-2.0 允许 fork/vendor；
+  若上游停更或 BOM 升级后二进制不兼容，按回退顺序裁源码进仓库。
+- `ReorderableItem` 默认 `animateItemModifier = Modifier.animateItem()` 由库内部解析，
+  本项目不显式传参以避免 import 作用域问题；真机若出现 `NoSuchMethodError`，
+  回退为显式 `animateItemModifier = Modifier`（即时让位、无补间）。
+
+### 三级回退顺序
+
+1. 编译失败（API / import / `LazyItemScope` 作用域）→ 每次只改一处单独推送，
+   不堆叠修改。
+2. 运行时 `animateItem` 二进制不兼容 → 显式传 `animateItemModifier = Modifier`。
+3. 手感仍不达标 → 保留库但把 ↑↓ 恢复为主入口、拖拽降级；或 vendor 源码。
+   MUST NOT 无限迭代手势。
+
+### 本批改动面
+
+6 个 Kotlin 文件（1 新增 / 1 精简 / 3 接入 / 1 VM）、`app/build.gradle.kts`
+版本 `0.2.4 → 0.2.5`、3 份 delta 按标题整块修订（未归档 change 直接改，
+不追加 ADDED 制造矛盾文本）、design/tasks/活文档/project 回填。
+零表结构变更 → 覆盖安装即可，不用卸载；`AppDatabase` 仍 `version = 1`。

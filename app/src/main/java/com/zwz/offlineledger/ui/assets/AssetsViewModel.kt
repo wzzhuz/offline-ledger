@@ -205,6 +205,26 @@ class AssetsViewModel(
         }
     }
 
+    /**
+     * 第 20 批：库拖动后的全局顺序落库。
+     * onMove 在内存里交换全局 ids（各 AccountType 组的分段结构由 UI 分组渲染保证），
+     * 松手一次性写回；未在列表中的（新增/归档）账户按 sortOrder 追加，避免丢项。
+     */
+    fun commitAccountOrderAll(orderedActiveIds: List<Long>) {
+        viewModelScope.launch {
+            val all = _state.value.accounts
+            val byId = all.associateBy { it.id }
+            val valid = orderedActiveIds.mapNotNull { byId[it] }
+                .filter { !it.isArchived }
+                .map { it.id }
+            val rest = all.filter { !it.isArchived && it.id !in valid }
+                .sortedBy { it.sortOrder }.map { it.id }
+            val archived = all.filter { it.isArchived }.map { it.id }
+            repository.reorderAccounts(valid + rest + archived)
+            reload()
+        }
+    }
+
     /** 第三批：无流水可物理删除（重建）；有流水 MUST 归档。 */
     suspend fun deleteAccount(id: Long): String? {
         if (accountDao.linkedRecordCount(id) > 0) {

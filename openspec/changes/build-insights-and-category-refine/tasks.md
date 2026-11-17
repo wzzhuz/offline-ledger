@@ -209,3 +209,28 @@ commit 里一起处理。**如实限制**：让位是即时的、不是连续像
 升 `0.2.5` SHALL 留到代码接入完成、真机可验之后，避免出现「版本号升了但行为没变」的错位。
 **如实限制**：CI 全绿只证明**库能编译进项目**，不证明拖拽手感变好——
 手势替换尚未写一行 Kotlin。真机项继续由活文档 §8 继承。
+
+
+---
+
+## 第 20 批：接入 reorderable 3.1.0（v0.2.5）
+
+- [x] 核对远端 HEAD `3d2f45175fbb98e8b25eb9bbd59a25d50f36c3d5`（v0.2.4 回填），
+      复用第 19 批已由 CI 验证的依赖坐标
+- [x] 查证库一手源码 / README：`rememberReorderableLazyListState`、
+      `LazyItemScope.ReorderableItem`、`longPressDraggableHandle`、`from.key` / `to.key`
+- [x] 新增 `ReorderListSupport.kt`（`KeyedReorderState` + `rememberKeyedReorder`）
+- [x] `ReorderSupport.kt` 精简为只保留 `WrapRow`
+- [x] 资产页改 `LazyColumn` 并接入库；`AccountCard` 手柄改为可空
+- [x] `AssetsViewModel.commitAccountOrderAll` 全量落库
+- [x] 分类一级接入库；二级 chips 保留 `WrapRow` + 操作弹层上移下移
+- [x] 模板列表接入库
+- [x] 版本号 `0.2.5`
+- [x] 3 份 delta 按标题整块修订，去掉「零新增依赖 / 自研手势层」矛盾文本
+- [x] design / 活文档 / project 回填
+- [x] 本地静态自检：6 个 Kotlin 文件括号平衡、无已删类残留 import
+- [x] 单次 commit 推送 + 远端 sha 校验
+- [x] push CI 与 release 实测回填、坚果云上传
+- [ ] **真机复核（由使用者装机确认）**：资产页 10+ 账户滚动后长按拖动不误触滚屏、
+      拖到屏幕边缘能连续滚到屏外账户、松手顺序持久；分类一级 / 模板让位补间顺滑；
+      二级 chips 左对齐与点击编辑仍正常；⋮ 上移下移兜底可用

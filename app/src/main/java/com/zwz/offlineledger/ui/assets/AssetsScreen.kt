@@ -13,15 +13,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.FilterChip
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,8 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.currency.LedgerCurrency
@@ -55,12 +54,13 @@ import com.zwz.offlineledger.data.model.displayName
 import com.zwz.offlineledger.engine.Reconciliation
 import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.components.ListDivider
-import com.zwz.offlineledger.ui.components.rememberReorderDrag
-import com.zwz.offlineledger.ui.components.ReorderBounds
+import com.zwz.offlineledger.ui.components.rememberKeyedReorder
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import com.zwz.offlineledger.ui.reconcile.ReconcileDialog
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun AssetsScreen() {
@@ -81,87 +81,108 @@ fun AssetsScreen() {
     var editError by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<AccountEntity?>(null) }
 
-    // 第 17 批：拖拽期间禁用父滚动（否则上下移动同时滚屏，子拖拽被 onDragCancel 释放）；
-    // 配套边缘自动滚动，保证 10+ 账户时仍能拖到屏幕外的位置。
-    val scrollState = rememberScrollState()
-    val reorderBounds = remember { ReorderBounds() }
-    var anyDragging by remember { mutableStateOf(false) }
+    // 第 20 批：资产页 Column+verticalScroll 改 LazyColumn，接入 reorderable 3.1.0。
+    // 删除自研「拖拽期间禁用父滚动 / 边缘 scrollBy / 实测行高」整套代码：
+    // 库接管长按窗口、pointer pass 顺序、边缘按距离变速滚动与 animateItem 让位补间。
+    val listState = rememberLazyListState()
+    val visible = state.accounts.filter { state.showArchived || !it.isArchived }
+    val activeIds = visible.filter { !it.isArchived }.map { it.id }
+    val accountOrder = rememberKeyedReorder(
+        ids = activeIds,
+        prefix = "acc",
+        onCommit = { ids -> vm.commitAccountOrderAll(ids) }
+    )
+    val reorderState = rememberReorderableLazyListState(listState) { from, to ->
+        accountOrder.move(from.key, to.key)
+    }
 
     LaunchedEffect(Unit) { vm.reload() }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState, enabled = !anyDragging)
-            .onGloballyPositioned {
-                reorderBounds.topPx = it.positionInRoot().y
-                reorderBounds.bottomPx = reorderBounds.topPx + it.size.height
-            }
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Text(text = "资产", style = MaterialTheme.typography.headlineMedium)
-
-        CurrencyGroupsCard(state)
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "账户（${state.accounts.count { !it.isArchived }}）",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                FilterChip(
-                    selected = state.showArchived,
-                    onClick = { vm.toggleShowArchived() },
-                    label = { Text("含已归档") }
-                )
-                TextButton(onClick = { addError = null; showAdd = true }) { Text("+ 新增") }
+        item(key = "assets-header") {
+            Column {
+                Text(text = "资产", style = MaterialTheme.typography.headlineMedium)
+                CurrencyGroupsCard(state)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "账户（${state.accounts.count { !it.isArchived }}）",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FilterChip(
+                            selected = state.showArchived,
+                            onClick = { vm.toggleShowArchived() },
+                            label = { Text("含已归档") }
+                        )
+                        TextButton(onClick = { addError = null; showAdd = true }) { Text("+ 新增") }
+                    }
+                }
             }
         }
-
-        val visible = state.accounts.filter { state.showArchived || !it.isArchived }
         AccountType.entries.forEach { type ->
-            SectionTitle(type.displayName())
+            item(key = "section-" + type.name) {
+                Column {
+                    SectionTitle(type.displayName())
+                    if (visible.none { it.type == type }) {
+                        EmptyHint("还没有" + type.displayName() + "账户")
+                    }
+                }
+            }
             val group = visible.filter { it.type == type }
-            if (group.isEmpty()) EmptyHint("还没有" + type.displayName() + "账户")
-            // 第 16 批：每个账户类型组内独立拖拽，作用域与第 15 批分组一致。
-            // AccountType.entries 固定 4 项，循环内调用点稳定。
-            val accountDrag = rememberReorderDrag(
-                ids = group.filter { !it.isArchived }.map { it.id },
-                rowHeightDp = 56,
-                bounds = reorderBounds,
-                onDraggingChange = { anyDragging = it },
-                onEdgeScroll = { d -> scrollState.dispatchRawDelta(d); Unit },
-                onCommit = { ids -> scope.launch { vm.commitAccountOrder(type, ids) } }
-            )
-            val ordered = accountDrag.orderedIds.mapNotNull { id ->
-                group.firstOrNull { it.id == id }
-            } + group.filter { it.isArchived }
-            ordered.forEach { account ->
-                AccountCard(
-                    account = account,
-                    itemModifier = accountDrag.itemModifier(account.id)
-                        .then(accountDrag.rowMeasureModifier()),
-                    dragModifier = accountDrag.handleModifier(account.id),
-                    onDetail = { detailId = account.id },
-                    onReconcile = { reconcileId = account.id },
-                    onEdit = { editError = null; editAccount = account },
-                    onDelete = { deleting = account },
-                    onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
-                    onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
-                )
+            items(
+                accountOrder.ids.mapNotNull { id ->
+                    group.firstOrNull { it.id == id && !it.isArchived }
+                },
+                key = { accountOrder.keyOf(it.id) }
+            ) { account ->
+                ReorderableItem(reorderState, key = accountOrder.keyOf(account.id)) { _ ->
+                    val dragHandle = with(this) {
+                        Modifier.longPressDraggableHandle(
+                            onDragStopped = { accountOrder.commit() }
+                        )
+                    }
+                    AccountCard(
+                        account = account,
+                        dragModifier = dragHandle,
+                        onDetail = { detailId = account.id },
+                        onReconcile = { reconcileId = account.id },
+                        onEdit = { editError = null; editAccount = account },
+                        onDelete = { deleting = account },
+                        onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
+                        onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
+                    )
+                }
+            }
+            // 已归档账户不参与拖拽，仍按列表展示。
+            group.filter { it.isArchived }.forEach { account ->
+                item(key = "archived-account-" + account.id) {
+                    AccountCard(
+                        account = account,
+                        onDetail = { detailId = account.id },
+                        onReconcile = { reconcileId = account.id },
+                        onEdit = { editError = null; editAccount = account },
+                        onDelete = { deleting = account },
+                        onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
+                        onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
+                    )
+                }
             }
         }
-
-        Text(
-            text = "总负债仅作展示；各币种小计 = SUM(计入统计账户余额)。",
-            style = MaterialTheme.typography.bodySmall,
-            color = LedgerColors.Neutral,
-            modifier = Modifier.padding(top = 10.dp)
-        )
+        item(key = "assets-footer") {
+            Text(
+                text = "总负债仅作展示；各币种小计 = SUM(计入统计账户余额)。",
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.Neutral,
+                modifier = Modifier.padding(top = 10.dp)
+            )
+        }
     }
 
     if (showAdd) {
@@ -310,11 +331,10 @@ private fun AccountCard(
     onDelete: () -> Unit,
     onMove: (Int) -> Unit,
     onArchived: (Boolean) -> Unit,
-    dragModifier: Modifier = Modifier,
-    itemModifier: Modifier = Modifier
+    dragModifier: Modifier? = null
 ) {
     var menu by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxWidth().then(itemModifier)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -361,13 +381,15 @@ private fun AccountCard(
                 MiniAction(if (account.isArchived) "恢复" else "归档",
                     { onArchived(!account.isArchived) })
                 MiniAction("删除", onDelete, LedgerColors.ExpenseRed)
-                // 第 16 批：统一长按拖手柄，与分类 / 模板同款。
-                Box(
-                    modifier = dragModifier.size(40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("≡", style = MaterialTheme.typography.titleMedium,
-                        color = LedgerColors.Neutral)
+                // 第 20 批：库 draggableHandle；归档账户不传，手柄不显示。
+                if (dragModifier != null) {
+                    Box(
+                        modifier = dragModifier.size(40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("≡", style = MaterialTheme.typography.titleMedium,
+                            color = LedgerColors.Neutral)
+                    }
                 }
                 // 上移 / 下移降为无障碍兜底（TalkBack 无法执行拖动手势）。
                 IconButton(onClick = { menu = true }) {

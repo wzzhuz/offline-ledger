@@ -57,23 +57,22 @@ MUST NOT 在 Kotlin 里对已加载分页数据分组。排行卡与占比卡 MU
 分类管理 SHALL 提供一级与二级排序，**排序作用域 SHALL 为
 `(type, level, parentId)` 三元组**：一级只在同收支类型的一级之间排序，
 二级只在所属一级内部排序，MUST NOT 把全部未归档分类当成一个全局数组交换相邻项。
-分类一级、分类二级 chips、资产页账户、模板管理 SHALL 共用
-`ui/components/ReorderSupport.kt` 的 `rememberReorderDrag` 单一实现：
-MUST 长按手柄（或 chip）触发、MUST 使用稳定 `key`、拖动过程中每跨过一行
-SHALL **立即重排列表使其余项实时让位**（MUST NOT 等到松手才整列跳变）、
-松手 SHALL 一次性写入显式 `sortOrder`，重开页面顺序 SHALL 保持；
-MUST 零新增依赖，MUST NOT 使用跨应用 `dragAndDropSource/Target` 协议。
-**第 17 批修订**：拖拽期间父滚动容器 SHALL 禁用用户滚动
-（`verticalScroll(enabled=false)` / `LazyColumn(userScrollEnabled=false)`），
-MUST NOT 让上下拖动同时触发列表滚动、导致子拖拽被 `onDragCancel` 释放；
-禁用 SHALL 与**边缘自动滚动**成对出现（手指进入容器上下约 48dp 边缘区时
-按帧滚动），MUST NOT 只禁不滚导致多账户 / 多分类时拖不到屏幕外的位置。
-跨行判定阈值 SHALL 由 `onSizeChanged` **实测单行行高**得出，
-MUST NOT 继续用 56/40/44 估算；实测 MUST 挂在单行根，
-MUST NOT 挂在含展开区或多行 chips 的整块 item 上。
-上移 / 下移 SHALL 保留为无障碍兜底（TalkBack 无法执行拖动手势），
-MUST NOT 再作为主入口。账户排序作用域 SHALL 按 `AccountType` 分组，
-MUST NOT 跨类型交换。
+**第 20 批整块修订（替换第 15-17 批自研拖拽表述）**：分类一级、资产页账户、
+模板管理 SHALL 共用 `sh.calvin.reorderable:reorderable:3.1.0`（Apache-2.0、
+Maven Central、纯 UI 库、无运行时网络行为）与
+`ui/components/ReorderListSupport.kt` 的 `rememberKeyedReorder` 适配层：
+MUST 用 `ReorderableItem` + 稳定 `key`，MUST 用 `longPressDraggableHandle` 长按手柄，
+库 SHALL 负责拖动中 `animateItem()` 让位补间、pointer pass 顺序、长按窗口、
+拖到边缘按距离变速自动滚动，MUST NOT 再自写 `pointerInput` / `scrollable` /
+「拖拽期间禁用父滚动」/ 实测行高阈值；资产页容器 SHALL 为 `LazyColumn`
+（库的边缘滚动仅支持 Lazy 容器），MUST NOT 用 `Column + verticalScroll`。
+拖动中 `onMove` SHALL 只改内存顺序，松手 `onDragStopped` SHALL 一次性写入
+显式 `sortOrder`，重开页面顺序 SHALL 保持；MUST NOT 使用跨应用
+`dragAndDropSource/Target` 协议。分类二级 chips 是网格、不属于库的一维列表模型，
+SHALL 保留自研 `WrapRow` 自适应布局与操作弹层里的上移 / 下移；
+上移 / 下移同时 SHALL 保留为无障碍兜底（TalkBack 无法执行拖动手势），
+MUST NOT 再作为主入口。资产页账户的展示仍按 `AccountType` 分组，
+落库顺序 SHALL 由 `commitAccountOrderAll` 全量写回，MUST NOT 丢项。
 新增二级分类的父级选择 SHALL 以「搜索 + 可滚动全量列表」展示所有未归档一级分类，
 MUST NOT 因下拉高度或屏幕宽度截断；SHALL 显示当前选中的父级及其收支类型。
 分类管理 SHALL 提供「支出 / 收入」分段切换，默认支出，

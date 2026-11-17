@@ -48,8 +48,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.components.WrapRow
-import com.zwz.offlineledger.ui.components.rememberReorderDrag
-import com.zwz.offlineledger.ui.components.ReorderBounds
+import com.zwz.offlineledger.ui.components.rememberKeyedReorder
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
@@ -243,34 +244,23 @@ private fun CategoryList(
     val archived = categories.filter { it.isArchived && it.type == catType }
     // 第 14 批：点二级 chip 弹一个操作 Dialog，五项操作一个不丢。
     var actionChild by remember { mutableStateOf<CategoryEntity?>(null) }
-
-    // 第 17 批：拖拽期间禁用 LazyColumn 用户滚动 + 边缘自动滚动 + 实测行高。
+    // 第 20 批：一级分类接入 reorderable 3.1.0；自研「拖拽期间禁用父滚动 /
+    // 边缘滚动 / 实测行高」整套删除。二级 chips 是网格，不属于库的一维列表模型，
+    // 保留自研 WrapRow + 操作弹层上移/下移（同时是 TalkBack 无障碍兜底）。
     val listState = rememberLazyListState()
-    val reorderBounds = remember { ReorderBounds() }
-    var anyDragging by remember { mutableStateOf(false) }
-
-    // 第 15 批：一级拖拽排序。本地顺序是可观察状态，松手一次性提交落库；
-    // item 用 id 稳定 key；零新增依赖，不用跨应用 dragAndDrop API。
-    // 第 16 批：共享拖拽状态。拖动中每跨一行即重排，列表实时让位；
-    // 松手才一次性落库；scope 仍为当前收支类型的一级组。
-    val rootDrag = rememberReorderDrag(
+    val rootOrder = rememberKeyedReorder(
         ids = rootsBase.map { it.id },
-        rowHeightDp = 56,
-        bounds = reorderBounds,
-        onDraggingChange = { anyDragging = it },
-        onEdgeScroll = { d -> listState.dispatchRawDelta(d); Unit },
+        prefix = "root",
         onCommit = { ids -> onCommitOrder(ids) }
     )
-    val roots = rootDrag.orderedIds.mapNotNull { id -> rootsBase.firstOrNull { it.id == id } }
+    val reorderState = rememberReorderableLazyListState(listState) { from, to ->
+        rootOrder.move(from.key, to.key)
+    }
+    val roots = rootOrder.ids.mapNotNull { id -> rootsBase.firstOrNull { it.id == id } }
 
     LazyColumn(
         state = listState,
-        userScrollEnabled = !anyDragging,
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)
-            .onGloballyPositioned {
-                reorderBounds.topPx = it.positionInRoot().y
-                reorderBounds.bottomPx = reorderBounds.topPx + it.size.height
-            }
     ) {
         item {
             Text(
@@ -283,12 +273,13 @@ private fun CategoryList(
         roots.forEach { root ->
             val expanded = root.id in expandedRoots
             val childList = children.filter { it.parentId == root.id }
-            item(key = "root-" + root.id) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(rootDrag.itemModifier(root.id))
-                ) {
+            item(key = rootOrder.keyOf(root.id)) {
+                ReorderableItem(reorderState, key = rootOrder.keyOf(root.id)) { _ ->
+                    val dragHandle = with(this) {
+                        Modifier.longPressDraggableHandle(
+                            onDragStopped = { rootOrder.commit() }
+                        )
+                    }
                     Column {
                         CategoryRootRow(
                             label = root.name,
@@ -301,23 +292,10 @@ private fun CategoryList(
                             onMoveDown = { onMove(root.id, 1) },
                             onRename = { onRename(root.id, root.name) },
                             onDelete = { onDelete(root.id) },
-                            dragModifier = rootDrag.handleModifier(root.id),
-                            measureModifier = rootDrag.rowMeasureModifier()
+                            dragModifier = dragHandle,
+                            measureModifier = Modifier
                         )
                         if (expanded) {
-                            // 第 16 批：二级 chips 自适应换行 + 与一级同款实时让位拖拽。
-                            // 短名不再留白；长名受 widthIn(max) 约束，不独占整行。
-                            val childDrag = rememberReorderDrag(
-                                ids = childList.map { it.id },
-                                rowHeightDp = 40,
-                                bounds = reorderBounds,
-                                onDraggingChange = { anyDragging = it },
-                                onEdgeScroll = { d -> listState.dispatchRawDelta(d); Unit },
-                                onCommit = { ids -> onCommitChildOrder(root.id, ids) }
-                            )
-                            val orderedChildren = childDrag.orderedIds.mapNotNull { cid ->
-                                childList.firstOrNull { it.id == cid }
-                            }
                             WrapRow(
                                 spacing = 6.dp,
                                 horizontalAlignment = Alignment.Start,
@@ -325,27 +303,20 @@ private fun CategoryList(
                                     .fillMaxWidth()
                                     .padding(start = 12.dp, top = 2.dp, bottom = 6.dp)
                             ) {
-                                orderedChildren.forEach { child ->
-                                    Box(
-                                        modifier = childDrag.itemModifier(child.id)
-                                            .then(childDrag.rowMeasureModifier())
-                                    ) {
-                                        FilterChip(
-                                            selected = false,
-                                            onClick = { actionChild = child },
-                                            label = {
-                                                Text(
-                                                    child.name,
-                                                    maxLines = 1,
-                                                    textAlign = TextAlign.Start,
-                                                    style = MaterialTheme.typography.bodyMedium
-                                                )
-                                            },
-                                            modifier = Modifier
-                                                .widthIn(max = 150.dp)
-                                                .then(childDrag.handleModifier(child.id))
-                                        )
-                                    }
+                                childList.forEach { child ->
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { actionChild = child },
+                                        label = {
+                                            Text(
+                                                child.name,
+                                                maxLines = 1,
+                                                textAlign = TextAlign.Start,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        },
+                                        modifier = Modifier.widthIn(max = 150.dp)
+                                    )
                                 }
                             }
                         }

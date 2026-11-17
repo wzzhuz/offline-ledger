@@ -51,8 +51,9 @@ import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.model.Cadence
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.components.ListDivider
-import com.zwz.offlineledger.ui.components.rememberReorderDrag
-import com.zwz.offlineledger.ui.components.ReorderBounds
+import com.zwz.offlineledger.ui.components.rememberKeyedReorder
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.settings.SettingsPageTopBar
 import com.zwz.offlineledger.ui.theme.LedgerColors
@@ -169,32 +170,23 @@ private fun TemplateList(
     onDelete: (RecordTemplateEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 第 16 批：rememberReorderDrag 是 @Composable，MUST 放在函数体，
-    // 不能放在 LazyColumn 的 LazyListScope（非 composable）里——首轮 CI 第 3 条错误。
+    // 第 20 批：模板列表接入 reorderable 3.1.0，删除自研拖拽与滚动协商代码。
     val activeTemplates = state.templates.filter { !it.isArchived }
-    // 第 17 批：拖拽期间禁用父滚动 + 边缘自动滚动 + 实测行高。
     val listState = rememberLazyListState()
-    val reorderBounds = remember { ReorderBounds() }
-    var anyDragging by remember { mutableStateOf(false) }
-    val tplDrag = rememberReorderDrag(
+    val tplOrder = rememberKeyedReorder(
         ids = activeTemplates.map { it.id },
-        rowHeightDp = 44,
-        bounds = reorderBounds,
-        onDraggingChange = { anyDragging = it },
-        onEdgeScroll = { d -> listState.dispatchRawDelta(d); Unit },
+        prefix = "tpl",
         onCommit = { ids -> vm.commitTemplateOrder(ids) }
     )
-    val orderedTemplates = tplDrag.orderedIds.mapNotNull { id ->
+    val reorderState = rememberReorderableLazyListState(listState) { from, to ->
+        tplOrder.move(from.key, to.key)
+    }
+    val orderedTemplates = tplOrder.ids.mapNotNull { id ->
         activeTemplates.firstOrNull { it.id == id }
     }
     LazyColumn(
         state = listState,
-        userScrollEnabled = !anyDragging,
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)
-            .onGloballyPositioned {
-                reorderBounds.topPx = it.positionInRoot().y
-                reorderBounds.bottomPx = reorderBounds.topPx + it.size.height
-            }
     ) {
         if (state.message.isNotBlank()) {
             item {
@@ -211,50 +203,55 @@ private fun TemplateList(
             if (active.isEmpty()) {
                 item { Text("还没有模板。点右上角 + 新增一个。", modifier = Modifier.padding(vertical = 6.dp)) }
             }
-            items(orderedTemplates, key = { it.id }) { t ->
-                var menu by remember { mutableStateOf(false) }
-                val amount = if (t.amountCents > 0L)
-                    Cents(t.amountCents).toYuanString() + " 元" else "金额待填"
-                val path = categoryPath(t.categoryId, state.categories)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 40.dp)
-                        .then(tplDrag.itemModifier(t.id))
-                        .then(tplDrag.rowMeasureModifier())
-                ) {
-                    Text(
-                        text = t.name + " · " + typeLabel(t.type) + " · " + amount +
-                            (if (path.isBlank()) "" else " · " + path),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1
-                    )
-                    Box(
-                        modifier = tplDrag.handleModifier(t.id).size(40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("≡", style = MaterialTheme.typography.titleMedium,
-                            color = LedgerColors.Neutral)
-                    }
-                    IconButton(onClick = { menu = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
-                    }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("上移") },
-                            onClick = { menu = false; vm.moveTemplate(t.id, -1) })
-                        DropdownMenuItem(text = { Text("下移") },
-                            onClick = { menu = false; vm.moveTemplate(t.id, 1) })
-                        DropdownMenuItem(text = { Text("编辑") },
-                            onClick = { menu = false; onEdit(t) })
-                        DropdownMenuItem(
-                            text = { Text("删除", color = LedgerColors.ExpenseRed) },
-                            onClick = { menu = false; onDelete(t) }
+            items(orderedTemplates, key = { tplOrder.keyOf(it.id) }) { t ->
+                ReorderableItem(reorderState, key = tplOrder.keyOf(t.id)) { _ ->
+                    val dragHandle = with(this) {
+                        Modifier.longPressDraggableHandle(
+                            onDragStopped = { tplOrder.commit() }
                         )
                     }
+                    var menu by remember { mutableStateOf(false) }
+                    val amount = if (t.amountCents > 0L)
+                        Cents(t.amountCents).toYuanString() + " 元" else "金额待填"
+                    val path = categoryPath(t.categoryId, state.categories)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 40.dp)
+                    ) {
+                        Text(
+                            text = t.name + " · " + typeLabel(t.type) + " · " + amount +
+                                (if (path.isBlank()) "" else " · " + path),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1
+                        )
+                        Box(
+                            modifier = dragHandle.size(40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("≡", style = MaterialTheme.typography.titleMedium,
+                                color = LedgerColors.Neutral)
+                        }
+                        IconButton(onClick = { menu = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = { Text("上移") },
+                                onClick = { menu = false; vm.moveTemplate(t.id, -1) })
+                            DropdownMenuItem(text = { Text("下移") },
+                                onClick = { menu = false; vm.moveTemplate(t.id, 1) })
+                            DropdownMenuItem(text = { Text("编辑") },
+                                onClick = { menu = false; onEdit(t) })
+                            DropdownMenuItem(
+                                text = { Text("删除", color = LedgerColors.ExpenseRed) },
+                                onClick = { menu = false; onDelete(t) }
+                            )
+                        }
+                    }
+                    ListDivider(Modifier.padding(horizontal = 4.dp))
                 }
-                ListDivider(Modifier.padding(horizontal = 4.dp))
             }
             val archived = state.templates.count { it.isArchived }
             if (archived > 0) {
