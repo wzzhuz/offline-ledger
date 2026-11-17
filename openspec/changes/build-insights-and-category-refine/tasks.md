@@ -92,18 +92,40 @@ release `44034725835` **success**（23 步绿 / 5 步跳过、坚果云 success�
 
 ## 第 16 批（v0.2.3，同一 change 内）
 
-- [ ] 1. 新增 `ui/components/ReorderSupport.kt`（`WrapRow` / `ReorderDragState` / `rememberReorderDrag` / `ReorderHandle`）
-- [ ] 2. 分类一级改共享拖拽 + `animateItem()` 实时让位
-- [ ] 3. 分类二级改 `WrapRow` 自适应换行 + 长按拖拽；新增 `commitChildOrder`
-- [ ] 4. 资产页去 `Card` 纯行；`MiniAction` 升 `bodyMedium` + 40dp 触摸区
-- [ ] 5. 资产页按 `AccountType` 分组接入拖拽；新增 `commitAccountOrder`；↑↓ 收进 ⋯ 兜底
-- [ ] 6. 模板页接入共享拖拽；新增 `commitTemplateOrder`；↑↓ 保留
-- [ ] 7. 合并 `category-stats` 两个同标题 MODIFIED 为一份新文本
-- [ ] 8. 新增 `ledger-transactions` 2 份 MODIFIED；修订 `reporting-ui` 资产页表述
-- [ ] 9. 活文档 §7.6 / §8 更新；版本号 0.2.3
-- [ ] 10. 六个静态检查本地全 PASS + 括号 / import 粗检
-- [ ] 11. 单次 commit 推送（差异集合断言 + 误删保护）
-- [ ] 12. 按 commit sha 独立比对远端 blob
-- [ ] 13. 查 push CI；若红按 `design.md` 三级回退顺序修复
-- [ ] 14. 手动触发 `release.yml`（minify=on / upload_nutstore=true）并查结果
-- [ ] 15. 回填实测与真机未验清单继承
+- [x] 1. 新增 `ui/components/ReorderSupport.kt`（`WrapRow` / `ReorderDragState` / `rememberReorderDrag` / `ReorderHandle`）
+- [x] 2. 分类一级改共享拖拽 + `animateItem()` 实时让位
+- [x] 3. 分类二级改 `WrapRow` 自适应换行 + 长按拖拽；新增 `commitChildOrder`
+- [x] 4. 资产页去 `Card` 纯行；`MiniAction` 升 `bodyMedium` + 40dp 触摸区
+- [x] 5. 资产页按 `AccountType` 分组接入拖拽；新增 `commitAccountOrder`；↑↓ 收进 ⋯ 兜底
+- [x] 6. 模板页接入共享拖拽；新增 `commitTemplateOrder`；↑↓ 保留
+- [x] 7. 合并 `category-stats` 两个同标题 MODIFIED 为一份新文本
+- [x] 8. 新增 `ledger-transactions` 2 份 MODIFIED；修订 `reporting-ui` 资产页表述
+- [x] 9. 活文档 §7.6 / §8 更新；版本号 0.2.3
+- [x] 10. 六个静态检查本地全 PASS + 括号 / import 粗检
+- [x] 11. 单次 commit 推送（差异集合断言 + 误删保护）
+- [x] 12. 按 commit sha 独立比对远端 blob
+- [x] 13. 查 push CI；若红按 `design.md` 三级回退顺序修复
+- [x] 14. 手动触发 `release.yml`（minify=on / upload_nutstore=true）并查结果
+- [x] 15. 回填实测与真机未验清单继承
+
+## 第 16 批实测（2026-11-17）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `49516fd15550594154b2a36a8109302cc53b2243`（14 文件，v0.2.3） |
+| 首轮 push CI | `44045003985` **failure**，挂在「运行单元测试」（Kotlin 编译） |
+| 诊断通道 | 临时 dispatch-only `diag.yml`（`7a94c11c740c…`）→ run `44045388978` success → 日志回传 `diag/unit.log`（`de1d21ac3ea1`）；job logs 仍 403 |
+| 三条编译错误 | ① `CategoryManagerDialog.kt:48 Unresolved reference 'animateItem'`；② `TemplateManagerDialog.kt:5` 同；③ `TemplateManagerDialog.kt:183 @Composable invocations can only happen from the context of a @Composable function`——`rememberReorderDrag` 被放进非 composable 的 `LazyListScope` |
+| 修复 commit | `3e367748af2f061b0589d2e32eab17c8b68f8f85`（去掉 `animateItem` import 与调用、把 `tplDrag`/`orderedTemplates` 提升到 `@Composable` 函数体、删除 `diag.yml` 与 `diag/unit.log`） |
+| push CI | `44045792325` **success**（17 步全绿） |
+| release | `44046503643` **success**，23 步绿 / 5 步按 input 跳过；**上传到坚果云 completed success**；重复排队 `44046920100` 已 cancelled |
+| 制品 | `offline-ledger-release-v0.2.3` 12,231,819 B；`offline-ledger-mapping-v0.2.3` 3,502,962 B；`offline-ledger-metrics-v0.2.3-p-m-nsfalse` 271 B |
+| 远端校验 | 按最终 commit sha 比对 **293↔293 blob、sha 全一致、PASS**；`diag/` 与 `diag.yml` 零残留、workflow 仅 build/release 两份；无 token 明文；六个静态检查全 PASS |
+
+**回退顺序实际用上第 1 条**：`androidx.compose.foundation.lazy.animateItem` 在 Compose BOM
+2026.06 不存在，去掉后**实时重排仍然生效**（`orderedIds` 状态驱动列表重组），
+只是没有补间动画。第 3 条是独立发现的作用域错误，按「每次只改一处」在同一修复
+commit 里一起处理。**如实限制**：让位是即时的、不是连续像素级补间，
+顺滑度仍不如 Flutter `ReorderableListView`；不把「实时重排」包装成「动画已对齐」。
+`nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
+**不当作已验证 HEAD 200**。真机观感与累积未验清单继续按使用者决定整体推迟。

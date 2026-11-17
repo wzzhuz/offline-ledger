@@ -261,7 +261,8 @@ BeeCount 的参照是 Flutter `ReorderableListView`：官方行为即「拖动�
 ### 2. 落地方案
 
 - 新增 `ui/components/ReorderSupport.kt` 单一来源：`WrapRow`（稳定 `Layout` API，按实测宽度换行，**刻意不用实验性 `FlowRow` 注解**，见 §3 T12 例外）+ `ReorderDragState` + `rememberReorderDrag` + `ReorderHandle`。
-- **实时让位**：`drag()` 每跨过 `rowPx` 即 `removeAt/add` 更新 `orderedIds`，列表随之重组；`LazyColumn` 的 `animateItem()` 给其余项位移动画，被拖项 `zIndex + shadowElevation + alpha` 浮起。松手才 `onCommit` 一次性落库；`onDragCancel` 回滚快照。
+- **实时让位**：`drag()` 每跨过 `rowPx` 即 `removeAt/add` 更新 `orderedIds`，列表随之重组、其余项**立即**让位；被拖项 `zIndex + shadowElevation + alpha` 浮起。松手才 `onCommit` 一次性落库；`onDragCancel` 回滚快照。
+  **如实限制**：本 BOM 无 `androidx.compose.foundation.lazy.animateItem`（首轮 CI 报 Unresolved reference，已按 §3 回退顺序第 1 条去掉），因此让位是即时的、没有补间动画，顺滑度仍不如 Flutter `ReorderableListView`。
 - 四处接入：分类一级（56dp）、分类二级 chips（40dp）、资产账户（按 `AccountType` 分组、56dp）、模板（44dp）。
 - 三个 VM 各加一个按组落库方法：`commitChildOrder(parentId, ids)`、`commitAccountOrder(type, ids)`、`commitTemplateOrder(ids)`，复用既有 `persistWithGroup` / `reorderAccounts` / `reorderTemplates` 单事务，**DAO 与表结构一字不动**。
 - 上移 / 下移全部保留（分类 ⋯ 菜单与二级操作 Dialog、模板 ⋯ 菜单、资产新增 ⋯ 菜单）作为 TalkBack 兜底，不再占主行。
@@ -286,4 +287,24 @@ BeeCount 的参照是 Flutter `ReorderableListView`：官方行为即「拖动�
 - 只追加 ADDED 不改旧 Requirement（指南 §5）
 - 顺手给预算页加排序（当前无此能力，避免范围蔓延）
 
-### 5. 实测回填（待本批推送后补）
+### 5. 实测回填（第 16 批，2026-11-17）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `49516fd15550594154b2a36a8109302cc53b2243`（14 文件，v0.2.3） |
+| 首轮 push CI | `44045003985` **failure**，挂在「运行单元测试」（Kotlin 编译） |
+| 诊断通道 | 临时 dispatch-only `diag.yml`（`7a94c11c740c…`）→ run `44045388978` success → 日志回传 `diag/unit.log`（`de1d21ac3ea1`）；job logs 仍 403 |
+| 三条编译错误 | ① `CategoryManagerDialog.kt:48 Unresolved reference 'animateItem'`；② `TemplateManagerDialog.kt:5` 同；③ `TemplateManagerDialog.kt:183 @Composable invocations can only happen from the context of a @Composable function`——`rememberReorderDrag` 被放进非 composable 的 `LazyListScope` |
+| 修复 commit | `3e367748af2f061b0589d2e32eab17c8b68f8f85`（去掉 `animateItem` import 与调用、把 `tplDrag`/`orderedTemplates` 提升到 `@Composable` 函数体、删除 `diag.yml` 与 `diag/unit.log`） |
+| push CI | `44045792325` **success**（17 步全绿） |
+| release | `44046503643` **success**，23 步绿 / 5 步按 input 跳过；**上传到坚果云 completed success**；重复排队 `44046920100` 已 cancelled |
+| 制品 | `offline-ledger-release-v0.2.3` 12,231,819 B；`offline-ledger-mapping-v0.2.3` 3,502,962 B；`offline-ledger-metrics-v0.2.3-p-m-nsfalse` 271 B |
+| 远端校验 | 按最终 commit sha 比对 **293↔293 blob、sha 全一致、PASS**；`diag/` 与 `diag.yml` 零残留、workflow 仅 build/release 两份；无 token 明文；六个静态检查全 PASS |
+
+**回退顺序实际用上第 1 条**：`androidx.compose.foundation.lazy.animateItem` 在 Compose BOM
+2026.06 不存在，去掉后**实时重排仍然生效**（`orderedIds` 状态驱动列表重组），
+只是没有补间动画。第 3 条是独立发现的作用域错误，按「每次只改一处」在同一修复
+commit 里一起处理。**如实限制**：让位是即时的、不是连续像素级补间，
+顺滑度仍不如 Flutter `ReorderableListView`；不把「实时重排」包装成「动画已对齐」。
+`nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
+**不当作已验证 HEAD 200**。真机观感与累积未验清单继续按使用者决定整体推迟。
