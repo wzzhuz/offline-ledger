@@ -16,5 +16,5 @@
 - [x] 版本 `0.2.5 → 0.2.6`
 - [x] `docs/FireflyIII导入说明.md` 中文逐字段说明
 - [x] 活文档 §7.8 / §8 与 `project.md` 阶段计划同步
-- [x] 单次 commit 推送 + push CI + release + 坚果云上传
+- [x] 单次 commit `71baf76b3576` 推送 + push CI `44109301622` success + release `44110502009` success + 坚果云上传 success
 - [ ] 真机复核：用真实 1916 行样本导入、核对账户余额与统计（**由使用者装机确认**）
