@@ -209,6 +209,7 @@ MUST 重新启用显式 `Migration`、`MIN_SUPPORTED` 向后兼容、
 | 15 | 第 13 批：吸收 BeeCount「一卡一结论」——洞察总结卡、Top5 排行、隐私模式、分类管理分段/笔数/详情下钻（v0.2.0） |
 | 16 | 第 18 批：引入 `sh.calvin.reorderable:reorderable:3.1.0` 替换自研拖拽手势层；隐私口径按使用者 2026-11-17 声明改写（依赖兼容先由 CI 验证，再逐页替换实现） |
 | 17 | 第 20 批：按已验证坐标逐页接入 reorderable 3.1.0（资产页改 `LazyColumn`、分类一级、模板），删除自研手势层；二级 chips 保留 `WrapRow` + ↑↓（v0.2.5） |
+| 收口（二） | 使用者 v0.2.5 装机确认「拖动排序顺畅了，达到预期效果。页面打磨的差不多了」→ 第 13–20 批全部合并进 `specs/` 并归档 `build-insights-and-category-refine`；基线 227 Requirement / 408 Scenario，进行中 change 为无；下一阶段为 **Firefly III 历史数据迁移** |
 
 ### 永久不做
 - 云同步、账号体系、多账本 / 成员 / 共享账套
