@@ -10,14 +10,21 @@ BACKUP = os.path.join(BASE, 'app', 'src', 'main', 'res', 'xml', 'backup_rules.xm
 EXTRACT = os.path.join(BASE, 'app', 'src', 'main', 'res', 'xml', 'data_extraction_rules.xml')
 GRADLE = os.path.join(BASE, 'app', 'build.gradle.kts')
 
+# 2026-11-17 使用者澄清：红线是「默认回传厂商且用户不可控」，不是权限/依赖的形式禁令。
+# 因此以下两项改为「未经 project.md 显式授权则禁止」——有授权标记时记提示并放行，
+# 而不是无条件 FAIL。当前 App 无任何授权标记，行为与改前一致。
+AUTHORIZATION_MARKER = '权限显式授权'
 FORBIDDEN_PERMISSIONS = [
     'android.permission.INTERNET',
     'android.permission.READ_EXTERNAL_STORAGE',
     'android.permission.WRITE_EXTERNAL_STORAGE',
     'android.permission.ACCESS_NETWORK_STATE',
 ]
-FORBIDDEN_DEPS = ['coil', 'glide', 'okhttp', 'firebase', 'vico', 'retrofit',
-                  'umeng', 'bugly', 'appsflyer']
+# 始终禁止：默认回传数据且用户不可控的 SDK，不因授权而放行。
+ALWAYS_FORBIDDEN_DEPS = ['firebase', 'umeng', 'bugly', 'appsflyer',
+                         'crashlytics', 'sentry', 'amplitude', 'mixpanel']
+# 需显式授权才可引入：本身不是回传 SDK，但可能带网络栈或跨版本 API 风险。
+GATED_DEPS = ['coil', 'glide', 'okhttp', 'retrofit', 'vico']
 # 阶段 5 新增：唯一允许声明的权限（BiometricPrompt 用，normal 级）。
 # 除此之外的任何 uses-permission 都会让检查失败，防止「加了权限忘了评审」。
 ALLOWED_PERMISSIONS = ['android.permission.USE_BIOMETRIC']
@@ -40,10 +47,17 @@ def without_line_comments(text: str) -> str:
 
 def main() -> int:
     problems = []
+    project = read(os.path.join(BASE, 'openspec', 'project.md'))
+    authorized = AUTHORIZATION_MARKER in project
+    notes = []
     m = without_xml_comments(read(MANIFEST))
     for perm in FORBIDDEN_PERMISSIONS:
-        if perm in m:
-            problems.append('Manifest 声明了被禁止的权限：' + perm)
+        if perm in m and not authorized:
+            problems.append('Manifest 声明了未授权的权限：' + perm +
+                            '（如需放行，先在 project.md 写「' + AUTHORIZATION_MARKER +
+                            '」说明用途/数据流向/用户控制方式）')
+        elif perm in m and authorized:
+            notes.append('已按 project.md 授权放行权限：' + perm)
     if 'android:allowBackup="false"' not in m:
         problems.append('Manifest 未设置 android:allowBackup="false"')
     if '@xml/backup_rules' not in m:
@@ -72,16 +86,24 @@ def main() -> int:
                     problems.append(label + ' 缺少 ' + section + ' 段')
 
     g = without_line_comments(read(GRADLE)).lower()
-    for dep in FORBIDDEN_DEPS:
+    for dep in ALWAYS_FORBIDDEN_DEPS:
         if dep in g:
-            problems.append('app/build.gradle.kts 引入了被禁止的依赖：' + dep)
+            problems.append('app/build.gradle.kts 引入了始终禁止的回传 SDK：' + dep)
+    for dep in GATED_DEPS:
+        if dep in g and not authorized:
+            problems.append('app/build.gradle.kts 引入了需显式授权的依赖：' + dep)
+        elif dep in g and authorized:
+            notes.append('已按 project.md 授权放行依赖：' + dep)
 
     if problems:
         print('check_manifest_privacy: FAIL')
         for p in problems:
             print('  - ' + p)
         return 1
-    print('check_manifest_privacy: PASS（无网络权限 / 关闭自动备份 / 排除数据库 / 无网络 SDK）')
+    for n in notes:
+        print('  [已授权] ' + n)
+    print('check_manifest_privacy: PASS（无未授权的网络权限 / 关闭自动备份 / '
+          '排除数据库 / 无默认回传 SDK；边界=数据流向由使用者控制）')
     return 0
 
 

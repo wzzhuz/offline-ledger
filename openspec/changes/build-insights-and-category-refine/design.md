@@ -301,9 +301,12 @@ BeeCount 的参照是 Flutter `ReorderableListView`：官方行为即「拖动�
 | 制品 | `offline-ledger-release-v0.2.3` 12,231,819 B；`offline-ledger-mapping-v0.2.3` 3,502,962 B；`offline-ledger-metrics-v0.2.3-p-m-nsfalse` 271 B |
 | 远端校验 | 按最终 commit sha 比对 **293↔293 blob、sha 全一致、PASS**；`diag/` 与 `diag.yml` 零残留、workflow 仅 build/release 两份；无 token 明文；六个静态检查全 PASS |
 
-**回退顺序实际用上第 1 条**：`androidx.compose.foundation.lazy.animateItem` 在 Compose BOM
-2026.06 不存在，去掉后**实时重排仍然生效**（`orderedIds` 状态驱动列表重组），
-只是没有补间动画。第 3 条是独立发现的作用域错误，按「每次只改一处」在同一修复
+**回退顺序实际用上第 1 条**：当时报 `Unresolved reference 'animateItem'`，去掉后
+**实时重排仍然生效**（`orderedIds` 状态驱动列表重组），只是没有补间动画。
+**第 19 批订正**：此处写「该 API 在 Compose BOM 2026.06 不存在」是错误结论——
+官方 Lazy lists 文档明确有 `Modifier.animateItem()`（`LazyItemScope` 扩展）。
+更可能是当时列表为普通 `Column`（无 `LazyItemScope` receiver）或 import 作用域不对。
+不得再把它记为平台限制。第 3 条是独立发现的作用域错误，按「每次只改一处」在同一修复
 commit 里一起处理。**如实限制**：让位是即时的、不是连续像素级补间，
 顺滑度仍不如 Flutter `ReorderableListView`；不把「实时重排」包装成「动画已对齐」。
 `nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
@@ -426,3 +429,53 @@ chip 内 label 又是 M3 默认居中。改法：显式 `horizontalAlignment` �
 编译通过，不证明「手指拖到屏幕底部时列表按预期滚、父滚动不抢事件」。
 这轮 MUST 由使用者装机拖一次才算数。若真机仍被抢，按 §3 回退顺序
 退到 `NestedScrollConnection` 拦截；若边缘滚动抖动，退到固定步进 + 阈值死区。
+
+---
+
+## 第 19 批：引入开源拖拽库 + 隐私口径按使用者声明改写
+
+### 1. 触发与根因
+
+使用者验 v0.2.4 后报「资产页拖动排序还是有问题」。只读复核确认三处：
+① `anyDragging` 只在长按成功 `start(id)` 后为 true，而长按等待约 500ms 窗口内
+父 `verticalScroll` 仍 `enabled=true`，微小移动即过 touch slop 抢走 pointer，
+`onDragStart` 根本不触发；② 资产页是 `Column+verticalScroll`，分类/模板是
+`LazyColumn`，父 `pointerInput` 重启时序不同，「四处统一」并未真正成立；
+③ `rowMeasureModifier` 按组件契约 MUST 只挂单行，实际挂在整张 `AccountCard`
+（主行+副信息+40dp 操作行），且边缘坐标 `handleTops + change.position.y`
+是随列表滚动漂移的混合量。
+
+连续三轮真机验不过，判定为**平台级手势知识**而非逻辑 bug，改用成熟库替换最脆一层。
+
+### 2. 选型
+
+`sh.calvin.reorderable:reorderable:3.1.0`（Apache-2.0，Maven Central，2026-04-20）：
+支持 `LazyColumn` / Grid / `Column` / `Row`、分段头与非可拖拽项、
+立即或长按拖拽、子控件手柄、**按距边缘距离变速自动滚动**、
+`Modifier.animateItem()` 补间让位、内置无障碍 `CustomAccessibilityAction`
+（正好对应本项目 `↑↓` 兜底）。传递依赖无网络客户端。
+对比 `org.burnoutcrew.composereorderable:0.9.6`（停在 2022、首项不动画）后不采用。
+
+### 3. 使用者隐私口径澄清（本批一并落地）
+
+> app 是自用的，自己不会主动往不可信的三方服务器上传。权限在自己手里就可以。
+> 前面不用钱迹等 app 原因是它们默认就把数据上传到他们服务器、不支持用户控制。
+
+据此把 `project.md` 铁律 1 / 技术栈依赖取舍 / 永久不做清单、
+`check_manifest_privacy.py`（硬禁令 → 显式授权闸门）、
+`privacy-security` 3 份 MODIFIED、Manifest 注释、活文档 §2.7 全部改写：
+**红线 = 默认回传厂商且用户不可控；不是「无 INTERNET」或「零新增依赖」的形式禁令**。
+当前 App 实际仍不声明 `INTERNET`（功能不需要），但不再作为否决理由。
+
+### 4. 分批与回退顺序
+
+1. **本 commit**：只加依赖坐标 + 口径/规格/文档订正，不动任何 Kotlin 拖拽代码。
+   这次 CI 是「库 3.1.0 与 BOM 2026.06.00 是否兼容」的真实门槛。
+2. 兼容确认后：先接资产页（改 `LazyColumn`，库 state + `ReorderableItem` +
+   `longPressDraggableHandle`），逐页再接分类一级与模板；二级 chips 保留自研 `WrapRow`。
+3. 若库与 BOM 不兼容 → 退到 vendor 源码（按 Apache-2.0 裁进仓库、保留 LICENSE/NOTICE）；
+   若仍不顺 → `↑↓` 恢复主入口、拖拽降级为可选，如实记入指南，不无限迭代手势。
+
+### 5. 实测回填（待推送后补）
+
+（占位：代码 commit / push CI 真实结论 / 库兼容判定 / 后续批次 / release / 制品 / 远端校验。）

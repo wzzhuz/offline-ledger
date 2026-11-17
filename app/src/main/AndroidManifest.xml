@@ -2,7 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-        刻意不声明 android.permission.INTERNET。
+        当前不声明 android.permission.INTERNET，因为现有功能无需联网，
+        而不是因为它是一条形式禁令。2026-11-17 使用者澄清：红线是
+        「默认把账本数据回传厂商服务器且用户无法控制」；权限在手里即可。
+        将来如需联网能力，SHALL 先在 openspec/project.md 写权限显式授权
+        （用途 / 数据流向 / 用户控制方式），check_manifest_privacy.py 再放行。
         也刻意不声明 READ/WRITE_EXTERNAL_STORAGE：导入导出走 Storage Access Framework。
         依据：openspec/specs/privacy-security/spec.md 与 project.md 第一条铁律。
         自动化检查：scripts/check_manifest_privacy.py

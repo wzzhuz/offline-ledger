@@ -177,6 +177,12 @@ dependencies {
     // 刻意不引入任何含网络行为的依赖。
     implementation("androidx.biometric:biometric:1.1.0")
 
+    // ---- 第 19 批：列表拖拽重排（纯 UI 库，无运行时网络行为） ----
+    // sh.calvin.reorderable:reorderable:3.1.0，Apache-2.0，Maven Central。
+    // 传递依赖仅 kotlin-stdlib-common 与 compose runtime/animation/foundation，
+    // 不含网络客户端；Gradle 依赖只在构建期解析，不产生 App 运行时联网。
+    implementation("sh.calvin.reorderable:reorderable:3.1.0")
+
     // ---- 单元测试 ----
     testImplementation("junit:junit:4.13.2")
 }
