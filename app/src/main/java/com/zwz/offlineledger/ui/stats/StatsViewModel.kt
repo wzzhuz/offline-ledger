@@ -14,6 +14,7 @@ import com.zwz.offlineledger.engine.BudgetEngine
 import com.zwz.offlineledger.engine.BudgetProgress
 import com.zwz.offlineledger.engine.ChartData
 import com.zwz.offlineledger.engine.ChartData.ChartSlice
+import com.zwz.offlineledger.engine.InsightData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,6 +61,14 @@ data class StatsUiState(
     val drillCategoryId: Long? = null,
     val drillCategoryName: String = "",
     val drillRows: List<DrillRow> = emptyList(),
+    /** 第 13 批：洞察总结卡与 Top5 排行。 */
+    val recordCount: Int = 0,
+    val averageCents: Long = 0L,
+    val averageUnits: Int = 0,
+    val averageLabel: String = "日均",
+    val topCategories: List<InsightData.RankRow> = emptyList(),
+    val topCounterparties: List<InsightData.RankRow> = emptyList(),
+    val topAccounts: List<InsightData.RankRow> = emptyList(),
     val loading: Boolean = false
 )
 
@@ -263,7 +272,26 @@ class StatsViewModel(
                 ChartData.assetSeries(current - deltas.values.sum(), deltas)
             } else emptyList()
 
+            // 第 13 批：洞察聚合，全部走只读 SQL，按当前币种，不加载流水实体。
+            val count = recordDao.insightRecordCount(from, to, cc).toInt()
+            val cpItems = recordDao.insightTopCounterparties(from, to, cc, 5)
+                .map { InsightData.RankItem(it.name, it.totalCents, it.cnt) }
+            val accNames = accountDao.all().associateBy { it.id }
+            val accItems = recordDao.insightTopAccounts(from, to, cc, 5)
+                .map { InsightData.RankItem(accNames[it.id]?.name ?: ("账户 " + it.id), it.totalCents, it.cnt) }
+            val catItems = roots.map { InsightData.RankItem(it.name, it.cents, 0, it.id) }
+            val units = if (s.mode == StatsMode.MONTH)
+                (MonthRange.of(s.yearMonth).second % 100).coerceAtLeast(1) else 12
+            val avgLabel = if (s.mode == StatsMode.MONTH) "日均" else "月均"
+
             _state.value = s.copy(
+                recordCount = count,
+                averageCents = InsightData.averageCents(totalExpense, units),
+                averageUnits = units,
+                averageLabel = avgLabel,
+                topCategories = InsightData.topRows(catItems, netTotal, 5),
+                topCounterparties = InsightData.topRows(cpItems, totalExpense, 5),
+                topAccounts = InsightData.topRows(accItems, totalExpense, 5),
                 totalIncomeCents = totalIncome,
                 totalExpenseCents = totalExpense,
                 settlementCents = settleTotal,

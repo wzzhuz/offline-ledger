@@ -40,6 +40,11 @@ class LedgerPrefs(context: Context) {
         get() = sp.getString(KEY_DEFAULT_CURRENCY, null) ?: LedgerCurrency.DEFAULT
         set(value) = sp.edit().putString(KEY_DEFAULT_CURRENCY, value).apply()
 
+    /** 第 13 批：隐藏金额。只遮显示，不进 Room / 备份 DTO / 不触发 Migration。 */
+    var hideAmounts: Boolean
+        get() = sp.getBoolean(KEY_HIDE_AMOUNTS, false)
+        set(value) = sp.edit().putBoolean(KEY_HIDE_AMOUNTS, value).apply()
+
     /** 第 6 批：默认账户，记一笔与模板填充的账户兜底；0 = 未设置。只存 id，不进备份。 */
     var defaultAccountId: Long
         get() = sp.getLong(KEY_DEFAULT_ACCOUNT_ID, 0L)
@@ -96,6 +101,7 @@ class LedgerPrefs(context: Context) {
         private const val KEY_PIN_HASH = "pin_hash"
         private const val KEY_DEFAULT_CURRENCY = "default_currency"
         private const val KEY_DEFAULT_ACCOUNT_ID = "default_account_id"
+        private const val KEY_HIDE_AMOUNTS = "hide_amounts"
         const val MAX_THRESHOLD_CENTS = 100_000L // 1000.00 元
     }
 }

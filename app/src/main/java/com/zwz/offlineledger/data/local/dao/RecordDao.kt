@@ -13,6 +13,11 @@ data class MonthTotalRow(val yearMonth: Int, val type: String, val totalCents: L
 /** 阶段 8：年度资产趋势的月度净变动行。 */
 data class MonthDeltaRow(val yearMonth: Int, val totalCents: Long)
 
+/** 第 13 批：洞察只读聚合行；全部由 GROUP BY 返回，不加载流水实体。 */
+data class InsightNameRow(val name: String, val totalCents: Long, val cnt: Int)
+data class InsightIdRow(val id: Long, val totalCents: Long, val cnt: Int)
+data class InsightCountRow(val categoryId: Long, val cnt: Int)
+
 /** 阶段 8：账户最近使用频次，用于记账页常用账户置顶。 */
 data class AccountUsageRow(val id: Long, val uses: Int)
 
@@ -474,4 +479,20 @@ interface RecordDao {
     /** 阶段 8：年度资产趋势的月度净变动，按币种、不混算；转账天然净额为 0。 */
     @Query("SELECT yearMonth, SUM(CASE WHEN type IN ('INCOME','SETTLEMENT') THEN amountCents WHEN type = 'EXPENSE' THEN -amountCents ELSE 0 END) AS totalCents FROM records WHERE yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :cc AND excludeFromStats = 0 GROUP BY yearMonth ORDER BY yearMonth")
     suspend fun monthlyBalanceDeltaForCurrency(fromYm: Int, toYm: Int, cc: String): List<MonthDeltaRow>
+
+    // ---- 第 13 批：洞察聚合。全部带唯一统计口径 + 当前币种，严格不混算。 ----
+    @Query("SELECT COUNT(*) FROM records WHERE type IN ('EXPENSE', 'INCOME') AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :cc")
+    suspend fun insightRecordCount(fromYm: Int, toYm: Int, cc: String): Long
+
+    @Query("SELECT counterparty AS name, SUM(amountCents) AS totalCents, COUNT(*) AS cnt FROM records WHERE type = 'EXPENSE' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :cc AND counterparty IS NOT NULL AND counterparty <> '' GROUP BY counterparty ORDER BY totalCents DESC LIMIT :limit")
+    suspend fun insightTopCounterparties(fromYm: Int, toYm: Int, cc: String, limit: Int): List<InsightNameRow>
+
+    @Query("SELECT fromAccountId AS id, SUM(amountCents) AS totalCents, COUNT(*) AS cnt FROM records WHERE type = 'EXPENSE' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :cc AND fromAccountId IS NOT NULL GROUP BY fromAccountId ORDER BY totalCents DESC LIMIT :limit")
+    suspend fun insightTopAccounts(fromYm: Int, toYm: Int, cc: String, limit: Int): List<InsightIdRow>
+
+    @Query("SELECT categoryId AS categoryId, COUNT(*) AS cnt FROM records WHERE type IN ('EXPENSE','INCOME') AND excludeFromStats = 0 AND categoryId IS NOT NULL GROUP BY categoryId")
+    suspend fun insightCategoryCounts(): List<InsightCountRow>
+
+    @Query("SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents, r.localDate AS localDate, r.note AS note, c.name AS categoryName FROM records r LEFT JOIN categories c ON r.categoryId = c.id WHERE r.type IN ('EXPENSE','INCOME') AND r.excludeFromStats = 0 AND (r.categoryId = :categoryId OR r.rootCategoryId = :categoryId) ORDER BY r.localDate DESC, r.id DESC LIMIT :limit")
+    suspend fun insightCategoryDetailRows(categoryId: Long, limit: Int): List<DrillRow>
 }

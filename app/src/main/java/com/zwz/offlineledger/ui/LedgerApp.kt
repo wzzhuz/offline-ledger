@@ -151,7 +151,9 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                 )
             }
             composable("assets") { AssetsScreen() }
-            composable("stats") { StatsScreen() }
+            composable("stats") {
+                StatsScreen(onOpenCategories = { navController.navigate("categories") })
+            }
             composable("settings") {
                 SettingsScreen(onOpen = { route -> navController.navigate(route) })
             }

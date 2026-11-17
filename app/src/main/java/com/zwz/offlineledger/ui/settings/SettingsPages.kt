@@ -55,7 +55,8 @@ internal fun settingsVm(): SettingsViewModel {
     val vm: SettingsViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
             SettingsViewModel(
-                ep.ledgerRepository(), ep.categoryDao(), ep.accountDao(), LedgerPrefs(context)
+                ep.ledgerRepository(), ep.categoryDao(), ep.accountDao(),
+                ep.recordDao(), LedgerPrefs(context)
             )
         }
     )
@@ -360,7 +361,8 @@ fun PreferenceSettingsScreen(onBack: () -> Unit) {
         OutlinedTextField(
             value = thresholdInput,
             onValueChange = { thresholdInput = it; vm.setThresholdYuan(it) },
-            label = { Text("对账尾差阈值（元，默认 1.00）") },
+            placeholder = { Text("对账尾差阈值（元，默认 1.00）") },
+            textStyle = MaterialTheme.typography.bodyMedium,
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth()
@@ -368,6 +370,14 @@ fun PreferenceSettingsScreen(onBack: () -> Unit) {
         SettingSwitchRow("支出 / 收入配色反转", state.reverseColors) {
             vm.setReverseColors(it)
         }
+        SettingSwitchRow("隐藏金额（公共场合翻账，只遮显示）", state.hideAmounts) {
+            vm.setHideAmounts(it)
+        }
+        Text(
+            text = "开启后统计 / 明细 / 资产页的金额显示为 ****，数据本身不变，也不会写进备份。",
+            style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral
+        )
         Text(
             text = "默认币种（只影响之后新建的账户）",
             style = MaterialTheme.typography.labelMedium

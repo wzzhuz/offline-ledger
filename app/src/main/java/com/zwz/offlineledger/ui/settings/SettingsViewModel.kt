@@ -13,10 +13,13 @@ import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
+import com.zwz.offlineledger.data.local.dao.DrillRow
+import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
+import com.zwz.offlineledger.engine.InsightData
 import com.zwz.offlineledger.engine.Reconciliation
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import kotlinx.coroutines.Dispatchers
@@ -43,13 +46,19 @@ data class SettingsState(
     val csvPlan: CsvImportPlan? = null,
     val defaultCurrency: String = LedgerCurrency.DEFAULT,
     val accounts: List<AccountEntity> = emptyList(),
-    val defaultAccountId: Long = 0L
+    val defaultAccountId: Long = 0L,
+    val hideAmounts: Boolean = false,
+    /** 第 13 批：分类笔数（一级含二级）与分类详情下钻。 */
+    val categoryCounts: Map<Long, Int> = emptyMap(),
+    val categoryDetailName: String = "",
+    val categoryDetail: List<DrillRow> = emptyList()
 )
 
 class SettingsViewModel(
     private val repository: LedgerRepository,
     private val categoryDao: CategoryDao,
     private val accountDao: AccountDao,
+    private val recordDao: RecordDao,
     private val prefs: LedgerPrefs
 ) : ViewModel() {
 
@@ -87,7 +96,8 @@ class SettingsViewModel(
             flagSecure = prefs.flagSecureEnabled,
             appLockEnabled = prefs.appLockEnabled,
             hasPin = prefs.hasPin(),
-            defaultCurrency = prefs.defaultCurrency
+            defaultCurrency = prefs.defaultCurrency,
+            hideAmounts = prefs.hideAmounts
         )
     }
 
@@ -103,6 +113,13 @@ class SettingsViewModel(
     }
 
     /** 只改默认值，绝不自动改已有账户与流水。 */
+    /** 第 13 批：只改显示状态，不写数据、不进备份。 */
+    fun setHideAmounts(hidden: Boolean) {
+        prefs.hideAmounts = hidden
+        com.zwz.offlineledger.ui.components.AmountMask.hidden = hidden
+        _state.value = _state.value.copy(hideAmounts = hidden)
+    }
+
     fun setDefaultCurrency(code: String) {
         require(code in LedgerCurrency.SUPPORTED) { "不支持的币种" }
         prefs.defaultCurrency = code
@@ -342,8 +359,30 @@ class SettingsViewModel(
     fun loadCategories() {
         viewModelScope.launch {
             val all = withContext(Dispatchers.IO) { categoryDao.all() }
-            _state.value = _state.value.copy(categories = all)
+            // 第 13 批：一条 GROUP BY 拿全部笔数，再在纯 JVM 层把二级累加进一级。
+            val direct = withContext(Dispatchers.IO) {
+                recordDao.insightCategoryCounts().associate { it.categoryId to it.cnt }
+            }
+            val parentOf = all.associate { it.id to it.parentId }
+            val counts = InsightData.rollupCounts(direct, parentOf)
+            _state.value = _state.value.copy(categories = all, categoryCounts = counts)
         }
+    }
+
+    /** 分类详情：带 LIMIT，MUST NOT 全量加载；一级能看到其下所有二级流水。 */
+    fun openCategoryDetail(id: Long, name: String) {
+        viewModelScope.launch {
+            val rows = withContext(Dispatchers.IO) {
+                recordDao.insightCategoryDetailRows(id, 30)
+            }
+            _state.value = _state.value.copy(
+                categoryDetailName = name, categoryDetail = rows
+            )
+        }
+    }
+
+    fun closeCategoryDetail() {
+        _state.value = _state.value.copy(categoryDetailName = "", categoryDetail = emptyList())
     }
 
     fun createCategory(name: String, type: RecordType, parentId: Long?) {

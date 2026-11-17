@@ -16,6 +16,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
+import com.zwz.offlineledger.ui.components.AmountMask
 import com.zwz.offlineledger.ui.LedgerApp
 import com.zwz.offlineledger.ui.lock.AppLockScreen
 import com.zwz.offlineledger.ui.theme.LedgerColors
@@ -39,6 +40,8 @@ class MainActivity : FragmentActivity() {
         val startWithRecordEntry =
             intent?.action == "com.zwz.offlineledger.ACTION_QUICK_RECORD"
         LedgerColors.applyReverseColors(prefs.reverseColors)
+        // 第 13 批：隐藏金额偏好冷启动即生效，直到用户手动关闭。
+        AmountMask.hidden = prefs.hideAmounts
         applyFlagSecure(prefs.flagSecureEnabled)
 
         setContent {

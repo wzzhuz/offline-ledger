@@ -7,6 +7,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,7 +47,19 @@ fun amountColor(type: RecordType): Color = when (type) {
     RecordType.SETTLEMENT -> LedgerColors.IncomeGreen
 }
 
-fun formatCents(cents: Long): String = Cents(cents).toYuanString()
+/**
+ * 第 13 批：隐藏金额是**可观察的全局显示状态**。
+ * 放在 formatCents 单入口里，让「金额 Text / 图表 valueLabels / 图例 / 中心总额」
+ * 全部同步遮蔽，且不需要把每个调用点改成 composable 函数
+ * （values.map { } 这类非 @Composable lambda 里不能调 composable）。
+ * 组合期间读取 mutableStateOf 会被 snapshot 记录，开关一变即重组。
+ */
+object AmountMask {
+    var hidden by mutableStateOf(false)
+}
+
+fun formatCents(cents: Long): String =
+    if (AmountMask.hidden) "****" else Cents(cents).toYuanString()
 
 fun signedAmount(type: RecordType, cents: Long): String = when (type) {
     RecordType.EXPENSE -> "-" + formatCents(cents)

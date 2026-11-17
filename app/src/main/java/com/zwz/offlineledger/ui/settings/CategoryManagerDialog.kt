@@ -1,5 +1,7 @@
 package com.zwz.offlineledger.ui.settings
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +10,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
@@ -31,13 +35,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
+import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /**
  * 第 12 批：分类管理由「列表 + 新增表单同 Column(verticalScroll)」改为
  * 「TopBar 固定 + 入口 + LazyColumn 纯列表 + 编辑独立视图」。
- * 新增入口不再随分类增多往下移动；顶层 LazyColumn 无无限高度问题
- * （旧注释「用普通 Column 避免嵌套 LazyColumn 冲突」只对嵌套成立）。
+ * 第 13 批：补齐信息价值——支出 / 收入分段、每类笔数（一级含二级）、
+ * 点分类行看近期流水、编辑视图字段分组。骨架一字未回退。
  */
 private data class CategoryEditorState(
     val mode: String,                 // "add" | "rename"
@@ -52,6 +57,7 @@ fun CategoryManagerScreen(onBack: () -> Unit) {
     var editor by remember { mutableStateOf<CategoryEditorState?>(null) }
     var deletingId by remember { mutableStateOf<Long?>(null) }
     var showArchived by remember { mutableStateOf(false) }
+    var catType by remember { mutableStateOf(RecordType.EXPENSE) }
 
     val categories = state.categories
     Column(modifier = Modifier.fillMaxSize()) {
@@ -69,6 +75,7 @@ fun CategoryManagerScreen(onBack: () -> Unit) {
             CategoryEditor(
                 editor = editor!!,
                 categories = categories,
+                catType = catType,
                 onSaveRoot = { name, type -> vm.createCategory(name, type, null); editor = null },
                 onSaveChild = { name, parentId ->
                     val parent = categories.firstOrNull { it.id == parentId }
@@ -79,10 +86,25 @@ fun CategoryManagerScreen(onBack: () -> Unit) {
                 modifier = Modifier.weight(1f)
             )
         } else {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(RecordType.EXPENSE, RecordType.INCOME).forEach { t ->
+                    FilterChip(
+                        selected = catType == t,
+                        onClick = { catType = t },
+                        label = { Text(typeLabel(t)) }
+                    )
+                }
+            }
             CategoryList(
                 categories = categories,
+                catType = catType,
+                counts = state.categoryCounts,
                 showArchived = showArchived,
                 onToggleArchived = { showArchived = !showArchived },
+                onOpen = { id, name -> vm.openCategoryDetail(id, name) },
                 onRename = { id, name -> editor = CategoryEditorState("rename", id, name) },
                 onDelete = { deletingId = it },
                 onMove = { id, delta -> vm.moveCategory(id, delta) },
@@ -105,30 +127,81 @@ fun CategoryManagerScreen(onBack: () -> Unit) {
             dismissButton = { TextButton(onClick = { deletingId = null }) { Text("取消") } }
         )
     }
+
+    if (state.categoryDetailName.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { vm.closeCategoryDetail() },
+            title = { Text(state.categoryDetailName + " · 近期流水") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 320.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (state.categoryDetail.isEmpty()) {
+                        Text("该分类暂无流水", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        state.categoryDetail.forEach { r ->
+                            Text(
+                                text = dateLabel(r.localDate) + "  " +
+                                    (if (r.type == "EXPENSE") "支出" else "收入") + "  " +
+                                    formatCents(r.amountCents) + "  " +
+                                    (r.note ?: ""),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(vertical = 3.dp)
+                            )
+                        }
+                        Text(
+                            text = "仅显示最近 30 条，不全量加载。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.closeCategoryDetail() }) { Text("关闭") }
+            }
+        )
+    }
+}
+
+private fun dateLabel(d: Int): String {
+    val m = (d / 100) % 100
+    val day = d % 100
+    return m.toString().padStart(2, '0') + "-" + day.toString().padStart(2, '0')
 }
 
 /* ------------------------------------------------------------------ */
-/* 纯列表：LazyColumn + 每行一个「⋯」菜单，行高不再被 4 个 48dp 按钮撑高   */
+/* 纯列表：按收支类型分段；每行显示笔数，点行看流水，⋯ 菜单放操作          */
 /* ------------------------------------------------------------------ */
 @Composable
 private fun CategoryList(
     categories: List<CategoryEntity>,
+    catType: RecordType,
+    counts: Map<Long, Int>,
     showArchived: Boolean,
     onToggleArchived: () -> Unit,
+    onOpen: (Long, String) -> Unit,
     onRename: (Long, String) -> Unit,
     onDelete: (Long) -> Unit,
     onMove: (Long, Int) -> Unit,
     onRestore: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val roots = categories.filter { it.level == 0 && !it.isArchived }
-    val children = categories.filter { it.level == 1 && !it.isArchived }
-    val archived = categories.filter { it.isArchived }
+    val roots = categories.filter {
+        it.level == 0 && !it.isArchived && it.type == catType
+    }
+    val children = categories.filter {
+        it.level == 1 && !it.isArchived && it.type == catType
+    }
+    val archived = categories.filter { it.isArchived && it.type == catType }
 
     LazyColumn(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         item {
             Text(
-                text = "最多两级；删除有流水的分类自动转归档，历史流水归属不变。",
+                text = "最多两级；点分类看近期流水，笔数含二级。删除有流水的分类自动转归档。",
                 style = MaterialTheme.typography.bodySmall,
                 color = LedgerColors.Neutral,
                 modifier = Modifier.padding(vertical = 6.dp)
@@ -137,8 +210,10 @@ private fun CategoryList(
         roots.forEach { root ->
             item(key = "root-" + root.id) {
                 CategoryRow(
-                    label = root.name + "（" + typeLabel(root.type) + "）",
+                    label = root.name,
+                    countText = (counts[root.id] ?: 0).toString() + " 笔（含二级）",
                     indent = 0,
+                    onOpen = { onOpen(root.id, root.name) },
                     onMoveUp = { onMove(root.id, -1) },
                     onMoveDown = { onMove(root.id, 1) },
                     onRename = { onRename(root.id, root.name) },
@@ -149,7 +224,9 @@ private fun CategoryList(
                 item(key = "child-" + child.id) {
                     CategoryRow(
                         label = "└ " + child.name,
+                        countText = (counts[child.id] ?: 0).toString() + " 笔",
                         indent = 1,
+                        onOpen = { onOpen(child.id, child.name) },
                         onMoveUp = { onMove(child.id, -1) },
                         onMoveDown = { onMove(child.id, 1) },
                         onRename = { onRename(child.id, child.name) },
@@ -172,7 +249,7 @@ private fun CategoryList(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                     ) {
                         Text(
-                            text = c.name + "（" + typeLabel(c.type) + "）",
+                            text = c.name,
                             style = MaterialTheme.typography.bodySmall,
                             color = LedgerColors.Neutral,
                             modifier = Modifier.weight(1f)
@@ -188,7 +265,9 @@ private fun CategoryList(
 @Composable
 private fun CategoryRow(
     label: String,
+    countText: String,
     indent: Int,
+    onOpen: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onRename: () -> Unit,
@@ -201,15 +280,28 @@ private fun CategoryRow(
             .padding(start = if (indent == 1) 12.dp else 0.dp)
             .heightIn(min = 40.dp)
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
-        )
+        // 整行主点击区：Box + clickable，保持 40dp 触摸目标且不撑高行。
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 40.dp)
+                .clickable { onOpen() },
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = label, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = "  " + countText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral
+                )
+            }
+        }
         IconButton(onClick = { menu = true }) {
             Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text("看流水") }, onClick = { menu = false; onOpen() })
             DropdownMenuItem(text = { Text("上移") }, onClick = { menu = false; onMoveUp() })
             DropdownMenuItem(text = { Text("下移") }, onClick = { menu = false; onMoveDown() })
             DropdownMenuItem(text = { Text("改名") }, onClick = { menu = false; onRename() })
@@ -222,30 +314,34 @@ private fun CategoryRow(
 }
 
 /* ------------------------------------------------------------------ */
-/* 编辑独立视图：新增（一级 / 二级切换）与改名；父级搜索 + 限高全量列表      */
+/* 编辑独立视图：字段分组；父级列表按当前收支分段过滤                     */
 /* ------------------------------------------------------------------ */
 @Composable
 private fun CategoryEditor(
     editor: CategoryEditorState,
     categories: List<CategoryEntity>,
+    catType: RecordType,
     onSaveRoot: (String, RecordType) -> Unit,
     onSaveChild: (String, Long) -> Unit,
     onSaveRename: (Long, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var name by remember { mutableStateOf(editor.initialName) }
-    var level by remember { mutableStateOf(0) }                 // 0 一级 / 1 二级
-    var type by remember { mutableStateOf(RecordType.EXPENSE) }
+    var level by remember { mutableStateOf(0) }
+    var type by remember { mutableStateOf(catType) }
     var parentId by remember { mutableStateOf<Long?>(null) }
     var parentQuery by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val roots = categories.filter { it.level == 0 && !it.isArchived }
+    val roots = categories.filter {
+        it.level == 0 && !it.isArchived && it.type == catType
+    }
     val matched = roots.filter { it.name.contains(parentQuery, ignoreCase = true) }
 
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         if (editor.mode == "add") {
-            Row {
+            Text("分类层级", style = MaterialTheme.typography.labelMedium)
+            Row(modifier = Modifier.padding(top = 4.dp)) {
                 FilterChip(
                     selected = level == 0,
                     onClick = { level = 0; error = null },
@@ -260,6 +356,11 @@ private fun CategoryEditor(
             }
         }
 
+        Text(
+            text = "名称",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(top = 10.dp)
+        )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it; error = null },
@@ -269,50 +370,54 @@ private fun CategoryEditor(
             modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
         )
 
-        if (editor.mode == "add" && level == 0) {
-            Row(modifier = Modifier.padding(top = 6.dp)) {
-                listOf(RecordType.EXPENSE, RecordType.INCOME).forEach { t ->
-                    FilterChip(
-                        selected = type == t,
-                        onClick = { type = t },
-                        label = { Text(typeLabel(t)) },
-                        modifier = Modifier.padding(end = 6.dp)
-                    )
+        if (editor.mode == "add") {
+            if (level == 0) {
+                Text(
+                    text = "收支类型",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+                Row(modifier = Modifier.padding(top = 4.dp)) {
+                    listOf(RecordType.EXPENSE, RecordType.INCOME).forEach { t ->
+                        FilterChip(
+                            selected = type == t,
+                            onClick = { type = t },
+                            label = { Text(typeLabel(t)) },
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
+                    }
                 }
-            }
-        }
-
-        if (editor.mode == "add" && level == 1) {
-            val selected = roots.firstOrNull { it.id == parentId }
-            Text(
-                text = "父级：" + (selected?.let { it.name + "（" + typeLabel(it.type) + "）" }
-                    ?: "未选，点下面列表选择"),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (selected == null) LedgerColors.ExpenseRed else LedgerColors.IncomeGreen,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            OutlinedTextField(
-                value = parentQuery,
-                onValueChange = { parentQuery = it },
-                placeholder = { Text("搜索一级分类（可留空看全部）") },
-                textStyle = MaterialTheme.typography.bodyMedium,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
-            )
-            // 第 12 批：限高 + 惰性列表，10 个一级不再全量平铺 480dp。
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp)) {
-                items(matched, key = { it.id }) { r ->
-                    FilterChip(
-                        selected = parentId == r.id,
-                        onClick = { parentId = r.id; error = null },
-                        label = {
-                            Text(
-                                r.name + "（" + typeLabel(r.type) + "）",
-                                maxLines = 1
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-                    )
+            } else {
+                Text(
+                    text = "父级（" + typeLabel(catType) + "）",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+                val selected = roots.firstOrNull { it.id == parentId }
+                Text(
+                    text = "当前：" + (selected?.name ?: "未选，点下面列表选择"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selected == null) LedgerColors.ExpenseRed else LedgerColors.IncomeGreen,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                OutlinedTextField(
+                    value = parentQuery,
+                    onValueChange = { parentQuery = it },
+                    placeholder = { Text("搜索一级分类（可留空看全部）") },
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                )
+                // 限高 + 惰性列表：10 个一级不再全量平铺 480dp。
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp)) {
+                    items(matched, key = { it.id }) { r ->
+                        FilterChip(
+                            selected = parentId == r.id,
+                            onClick = { parentId = r.id; error = null },
+                            label = { Text(r.name, maxLines = 1) },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        )
+                    }
                 }
             }
         }

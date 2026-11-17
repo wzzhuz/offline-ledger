@@ -44,7 +44,10 @@ def main() -> int:
                    'rootTotalsForCurrency', 'categoryTotalsForCurrency',
                    'subcategoryTotalsUnderRootForCurrency', 'drillDownRowsForCurrency',
                    'settlementByRootForCurrency', 'settlementByCategoryForCurrency',
-                   'settlementTotalForCurrency']:
+                   'settlementTotalForCurrency',
+                   # 第 13 批：洞察只读聚合，同样必须带唯一口径
+                   'insightRecordCount', 'insightTopCounterparties', 'insightTopAccounts',
+                   'insightCategoryCounts', 'insightCategoryDetailRows']:
         idx = dao.find('fun ' + marker)
         if idx < 0:
             problems.append('缺少统计查询 ' + marker)
