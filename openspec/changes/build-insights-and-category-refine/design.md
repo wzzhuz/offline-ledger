@@ -221,7 +221,23 @@ BeeCount 的 `analytics_content.dart` 用 `BeeSurface` 把每个结论装进独�
 - 只改设置页代码不改 spec / 只追加 ADDED 制造两份清单（指南 §5）
 - 为紧凑删回收站信息或压触摸区到 40dp 以下
 
-### 实测回填
+### 实测回填（第 15 批，2026-11-17）
 
-（推送后写：commit sha / push CI run id / release run id / 制品大小 / 首轮失败根因 /
-真机未验清单继承）
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `6cf6092db3ee8a1b4757c93da158a1880737cf91`（17 文件，v0.2.2） |
+| 首轮 push CI | `44033035742` **failure**，挂在「运行单元测试」，Kotlin 编译失败 |
+| 诊断通道 | 临时 dispatch-only `diag.yml`（`e6e5b357…`）→ run `44033638697` success → 把 gradle 日志回传 `diag/unit.log`（job logs 仍 403） |
+| 唯一编译错误 | `CategoryManagerDialog.kt:476 Unresolved reference 'Menu'` —— material-icons-core 无 `Icons.Filled.Menu`；拖手柄改为文本 `≡` |
+| 修复 commit | `143327b85b334c9b71305446a53d7c6dde638610`（同时删除 diag.yml 与 diag/unit.log） |
+| push CI | `44034000868` **success**（17 步全绿） |
+| release | `44034725835` **success**，23 步绿 / 5 步按 input 跳过；坚果云上传步骤 `completed success`；重复排队的 `44035074087` 已 cancelled |
+| 制品 | `offline-ledger-release-v0.2.2` 12,222,648 B；`mapping-v0.2.2` 3,492,783 B；`metrics-v0.2.2-p-m-nsfalse` 272 B |
+| 远端校验 | 按最终 commit sha 比对 **291↔291 blob、sha 全一致、PASS**；`diag/` 与 `diag.yml` **零残留**，workflow 仅 build/release 两份；六个静态检查全 PASS |
+
+**首轮失败正好落在 `design.md` 三级回退顺序第 1 条的相邻路径**：不是拖拽 API 签名错，
+而是给手柄挑了个不存在的图标。诊断日志证实全仓**仅此 1 条** `e:`，其余 16 个改动文件
+（含 `graphicsLayer` / `pointerInput` / `Triple` 分组 / `ListDivider`）编译零错误，
+回退顺序 2、3 条未用上。
+`nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
+**不当作已验证 HEAD 200**。真机观感与累积未验清单仍按使用者决定整体推迟。

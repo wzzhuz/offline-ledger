@@ -61,24 +61,30 @@ BiometricPrompt 弹窗、SAF 文件选择器、Excel 打开 CSV 是否乱码 / �
 
 ## 第 15 批（v0.2.2，同一 change 内）
 
-- [ ] 1. `LedgerUiParts.kt` 新增 `ListDivider()` 单一来源
-- [ ] 2. 明细页内联分割 Box 换成 `ListDivider()`，视觉基准保持 16dp
-- [ ] 3. 分类 / 模板 / 预算 / 回收站四页补 `ListDivider`，风格对齐明细
-- [ ] 4. 资产页账户卡 1dp 贴片 → 4dp 组距 + 8dp 内边距 + 分割线
-- [ ] 5. 分类一级 `titleSmall + SemiBold`，二级 chip 按文本自适应 + `widthIn(max)`
-- [ ] 6. `SettingsViewModel.moveCategory` 改 `(type, level, parentId)` 分组作用域
-- [ ] 7. `SettingsViewModel` 新增 `commitRootOrder()` 供拖拽落库
-- [ ] 8. `AssetsViewModel.moveAccount` 改按 `AccountType` 分组（同类 bug）
-- [ ] 9. 分类一级行加零依赖长按拖手柄（稳定 key + 松手一次性落库）
-- [ ] 10. 设置页分组顺序改 账本 → 数据与备份 → 偏好 → 安全 → 关于
-- [ ] 11. 3 份 MODIFIED 按标题整块替换（2× reporting-ui + 1× category-stats）
-- [ ] 12. 活文档 §7.5 / §8 更新；版本号 0.2.2
-- [ ] 13. 六个静态检查本地全 PASS + 大括号 / import 粗检
-- [ ] 14. 单次 commit 推送 + 按 commit sha 远端逐文件校验
-- [ ] 15. 查 push CI；若红按 `design.md` 三级回退顺序修复
-- [ ] 16. 手动触发 `release.yml`（minify=on / upload_nutstore=true）并查结果
-- [ ] 17. 回填实测；真机未验清单继承
+- [x] 1. `LedgerUiParts.kt` 新增 `ListDivider()` 单一来源
+- [x] 2. 明细页内联分割 Box 换成 `ListDivider()`，视觉基准保持 16dp
+- [x] 3. 分类 / 模板 / 预算 / 回收站四页补 `ListDivider`，风格对齐明细
+- [x] 4. 资产页账户卡 1dp 贴片 → 4dp 组距 + 8dp 内边距 + 分割线
+- [x] 5. 分类一级 `titleSmall + SemiBold`，二级 chip 按文本自适应 + `widthIn(max)`
+- [x] 6. `SettingsViewModel.moveCategory` 改 `(type, level, parentId)` 分组作用域
+- [x] 7. `SettingsViewModel` 新增 `commitRootOrder()` 供拖拽落库
+- [x] 8. `AssetsViewModel.moveAccount` 改按 `AccountType` 分组（同类 bug）
+- [x] 9. 分类一级行加零依赖长按拖手柄（稳定 key + 松手一次性落库）
+- [x] 10. 设置页分组顺序改 账本 → 数据与备份 → 偏好 → 安全 → 关于
+- [x] 11. 3 份 MODIFIED 按标题整块替换（2× reporting-ui + 1× category-stats）
+- [x] 12. 活文档 §7.5 / §8 更新；版本号 0.2.2
+- [x] 13. 六个静态检查本地全 PASS + 大括号 / import 粗检
+- [x] 14. 单次 commit 推送 + 按 commit sha 远端逐文件校验
+- [x] 15. 查 push CI；若红按 `design.md` 三级回退顺序修复
+- [x] 16. 手动触发 `release.yml`（minify=on / upload_nutstore=true）并查结果
+- [x] 17. 回填实测；真机未验清单继承
 
-## 第 15 批实测
+## 第 15 批实测（2026-11-17）
 
-（推送后回填）
+首轮 push CI `44033035742` failure（`Icons.Filled.Menu` 不存在）；临时诊断 workflow
+回传日志定位到唯一 1 条编译错误，改为文本 `≡` 并清理诊断通道。
+修复 commit `143327b85b33` → push CI `44034000868` **success**（17 步全绿）；
+release `44034725835` **success**（23 步绿 / 5 步跳过、坚果云 success）。
+制品：`release-v0.2.2` 12,222,648 B / `mapping-v0.2.2` 3,492,783 B / `metrics` 272 B。
+远端按最终 commit sha 比对 291↔291 PASS、无 `diag/` 残留、无 token 明文。
+真机未验清单继续按使用者决定整体推迟，见活文档 §8。
