@@ -172,6 +172,9 @@ MUST NOT 用 `Card` 底色 / 阴影或 1dp 间距表达边界（第 16 批修正
 SHALL 共用 `ui/components/ReorderSupport.kt` 的 `rememberReorderDrag`；
 拖动中 SHALL 实时重排让位、松手一次性落库；上移 / 下移 SHALL 保留为
 无障碍兜底，MUST NOT 作为主入口；零新增依赖、零表结构变更。
+**第 17 批修订**：四处拖拽期间父滚动容器 SHALL 禁用用户滚动并配套边缘自动滚动，
+MUST NOT 只禁不滚；跨行阈值 SHALL 由 `onSizeChanged` 实测单行行高得出；
+分类二级 `WrapRow` SHALL 默认左对齐、占满父宽、行尾留白在右。
 
 #### Scenario: 分类增多不推走入口
 

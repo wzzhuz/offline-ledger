@@ -129,3 +129,24 @@ commit 里一起处理。**如实限制**：让位是即时的、不是连续像
 顺滑度仍不如 Flutter `ReorderableListView`；不把「实时重排」包装成「动画已对齐」。
 `nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
 **不当作已验证 HEAD 200**。真机观感与累积未验清单继续按使用者决定整体推迟。
+
+
+---
+
+## 第 17 批（v0.2.4，同一 change 内）
+
+- [ ] 1. `ReorderSupport.kt`：`WrapRow` 加 `horizontalAlignment`，`layout()` 占满父宽、行尾留白在右
+- [ ] 2. chip label 显式 `TextAlign.Start`，去掉 M3 默认居中观感
+- [ ] 3. 新增 `ReorderBounds`（容器可见边界，root px）与 `onGloballyPositioned` 写入
+- [ ] 4. `ReorderDragState` 暴露 `edgeDirection`、`onDraggingChange` 回调与 `rowMeasureModifier()`
+- [ ] 5. `rememberReorderDrag` 加 `bounds` / `onDraggingChange` / `onEdgeScroll` 参数，帧级边缘自动滚动
+- [ ] 6. 资产页 `verticalScroll(enabled = !anyDragging)` + 共享 bounds + 边缘滚动
+- [ ] 7. 分类页 `LazyColumn(userScrollEnabled = !anyDragging)` + 共享 bounds + 边缘滚动
+- [ ] 8. 模板页 `LazyColumn(userScrollEnabled = !anyDragging)` + 共享 bounds + 边缘滚动
+- [ ] 9. 四处 `rowMeasureModifier()` 实测行高，替掉 56/40/44 估算
+- [ ] 10. 3 份 spec delta 按标题整块修订（WrapRow 左对齐 / 禁用父滚动 / 实测行高）
+- [ ] 11. 活文档 §7.7 追加「父子手势竞争」、§8 版本与真机清单更新
+- [ ] 12. 版本号 0.2.3 → 0.2.4；单次 commit 推送
+- [ ] 13. push CI + release（minify=on、上传坚果云）全绿、制品带短 sha
+- [ ] 14. design / tasks / 活文档实测回填，远端按最终 sha 独立校验
+- [ ] 15. 真机复核：四处拖拽不误触滚动、边缘滚动、二级 chips 左对齐（**由使用者装机确认**）

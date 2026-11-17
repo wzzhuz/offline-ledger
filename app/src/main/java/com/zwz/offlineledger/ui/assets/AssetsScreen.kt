@@ -42,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.currency.LedgerCurrency
@@ -54,6 +56,7 @@ import com.zwz.offlineledger.engine.Reconciliation
 import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.components.rememberReorderDrag
+import com.zwz.offlineledger.ui.components.ReorderBounds
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import com.zwz.offlineledger.ui.reconcile.ReconcileDialog
@@ -78,12 +81,22 @@ fun AssetsScreen() {
     var editError by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<AccountEntity?>(null) }
 
+    // 第 17 批：拖拽期间禁用父滚动（否则上下移动同时滚屏，子拖拽被 onDragCancel 释放）；
+    // 配套边缘自动滚动，保证 10+ 账户时仍能拖到屏幕外的位置。
+    val scrollState = rememberScrollState()
+    val reorderBounds = remember { ReorderBounds() }
+    var anyDragging by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) { vm.reload() }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState, enabled = !anyDragging)
+            .onGloballyPositioned {
+                reorderBounds.topPx = it.positionInRoot().y
+                reorderBounds.bottomPx = reorderBounds.topPx + it.size.height
+            }
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(text = "资产", style = MaterialTheme.typography.headlineMedium)
@@ -119,6 +132,9 @@ fun AssetsScreen() {
             val accountDrag = rememberReorderDrag(
                 ids = group.filter { !it.isArchived }.map { it.id },
                 rowHeightDp = 56,
+                bounds = reorderBounds,
+                onDraggingChange = { anyDragging = it },
+                onEdgeScroll = { d -> scrollState.dispatchRawDelta(d); Unit },
                 onCommit = { ids -> scope.launch { vm.commitAccountOrder(type, ids) } }
             )
             val ordered = accountDrag.orderedIds.mapNotNull { id ->
@@ -127,7 +143,8 @@ fun AssetsScreen() {
             ordered.forEach { account ->
                 AccountCard(
                     account = account,
-                    itemModifier = accountDrag.itemModifier(account.id),
+                    itemModifier = accountDrag.itemModifier(account.id)
+                        .then(accountDrag.rowMeasureModifier()),
                     dragModifier = accountDrag.handleModifier(account.id),
                     onDetail = { detailId = account.id },
                     onReconcile = { reconcileId = account.id },

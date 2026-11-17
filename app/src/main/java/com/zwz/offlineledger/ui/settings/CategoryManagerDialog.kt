@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -41,10 +42,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.components.WrapRow
 import com.zwz.offlineledger.ui.components.rememberReorderDrag
+import com.zwz.offlineledger.ui.components.ReorderBounds
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
@@ -239,6 +244,11 @@ private fun CategoryList(
     // 第 14 批：点二级 chip 弹一个操作 Dialog，五项操作一个不丢。
     var actionChild by remember { mutableStateOf<CategoryEntity?>(null) }
 
+    // 第 17 批：拖拽期间禁用 LazyColumn 用户滚动 + 边缘自动滚动 + 实测行高。
+    val listState = rememberLazyListState()
+    val reorderBounds = remember { ReorderBounds() }
+    var anyDragging by remember { mutableStateOf(false) }
+
     // 第 15 批：一级拖拽排序。本地顺序是可观察状态，松手一次性提交落库；
     // item 用 id 稳定 key；零新增依赖，不用跨应用 dragAndDrop API。
     // 第 16 批：共享拖拽状态。拖动中每跨一行即重排，列表实时让位；
@@ -246,11 +256,22 @@ private fun CategoryList(
     val rootDrag = rememberReorderDrag(
         ids = rootsBase.map { it.id },
         rowHeightDp = 56,
+        bounds = reorderBounds,
+        onDraggingChange = { anyDragging = it },
+        onEdgeScroll = { d -> listState.dispatchRawDelta(d); Unit },
         onCommit = { ids -> onCommitOrder(ids) }
     )
     val roots = rootDrag.orderedIds.mapNotNull { id -> rootsBase.firstOrNull { it.id == id } }
 
-    LazyColumn(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+    LazyColumn(
+        state = listState,
+        userScrollEnabled = !anyDragging,
+        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)
+            .onGloballyPositioned {
+                reorderBounds.topPx = it.positionInRoot().y
+                reorderBounds.bottomPx = reorderBounds.topPx + it.size.height
+            }
+    ) {
         item {
             Text(
                 text = "最多两级；点一级展开二级，点二级可编辑；笔数含二级。删除有流水的分类自动转归档。",
@@ -280,7 +301,8 @@ private fun CategoryList(
                             onMoveDown = { onMove(root.id, 1) },
                             onRename = { onRename(root.id, root.name) },
                             onDelete = { onDelete(root.id) },
-                            dragModifier = rootDrag.handleModifier(root.id)
+                            dragModifier = rootDrag.handleModifier(root.id),
+                            measureModifier = rootDrag.rowMeasureModifier()
                         )
                         if (expanded) {
                             // 第 16 批：二级 chips 自适应换行 + 与一级同款实时让位拖拽。
@@ -288,6 +310,9 @@ private fun CategoryList(
                             val childDrag = rememberReorderDrag(
                                 ids = childList.map { it.id },
                                 rowHeightDp = 40,
+                                bounds = reorderBounds,
+                                onDraggingChange = { anyDragging = it },
+                                onEdgeScroll = { d -> listState.dispatchRawDelta(d); Unit },
                                 onCommit = { ids -> onCommitChildOrder(root.id, ids) }
                             )
                             val orderedChildren = childDrag.orderedIds.mapNotNull { cid ->
@@ -295,12 +320,16 @@ private fun CategoryList(
                             }
                             WrapRow(
                                 spacing = 6.dp,
+                                horizontalAlignment = Alignment.Start,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(start = 12.dp, top = 2.dp, bottom = 6.dp)
                             ) {
                                 orderedChildren.forEach { child ->
-                                    Box(modifier = childDrag.itemModifier(child.id)) {
+                                    Box(
+                                        modifier = childDrag.itemModifier(child.id)
+                                            .then(childDrag.rowMeasureModifier())
+                                    ) {
                                         FilterChip(
                                             selected = false,
                                             onClick = { actionChild = child },
@@ -308,6 +337,7 @@ private fun CategoryList(
                                                 Text(
                                                     child.name,
                                                     maxLines = 1,
+                                                    textAlign = TextAlign.Start,
                                                     style = MaterialTheme.typography.bodyMedium
                                                 )
                                             },
@@ -402,12 +432,14 @@ private fun CategoryRootRow(
     onMoveDown: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
-    dragModifier: Modifier = Modifier
+    dragModifier: Modifier = Modifier,
+    measureModifier: Modifier = Modifier
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
+            .then(measureModifier)
     ) {
         // 整行主点击区：展开 / 收起，保持 44dp 触摸目标。
         Box(

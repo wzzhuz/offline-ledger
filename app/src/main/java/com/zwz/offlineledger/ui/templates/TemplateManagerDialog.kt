@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -49,6 +52,7 @@ import com.zwz.offlineledger.data.model.Cadence
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.components.rememberReorderDrag
+import com.zwz.offlineledger.ui.components.ReorderBounds
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.settings.SettingsPageTopBar
 import com.zwz.offlineledger.ui.theme.LedgerColors
@@ -168,15 +172,30 @@ private fun TemplateList(
     // 第 16 批：rememberReorderDrag 是 @Composable，MUST 放在函数体，
     // 不能放在 LazyColumn 的 LazyListScope（非 composable）里——首轮 CI 第 3 条错误。
     val activeTemplates = state.templates.filter { !it.isArchived }
+    // 第 17 批：拖拽期间禁用父滚动 + 边缘自动滚动 + 实测行高。
+    val listState = rememberLazyListState()
+    val reorderBounds = remember { ReorderBounds() }
+    var anyDragging by remember { mutableStateOf(false) }
     val tplDrag = rememberReorderDrag(
         ids = activeTemplates.map { it.id },
         rowHeightDp = 44,
+        bounds = reorderBounds,
+        onDraggingChange = { anyDragging = it },
+        onEdgeScroll = { d -> listState.dispatchRawDelta(d); Unit },
         onCommit = { ids -> vm.commitTemplateOrder(ids) }
     )
     val orderedTemplates = tplDrag.orderedIds.mapNotNull { id ->
         activeTemplates.firstOrNull { it.id == id }
     }
-    LazyColumn(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+    LazyColumn(
+        state = listState,
+        userScrollEnabled = !anyDragging,
+        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)
+            .onGloballyPositioned {
+                reorderBounds.topPx = it.positionInRoot().y
+                reorderBounds.bottomPx = reorderBounds.topPx + it.size.height
+            }
+    ) {
         if (state.message.isNotBlank()) {
             item {
                 Text(
@@ -203,6 +222,7 @@ private fun TemplateList(
                         .fillMaxWidth()
                         .heightIn(min = 40.dp)
                         .then(tplDrag.itemModifier(t.id))
+                        .then(tplDrag.rowMeasureModifier())
                 ) {
                     Text(
                         text = t.name + " · " + typeLabel(t.type) + " · " + amount +

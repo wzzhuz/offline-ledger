@@ -63,6 +63,14 @@ MUST 长按手柄（或 chip）触发、MUST 使用稳定 `key`、拖动过程�
 SHALL **立即重排列表使其余项实时让位**（MUST NOT 等到松手才整列跳变）、
 松手 SHALL 一次性写入显式 `sortOrder`，重开页面顺序 SHALL 保持；
 MUST 零新增依赖，MUST NOT 使用跨应用 `dragAndDropSource/Target` 协议。
+**第 17 批修订**：拖拽期间父滚动容器 SHALL 禁用用户滚动
+（`verticalScroll(enabled=false)` / `LazyColumn(userScrollEnabled=false)`），
+MUST NOT 让上下拖动同时触发列表滚动、导致子拖拽被 `onDragCancel` 释放；
+禁用 SHALL 与**边缘自动滚动**成对出现（手指进入容器上下约 48dp 边缘区时
+按帧滚动），MUST NOT 只禁不滚导致多账户 / 多分类时拖不到屏幕外的位置。
+跨行判定阈值 SHALL 由 `onSizeChanged` **实测单行行高**得出，
+MUST NOT 继续用 56/40/44 估算；实测 MUST 挂在单行根，
+MUST NOT 挂在含展开区或多行 chips 的整块 item 上。
 上移 / 下移 SHALL 保留为无障碍兜底（TalkBack 无法执行拖动手势），
 MUST NOT 再作为主入口。账户排序作用域 SHALL 按 `AccountType` 分组，
 MUST NOT 跨类型交换。
@@ -74,6 +82,10 @@ MUST NOT 因下拉高度或屏幕宽度截断；SHALL 显示当前选中的父�
 展开态 SHALL 以 `WrapRow` 按实测宽度的紧凑 chips 展示二级，
 MUST 自适应填满可用宽度后换行，MUST NOT 用 `chunked(3)` 固定每行个数
 造成短名右侧留白，MUST NOT 一次把全部二级平铺成独立行；
+`WrapRow` SHALL 默认**左对齐**（显式 `Alignment.Start`、`layout()` 占满父宽、
+每行从 0 起排），短名行的剩余留白 MUST 固定留在右侧，MUST NOT 交给父级
+对齐策略把 chips 推到中间；chip 内文字 SHALL 显式左对齐，MUST NOT 用 M3
+默认居中造成「一行看着居中」的观感；
 chip SHALL 带 `widthIn(max)` 防超长名独占一行，MUST NOT 用 `weight(1f)` 等宽列。
 SHALL 显示每个一级的二级分类数与流水笔数；一级行的笔数 SHALL 含其所有二级分类
 （标注「含二级」），笔数 MUST 由一条 `GROUP BY` 只读查询得出，MUST NOT 逐行查库。
@@ -114,6 +126,13 @@ MUST 带 `LIMIT`、MUST NOT 全量加载，且 MUST 保留时间、金额、分�
 - **WHEN** 展开该一级
 - **THEN** chips 按实测宽度连续排列填满一行后才换行，MUST NOT 固定每行 3 个
 - **AND** 行尾无大片空白，超长名受 `widthIn(max)` 约束不占满整行
+- **AND** chips 从左边界起排，不居中
+
+#### Scenario: 资产页拖拽不误触滚动（第 17 批）
+- **GIVEN** 资产账户超过一屏，需要滑动查看更多
+- **WHEN** 长按某账户手柄上下拖动
+- **THEN** 页面不随手指滚动，账户按实测行高跨行换位，松手顺序持久
+- **AND** 拖到屏幕上下边缘时列表自动滚动，可继续与屏幕外账户换位
 
 #### Scenario: 分类详情
 - **GIVEN** 某分类有 300 条流水

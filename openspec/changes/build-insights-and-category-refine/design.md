@@ -308,3 +308,99 @@ commit 里一起处理。**如实限制**：让位是即时的、不是连续像
 顺滑度仍不如 Flutter `ReorderableListView`；不把「实时重排」包装成「动画已对齐」。
 `nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
 **不当作已验证 HEAD 200**。真机观感与累积未验清单继续按使用者决定整体推迟。
+
+
+---
+
+## 第 17 批（v0.2.4）：拖拽与父滚动竞争 / WrapRow 左对齐 / 实测行高
+
+### 1. 真机反馈与根因（两条，按「全局搜同类写法」外推到四处）
+
+**① 二级 chips 视觉居中、短名行右侧留白没用上。** 第 16 批 `WrapRow` 用
+`layout(widest.coerceAtMost(constraints.maxWidth), totalHeight)`：容器宽度取
+「最宽一行的实测宽」而非父宽，且 `horizontalAlignment` 从未声明。父级
+`fillMaxWidth()` 的剩余空间由布局对齐策略决定，短 chips 行就被推到中间；
+chip 内 label 又是 M3 默认居中。改法：显式 `horizontalAlignment` 参数
+（默认 `Alignment.Start`）、`layout()` 宽度强制 `constraints.maxWidth`、
+每行从 0 起排、行尾留白明确在右，chip label 显式 `TextAlign.Start`。
+
+**② 资产页拖动排序时上下移动同时滚屏、拖拽事件被释放。** 两个 bug 叠加：
+
+- **手势竞争**：资产页是 `Column + verticalScroll(rememberScrollState())`
+  **整页一个滚动容器**，分类 / 模板是 `LazyColumn`。父 `scrollable` 在
+  `PointerEventPass.Initial` 过 touch slop 拿到滚动权，子级手柄的
+  `pointerInput` 只在 `onDrag` 里 `consume()`（Main pass）拦不住 Initial pass，
+  于是父滚动开始 → 布局位移 → 子拖拽收到 `onDragCancel` → `end(false)` 回滚。
+  **标准解法是拖拽期间禁用父滚动**，不是手动消费 down event：
+  `verticalScroll(state, enabled = !anyDragging)` /
+  `LazyColumn(userScrollEnabled = !anyDragging)`。
+  （Compose 的 `detectDragGesturesAfterLongPress` 内部 `awaitFirstDown` 依赖
+  未被消费的 down；在 Initial pass 显式 consume down 反而会让拖拽失效。
+  本批按此如实实现，不把「消费 down」写成已做。）
+- **跨行阈值按错行高**：`AccountCard` 根 `heightIn(min=56.dp)`，内部是
+  「主行 + 可选副信息行 + 40dp 操作行」，实测约 76–96dp；而
+  `rememberReorderDrag(rowHeightDp = 56)` 按 56 算「跨过一行」。分类一级
+  56 / 二级 40 / 模板 44 也都是估算。手指还没拖过一整格就换一次位。
+  改法：`rowMeasureModifier()` 用 `onSizeChanged` 把实测行高写回 state，
+  `rowHeightDp` 退化为初值兜底；MUST 挂在单行根，MUST NOT 挂在含展开区
+  / 多行 chips 的整块 item 上（否则把整块高度当行高）。
+
+**③ 禁用滚动必须配套边缘自动滚动。** 资产页 10+ 账户时，禁用父滚动后
+手指拖不到屏幕外的位置，等于功能倒退。共享 state 暴露 `edgeDirection`
+（-1/0/1），`handleModifier` 用 `onGloballyPositioned` 记录手柄在 root 中的
+位置、`change.position.y` 换算手指 root y，进入容器上下 48dp 边缘区时
+页面按 16ms 帧 `dispatchRawDelta` 滚动。用 root 坐标近似、48dp 为粗判定，
+**沙盒无法验手感，回退顺序见 §3**。
+
+**④ 全局扫到的同类**：`CategoryManagerDialog` / `TemplateManagerDialog` 的
+`LazyColumn` 同样存在竞争，只是分类一屏能放下、尚未触发；
+`BudgetManagerDialog` 有 `verticalScroll` 但无拖拽，不动。
+四处共用 `ui/components/ReorderSupport.kt` 单一来源，按指南 §7.2
+「老页面 MUST 全局搜同类写法」一次修掉。
+
+### 2. 方案（推荐 A 已确认）
+
+| 项 | 落地 |
+|---|---|
+| WrapRow | `horizontalAlignment: Alignment.Horizontal = Alignment.Start`，`layout()` 占满父宽、每行从 0 起、行尾留白在右；chip label `TextAlign.Start` |
+| 父滚动 | `ReorderBounds`（容器可见边界）+ `onDraggingChange` 汇总 `anyDragging`；资产页 `verticalScroll(enabled=!anyDragging)`，分类/模板 `LazyColumn(userScrollEnabled=!anyDragging)` |
+| 边缘滚动 | `edgeDirection` + `LaunchedEffect` 每 16ms `dispatchRawDelta(±10dp)`；`ReorderBounds` 由列表根 `onGloballyPositioned` 写入 |
+| 实测行高 | `rowMeasureModifier()`；资产挂 `AccountCard` 根、分类一级挂 `CategoryRootRow` 的 Row（**不挂含展开 chips 的 item Box**）、二级挂单个 chip Box、模板挂行 Row |
+| 不变 | DAO / 写方法 / 表结构 / `sortOrder` 三元作用域 / 4 Tab / 上移下移 TalkBack 兜底 / `rememberSaveable` 折叠态 / `ListDivider` / 金额铁律 / 统计口径 / Manifest / `release.yml` |
+
+### 3. 三级回退顺序（动手前写定，每次只改一处单独推送）
+
+1. **`LazyListState.dispatchRawDelta` / `ScrollState.dispatchRawDelta` 编译不过**
+   → 改 `LaunchedEffect` 内 `animateScrollBy(±10dp)`（suspend，逐帧调用）。
+2. **禁用父滚动反而让 `onDragCancel` 更频繁 / 手势完全收不到**
+   → 退回「不在 Initial pass 消费 down」的既有实现，改用 `NestedScrollConnection`
+   在拖拽期间吞掉 `onPreScroll`，保留父滚动节点但不生效。
+3. **边缘滚动抖动 / 手指 root 近似偏移导致误触**
+   → 固定步进 + 阈值死区（连续 3 帧同方向才启动），或把 48dp 调到 64dp；
+   仍不稳则本批只保留「禁用父滚动」，边缘滚动如实记为待下一批。
+
+`androidx.compose.foundation.lazy.animateItem` 在 BOM 2026.06 不存在
+（第 16 批首轮 CI 已证），本批继续不用；让位是即时重排，不是补间动画。
+
+### 4. 验收（真机项 MUST 由使用者装机确认，CI 全绿不得代替）
+
+1. 短名二级 chips 从左起排、行尾留白在右、chip 内文字不居中。
+2. 资产页 10+ 账户滚动到底后，长按拖动不再带动页面滚动；顺序按视觉跨行变化；松手落库持久、重开保持。
+3. 拖到屏幕上下边缘能自动滚到屏外账户并继续换位；切 Tab 返回不丢顺序。
+4. 分类一级 / 二级、模板四处同样不误触滚动；↑↓ 兜底仍可用。
+5. 归档校验 3 份 spec delta 按标题整块替换、无「估算行高 / 不禁用父滚动」矛盾文本。
+6. CI 全绿、版本 0.2.4、远端 sha PASS、无 token 明文、六个静态检查全过。
+
+### 5. 否决
+
+- 只调 `consume()` 不禁用父滚动（Initial pass 仍抢）；只禁滚动不补边缘滚动（功能倒退）。
+- 只在资产页局部打补丁（分类 / 模板同病）；继续用 56/40/44 估算行高。
+- `WrapRow` 换回 `chunked(3)` 或引入 `FlowRow + @OptIn`；`layout()` 继续取 widest。
+- 引入 `sh.calvin.reorderable` / 任何第三方拖拽库（破零依赖基线）。
+- 把 `rowMeasureModifier` 挂在含展开区的整块 item 上。
+- 顺手给预算页加排序（当前无此能力，不新增）；为紧凑压触摸区到 40dp 以下。
+- 只追加 ADDED 不改第 16 批 delta（指南 §5 规格债）。
+
+### 6. 实测回填（待本批推送后补）
+
+（占位：代码 commit / push CI / 诊断 / 修复 / release / 制品 / 远端校验 / 回填。）

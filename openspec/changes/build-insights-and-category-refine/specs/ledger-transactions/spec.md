@@ -10,6 +10,9 @@ SHALL 提供已归档账户查看与恢复入口；
 账户排序 SHALL 按 `AccountType` 分组，SHALL 与分类 / 模板共用
 `ui/components/ReorderSupport.kt` 的 `rememberReorderDrag`：
 长按手柄拖动过程中其余账户 SHALL 实时让位，松手一次性写入 `sortOrder`；
+拖拽期间资产页父滚动 SHALL 禁用，MUST NOT 出现「上下拖动同时滚屏导致拖拽被释放」，
+且 SHALL 配套边缘自动滚动（多账户时能拖到屏幕外）；跨行阈值 SHALL 来自
+`onSizeChanged` 实测单行行高，MUST NOT 用 56dp 估算（第 17 批修订）；
 上移 / 下移 SHALL 保留在「⋯」菜单内作为无障碍兜底，MUST NOT 作为主入口；
 顺序 SHALL 同步到记一笔的常用账户平铺。
 所有新增写操作 MUST 包在同一个数据库事务内并在末尾重算余额。
@@ -47,6 +50,8 @@ MUST NOT 用 `Card` 底色 / 阴影或 1dp 间距表达边界；
 生成流水时由默认账户兜底。周期规则会自动写入流水，其账户字段 SHALL 仍必填。
 模板管理 SHALL 与分类 / 账户共用 `ui/components/ReorderSupport.kt` 的
 `rememberReorderDrag`：长按手柄拖动过程中其余模板 SHALL 实时让位，
+拖拽期间 `LazyColumn` 用户滚动 SHALL 禁用并配套边缘自动滚动，
+跨行阈值 SHALL 由实测行高得出（第 17 批修订）；
 松手一次性写入 `sortOrder`；上移 / 下移 SHALL 保留在 ⋯ 菜单内作为无障碍兜底，
 MUST NOT 作为主入口。顺序 SHALL 复用到记一笔的常用模板平铺；
 排序 MUST 走既有 `reorderTemplates` 单事务，MUST NOT 新开写余额路径。
