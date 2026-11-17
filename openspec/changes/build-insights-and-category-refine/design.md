@@ -111,6 +111,19 @@ BeeCount 的 `analytics_content.dart` 用 `BeeSurface` 把每个结论装进独�
 2. 展开态存取报类型错 → `expandedKey` 已用 String 规避 saver，若仍报则退回 `remember`（仅配置变更不保存）
 3. chips 网格 `weight(1f)` 报尺寸错 → 退回每个 chip 固定宽度 + 横向 `Row`
 
-### 实测回填
+### 实测回填（第 14 批，2026-11-17）
 
-（推送后写：commit sha / push CI run id / release run id / 制品大小 / 首轮失败根因 / 真机未验清单继承）
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `ce919f59b549c4f64900d2674144cc4723529cbf`（8 文件，v0.2.1） |
+| push CI | `44011265168` **success**，17 步全绿，**首轮 Kotlin 编译零错误** |
+| release | `44012015782` **success**，28 步；坚果云上传步骤 `completed success` |
+| 制品 | `offline-ledger-release-v0.2.1` 12,218,823 B；`mapping-v0.2.1` 3,484,719 B；`metrics-v0.2.1-p-m-nsfalse` 271 B |
+| 远端校验 | 按最终 commit sha 独立比对 **291↔291 blob、sha 全一致、PASS**；无 `diag/` 残留、无 token 明文 |
+| 推送断言 | 差异集合恰好 8 个预期文件、零删除、`.github/` 与 `.gitignore` 误删保护通过（沿用第 13 批事故后的防线） |
+
+**首轮无失败**：动手前先写根因与三级回退顺序；并主动把
+`rememberSaveable { mutableStateOf(setOf<Long>()) }` 改为 `String` 键派生 `Set<Long>`，
+规避「保存 `MutableState` 包装对象」的 saver 版本依赖，回退顺序第 2 条未用上。
+`nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
+**不当作已验证 HEAD 200**。真机观感与累积未验清单仍按使用者决定整体推迟。

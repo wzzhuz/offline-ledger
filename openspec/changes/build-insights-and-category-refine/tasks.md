@@ -18,17 +18,25 @@
 
 ## 第 14 批（真机反馈修正，同一 change 内）
 
-- [ ] 1. 统计页删 `InsightMode`，`CategoryInsightCard` 拆成占比 / 排行两张独立卡
-- [ ] 2. 顶层顺序改为 总结 → 趋势 → 占比 → 排行 →（年度）资产 → 口径；「分类管理 ›」移挂占比卡
-- [ ] 3. 分类管理一级默认折叠 + `rememberSaveable(expandedRoots)`
-- [ ] 4. 展开态二级 `chunked(3)` chips + 补空位；点 chip 弹操作 Dialog（五项操作不丢）
-- [ ] 5. 4 份 delta 按标题整块替换矛盾 Requirement（不新增 MODIFIED）
-- [ ] 6. 版本号 0.2.1；活文档 §2.6 / §7.3 / §7.4 / §8 更新
-- [ ] 7. 六个静态检查本地全 PASS
-- [ ] 8. 单次 commit 推送 + 按 commit sha 远端逐文件校验
-- [ ] 9. 查 push CI；若红按 `design.md` 第 14 批回退顺序修复
-- [ ] 10. 手动触发 `release.yml`（minify=on / upload_nutstore=true）并查结果
-- [ ] 11. 回填实测到 `design.md` / `tasks.md`；真机未验清单继承
+- [x] 1. 统计页删 `InsightMode`，`CategoryInsightCard` 拆成占比 / 排行两张独立卡
+- [x] 2. 顶层顺序改为 总结 → 趋势 → 占比 → 排行 →（年度）资产 → 口径；「分类管理 ›」移挂占比卡
+- [x] 3. 分类管理一级默认折叠 + `rememberSaveable(expandedRoots)`
+- [x] 4. 展开态二级 `chunked(3)` chips + 补空位；点 chip 弹操作 Dialog（五项操作不丢）
+- [x] 5. 4 份 delta 按标题整块替换矛盾 Requirement（不新增 MODIFIED）
+- [x] 6. 版本号 0.2.1；活文档 §2.6 / §7.3 / §7.4 / §8 更新
+- [x] 7. 六个静态检查本地全 PASS
+- [x] 8. 单次 commit 推送 + 按 commit sha 远端逐文件校验
+- [x] 9. 查 push CI；若红按 `design.md` 第 14 批回退顺序修复
+- [x] 10. 手动触发 `release.yml`（minify=on / upload_nutstore=true）并查结果
+- [x] 11. 回填实测到 `design.md` / `tasks.md`；真机未验清单继承
+
+## 第 14 批实测（2026-11-17）
+
+push CI `44011265168` success（17 步全绿、首轮零编译错误）；
+release `44012015782` success（28 步、坚果云 completed success）；
+制品 APK 12,218,823 B / mapping 3,484,719 B / metrics 271 B；
+远端按最终 commit sha 比对 291↔291 PASS、无 `diag/` 残留、无 token 明文。
+真机未验清单继续按使用者决定整体推迟，见下节。
 
 ## 真机未验（全部继承，不许被本批改写成「已通过」）
 BiometricPrompt 弹窗、SAF 文件选择器、Excel 打开 CSV 是否乱码 / 中文 BOM、
