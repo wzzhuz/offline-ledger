@@ -62,3 +62,13 @@ BeeCount 的 `analytics_content.dart` 用 `BeeSurface` 把每个结论装进独�
 ## 5. 实测回填
 
 （推送后写：commit sha / push CI run id / release run id / 制品大小 / 首轮失败根因 / 真机未验清单继承）
+
+
+## 实测结果
+
+- push CI `44002929060` success（17 步）；release `44004138708` success（23 步，坚果云 completed success）
+- 制品字节：APK 12,217,237 / mapping 3,476,907 / metrics 270
+- 远端按最终 commit sha 逐文件校验 291↔291 PASS，无 `diag/` 残留、无 token 明文
+- 六个静态检查全 PASS；`check_stat_rules.py` 的 4 条新只读聚合 marker 已在清单内
+- 隐私模式落地为 `AmountMask.hidden` 单入口 + `formatCents` 可观察状态（MainActivity / LedgerUiParts / SettingsViewModel / StatsScreen 四处）
+- 真机观感与累积未验清单仍按使用者决定整体推迟，见下节与活文档 §8
