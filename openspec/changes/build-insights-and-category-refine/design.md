@@ -476,6 +476,19 @@ chip 内 label 又是 M3 默认居中。改法：显式 `horizontalAlignment` �
 3. 若库与 BOM 不兼容 → 退到 vendor 源码（按 Apache-2.0 裁进仓库、保留 LICENSE/NOTICE）；
    若仍不顺 → `↑↓` 恢复主入口、拖拽降级为可选，如实记入指南，不无限迭代手势。
 
-### 5. 实测回填（待推送后补）
+### 5. 实测回填（第 19 批 A 第一步，2026-11-17）
 
-（占位：代码 commit / push CI 真实结论 / 库兼容判定 / 后续批次 / release / 制品 / 远端校验。）
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `aa26aa87f293`（8 文件；仅依赖坐标 + 口径/规格/文档，**未动任何 Kotlin 拖拽代码**） |
+| push CI | `44074939870` **success**（静态检查 6 项 / 单测 / Debug APK / release lintVital 全绿） |
+| 并发取消 | `44074938760` cancelled（同 commit 的 dispatch 与 push 撞 concurrency，正常） |
+| 制品 | `offline-ledger-debug-apk` 24,179,773 B |
+| **库兼容性判定** | **PASS** —— Gradle 成功解析 `sh.calvin.reorderable:reorderable:3.1.0`、Kotlin 编译与 lintVital 全过，证明与 Compose BOM `2026.06.00` / Kotlin `2.3.21` 兼容；无版本冲突、无传递网络客户端 |
+| 本地静态检查 | 六个全 PASS（含改写后的 `check_manifest_privacy.py` 显式授权闸门） |
+| 回填 | 仅文档 commit，代码零变化 |
+
+**本批刻意不升版本号**：v0.2.4 仍是当前可装包；库已入依赖树但拖拽实现仍为自研，
+升 `0.2.5` SHALL 留到代码接入完成、真机可验之后，避免出现「版本号升了但行为没变」的错位。
+**如实限制**：CI 全绿只证明**库能编译进项目**，不证明拖拽手感变好——
+手势替换尚未写一行 Kotlin。真机项继续由活文档 §8 继承。
