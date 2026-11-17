@@ -164,7 +164,14 @@ MUST NOT 用 `● ` 文字前缀；管理类页面的输入框 SHALL 用 `placeh
 SHALL 共用 `ui/components/LedgerUiParts.kt` 的 `ListDivider()` 单一来源，
 1dp / `Neutral.copy(alpha = 0.10f)` / 距屏幕 16dp，MUST NOT 各页各画一遍 Box。
 行高 SHALL 按信息量分档（明细 60dp / 资产 56dp / 管理页 44dp），
-MUST NOT 一刀切；可点区 MUST ≥40dp。资产页账户卡 MUST NOT 用 1dp 间距表达边界。
+MUST NOT 一刀切；可点区 MUST ≥40dp。资产页账户行 SHALL 与明细页同为纯行，
+MUST NOT 用 `Card` 底色 / 阴影或 1dp 间距表达边界（第 16 批修正：第 15 批只
+补了分割线、没拆 Card，卡片内边距仍把内容往里收一圈，视觉量级小于明细页）。
+
+**全站排序交互统一（第 16 批）**：分类一级、分类二级 chips、资产账户、模板
+SHALL 共用 `ui/components/ReorderSupport.kt` 的 `rememberReorderDrag`；
+拖动中 SHALL 实时重排让位、松手一次性落库；上移 / 下移 SHALL 保留为
+无障碍兜底，MUST NOT 作为主入口；零新增依赖、零表结构变更。
 
 #### Scenario: 分类增多不推走入口
 

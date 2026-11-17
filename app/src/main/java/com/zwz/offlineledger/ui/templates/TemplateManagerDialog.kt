@@ -1,6 +1,8 @@
 package com.zwz.offlineledger.ui.templates
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.animateItem
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,6 +49,7 @@ import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.model.Cadence
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.components.ListDivider
+import com.zwz.offlineledger.ui.components.rememberReorderDrag
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.settings.SettingsPageTopBar
 import com.zwz.offlineledger.ui.theme.LedgerColors
@@ -176,17 +179,30 @@ private fun TemplateList(
         }
         if (tab == 0) {
             val active = state.templates.filter { !it.isArchived }
+            // 第 16 批：与分类 / 资产同款共享拖拽，拖动中实时让位。
+            val tplDrag = rememberReorderDrag(
+                ids = active.map { it.id },
+                rowHeightDp = 44,
+                onCommit = { ids -> vm.commitTemplateOrder(ids) }
+            )
+            val ordered = tplDrag.orderedIds.mapNotNull { id ->
+                active.firstOrNull { it.id == id }
+            }
             if (active.isEmpty()) {
                 item { Text("还没有模板。点右上角 + 新增一个。", modifier = Modifier.padding(vertical = 6.dp)) }
             }
-            items(active, key = { it.id }) { t ->
+            items(ordered, key = { it.id }) { t ->
                 var menu by remember { mutableStateOf(false) }
                 val amount = if (t.amountCents > 0L)
                     Cents(t.amountCents).toYuanString() + " 元" else "金额待填"
                 val path = categoryPath(t.categoryId, state.categories)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 40.dp)
+                        .animateItem()
+                        .then(tplDrag.itemModifier(t.id))
                 ) {
                     Text(
                         text = t.name + " · " + typeLabel(t.type) + " · " + amount +
@@ -195,6 +211,13 @@ private fun TemplateList(
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1
                     )
+                    Box(
+                        modifier = tplDrag.handleModifier(t.id).size(40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("≡", style = MaterialTheme.typography.titleMedium,
+                            color = LedgerColors.Neutral)
+                    }
                     IconButton(onClick = { menu = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
                     }

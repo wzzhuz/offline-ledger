@@ -114,6 +114,21 @@ class TemplateManagerViewModel(
         }
     }
 
+    /** 第 16 批：拖拽落库，复用既有 reorderTemplates 单事务。 */
+    fun commitTemplateOrder(orderedIds: List<Long>) {
+        viewModelScope.launch {
+            val all = _state.value.templates
+            val byId = all.associateBy { it.id }
+            val valid = orderedIds.mapNotNull { byId[it] }
+                .filter { !it.isArchived }.map { it.id }
+            val tail = all.filter { !it.isArchived && it.id !in valid }.map { it.id }
+            val archived = all.filter { it.isArchived }.map { it.id }
+            runCatching { repository.reorderTemplates(valid + tail + archived) }
+                .onSuccess { refresh() }
+                .onFailure { message(it.message ?: "调整顺序失败") }
+        }
+    }
+
     fun setRuleEnabled(id: Long, enabled: Boolean) {
         viewModelScope.launch {
             runCatching { repository.setRuleEnabled(id, enabled) }

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -21,6 +23,10 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -47,6 +53,7 @@ import com.zwz.offlineledger.data.model.displayName
 import com.zwz.offlineledger.engine.Reconciliation
 import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.components.ListDivider
+import com.zwz.offlineledger.ui.components.rememberReorderDrag
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import com.zwz.offlineledger.ui.reconcile.ReconcileDialog
@@ -107,9 +114,21 @@ fun AssetsScreen() {
             SectionTitle(type.displayName())
             val group = visible.filter { it.type == type }
             if (group.isEmpty()) EmptyHint("还没有" + type.displayName() + "账户")
-            group.forEach { account ->
+            // 第 16 批：每个账户类型组内独立拖拽，作用域与第 15 批分组一致。
+            // AccountType.entries 固定 4 项，循环内调用点稳定。
+            val accountDrag = rememberReorderDrag(
+                ids = group.filter { !it.isArchived }.map { it.id },
+                rowHeightDp = 56,
+                onCommit = { ids -> scope.launch { vm.commitAccountOrder(type, ids) } }
+            )
+            val ordered = accountDrag.orderedIds.mapNotNull { id ->
+                group.firstOrNull { it.id == id }
+            } + group.filter { it.isArchived }
+            ordered.forEach { account ->
                 AccountCard(
                     account = account,
+                    itemModifier = accountDrag.itemModifier(account.id),
+                    dragModifier = accountDrag.handleModifier(account.id),
                     onDetail = { detailId = account.id },
                     onReconcile = { reconcileId = account.id },
                     onEdit = { editError = null; editAccount = account },
@@ -260,7 +279,11 @@ private fun EmptyHint(text: String) {
     )
 }
 
-/** 第三批：紧凑单行账户卡，留白压缩，操作改成小按钮一行放下。 */
+/**
+ * 第 16 批：去掉 Card 底色与阴影，改明细页同款纯行（16dp 内边距 + 56dp 行高）。
+ * 副信息仍是非点击的 labelSmall；下面 5 个操作是可点击的，故字号与触摸区
+ * MUST 提升到 bodyMedium / ≥40dp（指南 §2.1 第三次应用）。
+ */
 @Composable
 private fun AccountCard(
     account: AccountEntity,
@@ -269,12 +292,18 @@ private fun AccountCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onMove: (Int) -> Unit,
-    onArchived: (Boolean) -> Unit
+    onArchived: (Boolean) -> Unit,
+    dragModifier: Modifier = Modifier,
+    itemModifier: Modifier = Modifier
 ) {
-    // 第 15 批：1dp 贴片 → 统一 4dp 组距 + 8dp 行内边距 + 细分割线。
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+    var menu by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxWidth().then(itemModifier)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = account.name + " · " + account.currencyCode +
@@ -306,21 +335,36 @@ private fun AccountCard(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 MiniAction("详情", onDetail)
                 MiniAction("对账", onReconcile)
                 MiniAction("编辑", onEdit)
-                MiniAction("↑", { onMove(-1) })
-                MiniAction("↓", { onMove(1) })
                 MiniAction(if (account.isArchived) "恢复" else "归档",
                     { onArchived(!account.isArchived) })
                 MiniAction("删除", onDelete, LedgerColors.ExpenseRed)
+                // 第 16 批：统一长按拖手柄，与分类 / 模板同款。
+                Box(
+                    modifier = dragModifier.size(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("≡", style = MaterialTheme.typography.titleMedium,
+                        color = LedgerColors.Neutral)
+                }
+                // 上移 / 下移降为无障碍兜底（TalkBack 无法执行拖动手势）。
+                IconButton(onClick = { menu = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("上移") },
+                        onClick = { menu = false; onMove(-1) })
+                    DropdownMenuItem(text = { Text("下移") },
+                        onClick = { menu = false; onMove(1) })
+                }
             }
         }
-        }
-        ListDivider(Modifier.padding(horizontal = 4.dp))
+        ListDivider(Modifier.padding(horizontal = 16.dp))
     }
 }
 
@@ -330,12 +374,15 @@ private fun MiniAction(
     onClick: () -> Unit,
     color: androidx.compose.ui.graphics.Color = LedgerColors.Neutral
 ) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = color,
-        modifier = Modifier.clickable { onClick() }.padding(vertical = 2.dp)
-    )
+    Box(
+        modifier = Modifier
+            .heightIn(min = 40.dp)
+            .widthIn(min = 40.dp)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = text, style = MaterialTheme.typography.bodyMedium, color = color)
+    }
 }
 
 @Composable

@@ -507,6 +507,23 @@ class SettingsViewModel(
         }
     }
 
+    /** 第 16 批：二级 chips 拖拽落库，只替换该父级下的二级组（作用域仍按三元组）。 */
+    fun commitChildOrder(parentId: Long, orderedChildIds: List<Long>) {
+        viewModelScope.launch {
+            val all = _state.value.categories
+            val parent = all.firstOrNull { it.id == parentId } ?: return@launch
+            val byId = all.associateBy { it.id }
+            val key = Triple<RecordType, Int, Long?>(parent.type, 1, parentId)
+            val valid = orderedChildIds.mapNotNull { byId[it] }
+                .filter { !it.isArchived && it.level == 1 && it.parentId == parentId }
+                .map { it.id }
+            val tail = all.filter { !it.isArchived && groupKey(it) == key }
+                .map { it.id }.filter { it !in valid }
+            persistWithGroup(valid + tail, key)
+            loadCategories()
+        }
+    }
+
     /** 供 UI 显示默认阈值，避免有人把偏好写成非法值后界面一片空白。 */
     val defaultThresholdCents: Long = Reconciliation.TAIL_DIFFERENCE_THRESHOLD_CENTS
 }

@@ -177,6 +177,34 @@ class AssetsViewModel(
         }
     }
 
+    /** 第 16 批：组内拖拽落库。只替换该 AccountType 组，其余组相对次序不变。 */
+    fun commitAccountOrder(type: AccountType, orderedIds: List<Long>) {
+        viewModelScope.launch {
+            val all = _state.value.accounts
+            val byId = all.associateBy { it.id }
+            val valid = orderedIds.mapNotNull { byId[it] }
+                .filter { !it.isArchived && it.type == type }
+                .map { it.id }
+            val active = all.filter { !it.isArchived }.sortedBy { it.sortOrder }
+            val rebuilt = mutableListOf<Long>()
+            val seen = mutableSetOf<AccountType>()
+            active.forEach { a ->
+                if (a.type !in seen) {
+                    seen += a.type
+                    if (a.type == type) {
+                        rebuilt.addAll(valid)
+                        rebuilt.addAll(active.filter { it.type == type && it.id !in valid }
+                            .map { it.id })
+                    } else {
+                        rebuilt.addAll(active.filter { it.type == a.type }.map { it.id })
+                    }
+                }
+            }
+            repository.reorderAccounts(rebuilt + all.filter { it.isArchived }.map { it.id })
+            reload()
+        }
+    }
+
     /** 第三批：无流水可物理删除（重建）；有流水 MUST 归档。 */
     suspend fun deleteAccount(id: Long): String? {
         if (accountDao.linkedRecordCount(id) > 0) {

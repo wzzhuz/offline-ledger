@@ -88,3 +88,22 @@ release `44034725835` **success**（23 步绿 / 5 步跳过、坚果云 success�
 制品：`release-v0.2.2` 12,222,648 B / `mapping-v0.2.2` 3,492,783 B / `metrics` 272 B。
 远端按最终 commit sha 比对 291↔291 PASS、无 `diag/` 残留、无 token 明文。
 真机未验清单继续按使用者决定整体推迟，见活文档 §8。
+
+
+## 第 16 批（v0.2.3，同一 change 内）
+
+- [ ] 1. 新增 `ui/components/ReorderSupport.kt`（`WrapRow` / `ReorderDragState` / `rememberReorderDrag` / `ReorderHandle`）
+- [ ] 2. 分类一级改共享拖拽 + `animateItem()` 实时让位
+- [ ] 3. 分类二级改 `WrapRow` 自适应换行 + 长按拖拽；新增 `commitChildOrder`
+- [ ] 4. 资产页去 `Card` 纯行；`MiniAction` 升 `bodyMedium` + 40dp 触摸区
+- [ ] 5. 资产页按 `AccountType` 分组接入拖拽；新增 `commitAccountOrder`；↑↓ 收进 ⋯ 兜底
+- [ ] 6. 模板页接入共享拖拽；新增 `commitTemplateOrder`；↑↓ 保留
+- [ ] 7. 合并 `category-stats` 两个同标题 MODIFIED 为一份新文本
+- [ ] 8. 新增 `ledger-transactions` 2 份 MODIFIED；修订 `reporting-ui` 资产页表述
+- [ ] 9. 活文档 §7.6 / §8 更新；版本号 0.2.3
+- [ ] 10. 六个静态检查本地全 PASS + 括号 / import 粗检
+- [ ] 11. 单次 commit 推送（差异集合断言 + 误删保护）
+- [ ] 12. 按 commit sha 独立比对远端 blob
+- [ ] 13. 查 push CI；若红按 `design.md` 三级回退顺序修复
+- [ ] 14. 手动触发 `release.yml`（minify=on / upload_nutstore=true）并查结果
+- [ ] 15. 回填实测与真机未验清单继承

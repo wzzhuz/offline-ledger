@@ -241,3 +241,49 @@ BeeCount 的 `analytics_content.dart` 用 `BeeSurface` 把每个结论装进独�
 回退顺序 2、3 条未用上。
 `nsfalse` 表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
 **不当作已验证 HEAD 200**。真机观感与累积未验清单仍按使用者决定整体推迟。
+
+
+---
+
+## 第 16 批（v0.2.3）：全站排序统一 + 资产页纯行化
+
+### 1. 根因（三条真机反馈归一）
+
+| 反馈 | 根因 |
+|---|---|
+| 资产页「底色导致视觉比明细页小」 | 第 15 批只补 `ListDivider`、没拆 `Card`；卡片内边距 + 阴影把内容往里收一圈。这是「统一网格第三半」只做了一半 |
+| 可点副标题字偏小 | `MiniAction` = `labelSmall` 裸 `Text` + `clickable + padding(vertical=2dp)`，触摸高约 20dp。违反活文档 §2.1「可点区 ≥40dp」，是同一类违反的**第三次**（第 9 批最近交易方、第 10 批联想行） |
+| 二级 chips 短名右侧空 | 第 15 批把 chip 改 `widthIn(max)` 按文本收缩，但分行仍是 `chunked(3)` 固定 3 个；省出的宽度空在行尾 |
+| 排序生硬 / 风格不统一 | 一级拖拽 `onDrag` 只累加 `acc`，`onDragEnd` 才一次 `add(to, removeAt(from))` → 拖动中其余行原地不动、松手整列跳变；二级 / 资产 / 模板仍是上移下移。四处共四套写法 |
+
+BeeCount 的参照是 Flutter `ReorderableListView`：官方行为即「拖动经过其他条目时自动平移让位」「被拖项浮起阴影」。Compose 无内置等价组件，也不引入 `reorderable` 第三方库（破零依赖基线）。
+
+### 2. 落地方案
+
+- 新增 `ui/components/ReorderSupport.kt` 单一来源：`WrapRow`（稳定 `Layout` API，按实测宽度换行，**刻意不用实验性 `FlowRow` 注解**，见 §3 T12 例外）+ `ReorderDragState` + `rememberReorderDrag` + `ReorderHandle`。
+- **实时让位**：`drag()` 每跨过 `rowPx` 即 `removeAt/add` 更新 `orderedIds`，列表随之重组；`LazyColumn` 的 `animateItem()` 给其余项位移动画，被拖项 `zIndex + shadowElevation + alpha` 浮起。松手才 `onCommit` 一次性落库；`onDragCancel` 回滚快照。
+- 四处接入：分类一级（56dp）、分类二级 chips（40dp）、资产账户（按 `AccountType` 分组、56dp）、模板（44dp）。
+- 三个 VM 各加一个按组落库方法：`commitChildOrder(parentId, ids)`、`commitAccountOrder(type, ids)`、`commitTemplateOrder(ids)`，复用既有 `persistWithGroup` / `reorderAccounts` / `reorderTemplates` 单事务，**DAO 与表结构一字不动**。
+- 上移 / 下移全部保留（分类 ⋯ 菜单与二级操作 Dialog、模板 ⋯ 菜单、资产新增 ⋯ 菜单）作为 TalkBack 兜底，不再占主行。
+- 资产页 `AccountCard` 去 `Card` → 明细页同款纯行（16dp / 56dp / `ListDivider`）；5 个操作 `bodyMedium` + `heightIn(min=40).widthIn(min=40)`，副信息仍 `labelSmall` 纯文本（本就不用点）。
+- **规格收口**：本 change 内 `category-stats` 原有**两个同标题 MODIFIED 块**合并为一个；`ledger-transactions` 新增 2 份 MODIFIED；`reporting-ui` 修订「资产页账户卡」表述。零表结构 → 覆盖安装即可。
+
+### 3. 三级回退顺序（首轮 CI 若红，每次只改一处单独推送）
+
+1. **`animateItem()` / `zIndex` / `graphicsLayer` / `Layout` API 签名错** → 先去掉 `.animateItem()`（实时重排仍生效，仅少让位动画），保绿后再补。
+2. **`rememberUpdatedState` / `detectDragGesturesAfterLongPress` / 循环内 `rememberReorderDrag` 调用点错** → 退回「四处保留上移下移 + 共享组件只留 `WrapRow`」，功能不丢。
+3. **VM 落库方法编译错（`Triple` 推断 / `AccountType` import）** → 显式写类型参数，不改 DAO。
+
+### 4. 被否决的方案
+
+- 松手才重排（本轮根因，已证伪）
+- 引入 `sh.calvin.reorderable` / 任何第三方拖拽库（破零依赖）
+- `dragAndDropSource/Target` 做列表内换位（跨应用 ClipData 协议）
+- 实验性 `FlowRow` + `@OptIn(ExperimentalLayoutApi::class)`（BOM 2026.06 注解状态不确定，改用稳定 `Layout`）
+- 把 ↑↓ 全删（TalkBack 无兜底）
+- 资产页操作收进 ⋯ 菜单（副标题需要直接可点）
+- 只放大操作字不拆 `Card`（底色问题不解决）
+- 只追加 ADDED 不改旧 Requirement（指南 §5）
+- 顺手给预算页加排序（当前无此能力，避免范围蔓延）
+
+### 5. 实测回填（待本批推送后补）
