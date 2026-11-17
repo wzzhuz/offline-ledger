@@ -135,18 +135,44 @@ commit 里一起处理。**如实限制**：让位是即时的、不是连续像
 
 ## 第 17 批（v0.2.4，同一 change 内）
 
-- [ ] 1. `ReorderSupport.kt`：`WrapRow` 加 `horizontalAlignment`，`layout()` 占满父宽、行尾留白在右
-- [ ] 2. chip label 显式 `TextAlign.Start`，去掉 M3 默认居中观感
-- [ ] 3. 新增 `ReorderBounds`（容器可见边界，root px）与 `onGloballyPositioned` 写入
-- [ ] 4. `ReorderDragState` 暴露 `edgeDirection`、`onDraggingChange` 回调与 `rowMeasureModifier()`
-- [ ] 5. `rememberReorderDrag` 加 `bounds` / `onDraggingChange` / `onEdgeScroll` 参数，帧级边缘自动滚动
-- [ ] 6. 资产页 `verticalScroll(enabled = !anyDragging)` + 共享 bounds + 边缘滚动
-- [ ] 7. 分类页 `LazyColumn(userScrollEnabled = !anyDragging)` + 共享 bounds + 边缘滚动
-- [ ] 8. 模板页 `LazyColumn(userScrollEnabled = !anyDragging)` + 共享 bounds + 边缘滚动
-- [ ] 9. 四处 `rowMeasureModifier()` 实测行高，替掉 56/40/44 估算
-- [ ] 10. 3 份 spec delta 按标题整块修订（WrapRow 左对齐 / 禁用父滚动 / 实测行高）
-- [ ] 11. 活文档 §7.7 追加「父子手势竞争」、§8 版本与真机清单更新
-- [ ] 12. 版本号 0.2.3 → 0.2.4；单次 commit 推送
-- [ ] 13. push CI + release（minify=on、上传坚果云）全绿、制品带短 sha
-- [ ] 14. design / tasks / 活文档实测回填，远端按最终 sha 独立校验
+- [x] 1. `ReorderSupport.kt`：`WrapRow` 加 `horizontalAlignment`，`layout()` 占满父宽、行尾留白在右
+- [x] 2. chip label 显式 `TextAlign.Start`，去掉 M3 默认居中观感
+- [x] 3. 新增 `ReorderBounds`（容器可见边界，root px）与 `onGloballyPositioned` 写入
+- [x] 4. `ReorderDragState` 暴露 `edgeDirection`、`onDraggingChange` 回调与 `rowMeasureModifier()`
+- [x] 5. `rememberReorderDrag` 加 `bounds` / `onDraggingChange` / `onEdgeScroll` 参数，帧级边缘自动滚动
+- [x] 6. 资产页 `verticalScroll(enabled = !anyDragging)` + 共享 bounds + 边缘滚动
+- [x] 7. 分类页 `LazyColumn(userScrollEnabled = !anyDragging)` + 共享 bounds + 边缘滚动
+- [x] 8. 模板页 `LazyColumn(userScrollEnabled = !anyDragging)` + 共享 bounds + 边缘滚动
+- [x] 9. 四处 `rowMeasureModifier()` 实测行高，替掉 56/40/44 估算
+- [x] 10. 3 份 spec delta 按标题整块修订（WrapRow 左对齐 / 禁用父滚动 / 实测行高）
+- [x] 11. 活文档 §7.7 追加「父子手势竞争」、§8 版本与真机清单更新
+- [x] 12. 版本号 0.2.3 → 0.2.4；单次 commit 推送
+- [x] 13. push CI + release（minify=on、上传坚果云）全绿、制品带短 sha
+- [x] 14. design / tasks / 活文档实测回填，远端按最终 sha 独立校验
 - [ ] 15. 真机复核：四处拖拽不误触滚动、边缘滚动、二级 chips 左对齐（**由使用者装机确认**）
+
+## 第 17 批实测（2026-11-17）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `8f547c789686f25805c8e7ba9f86cc2b64131f90`（11 文件，v0.2.4） |
+| push CI | `44057590347` **success**，17 步全绿，**首轮 Kotlin 编译零错误**（未走诊断通道） |
+| release | `44058813183` **success**，23 步绿 / 5 步按 input 跳过；**上传到坚果云 completed success**；重复排队 `44059276870` 已 cancelled |
+| 制品 | `offline-ledger-release-v0.2.4` 12,235,191 B；`offline-ledger-mapping-v0.2.4` 3,505,636 B；`offline-ledger-metrics-v0.2.4-p-m-nsfalse` 271 B |
+| 远端校验 | 按最终 commit sha 比对 **293↔293 blob、sha 全一致、PASS**；`diag/` 零残留、workflow 仅 build/release、无 token 明文；六个静态检查本地与 CI 全 PASS |
+| 文档回填 | 本 commit（仅文档，代码零变化） |
+
+**首轮无失败**：动手前按 `design.md` §3 写定三级回退顺序，并把
+`onEdgeScroll` 从 `suspend` lambda 收敛为普通 lambda（实际调用
+`dispatchRawDelta` 是同步的），避免函数类型歧义；四个
+`rememberReorderDrag` 调用点、`WrapRow` 唯一调用点、
+`CategoryRootRow` 的 `measureModifier` 参数全部同步核对，无「改一处漏一处」。
+
+**如实限制**：`nsfalse` 只表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验
+只写日志不中断，**不当作已验证 HEAD 200**。边缘自动滚动用 root 坐标近似
++ 48dp 粗判定、手指 root y 由 `onGloballyPositioned` 记录手柄位置换算，
+**沙盒无模拟器，手势竞争与边缘滚动完全验不了**；CI 全绿只证明
+`verticalScroll / LazyColumn / pointerInput / onSizeChanged / dispatchRawDelta`
+编译通过，不证明「手指拖到屏幕底部时列表按预期滚、父滚动不抢事件」。
+这轮 MUST 由使用者装机拖一次才算数。若真机仍被抢，按 §3 回退顺序
+退到 `NestedScrollConnection` 拦截；若边缘滚动抖动，退到固定步进 + 阈值死区。

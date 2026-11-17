@@ -401,6 +401,28 @@ chip 内 label 又是 M3 默认居中。改法：显式 `horizontalAlignment` �
 - 顺手给预算页加排序（当前无此能力，不新增）；为紧凑压触摸区到 40dp 以下。
 - 只追加 ADDED 不改第 16 批 delta（指南 §5 规格债）。
 
-### 6. 实测回填（待本批推送后补）
+### 6. 实测回填（第 17 批，2026-11-17）
 
-（占位：代码 commit / push CI / 诊断 / 修复 / release / 制品 / 远端校验 / 回填。）
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `8f547c789686f25805c8e7ba9f86cc2b64131f90`（11 文件，v0.2.4） |
+| push CI | `44057590347` **success**，17 步全绿，**首轮 Kotlin 编译零错误**（未走诊断通道） |
+| release | `44058813183` **success**，23 步绿 / 5 步按 input 跳过；**上传到坚果云 completed success**；重复排队 `44059276870` 已 cancelled |
+| 制品 | `offline-ledger-release-v0.2.4` 12,235,191 B；`offline-ledger-mapping-v0.2.4` 3,505,636 B；`offline-ledger-metrics-v0.2.4-p-m-nsfalse` 271 B |
+| 远端校验 | 按最终 commit sha 比对 **293↔293 blob、sha 全一致、PASS**；`diag/` 零残留、workflow 仅 build/release、无 token 明文；六个静态检查本地与 CI 全 PASS |
+| 文档回填 | 本 commit（仅文档，代码零变化） |
+
+**首轮无失败**：动手前按 `design.md` §3 写定三级回退顺序，并把
+`onEdgeScroll` 从 `suspend` lambda 收敛为普通 lambda（实际调用
+`dispatchRawDelta` 是同步的），避免函数类型歧义；四个
+`rememberReorderDrag` 调用点、`WrapRow` 唯一调用点、
+`CategoryRootRow` 的 `measureModifier` 参数全部同步核对，无「改一处漏一处」。
+
+**如实限制**：`nsfalse` 只表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验
+只写日志不中断，**不当作已验证 HEAD 200**。边缘自动滚动用 root 坐标近似
++ 48dp 粗判定、手指 root y 由 `onGloballyPositioned` 记录手柄位置换算，
+**沙盒无模拟器，手势竞争与边缘滚动完全验不了**；CI 全绿只证明
+`verticalScroll / LazyColumn / pointerInput / onSizeChanged / dispatchRawDelta`
+编译通过，不证明「手指拖到屏幕底部时列表按预期滚、父滚动不抢事件」。
+这轮 MUST 由使用者装机拖一次才算数。若真机仍被抢，按 §3 回退顺序
+退到 `NestedScrollConnection` 拦截；若边缘滚动抖动，退到固定步进 + 阈值死区。
