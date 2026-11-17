@@ -2,7 +2,6 @@ package com.zwz.offlineledger.ui.templates
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.animateItem
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -166,6 +165,17 @@ private fun TemplateList(
     onDelete: (RecordTemplateEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // 第 16 批：rememberReorderDrag 是 @Composable，MUST 放在函数体，
+    // 不能放在 LazyColumn 的 LazyListScope（非 composable）里——首轮 CI 第 3 条错误。
+    val activeTemplates = state.templates.filter { !it.isArchived }
+    val tplDrag = rememberReorderDrag(
+        ids = activeTemplates.map { it.id },
+        rowHeightDp = 44,
+        onCommit = { ids -> vm.commitTemplateOrder(ids) }
+    )
+    val orderedTemplates = tplDrag.orderedIds.mapNotNull { id ->
+        activeTemplates.firstOrNull { it.id == id }
+    }
     LazyColumn(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         if (state.message.isNotBlank()) {
             item {
@@ -178,20 +188,11 @@ private fun TemplateList(
             }
         }
         if (tab == 0) {
-            val active = state.templates.filter { !it.isArchived }
-            // 第 16 批：与分类 / 资产同款共享拖拽，拖动中实时让位。
-            val tplDrag = rememberReorderDrag(
-                ids = active.map { it.id },
-                rowHeightDp = 44,
-                onCommit = { ids -> vm.commitTemplateOrder(ids) }
-            )
-            val ordered = tplDrag.orderedIds.mapNotNull { id ->
-                active.firstOrNull { it.id == id }
-            }
+            val active = activeTemplates
             if (active.isEmpty()) {
                 item { Text("还没有模板。点右上角 + 新增一个。", modifier = Modifier.padding(vertical = 6.dp)) }
             }
-            items(ordered, key = { it.id }) { t ->
+            items(orderedTemplates, key = { it.id }) { t ->
                 var menu by remember { mutableStateOf(false) }
                 val amount = if (t.amountCents > 0L)
                     Cents(t.amountCents).toYuanString() + " 元" else "金额待填"
@@ -201,7 +202,6 @@ private fun TemplateList(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 40.dp)
-                        .animateItem()
                         .then(tplDrag.itemModifier(t.id))
                 ) {
                     Text(

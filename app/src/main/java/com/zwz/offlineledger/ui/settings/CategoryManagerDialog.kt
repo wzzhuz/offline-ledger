@@ -45,7 +45,6 @@ import androidx.compose.ui.text.font.FontWeight
 import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.components.WrapRow
 import com.zwz.offlineledger.ui.components.rememberReorderDrag
-import androidx.compose.foundation.lazy.animateItem
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
@@ -267,7 +266,6 @@ private fun CategoryList(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .animateItem()
                         .then(rootDrag.itemModifier(root.id))
                 ) {
                     Column {
