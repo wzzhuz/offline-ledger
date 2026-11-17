@@ -42,15 +42,16 @@ import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
-/** 第 13 批：分类洞察默认排行，可切回原有环形图。 */
-private enum class InsightMode { RANK, DONUT }
 private enum class RankDim { CATEGORY, COUNTERPARTY, ACCOUNT }
 
 /**
- * 第 13 批：统计页由「所有区块顺次平铺」改为「一卡一结论」：
- * 固定顶部 → 总结卡 → 分类洞察卡 → 趋势卡 →（年度）资产卡 → 口径入口。
- * 既有的环形图、三级下钻、双折线、资产累计推算、横屏放大、点数值全部保留，
- * 只是信息层级重排；合计一致性警告 MUST 置顶显眼。
+ * 第 14 批：统计页改为「一卡一结论 + 允许纵向滚动的浏览型长报表」。
+ * 顺序：固定顶部 →（警告置顶）总结卡 → 趋势卡 → 分类占比卡（环形独立）→
+ * 分类排行卡（Top5 独立）→（年度）资产卡 → 口径入口。
+ * 环形图与排行各自常驻，MUST NOT 再用切换 chip 把两张卡合并——第 13 批为挤一屏
+ * 的取巧做法已被使用者否掉：查看统计页允许滚动，不该硬塞。
+ * 既有三级下钻、双折线、资产累计推算、横屏放大、点数值全部保留；
+ * 合计一致性警告 MUST 置顶显眼。
  */
 @Composable
 fun StatsScreen(onOpenCategories: () -> Unit = {}) {
@@ -65,7 +66,6 @@ fun StatsScreen(onOpenCategories: () -> Unit = {}) {
     var pointMode by remember { mutableStateOf(StatsMode.MONTH) }
     var showAverage by remember { mutableStateOf(false) }
     var showScopeInfo by remember { mutableStateOf(false) }
-    var insightMode by remember { mutableStateOf(InsightMode.RANK) }
     var rankDim by remember { mutableStateOf(RankDim.CATEGORY) }
 
     // 组合期间读可观察状态：隐藏金额开关一变，竖轴刻度也跟着重组。
@@ -104,15 +104,6 @@ fun StatsScreen(onOpenCategories: () -> Unit = {}) {
             EmptyInsight(state, vm)
         } else {
             InsightSummaryCard(state, onAverage = { showAverage = true })
-            CategoryInsightCard(
-                state = state,
-                vm = vm,
-                insightMode = insightMode,
-                onInsightMode = { insightMode = it },
-                rankDim = rankDim,
-                onRankDim = { rankDim = it },
-                onOpenCategories = onOpenCategories
-            )
             TrendCard(
                 state = state,
                 vm = vm,
@@ -120,6 +111,17 @@ fun StatsScreen(onOpenCategories: () -> Unit = {}) {
                 pointMode = pointMode,
                 onPoint = { idx, mode -> pointIndex = idx; pointMode = mode },
                 yLabels = { max -> yLabels(max) }
+            )
+            DonutInsightCard(
+                state = state,
+                vm = vm,
+                onOpenCategories = onOpenCategories
+            )
+            RankInsightCard(
+                state = state,
+                vm = vm,
+                rankDim = rankDim,
+                onRankDim = { rankDim = it }
             )
             if (state.mode == StatsMode.YEAR) {
                 AssetCard(
@@ -335,16 +337,12 @@ private fun MiniBar(ratio: Float, isOver: Boolean) {
 }
 
 /* ------------------------------------------------------------------ */
-/* ② 分类洞察卡：Top5 排行 / 可切环形图 / 分类管理短跳转                   */
+/* ② 分类占比卡：环形图独立常驻（一级 / 二级切换 + 三级下钻）              */
 /* ------------------------------------------------------------------ */
 @Composable
-private fun CategoryInsightCard(
+private fun DonutInsightCard(
     state: StatsUiState,
     vm: StatsViewModel,
-    insightMode: InsightMode,
-    onInsightMode: (InsightMode) -> Unit,
-    rankDim: RankDim,
-    onRankDim: (RankDim) -> Unit,
     onOpenCategories: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -354,103 +352,115 @@ private fun CategoryInsightCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("分类洞察", style = MaterialTheme.typography.titleSmall)
+                Text("分类占比", style = MaterialTheme.typography.titleSmall)
                 TextButton(onClick = onOpenCategories) {
-                    Text("分类 ›", style = MaterialTheme.typography.labelSmall)
+                    Text("分类管理 ›", style = MaterialTheme.typography.labelSmall)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 FilterChip(
-                    selected = insightMode == InsightMode.RANK,
-                    onClick = { onInsightMode(InsightMode.RANK) },
-                    label = { Text("Top5 排行") }
+                    selected = state.sliceLevel == SliceLevel.ROOT,
+                    onClick = { vm.setSliceLevel(SliceLevel.ROOT) },
+                    label = { Text("按大类") }
                 )
                 FilterChip(
-                    selected = insightMode == InsightMode.DONUT,
-                    onClick = { onInsightMode(InsightMode.DONUT) },
-                    label = { Text("环形图") }
+                    selected = state.sliceLevel == SliceLevel.CHILD,
+                    onClick = { vm.setSliceLevel(SliceLevel.CHILD) },
+                    label = { Text("按小类") }
                 )
             }
+            val slices = if (state.sliceLevel == SliceLevel.ROOT)
+                state.rootSlices else state.childSlices
+            DonutChart(
+                sectors = ChartData.sectors(slices),
+                totalCents = state.netExpenseCents,
+                centerLabel = if (state.sliceLevel == SliceLevel.ROOT)
+                    "一级净支出" else "二级净支出",
+                onSectorClick = { i ->
+                    val id = slices.getOrNull(i)?.id
+                    if (id != null) {
+                        if (state.sliceLevel == SliceLevel.ROOT) vm.openRoot(id)
+                        else vm.openCategory(id)
+                    }
+                }
+            )
+            Text(
+                text = "点击扇区" + if (state.sliceLevel == SliceLevel.ROOT)
+                    "展开该大类下的二级构成" else "查看该分类明细",
+                style = MaterialTheme.typography.labelSmall,
+                color = LedgerColors.Neutral
+            )
+        }
+    }
+}
 
-            if (insightMode == InsightMode.RANK) {
-                Row(
-                    modifier = Modifier.padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    RankDim.values().forEach { d ->
-                        FilterChip(
-                            selected = rankDim == d,
-                            onClick = { onRankDim(d) },
-                            label = { Text(rankDimLabel(d)) }
-                        )
-                    }
-                }
-                val rows = when (rankDim) {
-                    RankDim.CATEGORY -> state.topCategories
-                    RankDim.COUNTERPARTY -> state.topCounterparties
-                    RankDim.ACCOUNT -> state.topAccounts
-                }
-                if (rows.isEmpty()) {
-                    Text(
-                        "本周期暂无该维度数据",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = LedgerColors.Neutral,
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-                } else {
-                    rows.forEach { row ->
-                        RankRowView(
-                            row = row,
-                            onClick = {
-                                if (rankDim == RankDim.CATEGORY) row.id?.let { vm.openRoot(it) }
-                            }
-                        )
-                    }
-                    Text(
-                        text = if (rankDim == RankDim.CATEGORY)
-                            "点分类可展开二级构成；排行与环形图共用同一份净支出切片。"
-                        else "按当前币种统计，不跨币种混算；金额来自 SQL 聚合。",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LedgerColors.Neutral,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier.padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = state.sliceLevel == SliceLevel.ROOT,
-                        onClick = { vm.setSliceLevel(SliceLevel.ROOT) },
-                        label = { Text("按大类") }
-                    )
-                    FilterChip(
-                        selected = state.sliceLevel == SliceLevel.CHILD,
-                        onClick = { vm.setSliceLevel(SliceLevel.CHILD) },
-                        label = { Text("按小类") }
-                    )
-                }
-                val slices = if (state.sliceLevel == SliceLevel.ROOT)
-                    state.rootSlices else state.childSlices
-                DonutChart(
-                    sectors = ChartData.sectors(slices),
-                    totalCents = state.netExpenseCents,
-                    centerLabel = if (state.sliceLevel == SliceLevel.ROOT)
-                        "一级净支出" else "二级净支出",
-                    onSectorClick = { i ->
-                        val id = slices.getOrNull(i)?.id
-                        if (id != null) {
-                            if (state.sliceLevel == SliceLevel.ROOT) vm.openRoot(id)
-                            else vm.openCategory(id)
-                        }
-                    }
-                )
+/* ------------------------------------------------------------------ */
+/* ③ 分类排行卡：Top5 独立常驻，三维切换只在卡内切换维度                   */
+/* ------------------------------------------------------------------ */
+@Composable
+private fun RankInsightCard(
+    state: StatsUiState,
+    vm: StatsViewModel,
+    rankDim: RankDim,
+    onRankDim: (RankDim) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("分类排行", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = "点击扇区" + if (state.sliceLevel == SliceLevel.ROOT)
-                        "展开该大类下的二级构成" else "查看该分类明细",
+                    "按金额排序",
                     style = MaterialTheme.typography.labelSmall,
                     color = LedgerColors.Neutral
+                )
+            }
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                RankDim.values().forEach { d ->
+                    FilterChip(
+                        selected = rankDim == d,
+                        onClick = { onRankDim(d) },
+                        label = { Text(rankDimLabel(d)) }
+                    )
+                }
+            }
+            val rows = when (rankDim) {
+                RankDim.CATEGORY -> state.topCategories
+                RankDim.COUNTERPARTY -> state.topCounterparties
+                RankDim.ACCOUNT -> state.topAccounts
+            }
+            if (rows.isEmpty()) {
+                Text(
+                    "本周期暂无该维度数据",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LedgerColors.Neutral,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            } else {
+                rows.forEach { row ->
+                    RankRowView(
+                        row = row,
+                        onClick = {
+                            if (rankDim == RankDim.CATEGORY) row.id?.let { vm.openRoot(it) }
+                        }
+                    )
+                }
+                Text(
+                    text = if (rankDim == RankDim.CATEGORY)
+                        "点分类可展开二级构成；排行与占比卡共用同一份净支出切片。"
+                    else "按当前币种统计，不跨币种混算；金额来自 SQL 聚合。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral,
+                    modifier = Modifier.padding(top = 6.dp)
                 )
             }
         }
@@ -488,7 +498,7 @@ private fun rankDimLabel(d: RankDim): String = when (d) {
 }
 
 /* ------------------------------------------------------------------ */
-/* ③ 趋势卡：原有折线 / 单线切换 / 点数值 / 横屏放大，一字不改地保留      */
+/* ④ 趋势卡：原有折线 / 单线切换 / 点数值 / 横屏放大，一字不改地保留      */
 /* ------------------------------------------------------------------ */
 @Composable
 private fun TrendCard(
@@ -595,7 +605,7 @@ private fun TrendCard(
 }
 
 /* ------------------------------------------------------------------ */
-/* ④ 年度资产卡                                                         */
+/* ⑤ 年度资产卡                                                         */
 /* ------------------------------------------------------------------ */
 @Composable
 private fun AssetCard(

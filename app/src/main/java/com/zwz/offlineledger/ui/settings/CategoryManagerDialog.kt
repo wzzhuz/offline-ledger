@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,9 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
  * 「TopBar 固定 + 入口 + LazyColumn 纯列表 + 编辑独立视图」。
  * 第 13 批：补齐信息价值——支出 / 收入分段、每类笔数（一级含二级）、
  * 点分类行看近期流水、编辑视图字段分组。骨架一字未回退。
+ * 第 14 批：一级默认折叠、点一级展开二级 chips、点二级 chip 弹操作
+ * （改名 / 删除 / 上移 / 下移 / 看流水）；展开态用 rememberSaveable 保存。
+ * 第 12/13 批的 TopBar 固定 + 惰性列表 + 编辑独立视图骨架一字未回退。
  */
 private data class CategoryEditorState(
     val mode: String,                 // "add" | "rename"
@@ -58,6 +62,13 @@ fun CategoryManagerScreen(onBack: () -> Unit) {
     var deletingId by remember { mutableStateOf<Long?>(null) }
     var showArchived by remember { mutableStateOf(false) }
     var catType by remember { mutableStateOf(RecordType.EXPENSE) }
+    // 第 14 批：展开态用 String 键经 rememberSaveable 保存（autoSaver 对 String 零风险），
+    // 再派生 Set<Long>，避免保存 MutableState<Set<>> 包装对象带来的 saver 版本依赖。
+    var expandedKey by rememberSaveable { mutableStateOf("") }
+    val expandedRoots: Set<Long> = expandedKey.split(',')
+        .filter { it.isNotEmpty() }
+        .mapNotNull { it.toLongOrNull() }
+        .toSet()
 
     val categories = state.categories
     Column(modifier = Modifier.fillMaxSize()) {
@@ -103,6 +114,12 @@ fun CategoryManagerScreen(onBack: () -> Unit) {
                 catType = catType,
                 counts = state.categoryCounts,
                 showArchived = showArchived,
+                expandedRoots = expandedRoots,
+                onToggleExpand = { id ->
+                    val next = if (id in expandedRoots)
+                        expandedRoots - id else expandedRoots + id
+                    expandedKey = next.sorted().joinToString(",")
+                },
                 onToggleArchived = { showArchived = !showArchived },
                 onOpen = { id, name -> vm.openCategoryDetail(id, name) },
                 onRename = { id, name -> editor = CategoryEditorState("rename", id, name) },
@@ -174,7 +191,7 @@ private fun dateLabel(d: Int): String {
 }
 
 /* ------------------------------------------------------------------ */
-/* 纯列表：按收支类型分段；每行显示笔数，点行看流水，⋯ 菜单放操作          */
+/* 一级默认折叠；点一级展开二级 chips，点 chip 弹操作（不回退第 12 批骨架）  */
 /* ------------------------------------------------------------------ */
 @Composable
 private fun CategoryList(
@@ -182,6 +199,8 @@ private fun CategoryList(
     catType: RecordType,
     counts: Map<Long, Int>,
     showArchived: Boolean,
+    expandedRoots: Set<Long>,
+    onToggleExpand: (Long) -> Unit,
     onToggleArchived: () -> Unit,
     onOpen: (Long, String) -> Unit,
     onRename: (Long, String) -> Unit,
@@ -197,22 +216,28 @@ private fun CategoryList(
         it.level == 1 && !it.isArchived && it.type == catType
     }
     val archived = categories.filter { it.isArchived && it.type == catType }
+    // 第 14 批：点二级 chip 弹一个操作 Dialog，五项操作一个不丢。
+    var actionChild by remember { mutableStateOf<CategoryEntity?>(null) }
 
     LazyColumn(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         item {
             Text(
-                text = "最多两级；点分类看近期流水，笔数含二级。删除有流水的分类自动转归档。",
+                text = "最多两级；点一级展开二级，点二级可编辑；笔数含二级。删除有流水的分类自动转归档。",
                 style = MaterialTheme.typography.bodySmall,
                 color = LedgerColors.Neutral,
                 modifier = Modifier.padding(vertical = 6.dp)
             )
         }
         roots.forEach { root ->
+            val expanded = root.id in expandedRoots
+            val childList = children.filter { it.parentId == root.id }
             item(key = "root-" + root.id) {
-                CategoryRow(
+                CategoryRootRow(
                     label = root.name,
+                    childCount = childList.size,
                     countText = (counts[root.id] ?: 0).toString() + " 笔（含二级）",
-                    indent = 0,
+                    expanded = expanded,
+                    onToggle = { onToggleExpand(root.id) },
                     onOpen = { onOpen(root.id, root.name) },
                     onMoveUp = { onMove(root.id, -1) },
                     onMoveDown = { onMove(root.id, 1) },
@@ -220,18 +245,32 @@ private fun CategoryList(
                     onDelete = { onDelete(root.id) }
                 )
             }
-            children.filter { it.parentId == root.id }.forEach { child ->
-                item(key = "child-" + child.id) {
-                    CategoryRow(
-                        label = "└ " + child.name,
-                        countText = (counts[child.id] ?: 0).toString() + " 笔",
-                        indent = 1,
-                        onOpen = { onOpen(child.id, child.name) },
-                        onMoveUp = { onMove(child.id, -1) },
-                        onMoveDown = { onMove(child.id, 1) },
-                        onRename = { onRename(child.id, child.name) },
-                        onDelete = { onDelete(child.id) }
-                    )
+            if (expanded) {
+                item(key = "children-" + root.id) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, top = 2.dp, bottom = 6.dp)
+                    ) {
+                        childList.chunked(3).forEach { group ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                horizontalArrangement =
+                                    androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
+                            ) {
+                                group.forEach { child ->
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { actionChild = child },
+                                        label = { Text(child.name, maxLines = 1) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                // 补空位保持三列对齐，末尾不足 3 个也不偏移。
+                                repeat(3 - group.size) { Box(modifier = Modifier.weight(1f)) }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -260,13 +299,54 @@ private fun CategoryList(
             }
         }
     }
+
+    actionChild?.let { c ->
+        AlertDialog(
+            onDismissRequest = { actionChild = null },
+            title = { Text(c.name) },
+            text = {
+                Column {
+                    Text(
+                        "二级分类 · " + (counts[c.id] ?: 0) + " 笔流水",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LedgerColors.Neutral
+                    )
+                    TextButton(
+                        onClick = { actionChild = null; onRename(c.id, c.name) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("改名") }
+                    TextButton(
+                        onClick = { actionChild = null; onOpen(c.id, c.name) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("看流水") }
+                    TextButton(
+                        onClick = { actionChild = null; onMove(c.id, -1) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("上移") }
+                    TextButton(
+                        onClick = { actionChild = null; onMove(c.id, 1) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("下移") }
+                    TextButton(
+                        onClick = { actionChild = null; onDelete(c.id) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("删除", color = LedgerColors.ExpenseRed) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { actionChild = null }) { Text("关闭") }
+            }
+        )
+    }
 }
 
 @Composable
-private fun CategoryRow(
+private fun CategoryRootRow(
     label: String,
+    childCount: Int,
     countText: String,
-    indent: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
     onOpen: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -276,26 +356,34 @@ private fun CategoryRow(
     var menu by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-            .padding(start = if (indent == 1) 12.dp else 0.dp)
-            .heightIn(min = 40.dp)
+        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
     ) {
-        // 整行主点击区：Box + clickable，保持 40dp 触摸目标且不撑高行。
+        // 整行主点击区：展开 / 收起，保持 44dp 触摸目标。
         Box(
             modifier = Modifier
                 .weight(1f)
-                .heightIn(min = 40.dp)
-                .clickable { onOpen() },
+                .heightIn(min = 44.dp)
+                .clickable { onToggle() },
             contentAlignment = Alignment.CenterStart
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = label, style = MaterialTheme.typography.bodyMedium)
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (expanded) "▾ " else "▸ ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LedgerColors.Neutral
+                    )
+                    Text(text = label, style = MaterialTheme.typography.bodyMedium)
+                }
                 Text(
-                    text = "  " + countText,
+                    text = childCount.toString() + " 二级分类 · " + countText,
                     style = MaterialTheme.typography.labelSmall,
                     color = LedgerColors.Neutral
                 )
             }
+        }
+        IconButton(onClick = onOpen) {
+            Text("›", style = MaterialTheme.typography.titleMedium)
         }
         IconButton(onClick = { menu = true }) {
             Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
