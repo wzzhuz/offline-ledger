@@ -468,14 +468,16 @@ private fun CategoryRootRow(
             }
         }
         // 第 15 批：长按拖手柄；只在手柄上接管拖拽，滚动不误触。
+        // 用文本「≡」而非 Icons.Filled.Menu —— material-icons-core 无该图标，
+        // 首轮 CI 的 Unresolved reference 'Menu' 即由此而来（诊断日志已证实）。
         Box(
             modifier = dragModifier.size(40.dp),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Filled.Menu,
-                contentDescription = "长按拖动排序",
-                tint = LedgerColors.Neutral
+            Text(
+                "≡",
+                style = MaterialTheme.typography.titleMedium,
+                color = LedgerColors.Neutral
             )
         }
         IconButton(onClick = onOpen) {
