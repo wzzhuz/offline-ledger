@@ -97,7 +97,7 @@ class FireflyCsvCodecTest {
         assertEquals("美团月付", e.toAccountName)
         assertEquals("", e.counterparty)
         assertEquals("", e.categoryKey)
-        assertTrue(e.note.contains("FF3分类"))
+        assertFalse(e.note.contains("FF3分类"))
     }
 
     @Test
