@@ -69,3 +69,9 @@
 - [x] 12. 单次 commit → push CI → release → 坚果云 → 实测回填
 - [ ] 13. 真机复核：按大类点扇区/图例跳一级流水、按收款方跳后分类行干净、
           收款方/账户三维下钻不回退、release 包冷启动与开库正常
+
+### 第 28 批实测回填
+
+- push CI `44271311112` success（17 步）/ release `44272571557` success（23 绿 / 5 跳过，坚果云 success）
+- 制品：`offline-ledger-release-v0.2.12` 12319640 B · `offline-ledger-mapping-v0.2.12` 3672809 B · `offline-ledger-metrics-v0.2.12-p-m-nsfalse` 271 B
+- 第 12 项已完成；第 13 项真机复核仍由使用者装机确认，保留 `[ ]`

@@ -147,3 +147,22 @@ completed success。制品 `offline-ledger-release-v0.2.11` 12,320,054 B、
 3. 若 `release.yml` 改名后产物匹配不到 → 退回 `*-minified-*.apk` 匹配，
    命名改动独立回滚，不影响 APK 内容。
 4. 三项任一真机验不过 → 不做无限迭代，按活文档 §1 登记后单独建 change。
+
+## 8. 第 28 批实测回填（真实编号）
+
+| 项 | 实测 |
+|---|---|
+| 代码 commit | `9d786823d666d747e628546f21cf82cee6514aa5`（13 改 / 1 新增，v0.2.12） |
+| push CI | `44271311112` **success**，17 步全绿，**首轮 Kotlin 编译零错误** |
+| release | `44272571557` **success**，23 步绿 / 5 步按 input 跳过；**上传到坚果云 success** |
+| 制品 | `offline-ledger-release-v0.2.12` 12319640 B；`offline-ledger-mapping-v0.2.12` 3672809 B；`offline-ledger-metrics-v0.2.12-p-m-nsfalse` 271 B |
+| 坚果云 | `nsfalse`（认证 / 建目录 / PUT 均未失败）；HEAD 落盘校验只写日志不中断，不当作已验证 HEAD 200 |
+| 静态检查 | 六个 `check_*.py` 本地与 CI 均 PASS；新增 `FilterValuesMutualExclusionTest` 由 CI 单测步骤覆盖 |
+
+**两处查证后更正（写进活文档 §7.13）**：
+1. 门禁里写「`filterByXxx` 沿用旧快照」不成立——三个入口本来就从全新
+   `RecordFilter(...)` 构造，串味的真因是单条 `filterDisplayName` 被分类行共用。
+2. 门禁里写「若 `pagedFiltered` 未接 `rootCategoryId` 就补一条」不需要——
+   第 27 批起该参数化短路已存在，本批零新增聚合 SQL 出口。
+3. 「12M 是 release、24M 是 debug」的归因是错的：两者是同一个 R8 release 包，
+   GitHub Actions artifact 显示的是二次压缩后的 zip 大小。本批只改产物名，不改上传源。
