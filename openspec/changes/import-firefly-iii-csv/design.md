@@ -293,10 +293,12 @@ Q5 预制账户 / 分类是 `SeedData` 代码常量，首次建库写进表，�
 
 | 项 | 结果 |
 |---|---|
-| 代码 commit | 待回填 |
-| push CI | 待回填 |
-| release | 待回填 |
-| 制品 | 待回填 |
+| 代码 commit | `024ee5aeb04d55f7204e9d69c2fc09cb0e64dacf`（10 文件：0 新增 + 10 修改、零删除） |
+| push CI | `44243316679` **success**，17 步全绿，**首轮 Kotlin 编译零错误**；未走临时诊断通道 |
+| release | `44244105038` **success**，23 步绿 / 5 步按 input 跳过；**「上传到坚果云」步骤 success** |
+| 制品 | `offline-ledger-release-v0.2.9` 12,317,953 B；`offline-ledger-mapping-v0.2.9` 3,661,914 B；`offline-ledger-metrics-v0.2.9-p-m-nsfalse` 270 B |
+| 静态检查 | 六个脚本本地全 PASS；Kotlin 大括号 / 引号粗检 0 个不平衡文件 |
+| 文档回填 | 本 commit（`docs(import-feedback)`），代码零变化 |
 
 真机复核仍由使用者装机确认：1916 行走完后结果卡可见（含耗时 / 行数）、
 失败也出卡、资产页到顶下拉出圆形指示器且松手有反馈、明细自动刷新不回退。
