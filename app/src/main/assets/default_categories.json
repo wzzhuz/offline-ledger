@@ -1,0 +1,573 @@
+{
+  "version": 3,
+  "note": "按 A 方案：居住只放租房/自住成本；代缴父母水电归人情/赡养·代缴水电。enabled=false 的一级默认停用，可在分类管理一键启用；二级一律启用。",
+  "categories": [
+    {
+      "id": 1,
+      "name": "三餐",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 2,
+      "name": "出行",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 3,
+      "name": "养车",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": false,
+      "sortOrder": 3
+    },
+    {
+      "id": 4,
+      "name": "居住",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 5,
+      "name": "宠物",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": false,
+      "sortOrder": 5
+    },
+    {
+      "id": 6,
+      "name": "日用购物",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 6
+    },
+    {
+      "id": 7,
+      "name": "医疗",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 7
+    },
+    {
+      "id": 8,
+      "name": "教育娱乐",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": false,
+      "sortOrder": 8
+    },
+    {
+      "id": 9,
+      "name": "人情",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": false,
+      "sortOrder": 9
+    },
+    {
+      "id": 10,
+      "name": "其他",
+      "type": "EXPENSE",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 10
+    },
+    {
+      "id": 11,
+      "name": "工资",
+      "type": "INCOME",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 11
+    },
+    {
+      "id": 12,
+      "name": "奖金",
+      "type": "INCOME",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 12
+    },
+    {
+      "id": 13,
+      "name": "兼职",
+      "type": "INCOME",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 13
+    },
+    {
+      "id": 14,
+      "name": "理财收益",
+      "type": "INCOME",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 14
+    },
+    {
+      "id": 15,
+      "name": "其他收入",
+      "type": "INCOME",
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 15
+    },
+    {
+      "id": 101,
+      "name": "早餐",
+      "type": "EXPENSE",
+      "parentId": 1,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 102,
+      "name": "外卖",
+      "type": "EXPENSE",
+      "parentId": 1,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 103,
+      "name": "聚餐",
+      "type": "EXPENSE",
+      "parentId": 1,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": 104,
+      "name": "买菜做饭",
+      "type": "EXPENSE",
+      "parentId": 1,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 201,
+      "name": "地铁公交",
+      "type": "EXPENSE",
+      "parentId": 2,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 202,
+      "name": "打车",
+      "type": "EXPENSE",
+      "parentId": 2,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 203,
+      "name": "火车飞机",
+      "type": "EXPENSE",
+      "parentId": 2,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": 204,
+      "name": "共享单车",
+      "type": "EXPENSE",
+      "parentId": 2,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 301,
+      "name": "加油充电",
+      "type": "EXPENSE",
+      "parentId": 3,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 302,
+      "name": "停车",
+      "type": "EXPENSE",
+      "parentId": 3,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 303,
+      "name": "保险",
+      "type": "EXPENSE",
+      "parentId": 3,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": 304,
+      "name": "保养维修",
+      "type": "EXPENSE",
+      "parentId": 3,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 305,
+      "name": "高速过路",
+      "type": "EXPENSE",
+      "parentId": 3,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 5
+    },
+    {
+      "id": 306,
+      "name": "洗车美容",
+      "type": "EXPENSE",
+      "parentId": 3,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 6
+    },
+    {
+      "id": 401,
+      "name": "房租",
+      "type": "EXPENSE",
+      "parentId": 4,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 402,
+      "name": "水费",
+      "type": "EXPENSE",
+      "parentId": 4,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 403,
+      "name": "电费",
+      "type": "EXPENSE",
+      "parentId": 4,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": 404,
+      "name": "燃气",
+      "type": "EXPENSE",
+      "parentId": 4,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 405,
+      "name": "物业",
+      "type": "EXPENSE",
+      "parentId": 4,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 5
+    },
+    {
+      "id": 406,
+      "name": "宽带",
+      "type": "EXPENSE",
+      "parentId": 4,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 6
+    },
+    {
+      "id": 501,
+      "name": "主粮零食",
+      "type": "EXPENSE",
+      "parentId": 5,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 502,
+      "name": "用品猫砂",
+      "type": "EXPENSE",
+      "parentId": 5,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 503,
+      "name": "医疗疫苗",
+      "type": "EXPENSE",
+      "parentId": 5,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": 504,
+      "name": "洗护美容",
+      "type": "EXPENSE",
+      "parentId": 5,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 505,
+      "name": "寄养",
+      "type": "EXPENSE",
+      "parentId": 5,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 5
+    },
+    {
+      "id": 601,
+      "name": "日用百货",
+      "type": "EXPENSE",
+      "parentId": 6,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 602,
+      "name": "服饰",
+      "type": "EXPENSE",
+      "parentId": 6,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 603,
+      "name": "数码",
+      "type": "EXPENSE",
+      "parentId": 6,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": 604,
+      "name": "家居",
+      "type": "EXPENSE",
+      "parentId": 6,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 701,
+      "name": "门诊",
+      "type": "EXPENSE",
+      "parentId": 7,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 702,
+      "name": "药品",
+      "type": "EXPENSE",
+      "parentId": 7,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 703,
+      "name": "体检",
+      "type": "EXPENSE",
+      "parentId": 7,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": 704,
+      "name": "牙科",
+      "type": "EXPENSE",
+      "parentId": 7,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 801,
+      "name": "课程书籍",
+      "type": "EXPENSE",
+      "parentId": 8,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 802,
+      "name": "影音会员",
+      "type": "EXPENSE",
+      "parentId": 8,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 803,
+      "name": "旅行",
+      "type": "EXPENSE",
+      "parentId": 8,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": 804,
+      "name": "运动健身",
+      "type": "EXPENSE",
+      "parentId": 8,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 901,
+      "name": "礼金",
+      "type": "EXPENSE",
+      "parentId": 9,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 902,
+      "name": "红包",
+      "type": "EXPENSE",
+      "parentId": 9,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 903,
+      "name": "请客",
+      "type": "EXPENSE",
+      "parentId": 9,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": 904,
+      "name": "赡养·代缴水电",
+      "type": "EXPENSE",
+      "parentId": 9,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4
+    },
+    {
+      "id": 1001,
+      "name": "未分类",
+      "type": "EXPENSE",
+      "parentId": 10,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 1101,
+      "name": "月薪",
+      "type": "INCOME",
+      "parentId": 11,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 1201,
+      "name": "绩效奖金",
+      "type": "INCOME",
+      "parentId": 12,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 1301,
+      "name": "劳务报酬",
+      "type": "INCOME",
+      "parentId": 13,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 1401,
+      "name": "利息",
+      "type": "INCOME",
+      "parentId": 14,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    },
+    {
+      "id": 1402,
+      "name": "分红",
+      "type": "INCOME",
+      "parentId": 14,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": 1501,
+      "name": "其他",
+      "type": "INCOME",
+      "parentId": 15,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1
+    }
+  ]
+}

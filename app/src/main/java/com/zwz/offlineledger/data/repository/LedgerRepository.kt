@@ -1,5 +1,6 @@
 package com.zwz.offlineledger.data.repository
 
+import com.zwz.offlineledger.data.local.CounterpartyNormalizer
 import androidx.room.withTransaction
 import com.zwz.offlineledger.backup.dto.BackupFile
 import com.zwz.offlineledger.backup.dto.LedgerSnapshot
@@ -8,6 +9,7 @@ import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.BudgetDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
+import com.zwz.offlineledger.data.local.dao.CounterpartyAliasDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
 import com.zwz.offlineledger.data.local.dao.TemplateDao
@@ -73,7 +75,8 @@ class LedgerRepository @Inject constructor(
     private val trashDao: TrashDao,
     private val templateDao: TemplateDao,
     private val ruleDao: RecurringRuleDao,
-    private val budgetDao: BudgetDao
+    private val budgetDao: BudgetDao,
+    private val aliasDao: CounterpartyAliasDao
 ) {
     fun observeNetWorth(): Flow<Long> = accountDao.observeNetWorth()
 
@@ -623,6 +626,7 @@ class LedgerRepository @Inject constructor(
     suspend fun importRecords(rows: List<CsvRow>): CsvImportOutcome = db.withTransaction {
         val accounts = accountDao.all().filter { !it.isArchived }
         val categories = categoryDao.all()
+        val aliases = aliasDao.all()
         var written = 0
         var skipped = 0
         rows.forEach { row ->
@@ -662,7 +666,7 @@ class LedgerRepository @Inject constructor(
                 yearMonth = ld / 100,
                 note = row.note,
                 excludeFromStats = false,
-                counterparty = row.counterparty,
+                counterparty = CounterpartyNormalizer.normalize(row.counterparty, aliases),
                 importSource = importSource,
                 sourceId = sourceId
             )
@@ -686,6 +690,7 @@ class LedgerRepository @Inject constructor(
     ): FireflyImportOutcome = db.withTransaction {
         val existingAccounts = accountDao.all()
         val existingCategories = categoryDao.all()
+        val aliases = aliasDao.all()
         val accountIds = HashMap<String, Long>()
         var newAccounts = 0
         var openingsApplied = 0
@@ -827,7 +832,7 @@ class LedgerRepository @Inject constructor(
                 yearMonth = e.yearMonth,
                 note = e.note,
                 excludeFromStats = false,
-                counterparty = e.counterparty,
+                counterparty = CounterpartyNormalizer.normalize(e.counterparty, aliases),
                 importSource = "FIREFLY_III",
                 sourceId = e.journalId
             )

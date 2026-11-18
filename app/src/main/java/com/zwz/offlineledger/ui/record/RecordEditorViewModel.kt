@@ -69,7 +69,7 @@ class RecordEditorViewModel(
     fun load(recordId: Long?) {
         viewModelScope.launch {
             val a = accountDao.all()
-            val c = categoryDao.all()
+            val c = categoryDao.all().filter { it.enabled }
             _accounts.value = a
             _categories.value = c
             _counterparties.value = runCatching { recordDao.distinctCounterparties() }.getOrDefault(emptyList())

@@ -113,11 +113,11 @@ fun FilterSheet(
     val accountOptions = listOf<Pair<String, String?>>("全部账户" to null) +
         accounts.filter { !it.isArchived }.map { it.name to it.id.toString() }
     val rootOptions = listOf<Pair<String, String?>>("全部一级" to null) +
-        categories.filter { it.level == 0 && !it.isArchived }
+        categories.filter { it.level == 0 && !it.isArchived && it.enabled }
             .map { it.name to it.id.toString() }
     val childOptions = listOf<Pair<String, String?>>("全部二级" to null) +
         categories.filter {
-            it.level == 1 && it.parentId == rootId && !it.isArchived
+            it.level == 1 && it.parentId == rootId && !it.isArchived && it.enabled
         }.map { it.name to it.id.toString() }
     val currencyOptions = listOf<Pair<String, String?>>("全部币种" to null) +
         accounts.filter { !it.isArchived }
@@ -126,10 +126,10 @@ fun FilterSheet(
     // 第 27 批：一级 + 二级平铺在同一份全量单选列表里，带搜索；
     // value 用 r:/c: 前缀区分层级，选中时同时还原 rootId 与 parentId。
     val categoryOptions = listOf<Pair<String, String?>>("全部分类" to null) +
-        categories.filter { it.level == 0 && !it.isArchived }
+        categories.filter { it.level == 0 && !it.isArchived && it.enabled }
             .flatMap { root ->
                 listOf(root.name to ("r:" + root.id)) +
-                    categories.filter { it.parentId == root.id && !it.isArchived }
+                    categories.filter { it.parentId == root.id && !it.isArchived && it.enabled }
                         .map { c -> CategoryDisplay.resolve(root.name, c.name) to ("c:" + c.id) }
             }
 

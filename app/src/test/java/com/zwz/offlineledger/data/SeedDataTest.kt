@@ -1,7 +1,6 @@
 package com.zwz.offlineledger.data
 
 import com.zwz.offlineledger.data.local.SeedData
-import com.zwz.offlineledger.data.model.AccountType
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.engine.CategoryTree
 import org.junit.Assert.assertEquals
@@ -24,10 +23,8 @@ class SeedDataTest {
     }
 
     @Test
-    fun `default accounts include a liability with credit limit`() {
-        assertTrue(SeedData.accounts.any { it.type == AccountType.ASSET })
-        val liability = SeedData.accounts.first { it.type == AccountType.LIABILITY }
-        assertTrue(liability.creditLimitCents != null && liability.creditLimitCents!! > 0)
+    fun `no preset accounts remain`() {
+        assertTrue("预制账户行已删除，首启应为零账户", SeedData.accounts.isEmpty())
     }
 
     @Test

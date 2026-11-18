@@ -34,7 +34,7 @@ class BudgetManagerViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(
                 budgets = budgetDao.all(),
-                categories = categoryDao.all().filter { !it.isArchived }
+                categories = categoryDao.all().filter { !it.isArchived && it.enabled }
             )
         }
     }

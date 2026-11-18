@@ -68,7 +68,8 @@ class AssetsViewModel(
         name: String,
         type: AccountType,
         initialYuan: String,
-        creditLimitYuan: String
+        creditLimitYuan: String,
+        cardLast4: String = ""
     ): String? {
         if (name.isBlank()) return "账户名不能为空"
         val initialCents = try {
@@ -84,7 +85,12 @@ class AssetsViewModel(
         return try {
             repository.createAccount(
                 AccountEntity(
-                    name = name.trim(),
+                    name = name.trim() +
+                        if (cardLast4.length == 4 && cardLast4.all { it.isDigit() })
+                            " (" + cardLast4 + ")" else "",
+                    cardLast4 = cardLast4.takeIf {
+                        it.length == 4 && it.all { ch -> ch.isDigit() }
+                    },
                     type = type,
                     initialBalanceCents = initialCents,
                     balanceCents = initialCents,

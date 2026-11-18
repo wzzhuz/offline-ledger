@@ -460,34 +460,17 @@ v1 JSON 缺两个键时会解析成空列表，兼容不需要额外分支。
 兼容不需要额外分支；信封头部不动保证既有解析器不返工。
 
 ### Requirement: CSV 明文导出格式
+CSV 明文导出 MUST 带 `importSource` 与 `sourceId` 列，导入缺列按空串处理；
+导出再导入同一份文件 MUST 继续幂等（0 写入），MUST NOT 因导出丢来源字段而破坏
+`UNIQUE(importSource, sourceId)`；加密备份 DTO 亦 MUST 携带这两个字段。
 
-系统 SHALL 提供 CSV 明文导出，文件 SHALL 使用 UTF-8 with BOM，
-表头 SHALL 固定为 `date,type,amount,account,categoryRoot,category,note,currencyCode`，
-金额列 SHALL 以「元」为单位保留两位小数，日期 SHALL 为 `YYYY-MM-DD`。
-导出 SHALL 通过 SAF 由用户选择保存位置，
-MUST NOT 申请存储权限，MUST NOT 在应用私有目录留下副本。
-加密 JSON 备份 SHALL 保持口令加密，MUST NOT 因提供 CSV 而倒退成明文。
+#### Scenario: 导出再导入同一份 CSV
+- **WHEN** 使用者导出明文 CSV 后对同一账本再导入该文件
+- **THEN** 全部行按来源唯一键跳过，写入 0 条
 
-#### Scenario: 两币种导出
-
-- **GIVEN** 一笔 HKD 3850 分与一笔 CNY 2000 分支出
-- **WHEN** 导出 CSV
-- **THEN** 两行金额分别为 `38.50` 与 `20.00`
-- **AND** `currencyCode` 列分别为 HKD 与 CNY
-- **AND** 文件以 `EF BB BF` 开头，Excel 打开中文不乱码
-
-#### Scenario: 导出不碰加密备份
-
-- **GIVEN** 已实现口令加密的 JSON 备份
-- **WHEN** 提供 CSV 导出入口
-- **THEN** 「导出加密备份」仍生成密文
-- **AND** 应用私有目录不新增明文 JSON
-
-**理由**：使用者最初规格书就写了「方便用电脑 Excel 打开」；
-6c-1 已澄清隐私边界是不上传第三方而非文件必须加密。
-明文可接受不等于把已交付的加密能力拆掉。
-
----
+#### Scenario: 缺列兼容
+- **WHEN** 导入一份没有 `importSource` / `sourceId` 列的旧 CSV
+- **THEN** 按空串解析，不报错，手工流水仍不受唯一索引约束
 
 ### Requirement: 账单导入解析失败整体回滚
 

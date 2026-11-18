@@ -654,6 +654,15 @@ class SettingsViewModel(
         }
     }
 
+    /** 第 30 批：启用/停用只改标志，不删行、不改历史；统计与导出仍读全量。 */
+    fun setCategoryEnabled(id: Long, enabled: Boolean) {
+        viewModelScope.launch {
+            categoryDao.setEnabled(id, enabled)
+            loadCategories()
+            message(if (enabled) "分类已启用，记一笔可选" else "分类已停用，历史仍计入统计")
+        }
+    }
+
     /** 排序作用域：支出/收入 + 一级/二级 + 所属父级。二级只在自己一级内排。 */
     private fun groupKey(c: CategoryEntity) =
         Triple<RecordType, Int, Long?>(c.type, c.level, c.parentId)

@@ -342,3 +342,14 @@ MUST 重新启用显式 `Migration`、`MIN_SUPPORTED` 向后兼容、
 
 - 第 27 批实测：代码 `73e8a19818d0` / CI `44260916347` success / release `44261811015` success；
   制品 `release-v0.2.11` 12,320,054 B、`mapping-v0.2.11` 3,672,588 B、`metrics` 272 B。
+
+
+## 第 30 批：预置数据与数据库版本 3（2026-11-18）
+
+- `AppDatabase.version = 3`：新增 `categories.enabled`、`accounts.cardLast4`、`counterparty_aliases` 表。
+  `Migrations.ALL` 仍为空；按使用者重申的测试阶段口径，**必须卸载重装，装前先导出**。
+- 预制账户行删除，首启零账户；账户由只读快捷模板创建，月付类归信用负债。
+- 分类清单唯一可替换来源是 `app/src/main/assets/default_categories.json`；`SeedData` 为同构 fallback，
+  `SeedCatalogTest` 逐行断言一致。停用只在录入侧隐藏，统计与导出仍读全量。
+- 商户别名归一只在导入落库前生效，不改 `records` 主表、不引入网络行为或新权限。
+- 隐私口径不变：不默认回传、数据流向由使用者控制；本次没有新增网络权限或联网依赖。

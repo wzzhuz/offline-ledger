@@ -25,5 +25,7 @@ data class AccountEntity(
     @ColumnInfo(name = "currencyCode") val currencyCode: String = LedgerCurrency.DEFAULT,
     /** 阶段 3 对账锚点，字段先预留。 */
     @ColumnInfo(name = "lastReconciledAt") val lastReconciledAt: Long? = null,
-    @ColumnInfo(name = "lastReconciledBalanceCents") val lastReconciledBalanceCents: Long? = null
+    @ColumnInfo(name = "lastReconciledBalanceCents") val lastReconciledBalanceCents: Long? = null,
+    /** 第 30 批：卡号后四位，仅用于区分同名卡片，不参与任何金额运算。 */
+    @ColumnInfo(name = "cardLast4") val cardLast4: String? = null
 )

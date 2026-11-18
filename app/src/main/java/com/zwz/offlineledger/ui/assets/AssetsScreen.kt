@@ -1,5 +1,8 @@
 package com.zwz.offlineledger.ui.assets
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import com.zwz.offlineledger.data.local.AccountTemplates
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -218,9 +221,9 @@ fun AssetsScreen(refreshTick: Int = 0) {
     if (showAdd) {
         AddAccountDialog(
             onDismiss = { showAdd = false },
-            onConfirm = { name, type, initial, limit ->
+            onConfirm = { name, type, initial, limit, last4 ->
                 scope.launch {
-                    val err = vm.addAccount(name, type, initial, limit)
+                    val err = vm.addAccount(name, type, initial, limit, last4)
                     if (err == null) { showAdd = false; addError = null } else addError = err
                 }
             },
@@ -457,23 +460,45 @@ private fun MiniAction(
 @Composable
 private fun AddAccountDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, AccountType, String, String) -> Unit,
+    onConfirm: (String, AccountType, String, String, String) -> Unit,
     errorText: String?
 ) {
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(AccountType.ASSET) }
     var initial by remember { mutableStateOf("") }
     var limit by remember { mutableStateOf("") }
+    var last4 by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("新增账户") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("快捷创建（点选后自动填名称与类型）",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral)
+                AccountTemplates.ALL.chunked(3).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        row.forEach { t ->
+                            FilterChip(
+                                selected = name == t.name,
+                                onClick = { name = t.name; type = t.type },
+                                label = { Text(t.label, maxLines = 1) }
+                            )
+                        }
+                    }
+                }
                 OutlinedTextField(
                     textStyle = MaterialTheme.typography.bodyMedium,
                     value = name, onValueChange = { name = it },
-                    placeholder = { Text("账户名称", style = MaterialTheme.typography.bodyMedium) }, modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                    placeholder = { Text("账户名称", style = MaterialTheme.typography.bodyMedium) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                )
+                OutlinedTextField(
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    value = last4, onValueChange = { last4 = it.filter { ch -> ch.isDigit() }.take(4) },
+                    placeholder = { Text("卡号后四位（可选）", style = MaterialTheme.typography.bodyMedium) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                 )
                 Column {
                     AccountType.entries.chunked(2).forEach { pair ->
@@ -497,7 +522,7 @@ private fun AddAccountDialog(
                 if (type == AccountType.LIABILITY) {
                     OutlinedTextField(
                         textStyle = MaterialTheme.typography.bodyMedium,
-                    value = limit, onValueChange = { limit = it },
+                        value = limit, onValueChange = { limit = it },
                         placeholder = { Text("信用额度（元，可空）", style = MaterialTheme.typography.bodyMedium) },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                     )
@@ -506,7 +531,7 @@ private fun AddAccountDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(name, type, initial, limit) }) { Text("保存") }
+            Button(onClick = { onConfirm(name, type, initial, limit, last4) }) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )

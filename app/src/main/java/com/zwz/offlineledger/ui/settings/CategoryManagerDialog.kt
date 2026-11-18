@@ -150,6 +150,7 @@ fun CategoryManagerScreen(onBack: () -> Unit) {
                 onRestore = { vm.restoreCategory(it) },
                 onCommitOrder = { ids -> vm.commitRootOrder(ids, catType) },
                 onCommitChildOrder = { parentId, ids -> vm.commitChildOrder(parentId, ids) },
+                onToggleEnabled = { id, en -> vm.setCategoryEnabled(id, en) },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -233,6 +234,7 @@ private fun CategoryList(
     onRestore: (Long) -> Unit,
     onCommitOrder: (List<Long>) -> Unit,
     onCommitChildOrder: (Long, List<Long>) -> Unit,
+    onToggleEnabled: (Long, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val rootsBase = categories.filter {
@@ -282,7 +284,9 @@ private fun CategoryList(
                     }
                     Column {
                         CategoryRootRow(
-                            label = root.name,
+                            label = root.name + if (root.enabled) "" else "（已停用）",
+                            enabled = root.enabled,
+                            onToggleEnabled = { onToggleEnabled(root.id, !root.enabled) },
                             childCount = childList.size,
                             countText = (counts[root.id] ?: 0).toString() + " 笔（含二级）",
                             expanded = expanded,
@@ -309,7 +313,7 @@ private fun CategoryList(
                                         onClick = { actionChild = child },
                                         label = {
                                             Text(
-                                                child.name,
+                                                child.name + if (child.enabled) "" else "（停用）",
                                                 maxLines = 1,
                                                 textAlign = TextAlign.Start,
                                                 style = MaterialTheme.typography.bodyMedium
@@ -371,6 +375,10 @@ private fun CategoryList(
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("看流水") }
                     TextButton(
+                        onClick = { actionChild = null; onToggleEnabled(c.id, !c.enabled) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (c.enabled) "停用" else "启用") }
+                    TextButton(
                         onClick = { actionChild = null; onMove(c.id, -1) },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("上移") }
@@ -394,6 +402,8 @@ private fun CategoryList(
 @Composable
 private fun CategoryRootRow(
     label: String,
+    enabled: Boolean,
+    onToggleEnabled: () -> Unit,
     childCount: Int,
     countText: String,
     expanded: Boolean,
@@ -464,6 +474,10 @@ private fun CategoryRootRow(
             DropdownMenuItem(text = { Text("上移") }, onClick = { menu = false; onMoveUp() })
             DropdownMenuItem(text = { Text("下移") }, onClick = { menu = false; onMoveDown() })
             DropdownMenuItem(text = { Text("改名") }, onClick = { menu = false; onRename() })
+            DropdownMenuItem(
+                text = { Text(if (enabled) "停用（录入隐藏）" else "启用（录入显示）") },
+                onClick = { menu = false; onToggleEnabled() }
+            )
             DropdownMenuItem(
                 text = { Text("删除", color = LedgerColors.ExpenseRed) },
                 onClick = { menu = false; onDelete() }

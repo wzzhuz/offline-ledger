@@ -10,6 +10,7 @@ import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.BudgetDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
+import com.zwz.offlineledger.data.local.dao.CounterpartyAliasDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
 import com.zwz.offlineledger.data.local.dao.TemplateDao
@@ -45,7 +46,7 @@ object DatabaseModule {
         AppDatabase.DATABASE_NAME
     )
         .openHelperFactory(factory)
-        .addCallback(SeedCallback())
+        .addCallback(SeedCallback(context))
         .addMigrations(*Migrations.ALL)
         .build()
 
@@ -57,4 +58,5 @@ object DatabaseModule {
     @Provides fun provideTemplateDao(db: AppDatabase): TemplateDao = db.templateDao()
     @Provides fun provideRecurringRuleDao(db: AppDatabase): RecurringRuleDao = db.recurringRuleDao()
     @Provides fun provideBudgetDao(db: AppDatabase): BudgetDao = db.budgetDao()
+    @Provides fun provideCounterpartyAliasDao(db: AppDatabase): CounterpartyAliasDao = db.counterpartyAliasDao()
 }

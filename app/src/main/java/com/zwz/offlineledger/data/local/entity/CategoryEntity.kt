@@ -27,5 +27,7 @@ data class CategoryEntity(
     @ColumnInfo(name = "iconName") val iconName: String = "",
     @ColumnInfo(name = "colorHex") val colorHex: String = "#888888",
     @ColumnInfo(name = "sortOrder") val sortOrder: Int = 0,
-    @ColumnInfo(name = "isArchived") val isArchived: Boolean = false
+    @ColumnInfo(name = "isArchived") val isArchived: Boolean = false,
+    /** 第 30 批：停用只在录入/筛选隐藏；统计、历史与导出 MUST 仍读全量。 */
+    @ColumnInfo(name = "enabled") val enabled: Boolean = true
 )

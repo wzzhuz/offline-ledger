@@ -40,6 +40,13 @@ interface CategoryDao {
     @Query("UPDATE categories SET isArchived = :archived WHERE id = :id")
     suspend fun setArchived(id: Long, archived: Boolean)
 
+    /** 第 30 批：启用/停用只改标志，MUST NOT 删行或改写已有流水。 */
+    @Query("UPDATE categories SET enabled = :enabled WHERE id = :id")
+    suspend fun setEnabled(id: Long, enabled: Boolean)
+
+    @Query("SELECT * FROM categories WHERE enabled = 1 AND isArchived = 0 ORDER BY sortOrder, id")
+    suspend fun enabledOnly(): List<CategoryEntity>
+
     @Query("SELECT COUNT(*) FROM records WHERE categoryId = :id OR rootCategoryId = :id")
     suspend fun linkedRecordCount(id: Long): Int
 }

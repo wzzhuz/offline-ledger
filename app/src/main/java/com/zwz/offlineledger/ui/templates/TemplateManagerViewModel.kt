@@ -43,7 +43,7 @@ class TemplateManagerViewModel(
             _state.value = _state.value.copy(
                 templates = templateDao.all(),
                 rules = ruleDao.all(),
-                categories = categoryDao.all().filter { !it.isArchived },
+                categories = categoryDao.all().filter { !it.isArchived && it.enabled },
                 accounts = accountDao.all().filter { !it.isArchived }
             )
         }
