@@ -276,14 +276,20 @@ MUST NOT 被写成「永远不做升级」；其余十几条历史 Requirement �
 短路实现，null 时行为 MUST NOT 改变。
 
 从统计页下钻到明细 Tab 时，系统 SHALL 同时带入可执行的条件值（`rootCategoryId` /
-`categoryId` / `counterpartyQuery` / `accountId`）与一个**只读展示名**字段；
-展示名 MUST NOT 参与 SQL、MUST NOT 计入 `activeCount()`（它不是一条独立条件）。
+`categoryId` / `counterpartyQuery` / `accountId`）与**按维度各自独立的三条只读展示名**
+（`categoryDisplayName` / `counterpartyDisplayName` / `accountDisplayName`）；
+三条展示名 MUST NOT 共用同一个字段（否则按收款方跳转时「分类」行会串味显示
+收款方名），MUST NOT 参与 SQL、MUST NOT 计入 `activeCount()`（它们不是独立条件）。
+三个下钻入口 SHALL 各自从全新条件对象起手，MUST NOT 沿用上一份条件快照。
 二级分类下钻 SHALL 同时带入父级 `rootCategoryId`，否则筛选面板无法还原该条件；
 筛选面板 SHALL 以一行「分类」显示具体名称（一级或「一级 / 二级」），并提供带
-搜索的全量单选弹层，让已设的每一项都可见、可改、可清。收款方下钻的筛选 chip
-文案 SHALL 标明「包含」，MUST NOT 写成「等于」；账户下钻 SHALL 带账户 id。
-明细页筛选 chip SHALL 始终显示「维度 + 具体值」，MUST NOT 用维度名兜底成
-「分类筛选：分类」。
+搜索的全量单选弹层，让已设的每一项都可见、可改、可清；一级项 SHALL 可选。
+收款方下钻的筛选 chip 文案 SHALL 标明「包含」，MUST NOT 写成「等于」；
+账户下钻 SHALL 带账户 id。明细页筛选 chip SHALL 始终显示「维度 + 具体值」，
+MUST NOT 用维度名兜底成「分类筛选：分类」。
+系统 SHALL 允许从一级分类扇区 / 图例直接下钻到明细 Tab 并带 `rootCategoryId`，
+MUST NOT 把一级下钻堵在「只能跳二级」的弹窗里；下钻弹窗若出现，SHALL 同时提供
+「查看该大类全部流水」入口。
 
 #### Scenario: 组合筛选
 
@@ -319,6 +325,20 @@ MUST NOT 被写成「永远不做升级」；其余十几条历史 Requirement �
 - **WHEN** 跳到明细 Tab
 - **THEN** 分别按包含匹配 / 账户 id 过滤，chip 显示具体名称，收款方标「包含」
 
+#### Scenario: 收款方下钻不污染分类行（第 28 批）
+
+- **GIVEN** 排行卡切到「收款方」点「盒马」跳到明细 Tab
+- **WHEN** 打开组合筛选面板
+- **THEN** 「分类」一行显示「全部分类」、不出现「盒马」
+- **AND** 「交易对方」输入框为「盒马」，已设项计数与 chip 一致
+
+#### Scenario: 饼图一级扇区下钻
+
+- **GIVEN** 分类占比卡切到「按大类」并点某个一级扇区或对应图例
+- **WHEN** 跳到明细 Tab
+- **THEN** 按 `rootCategoryId` 过滤，命中该一级下全部分类（含未分二级）流水
+- **AND** chip 显示该一级名称，筛选面板可在带搜索列表里改选或清除
+
 **理由**：动态组合筛选最容易写成拼 SQL；参数化绑定既零注入面，
 又让一条 SQL 覆盖所有组合，避免 `@RawQuery` 或多份 `@Query` 的组合爆炸。
 第 11 批新增交易对方时，MUST 沿用同一条查询而不是另开一条。
@@ -326,6 +346,9 @@ MUST NOT 被写成「永远不做升级」；其余十几条历史 Requirement �
 父级 id，导致 chip 显示「分类筛选：分类」、筛选面板看不到已选分类——
 第 27 批按「下钻契约四层（条件值 / 展示名 / 面板维度 / 跳转入口）」一次补齐，
 MUST NOT 只追加 ADDED 让 specs 出现两套条件清单。
+第 28 批把单条展示名拆成三条独立字段并补一级扇区直接下钻；核查确认
+`pagedFiltered` 早已接 `rootCategoryId`、筛选面板一级项早已可选、图例早已可点，
+所以本批 MUST NOT 新增聚合 SQL 出口或复制分页列表。
 
 ---
 

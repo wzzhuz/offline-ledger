@@ -52,3 +52,20 @@
 - [ ] 15. **真机复核（由使用者装机确认）**：chip 显示具体分类名、面板可见可改可清；
       扇区与图例都能跳、相邻色块可辨；排行一级展开二级、点二级跳明细；
       收款方 / 账户排行跳明细且条件正确
+
+# 第 28 批任务（v0.2.12 · 下钻收口 + 命名规范化）
+
+- [x] 1. 核查远端 HEAD、本地副本与 `release.yml` 上传源，订正 12M/24M 归因
+- [x] 2. `DonutInsightCard` ROOT 扇区/图例直接带 `rootCategoryId` 跳明细
+- [x] 3. `DrillDownDialog` 增「查看该大类全部流水」入口，`StatsScreen` 传参
+- [x] 4. `RecordFilter` / `FilterValues` 拆三条独立只读展示名
+- [x] 5. 三个 `filterByXxx` 抽纯 JVM 工厂，`applyFilter` / `clearFilter` 同步
+- [x] 6. `FilterSheet` 分类行只读 `categoryDisplayName`，`DetailScreen` chip 按维度读名
+- [x] 7. 新增 `FilterValuesMutualExclusionTest`（互斥 + activeCount + 展示名只读）
+- [x] 8. `release.yml` 产物名 `minified` → `release`，上传源与 R8 语义不变
+- [x] 9. 主 spec `ledger-transactions` MODIFIED 整块替换 + 2 个回归 Scenario
+- [x] 10. change 四件套、活文档 §7.13 与 §8 版本继承更新
+- [x] 11. 本地六个静态检查 + 单测
+- [x] 12. 单次 commit → push CI → release → 坚果云 → 实测回填
+- [ ] 13. 真机复核：按大类点扇区/图例跳一级流水、按收款方跳后分类行干净、
+          收款方/账户三维下钻不回退、release 包冷启动与开库正常

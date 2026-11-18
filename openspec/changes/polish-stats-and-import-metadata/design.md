@@ -103,3 +103,47 @@ completed success。制品 `offline-ledger-release-v0.2.11` 12,320,054 B、
 `nsfalse` 只表示认证 / 建目录 / PUT 均未失败，HEAD 落盘校验只写日志不中断，
 不当作已验证 HEAD 200。交付前 `.github/workflows/diag.yml` 与 `diag/unit.log`
 已删除（上批遗留），workflow 仅 build / release。
+
+## 7. 第 28 批（v0.2.12）· 下钻契约收口 + 构建产物口径订正
+
+### 7.1 根因（两处，都先读代码再定）
+
+1. **一级下钻被弹窗挡住**：`DonutInsightCard.onSectorClick` 在 `SliceLevel.ROOT` 时调用
+   `vm.openRoot(id)`，只打开「二级构成」弹窗；弹窗内 `onOpenCategoryInDetail` 固定传
+   `isRoot = false`。而 `LedgerApp.onOpenCategoryInDetail` 早就支持 `isRoot` 参数，
+   `pagedFiltered` 第 27 批起也**已经**接了 `rootCategoryId` 短路。所以真实缺口只是
+   一个分支调用，不是缺能力，更不需要新增聚合 SQL。
+2. **串味**：`RecordFilter.filterDisplayName` 是**单条**字段，三个 `filterByXxx` 都往它写；
+   `FilterSheet` 的 `displayName` 又无条件用它初始化并渲染「分类」行。按收款方跳转时
+   `filterDisplayName = "盒马"`，于是分类行与对方框同时出现「盒马」。
+   注意：三个入口本来就是从全新 `RecordFilter(...)` 构造的，门禁里写的「沿用旧快照」
+   不成立，此处按源码更正。
+
+### 7.2 修法
+
+- ROOT 扇区 / 图例 → `onOpenCategoryInDetail(id, true, ...)`；CHILD 保持 `false`。
+  弹窗保留并新增 `onOpenRootInDetail` 按钮，避免「只能跳二级」在任何路径重现。
+- 单条展示名拆成 `categoryDisplayName` / `counterpartyDisplayName` / `accountDisplayName`；
+  三个入口抽成 `RecordFilter.forCategory/forCounterparty/forAccount` 纯 JVM 工厂，
+  新增 `FilterValuesMutualExclusionTest` 断言互斥与 `activeCount()`。
+- `FilterSheet` 分类行只读 `categoryDisplayName`；对方框仍读 `counterpartyQuery`；
+  账户行仍按 `accountId` 反查。三者互不串味。
+
+### 7.3 12M / 24M 订正（重要）
+
+上一批门禁把「坚果云 24M、GitHub artifact 12M」判成 debug 变体 vs release 变体，
+**是错的**。读 `release.yml` 可知：`rename` 步骤的 `apk_name` 取
+`*-minified-<sha>.apk`，`upload_release_apk` 与坚果云用的**是同一个文件**，
+即 `-PminifyRelease=true` 产出的 R8 release 包。GitHub Actions artifact 的
+`size_in_bytes` 是二次压缩后的 zip 体积，APK 里的 `.so` 常以 store 方式存放，
+二次压缩能显著缩小，于是同一文件显示成 12M / 24M 两个数。`minified` 不是误命名。
+本批只做命名规范化（`minified` → `release`），**不改上传源**，并把口径写进活文档 §7.13。
+
+### 7.4 回退顺序（动手前写死）
+
+1. 若 `PullToRefreshBox` / 跨 Tab 传参编译失败 → 只回退对应文件，不动 `RecordFilter`。
+2. 若一级下钻命中为空 → 核查 `rootCategoryId` 是否为 null；`pagedFiltered` 已接参数，
+   MUST NOT 另开 `@Query`。
+3. 若 `release.yml` 改名后产物匹配不到 → 退回 `*-minified-*.apk` 匹配，
+   命名改动独立回滚，不影响 APK 内容。
+4. 三项任一真机验不过 → 不做无限迭代，按活文档 §1 登记后单独建 change。

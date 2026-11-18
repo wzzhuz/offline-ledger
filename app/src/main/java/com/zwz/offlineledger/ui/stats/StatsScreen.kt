@@ -218,6 +218,13 @@ fun StatsScreen(
                     id, false, state.yearMonth, state.currencyCode,
                     state.drillCategoryName.ifBlank { "分类" }
                 )
+            },
+            onOpenRootInDetail = { id ->
+                vm.closeDrill()
+                onOpenCategoryInDetail(
+                    id, true, state.yearMonth, state.currencyCode,
+                    state.drillRootName.ifBlank { "分类" }
+                )
             }
         )
     }
@@ -386,17 +393,20 @@ private fun DonutInsightCard(
                     val slice = slices.getOrNull(i)
                     val id = slice?.id
                     if (id != null) {
-                        if (state.sliceLevel == SliceLevel.ROOT) vm.openRoot(id)
-                        else onOpenCategoryInDetail(
-                            id, false, state.yearMonth, state.currencyCode,
+                        // 第 28 批：一级扇区/图例直接跳明细（带 rootCategoryId），
+                        // MUST NOT 只开二级构成弹窗、把一级下钻堵在弹窗里。
+                        onOpenCategoryInDetail(
+                            id, state.sliceLevel == SliceLevel.ROOT,
+                            state.yearMonth, state.currencyCode,
                             slice?.name ?: "分类"
                         )
                     }
                 }
             )
             Text(
-                text = "点击扇区或图例" + if (state.sliceLevel == SliceLevel.ROOT)
-                    "展开该大类下的二级构成" else "跳到明细页查看该分类流水",
+                text = "点击扇区或图例跳到明细页查看该" +
+                    if (state.sliceLevel == SliceLevel.ROOT)
+                        "大类（含其下全部分类）流水" else "分类流水",
                 style = MaterialTheme.typography.labelSmall,
                 color = LedgerColors.Neutral
             )

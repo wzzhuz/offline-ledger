@@ -25,7 +25,8 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 fun DrillDownDialog(
     state: StatsUiState,
     vm: StatsViewModel,
-    onOpenCategoryInDetail: (Long) -> Unit = {}
+    onOpenCategoryInDetail: (Long) -> Unit = {},
+    onOpenRootInDetail: (Long) -> Unit = {}
 ) {
     Dialog(
         onDismissRequest = { vm.closeDrill() },
@@ -54,6 +55,19 @@ fun DrillDownDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = LedgerColors.Neutral
                     )
+                    // 第 28 批：弹窗不能再「只能跳二级」，一级本身也要能下钻。
+                    if (state.drillRootId != null) {
+                        TextButton(onClick = {
+                            val rootId = state.drillRootId
+                            vm.closeDrill()
+                            rootId?.let(onOpenRootInDetail)
+                        }) {
+                            Text(
+                                "查看该大类全部流水 ›",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
                     LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
                         items(state.drillChildren, key = { it.id ?: 0L }) { c ->
                             Row(

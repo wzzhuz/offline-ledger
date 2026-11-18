@@ -51,8 +51,10 @@ data class FilterValues(
     val currencyCode: String? = null,
     /** 第 11 批：交易对方模糊匹配，与 pagedFiltered 参数一一对应。 */
     val counterpartyQuery: String? = null,
-    /** 第 27 批：只读展示名，不进 SQL、不进 activeCount()。 */
-    val filterDisplayName: String? = null
+    /** 第 28 批：三条只读展示名按维度独立，不进 SQL、不进 activeCount()。 */
+    val categoryDisplayName: String? = null,
+    val counterpartyDisplayName: String? = null,
+    val accountDisplayName: String? = null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -144,7 +146,9 @@ class DetailViewModel(
             noteQuery = v.noteQuery,
             currencyCode = v.currencyCode,
             counterpartyQuery = v.counterpartyQuery,
-            filterDisplayName = v.filterDisplayName,
+            categoryDisplayName = v.categoryDisplayName,
+            counterpartyDisplayName = v.counterpartyDisplayName,
+            accountDisplayName = v.accountDisplayName,
             revision = _filter.value.revision + 1
         )
     }
@@ -161,35 +165,35 @@ class DetailViewModel(
     ) {
         val parentId = if (isRoot) null
         else _categories.value.firstOrNull { it.id == categoryId }?.parentId
-        _filter.value = RecordFilter(
+        _filter.value = RecordFilter.forCategory(
             yearMonth = yearMonth,
             revision = _filter.value.revision + 1,
             rootCategoryId = if (isRoot) categoryId else parentId,
             categoryId = if (isRoot) null else categoryId,
             currencyCode = currencyCode,
-            filterDisplayName = displayName
+            categoryDisplayName = displayName
         )
     }
 
     /** 第 27 批：排行「收款方」跳明细，交易对方是自由文本，用包含匹配。 */
     fun filterByCounterparty(name: String, yearMonth: Int, currencyCode: String?) {
-        _filter.value = RecordFilter(
+        _filter.value = RecordFilter.forCounterparty(
             yearMonth = yearMonth,
             revision = _filter.value.revision + 1,
-            currencyCode = currencyCode,
             counterpartyQuery = name,
-            filterDisplayName = name
+            currencyCode = currencyCode,
+            counterpartyDisplayName = name
         )
     }
 
     /** 第 27 批：排行「账户」跳明细，带账户 id 与只读展示名。 */
     fun filterByAccount(accountId: Long, name: String, yearMonth: Int, currencyCode: String?) {
-        _filter.value = RecordFilter(
+        _filter.value = RecordFilter.forAccount(
             yearMonth = yearMonth,
             revision = _filter.value.revision + 1,
             accountId = accountId,
             currencyCode = currencyCode,
-            filterDisplayName = name
+            accountDisplayName = name
         )
     }
 
@@ -198,7 +202,9 @@ class DetailViewModel(
             fromDate = null, toDate = null, accountId = null, type = null,
             rootCategoryId = null, categoryId = null,
             minAmountCents = null, maxAmountCents = null, noteQuery = null,
-            currencyCode = null, counterpartyQuery = null, filterDisplayName = null,
+            currencyCode = null, counterpartyQuery = null,
+            categoryDisplayName = null, counterpartyDisplayName = null,
+            accountDisplayName = null,
             revision = _filter.value.revision + 1
         )
     }

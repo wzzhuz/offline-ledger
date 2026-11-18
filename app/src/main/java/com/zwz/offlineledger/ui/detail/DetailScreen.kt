@@ -126,19 +126,19 @@ fun DetailScreen(
                     onNext = { vm.switchMonth(1) },
                     onFilter = { showFilter = true }
                 )
-                // 第 27 批：统计页下钻的三种条件都显示「维度 + 具体值」，
-                // 优先用跨 Tab 带入的只读展示名，拿不到才按 id 反查兜底。
-                val drillName = filter.filterDisplayName
+                // 第 28 批：三条只读展示名按维度独立读取，MUST NOT 共用一个字段，
+                // 否则按收款方跳转时「分类」行会串味显示收款方名。
                 val drillLabel = when {
                     filter.categoryId != null || filter.rootCategoryId != null ->
-                        "分类筛选：" + (drillName ?: run {
+                        "分类筛选：" + (filter.categoryDisplayName ?: run {
                             val cid = filter.categoryId ?: filter.rootCategoryId
                             categories.firstOrNull { it.id == cid }?.name ?: "分类"
                         })
                     filter.counterpartyQuery != null ->
-                        "交易对方包含：" + (drillName ?: filter.counterpartyQuery)
+                        "交易对方包含：" +
+                            (filter.counterpartyDisplayName ?: filter.counterpartyQuery)
                     filter.accountId != null ->
-                        "账户：" + (drillName ?: (
+                        "账户：" + (filter.accountDisplayName ?: (
                             accounts.firstOrNull { it.id == filter.accountId }?.name ?: "账户"
                         ))
                     else -> null

@@ -89,7 +89,7 @@ fun FilterSheet(
     // 第 27 批：分类条件的只读展示名。旧状态没带名字时按 id 反查，
     // 二级拼成「一级 / 二级」，保证 chip 与筛选面板一定显示具体值。
     var displayName by remember {
-        mutableStateOf(initial.filterDisplayName ?: run {
+        mutableStateOf(initial.categoryDisplayName ?: run {
             val cid = initial.rootCategoryId ?: initial.categoryId
             val c = cid?.let { id -> categories.firstOrNull { it.id == id } }
             if (c == null) null else {
@@ -259,7 +259,10 @@ fun FilterSheet(
                                     noteQuery = noteText.takeIf { it.isNotBlank() },
                                     currencyCode = currencyCode,
                                     counterpartyQuery = partyText.takeIf { it.isNotBlank() },
-                                    filterDisplayName = displayName
+                                    categoryDisplayName = displayName,
+                                    counterpartyDisplayName =
+                                        partyText.takeIf { it.isNotBlank() },
+                                    accountDisplayName = null
                                 )
                             )
                             onDismiss()

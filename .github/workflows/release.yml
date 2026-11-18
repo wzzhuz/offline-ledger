@@ -174,8 +174,10 @@ jobs:
             -PversionCodeOverride="${{ steps.ver.outputs.code }}" \
             $( [ "${{ inputs.lint }}" = "true" ] || echo "-x lintVitalRelease" )
           mkdir -p out
+          # 第 28 批：产物名统一用 release（R8 语义不变），
+          # 避免把 GitHub artifact 压缩后的大小误读成「另一个变体」。
           cp app/build/outputs/apk/release/app-release.apk \
-             "out/offline-ledger-v${{ steps.ver.outputs.version }}-minified.apk"
+             "out/offline-ledger-v${{ steps.ver.outputs.version }}-release.apk"
 
       - name: 编译 AAB
         if: inputs.build_aab
@@ -210,7 +212,7 @@ jobs:
           echo "files=$(ls *.apk | tr '\n' ' ')" >> $GITHUB_OUTPUT
 
           # 单文件名：both 时优先取 R8 包用于 Release 附件与坚果云
-          APK=$(ls *-minified-*.apk 2>/dev/null | head -1)
+          APK=$(ls *-release-*.apk 2>/dev/null | head -1)
           [ -n "$APK" ] || APK=$(ls *-plain-*.apk 2>/dev/null | head -1)
           [ -n "$APK" ] || APK=$(ls *.apk | head -1)
           echo "apk_name=$APK" >> $GITHUB_OUTPUT
@@ -219,7 +221,7 @@ jobs:
 
           # 体积对比（both 才有意义）
           PLAIN=$(ls *-plain-*.apk 2>/dev/null | head -1)
-          MIN=$(ls *-minified-*.apk 2>/dev/null | head -1)
+          MIN=$(ls *-release-*.apk 2>/dev/null | head -1)
           if [ -n "$PLAIN" ] && [ -n "$MIN" ]; then
             P=$(stat -c%s "$PLAIN"); M=$(stat -c%s "$MIN")
             D=$(( P - M ))
@@ -228,7 +230,7 @@ jobs:
             echo "min_bytes=$M" >> $GITHUB_OUTPUT
             echo "saved_bytes=$D" >> $GITHUB_OUTPUT
             echo "saved_pct=$PCT" >> $GITHUB_OUTPUT
-            echo "plain: $P bytes / minified: $M bytes / 减少 $D bytes ($PCT%)"
+            echo "plain: $P bytes / release: $M bytes / 减少 $D bytes ($PCT%)"
           else
             echo "saved_pct=" >> $GITHUB_OUTPUT
           fi
@@ -512,7 +514,7 @@ jobs:
           echo "path=/$PARENT/$DIR/$APK_NAME" >> $GITHUB_OUTPUT
 
       # ---------------------------------------------------------------
-      # 构建指标制品：把「plain / minified 精确字节数 + 坚果云状态」编码进
+      # 构建指标制品：把「plain / R8 精确字节数 + 坚果云状态」编码进
       # artifact 名。GitHub 的 job logs / check-runs annotations / artifact zip
       # 在 fine-grained token 下常返回 403，但 artifacts 列表 API 能读到名字，
       # 于是体积对比与上传状态无需下载 zip 就能核验。文件名纯 ASCII。
@@ -560,7 +562,7 @@ jobs:
             cat /tmp/files.md 2>/dev/null
             echo ""
             if [ -n "${{ steps.rename.outputs.saved_pct }}" ]; then
-              echo "**R8 体积对比**：plain ${{ steps.rename.outputs.plain_bytes }} bytes → minified ${{ steps.rename.outputs.min_bytes }} bytes，减少 **${{ steps.rename.outputs.saved_bytes }} bytes（${{ steps.rename.outputs.saved_pct }}%）**"
+              echo "**R8 体积对比**：plain ${{ steps.rename.outputs.plain_bytes }} bytes → release ${{ steps.rename.outputs.min_bytes }} bytes，减少 **${{ steps.rename.outputs.saved_bytes }} bytes（${{ steps.rename.outputs.saved_pct }}%）**"
               echo ""
             fi
             echo "\`mapping.txt\` 制品用于反混淆 R8 后的线上堆栈。"
