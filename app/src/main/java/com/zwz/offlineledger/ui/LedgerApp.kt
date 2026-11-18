@@ -47,6 +47,8 @@ import com.zwz.offlineledger.ui.settings.LedgerSettingsScreen
 import com.zwz.offlineledger.ui.settings.PreferenceSettingsScreen
 import com.zwz.offlineledger.ui.settings.SecuritySettingsScreen
 import com.zwz.offlineledger.ui.settings.SettingsScreen
+import com.zwz.offlineledger.ui.settings.SnapshotSettingsScreen
+import com.zwz.offlineledger.ui.bulk.BulkEditScreen
 import com.zwz.offlineledger.ui.stats.StatsScreen
 import com.zwz.offlineledger.ui.templates.TemplateManagerScreen
 import com.zwz.offlineledger.ui.trash.TrashScreen
@@ -183,7 +185,9 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
             composable("backup") {
                 BackupSettingsScreen(
                     onBack = { goBack() },
-                    onOpenFirefly = { navController.navigate("firefly") }
+                    onOpenFirefly = { navController.navigate("firefly") },
+                    onOpenSnapshots = { navController.navigate("snapshots") },
+                    onOpenBulk = { navController.navigate("bulk") }
                 )
             }
             composable("firefly") {
@@ -192,6 +196,8 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                     onGoDetail = { navController.navigate("detail") }
                 )
             }
+            composable("snapshots") { SnapshotSettingsScreen(onBack = { goBack() }) }
+            composable("bulk") { BulkEditScreen(onBack = { goBack() }) }
             composable("security") { SecuritySettingsScreen(onBack = { goBack() }) }
             composable("prefs") { PreferenceSettingsScreen(onBack = { goBack() }) }
             composable("ledger") {

@@ -35,7 +35,9 @@ WRITE_METHODS = [
     # 第三批真机反馈
     'deleteTemplate', 'updateAccountType', 'setAccountArchived',
     'deleteAccountIfUnused', 'reorderAccounts',
-    'deleteCategory', 'restoreCategory'
+    'deleteCategory', 'restoreCategory',
+    # 第 31 批阶段二：批量规整单事务写入
+    'applyBulkTargets'
 ]
 
 TEMPLATE_SQL_COLS = [

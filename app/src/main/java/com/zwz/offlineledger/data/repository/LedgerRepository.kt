@@ -91,6 +91,27 @@ class LedgerRepository @Inject constructor(
         rebuildAllBalancesInternal()
     }
 
+    /**
+     * 第 31 批阶段二：批量规整的单事务写入口。
+     * 只改对方 / 备注 / 分类 / 不计入标记，金额与账户一分不动；
+     * 分类改动仍经 withResolvedRoot 同步冗余的一级分类，末尾只重算一次。
+     */
+    suspend fun applyBulkTargets(
+        targets: List<com.zwz.offlineledger.bulk.BulkTarget>
+    ) = db.withTransaction {
+        val byId = recordDao.all().associateBy { it.id }
+        for (t in targets) {
+            val entity = byId[t.id] ?: continue
+            recordDao.update(withResolvedRoot(entity.copy(
+                counterparty = t.counterparty,
+                note = t.note,
+                categoryId = t.categoryId,
+                excludeFromStats = t.excludedFromTotals
+            )))
+        }
+        rebuildAllBalancesInternal()
+    }
+
     /** 删除 = 从 records 移入 trash，然后重算。 */
     suspend fun deleteRecord(id: Long) = db.withTransaction {
         val record = recordDao.byId(id) ?: return@withTransaction

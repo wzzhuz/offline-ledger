@@ -23,3 +23,31 @@
 1. 若 SAF 原子改名在部分文件提供器上失败 → 退到「写唯一文件名 + 写完校验 + 不改名」。
 2. 若定时调度与应用生命周期冲突 → 退到「导入/批量规整完成后触发」+ 手动一键。
 3. 若批量规整落库事务过大 → 按 500 条分批，但保持同一 `changeset` 与一次性撤销。
+
+## 第 31 批阶段二实现（真实落盘）
+
+### 密钥与快照链路（不再用 KEK 封装）
+- 阶段一已核查：`SecureBackupCodec` 用使用者自设备份口令 PBKDF2 派生，与数据库口令无关。
+- 阶段二 `SnapshotPrefs` 用 AndroidKeystore 的独立别名 `offline_ledger_snapshot_pass`
+  加密保存自动快照口令，供每日定时任务使用；**恢复不依赖 Keystore**，重装后
+  Keystore 条目丢失时页面要求使用者手动输入同一口令。
+- 主库仍在内部私有目录；快照只写到 SAF 授权目录（可指向 NAS 同步本地目录）。
+- `SnapshotWriter`：`.tmp` → 写入 → 回读 SHA-256 校验 → `renameDocument` 成
+  `.ledgerbak` → `pruneCandidates` 清理临时文件并保留最近 7 份。失败删临时文件。
+- Uri 权限随卸载丢失、文件仍在：重装后 MUST 重新授权同一目录，恢复页列出成品。
+- `SnapshotScheduler`：`AlarmManager.setInexactRepeating` + `SnapshotReceiver`
+  （`goAsync` + IO 协程），失败只写日志不影响账本；导入/批量规整完成后也可手动一键。
+
+### 批量规整落库
+- `LedgerRepository.applyBulkTargets` 是新增的唯一写方法：`db.withTransaction` 内
+  按 id 取原实体、只 copy 四个可变字段、经 `withResolvedRoot` 同步冗余一级分类，
+  末尾 `rebuildAllBalancesInternal()` 一次。金额、账户、时间、币种一律不动。
+- `BulkEditViewModel` 把 `BulkEditEngine.apply` 的 `changeset` 留在本次页面会话，
+  撤销时 `revert` 取 before 再走同一写方法，逐字段还原。
+- 静态检查 `check_transaction_annotations.py` 的写方法清单同步登记 `applyBulkTargets`。
+
+### 三级回退（阶段二）
+1. 若 `renameDocument` 在个别文件提供器上失败 → 退到「写唯一成品名 + 写完校验 + 不改名」，
+   临时文件仍优先清理。
+2. 若定时闹钟与应用生命周期冲突 → 退到「导入/批量规整完成后触发」+ 手动一键。
+3. 若一次批量事务过大 → 按 500 条分批，但保持同一 `changeset` 与一次性撤销。

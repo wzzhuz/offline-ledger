@@ -20,3 +20,11 @@ SAF 目录授权与写入、每日定时调度、恢复页、批量规整页与�
 
 ## Impact
 零新增依赖、零新增权限、表结构不变；阶段一不出包。
+
+## 阶段二补充（第 31 批）
+阶段一「不在阶段一」列出的 SAF 授权目录、原子写、每日调度、恢复页与批量规整页
+已全部接线：`SnapshotPrefs` / `SnapshotWriter` / `SnapshotScheduler` /
+`SnapshotSettingsScreen` / `BulkEditScreen`，并在数据与备份页新增两个入口。
+批量规整一期动作收敛为内核已实现的四类（改分类 / 改对方 / 备注替换 /
+切换不计入收支），改账户与时间窗范围留二期，不写进 Requirement。
+表结构不变（仍 `version = 3`），零新增依赖、零新增权限。

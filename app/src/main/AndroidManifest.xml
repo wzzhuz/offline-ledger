@@ -48,6 +48,11 @@
             android:exported="false"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.OfflineLedger" />
+
+        <!-- 第 31 批阶段二：每日自动快照，仅内部广播，不导出、不新增权限。 -->
+        <receiver
+            android:name=".backup.snapshot.SnapshotReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>
