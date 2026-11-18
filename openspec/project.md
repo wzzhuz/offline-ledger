@@ -339,3 +339,6 @@ MUST 重新启用显式 `Migration`、`MIN_SUPPORTED` 向后兼容、
   上批遗留 `diag.yml` / `diag/unit.log` 本批交付前清理。
 - `polish-stats-and-import-metadata` 仍进行中（第 26+27 批），未归档；
   当前主 spec 基线 233 条 Requirement / 422 个 Scenario（第 22–25 批归档后），本 change 归档时再增 1 条 ADDED。
+
+- 第 27 批实测：代码 `73e8a19818d0` / CI `44260916347` success / release `44261811015` success；
+  制品 `release-v0.2.11` 12,320,054 B、`mapping-v0.2.11` 3,672,588 B、`metrics` 272 B。

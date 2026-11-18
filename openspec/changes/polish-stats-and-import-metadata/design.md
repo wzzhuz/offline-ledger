@@ -91,3 +91,15 @@ release `44254405887` success（23 步 / 5 步按 input 跳过），坚果云上
 `metrics-v0.2.10-p-m-nsfalse` 271 B。`nsfalse` 只表示认证 / 建目录 / PUT
 均未失败，HEAD 落盘校验只写日志不中断。上批遗留的 `diag.yml` /
 `diag/unit.log` 在第 27 批交付前清理。
+
+
+## 6. 第 27 批实测回填
+代码 `73e8a19818d0` → push CI `44260916347` **success**（17 步全绿，首轮 Kotlin 编译零错误；
+动手前先写回退顺序、每处替换断言唯一匹配，这次没走临时诊断通道）。
+release `44261811015` **success**：23 步绿 / 5 步按 input 跳过，「上传到坚果云」
+completed success。制品 `offline-ledger-release-v0.2.11` 12,320,054 B、
+`offline-ledger-mapping-v0.2.11` 3,672,588 B、
+`offline-ledger-metrics-v0.2.11-p-m-nsfalse` 272 B。
+`nsfalse` 只表示认证 / 建目录 / PUT 均未失败，HEAD 落盘校验只写日志不中断，
+不当作已验证 HEAD 200。交付前 `.github/workflows/diag.yml` 与 `diag/unit.log`
+已删除（上批遗留），workflow 仅 build / release。

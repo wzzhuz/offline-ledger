@@ -45,7 +45,10 @@
 - [x] 13. 清理上批遗留 `.github/workflows/diag.yml` / `diag/unit.log`
 
 ## 交付
-- [ ] 14. push CI 与 release 实测回填、坚果云上传
+- [x] 14. push CI 与 release 实测回填、坚果云上传（代码 `73e8a19818d0` / CI `44260916347` **success**
+      17 步全绿、首轮零编译错误；release `44261811015` **success** 23 步绿 / 5 步按 input
+      跳过，上传到坚果云 completed success；制品 `release-v0.2.11` 12,320,054 B、
+      `mapping-v0.2.11` 3,672,588 B、`metrics-v0.2.11-p-m-nsfalse` 272 B）
 - [ ] 15. **真机复核（由使用者装机确认）**：chip 显示具体分类名、面板可见可改可清；
       扇区与图例都能跳、相邻色块可辨；排行一级展开二级、点二级跳明细；
       收款方 / 账户排行跳明细且条件正确
