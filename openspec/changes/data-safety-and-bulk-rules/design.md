@@ -51,3 +51,23 @@
    临时文件仍优先清理。
 2. 若定时闹钟与应用生命周期冲突 → 退到「导入/批量规整完成后触发」+ 手动一键。
 3. 若一次批量事务过大 → 按 500 条分批，但保持同一 `changeset` 与一次性撤销。
+
+## 第 31 批阶段二实测回填（真实编号）
+
+| 项 | 实测 |
+|---|---|
+| 代码 commit | `84846cdf3f9a315c16da7b82da5ed9a100f250c7`（6 新增 / 9 修改，v0.2.15） |
+| push CI | `44332258434` **success**，17 步全绿，首轮 Kotlin 编译零错误；`BulkEditRevertTest` 由单测步骤跑过 |
+| release | `44333917298` **success**，23 步绿 / 5 步按 input 跳过；**「上传到坚果云」completed success** |
+| 制品（Actions artifact zip 压缩后尺寸） | `offline-ledger-release-v0.2.15` 12342643 B；`offline-ledger-mapping-v0.2.15` 3714261 B；`offline-ledger-metrics-v0.2.15-p-m-nsfalse` 270 B |
+| 坚果云 | `nsfalse`（认证 / 建目录 / PUT 均未失败）；HEAD 落盘校验只写日志不中断，不当作已验证 HEAD 200 |
+| 静态检查 | 六个 `check_*.py` 本地与 CI 均 PASS；写方法清单 41 个均在事务内 |
+
+**产物口径**：约 24M 是 R8 release APK 原始字节，Actions 制品页约 12M 是 zip
+二次压缩尺寸，两者同一个文件；不是 debug 变体。
+
+**阶段二真实落盘**：`SnapshotPrefs` / `SnapshotWriter` / `SnapshotScheduler` /
+`SnapshotSettingsScreen` / `BulkEditScreen` / `BulkEditRevertTest`；
+数据与备份页新增「自动快照与恢复」「批量规整」两个入口；
+`LedgerRepository.applyBulkTargets` 登记进写方法清单。
+`AppDatabase.version = 3` 未变 → v0.2.14 上覆盖安装即可，不用卸载。
