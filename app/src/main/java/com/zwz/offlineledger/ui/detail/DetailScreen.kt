@@ -126,9 +126,24 @@ fun DetailScreen(
                     onNext = { vm.switchMonth(1) },
                     onFilter = { showFilter = true }
                 )
-                if (filter.categoryId != null || filter.rootCategoryId != null) {
-                    val cid = filter.categoryId ?: filter.rootCategoryId
-                    val cname = categories.firstOrNull { it.id == cid }?.name ?: "分类"
+                // 第 27 批：统计页下钻的三种条件都显示「维度 + 具体值」，
+                // 优先用跨 Tab 带入的只读展示名，拿不到才按 id 反查兜底。
+                val drillName = filter.filterDisplayName
+                val drillLabel = when {
+                    filter.categoryId != null || filter.rootCategoryId != null ->
+                        "分类筛选：" + (drillName ?: run {
+                            val cid = filter.categoryId ?: filter.rootCategoryId
+                            categories.firstOrNull { it.id == cid }?.name ?: "分类"
+                        })
+                    filter.counterpartyQuery != null ->
+                        "交易对方包含：" + (drillName ?: filter.counterpartyQuery)
+                    filter.accountId != null ->
+                        "账户：" + (drillName ?: (
+                            accounts.firstOrNull { it.id == filter.accountId }?.name ?: "账户"
+                        ))
+                    else -> null
+                }
+                if (drillLabel != null) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -136,7 +151,7 @@ fun DetailScreen(
                         FilterChip(
                             selected = true,
                             onClick = { vm.clearFilter() },
-                            label = { Text("分类筛选：" + cname + "  ✕") }
+                            label = { Text(drillLabel + "  ✕") }
                         )
                     }
                 }

@@ -275,6 +275,16 @@ MUST NOT 被写成「永远不做升级」；其余十几条历史 Requirement �
 `(:counterpartyQuery IS NULL OR COALESCE(r.counterparty, '') LIKE '%' || :counterpartyQuery || '%')`
 短路实现，null 时行为 MUST NOT 改变。
 
+从统计页下钻到明细 Tab 时，系统 SHALL 同时带入可执行的条件值（`rootCategoryId` /
+`categoryId` / `counterpartyQuery` / `accountId`）与一个**只读展示名**字段；
+展示名 MUST NOT 参与 SQL、MUST NOT 计入 `activeCount()`（它不是一条独立条件）。
+二级分类下钻 SHALL 同时带入父级 `rootCategoryId`，否则筛选面板无法还原该条件；
+筛选面板 SHALL 以一行「分类」显示具体名称（一级或「一级 / 二级」），并提供带
+搜索的全量单选弹层，让已设的每一项都可见、可改、可清。收款方下钻的筛选 chip
+文案 SHALL 标明「包含」，MUST NOT 写成「等于」；账户下钻 SHALL 带账户 id。
+明细页筛选 chip SHALL 始终显示「维度 + 具体值」，MUST NOT 用维度名兜底成
+「分类筛选：分类」。
+
 #### Scenario: 组合筛选
 
 - **GIVEN** 用户设置上月 + 微信零钱 + 一级「餐饮」+ 金额 20–100 元 + 备注含「午饭」
@@ -296,9 +306,26 @@ MUST NOT 被写成「永远不做升级」；其余十几条历史 Requirement �
 - **THEN** 它被当作字面子串匹配
 - **AND** 不返回全部流水
 
+#### Scenario: 统计页二级分类下钻后面板可还原
+
+- **GIVEN** 统计页点二级分类「餐饮 / 外卖」跳到明细 Tab
+- **WHEN** 打开组合筛选面板
+- **THEN** 「分类」一行显示「餐饮 / 外卖」，已设项计数与 chip 一致
+- **AND** 点开该行可在带搜索的全量列表里改选或清除，应用后列表按新条件重查
+
+#### Scenario: 收款方 / 账户下钻
+
+- **GIVEN** 排行卡切到「收款方」或「账户」后点某一行
+- **WHEN** 跳到明细 Tab
+- **THEN** 分别按包含匹配 / 账户 id 过滤，chip 显示具体名称，收款方标「包含」
+
 **理由**：动态组合筛选最容易写成拼 SQL；参数化绑定既零注入面，
 又让一条 SQL 覆盖所有组合，避免 `@RawQuery` 或多份 `@Query` 的组合爆炸。
 第 11 批新增交易对方时，MUST 沿用同一条查询而不是另开一条。
+第 26 批把「查看分类流水」从弹窗改到明细 Tab，但只带条件 id、没带展示名与
+父级 id，导致 chip 显示「分类筛选：分类」、筛选面板看不到已选分类——
+第 27 批按「下钻契约四层（条件值 / 展示名 / 面板维度 / 跳转入口）」一次补齐，
+MUST NOT 只追加 ADDED 让 specs 出现两套条件清单。
 
 ---
 

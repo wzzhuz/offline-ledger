@@ -24,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +59,9 @@ private enum class RankDim { CATEGORY, COUNTERPARTY, ACCOUNT }
 fun StatsScreen(
     refreshTick: Int = 0,
     onOpenCategories: () -> Unit = {},
-    onOpenCategoryInDetail: (Long, Boolean, Int, String) -> Unit = { _, _, _, _ -> }
+    onOpenCategoryInDetail: (Long, Boolean, Int, String, String) -> Unit = { _, _, _, _, _ -> },
+    onOpenCounterpartyInDetail: (String, Int, String) -> Unit = { _, _, _ -> },
+    onOpenAccountInDetail: (Long, String, Int, String) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val vm: StatsViewModel = viewModel(
@@ -133,7 +136,9 @@ fun StatsScreen(
                 vm = vm,
                 rankDim = rankDim,
                 onRankDim = { rankDim = it },
-                onOpenCategoryInDetail = onOpenCategoryInDetail
+                onOpenCategoryInDetail = onOpenCategoryInDetail,
+                onOpenCounterpartyInDetail = onOpenCounterpartyInDetail,
+                onOpenAccountInDetail = onOpenAccountInDetail
             )
             if (state.mode == StatsMode.YEAR) {
                 AssetCard(
@@ -209,7 +214,10 @@ fun StatsScreen(
             vm = vm,
             onOpenCategoryInDetail = { id ->
                 vm.closeDrill()
-                onOpenCategoryInDetail(id, false, state.yearMonth, state.currencyCode)
+                onOpenCategoryInDetail(
+                    id, false, state.yearMonth, state.currencyCode,
+                    state.drillCategoryName.ifBlank { "分类" }
+                )
             }
         )
     }
@@ -338,7 +346,7 @@ private fun DonutInsightCard(
     state: StatsUiState,
     vm: StatsViewModel,
     onOpenCategories: () -> Unit,
-    onOpenCategoryInDetail: (Long, Boolean, Int, String) -> Unit
+    onOpenCategoryInDetail: (Long, Boolean, Int, String, String) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -375,17 +383,19 @@ private fun DonutInsightCard(
                 centerLabel = if (state.sliceLevel == SliceLevel.ROOT)
                     "一级净支出" else "二级净支出",
                 onSectorClick = { i ->
-                    val id = slices.getOrNull(i)?.id
+                    val slice = slices.getOrNull(i)
+                    val id = slice?.id
                     if (id != null) {
                         if (state.sliceLevel == SliceLevel.ROOT) vm.openRoot(id)
                         else onOpenCategoryInDetail(
-                            id, false, state.yearMonth, state.currencyCode
+                            id, false, state.yearMonth, state.currencyCode,
+                            slice?.name ?: "分类"
                         )
                     }
                 }
             )
             Text(
-                text = "点击扇区" + if (state.sliceLevel == SliceLevel.ROOT)
+                text = "点击扇区或图例" + if (state.sliceLevel == SliceLevel.ROOT)
                     "展开该大类下的二级构成" else "跳到明细页查看该分类流水",
                 style = MaterialTheme.typography.labelSmall,
                 color = LedgerColors.Neutral
@@ -403,8 +413,12 @@ private fun RankInsightCard(
     vm: StatsViewModel,
     rankDim: RankDim,
     onRankDim: (RankDim) -> Unit,
-    onOpenCategoryInDetail: (Long, Boolean, Int, String) -> Unit
+    onOpenCategoryInDetail: (Long, Boolean, Int, String, String) -> Unit,
+    onOpenCounterpartyInDetail: (String, Int, String) -> Unit,
+    onOpenAccountInDetail: (Long, String, Int, String) -> Unit
 ) {
+    // 第 27 批：二级展开态跨重组 / 切 Tab 保留（与分类管理折叠态同口径）。
+    var expandedRootId by rememberSaveable { mutableStateOf<Long?>(null) }
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -445,21 +459,62 @@ private fun RankInsightCard(
                 )
             } else {
                 rows.forEach { row ->
+                    val kids = if (rankDim == RankDim.CATEGORY) {
+                        row.id?.let { state.rankChildren[it] } ?: emptyList()
+                    } else emptyList()
                     RankRowView(
                         row = row,
+                        expandable = kids.isNotEmpty(),
+                        expanded = expandedRootId == row.id,
+                        onToggle = {
+                            expandedRootId = if (expandedRootId == row.id) null else row.id
+                        },
                         onClick = {
-                            if (rankDim == RankDim.CATEGORY) row.id?.let {
-                                onOpenCategoryInDetail(
-                                    it, true, state.yearMonth, state.currencyCode
-                                )
+                            when (rankDim) {
+                                RankDim.CATEGORY -> row.id?.let {
+                                    onOpenCategoryInDetail(
+                                        it, true, state.yearMonth,
+                                        state.currencyCode, row.name
+                                    )
+                                }
+                                RankDim.COUNTERPARTY ->
+                                    onOpenCounterpartyInDetail(
+                                        row.name, state.yearMonth, state.currencyCode
+                                    )
+                                RankDim.ACCOUNT -> row.id?.let {
+                                    onOpenAccountInDetail(
+                                        it, row.name, state.yearMonth, state.currencyCode
+                                    )
+                                }
                             }
                         }
                     )
+                    if (rankDim == RankDim.CATEGORY && expandedRootId == row.id) {
+                        kids.forEach { kid ->
+                            RankRowView(
+                                row = kid,
+                                indent = true,
+                                onClick = {
+                                    kid.id?.let {
+                                        onOpenCategoryInDetail(
+                                            it, false, state.yearMonth,
+                                            state.currencyCode, kid.name
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
                 Text(
-                    text = if (rankDim == RankDim.CATEGORY)
-                        "点分类跳明细页带筛选；排行与占比卡共用同一份净支出切片。"
-                    else "按当前币种统计，不跨币种混算；金额来自 SQL 聚合。",
+                    text = when (rankDim) {
+                        RankDim.CATEGORY ->
+                            "点一级看该分类流水，点 ⌄ 展开二级；二级可直接跳明细。"
+                        RankDim.COUNTERPARTY ->
+                            "点收款方跳明细（包含匹配）；按当前币种统计，不跨币种混算。"
+                        RankDim.ACCOUNT ->
+                            "点账户跳明细；按当前币种统计，不跨币种混算。"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = LedgerColors.Neutral,
                     modifier = Modifier.padding(top = 6.dp)
@@ -470,14 +525,26 @@ private fun RankInsightCard(
 }
 
 @Composable
-private fun RankRowView(row: InsightData.RankRow, onClick: () -> Unit) {
+private fun RankRowView(
+    row: InsightData.RankRow,
+    onClick: () -> Unit,
+    expandable: Boolean = false,
+    expanded: Boolean = false,
+    onToggle: () -> Unit = {},
+    indent: Boolean = false
+) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = onClick, modifier = Modifier.weight(1f)) {
-                Text(row.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                Text(
+                    (if (indent) "  └ " else "") + row.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1
+                )
             }
             Text(
                 text = formatCents(row.cents),
@@ -488,6 +555,11 @@ private fun RankRowView(row: InsightData.RankRow, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = LedgerColors.Neutral
             )
+            if (expandable) {
+                TextButton(onClick = onToggle) {
+                    Text(if (expanded) "⌃" else "⌄")
+                }
+            }
         }
         MiniBar(row.ratio, false)
     }

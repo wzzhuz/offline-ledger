@@ -71,6 +71,8 @@ data class StatsUiState(
     val topCategories: List<InsightData.RankRow> = emptyList(),
     val topCounterparties: List<InsightData.RankRow> = emptyList(),
     val topAccounts: List<InsightData.RankRow> = emptyList(),
+    /** 第 27 批：一级分类 -> 该级下二级排行，供排行卡内联展开，零新增 SQL。 */
+    val rankChildren: Map<Long, List<InsightData.RankRow>> = emptyMap(),
     val loading: Boolean = false
 )
 
@@ -221,6 +223,18 @@ class StatsViewModel(
             val children = ChartData.netSlices(toSlices(childRows, nameOf, colorOf), settleChild)
             val check = ChartData.checkTotals(roots, children, netTotal)
 
+            // 第 27 批：排行卡「点一级展开二级」复用已有 childSlices 聚合，
+            // 按 CategoryEntity.parentId 归组；不新增 DAO 查询、不改统计口径。
+            val childrenByRoot = children.mapNotNull { sl ->
+                val cid = sl.id ?: return@mapNotNull null
+                val parent = categories[cid]?.parentId ?: return@mapNotNull null
+                parent to InsightData.RankRow(
+                    sl.name, sl.cents, 0,
+                    InsightData.ratio(sl.cents, netTotal), cid
+                )
+            }.groupBy({ it.first }, { it.second })
+                .mapValues { (_, v) -> v.sortedByDescending { it.cents } }
+
             // 预算消耗固定按「当前选中月 + 当前币种」单月聚合，不跨月、不跨币种累加。
             val ym = s.yearMonth
             val mSettleRoot = recordDao.settlementByRootForCurrency(ym, ym, cc)
@@ -303,7 +317,7 @@ class StatsViewModel(
                 .map { InsightData.RankItem(it.name, it.totalCents, it.cnt) }
             val accNames = accountDao.all().associateBy { it.id }
             val accItems = recordDao.insightTopAccounts(from, to, cc, 5)
-                .map { InsightData.RankItem(accNames[it.id]?.name ?: ("账户 " + it.id), it.totalCents, it.cnt) }
+                .map { InsightData.RankItem(accNames[it.id]?.name ?: ("账户 " + it.id), it.totalCents, it.cnt, it.id) }
             val catItems = roots.map { InsightData.RankItem(it.name, it.cents, 0, it.id) }
             val units = when (s.mode) {
                 StatsMode.MONTH ->
@@ -325,6 +339,7 @@ class StatsViewModel(
                 topCategories = InsightData.topRows(catItems, netTotal, 5),
                 topCounterparties = InsightData.topRows(cpItems, totalExpense, 5),
                 topAccounts = InsightData.topRows(accItems, totalExpense, 5),
+                rankChildren = childrenByRoot,
                 totalIncomeCents = totalIncome,
                 totalExpenseCents = totalExpense,
                 settlementCents = settleTotal,

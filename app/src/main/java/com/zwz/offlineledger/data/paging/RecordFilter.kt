@@ -23,7 +23,13 @@ data class RecordFilter(
     /** 阶段 6c-2：null = 全部币种；选中后列表与日合计只统计该币种。 */
     val currencyCode: String? = null,
     /** 第 11 批：交易对方模糊匹配；null = 不过滤。 */
-    val counterpartyQuery: String? = null
+    val counterpartyQuery: String? = null,
+    /**
+     * 第 27 批：从统计页下钻带入的条件「只读展示名」。
+     * 只用于明细页筛选 chip 与筛选面板显示具体值，MUST NOT 参与 SQL，
+     * MUST NOT 计入 activeCount()（它不是一条独立筛选条件）。
+     */
+    val filterDisplayName: String? = null
 ) {
     fun effectiveFromDate(): Int = fromDate ?: MonthRange.of(yearMonth).first
     fun effectiveToDate(): Int = toDate ?: MonthRange.of(yearMonth).second

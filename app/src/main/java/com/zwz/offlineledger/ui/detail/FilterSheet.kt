@@ -86,6 +86,20 @@ fun FilterSheet(
     var rootId by remember { mutableStateOf(initial.rootCategoryId) }
     var categoryId by remember { mutableStateOf(initial.categoryId) }
     var currencyCode by remember { mutableStateOf(initial.currencyCode) }
+    // 第 27 批：分类条件的只读展示名。旧状态没带名字时按 id 反查，
+    // 二级拼成「一级 / 二级」，保证 chip 与筛选面板一定显示具体值。
+    var displayName by remember {
+        mutableStateOf(initial.filterDisplayName ?: run {
+            val cid = initial.rootCategoryId ?: initial.categoryId
+            val c = cid?.let { id -> categories.firstOrNull { it.id == id } }
+            if (c == null) null else {
+                val parent = c.parentId?.let { pid ->
+                    categories.firstOrNull { it.id == pid }?.name
+                }
+                if (parent != null) parent + " / " + c.name else c.name
+            }
+        })
+    }
 
     var picker by remember { mutableStateOf<String?>(null) }
     var dateTarget by remember { mutableStateOf<Int?>(null) }
@@ -107,6 +121,15 @@ fun FilterSheet(
         accounts.filter { !it.isArchived }
             .map { it.currencyCode }.distinct().sorted()
             .map { it to it }
+    // 第 27 批：一级 + 二级平铺在同一份全量单选列表里，带搜索；
+    // value 用 r:/c: 前缀区分层级，选中时同时还原 rootId 与 parentId。
+    val categoryOptions = listOf<Pair<String, String?>>("全部分类" to null) +
+        categories.filter { it.level == 0 && !it.isArchived }
+            .flatMap { root ->
+                listOf(root.name to ("r:" + root.id)) +
+                    categories.filter { it.parentId == root.id && !it.isArchived }
+                        .map { c -> (root.name + " / " + c.name) to ("c:" + c.id) }
+            }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
@@ -153,15 +176,9 @@ fun FilterSheet(
                 PickRow("账户", displayLabel(accountOptions, accountId?.toString())) {
                     picker = "account"
                 }
-                PickRow("一级", displayLabel(rootOptions, rootId?.toString())) {
-                    picker = "root"
-                }
-                PickRow(
-                    "二级",
-                    if (rootId == null) "先选一级" else displayLabel(childOptions, categoryId?.toString())
-                ) {
-                    picker = if (rootId == null) "root" else "child"
-                }
+                // 第 27 批：合并成一行「分类」，始终显示已选的具体名称，
+                // 点开是带搜索的全量单选弹层（一级 + 「一级 / 二级」）。
+                PickRow("分类", displayName ?: "全部分类") { picker = "category" }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CompactField(
@@ -241,7 +258,8 @@ fun FilterSheet(
                                     maxAmountCents = parseCents(maxText),
                                     noteQuery = noteText.takeIf { it.isNotBlank() },
                                     currencyCode = currencyCode,
-                                    counterpartyQuery = partyText.takeIf { it.isNotBlank() }
+                                    counterpartyQuery = partyText.takeIf { it.isNotBlank() },
+                                    filterDisplayName = displayName
                                 )
                             )
                             onDismiss()
@@ -288,6 +306,30 @@ fun FilterSheet(
             }
             "child" -> PickerData("二级分类", childOptions, categoryId?.toString()) { v ->
                 categoryId = v?.toLongOrNull()
+            }
+            "category" -> PickerData(
+                "分类",
+                categoryOptions,
+                when {
+                    categoryId != null -> "c:" + categoryId
+                    rootId != null -> "r:" + rootId
+                    else -> null
+                }
+            ) { v ->
+                if (v == null) {
+                    rootId = null; categoryId = null; displayName = null
+                } else if (v.startsWith("r:")) {
+                    rootId = v.removePrefix("r:").toLongOrNull()
+                    categoryId = null
+                    displayName = categoryOptions.firstOrNull { it.second == v }?.first
+                } else {
+                    val cid = v.removePrefix("c:").toLongOrNull()
+                    categoryId = cid
+                    rootId = cid?.let { id ->
+                        categories.firstOrNull { it.id == id }?.parentId
+                    }
+                    displayName = categoryOptions.firstOrNull { it.second == v }?.first
+                }
             }
             else -> PickerData("币种", currencyOptions, currencyCode) { v ->
                 currencyCode = v

@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.ui.charts
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -107,7 +109,8 @@ fun DonutChart(
             }
         }
 
-        // 图例：每行两项，普通 Column + Row，不依赖任何实验性布局 API
+        // 图例：每行两项，普通 Column + Row，不依赖任何实验性布局 API。
+        // 第 27 批起每项整行可点（点击等价于点对应扇区）。
         Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
             sectors.chunked(2).forEachIndexed { rowIndex, group ->
                 Row(
@@ -116,18 +119,25 @@ fun DonutChart(
                 ) {
                     group.forEachIndexed { colIndex, s ->
                         val i = rowIndex * 2 + colIndex
+                        // 第 27 批：图例与扇区共用同一个 onSectorClick，
+                        // 整行可点、色块加大、触摸区 >=40dp，不再只有圈能点。
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 40.dp)
+                                .clickable { onSectorClick(i) }
+                                .padding(horizontal = 4.dp)
                         ) {
-                            Canvas(modifier = Modifier.size(10.dp)) {
+                            Canvas(modifier = Modifier.size(12.dp)) {
                                 drawCircle(
                                     color = Color(ChartData.chartArgb(s.slice.id, i).toInt())
                                 )
                             }
                             Text(
                                 text = " " + s.slice.name + " " + formatCents(s.slice.cents),
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
                                 modifier = Modifier.padding(start = 4.dp)
                             )
                         }

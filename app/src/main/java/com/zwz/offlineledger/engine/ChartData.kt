@@ -223,15 +223,19 @@ object ChartData {
 
     // ---------------------------------------------------------------
     /**
-     * 第 23 批：图表专用低饱和同色系色板。
+     * 第 23 批引入、第 27 批修订：图表专用低饱和色板。
      * 分类标识（列表 / chip）仍保持中性单色圆，图表扇区才需要区分度；
      * 自动生成的分类 colorHex 恒为 #888888，直接读它会让所有扇区一个颜色。
      * 按分类 id 取模分配，MUST NOT 按金额排名索引分配 —— 否则每次占比变化就变色。
+     *
+     * 第 23 批用「同色系明度递进」，相邻扇区在真机上几乎分不出来（使用者反馈
+     * 「图例颜色太相近」）。本批改为明度接近、色相分明的柔和分类色板，
+     * MUST NOT 回到第 4 批否掉的高饱和 6~7 跳色，也不开放 colorHex 用户可配。
      */
     private val CHART_PALETTE = longArrayOf(
-        0xFF3F6C8BL, 0xFF5B8AA6L, 0xFF77A6B6L, 0xFF94BFC7L,
-        0xFF6E8F7BL, 0xFF8FAE91L, 0xFFB3C9A9L, 0xFF7A7FA8L,
-        0xFF9C9BC0L, 0xFFB98F7BL
+        0xFF4E79A7L, 0xFFE28E3BL, 0xFF59A14FL, 0xFF9C6ADEL,
+        0xFFD9534FL, 0xFF3FA7A0L, 0xFFA3B86CL, 0xFFB07A56L,
+        0xFFD06C9BL, 0xFF5B6FB8L
     )
 
     fun chartArgb(id: Long?, index: Int): Long {

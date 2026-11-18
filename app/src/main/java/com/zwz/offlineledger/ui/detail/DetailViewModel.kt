@@ -50,7 +50,9 @@ data class FilterValues(
     val noteQuery: String? = null,
     val currencyCode: String? = null,
     /** 第 11 批：交易对方模糊匹配，与 pagedFiltered 参数一一对应。 */
-    val counterpartyQuery: String? = null
+    val counterpartyQuery: String? = null,
+    /** 第 27 批：只读展示名，不进 SQL、不进 activeCount()。 */
+    val filterDisplayName: String? = null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -142,23 +144,52 @@ class DetailViewModel(
             noteQuery = v.noteQuery,
             currencyCode = v.currencyCode,
             counterpartyQuery = v.counterpartyQuery,
+            filterDisplayName = v.filterDisplayName,
             revision = _filter.value.revision + 1
         )
     }
 
-    /** 第 26 批：统计页点分类带筛选跳明细；清掉其它条件，仅留分类与币种。 */
+    /** 第 26/27 批：统计页点分类带筛选跳明细；清掉其它条件，仅留分类与币种。
+     *  第 27 批补齐两处：二级分类同时带上父级 rootCategoryId（否则筛选面板
+     *  「二级」显示「先选一级」、看不到已选条件），并带只读展示名。 */
     fun filterByCategory(
         categoryId: Long,
         isRoot: Boolean,
         yearMonth: Int,
-        currencyCode: String?
+        currencyCode: String?,
+        displayName: String? = null
     ) {
+        val parentId = if (isRoot) null
+        else _categories.value.firstOrNull { it.id == categoryId }?.parentId
         _filter.value = RecordFilter(
             yearMonth = yearMonth,
             revision = _filter.value.revision + 1,
-            rootCategoryId = if (isRoot) categoryId else null,
+            rootCategoryId = if (isRoot) categoryId else parentId,
             categoryId = if (isRoot) null else categoryId,
-            currencyCode = currencyCode
+            currencyCode = currencyCode,
+            filterDisplayName = displayName
+        )
+    }
+
+    /** 第 27 批：排行「收款方」跳明细，交易对方是自由文本，用包含匹配。 */
+    fun filterByCounterparty(name: String, yearMonth: Int, currencyCode: String?) {
+        _filter.value = RecordFilter(
+            yearMonth = yearMonth,
+            revision = _filter.value.revision + 1,
+            currencyCode = currencyCode,
+            counterpartyQuery = name,
+            filterDisplayName = name
+        )
+    }
+
+    /** 第 27 批：排行「账户」跳明细，带账户 id 与只读展示名。 */
+    fun filterByAccount(accountId: Long, name: String, yearMonth: Int, currencyCode: String?) {
+        _filter.value = RecordFilter(
+            yearMonth = yearMonth,
+            revision = _filter.value.revision + 1,
+            accountId = accountId,
+            currencyCode = currencyCode,
+            filterDisplayName = name
         )
     }
 
@@ -167,7 +198,7 @@ class DetailViewModel(
             fromDate = null, toDate = null, accountId = null, type = null,
             rootCategoryId = null, categoryId = null,
             minAmountCents = null, maxAmountCents = null, noteQuery = null,
-            currencyCode = null, counterpartyQuery = null,
+            currencyCode = null, counterpartyQuery = null, filterDisplayName = null,
             revision = _filter.value.revision + 1
         )
     }
