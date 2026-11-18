@@ -199,3 +199,19 @@ APK 的原始字节」，`release.yml` 的 rename 步骤本来就优先选 `*-re
 3. 若新单测在 CI 崩溃 → 先移除单测文件，保留实现，单独诊断 JVM 测试源集。
 
 按指南 §4，所有替换断言「每处唯一匹配」，新增文件不覆盖既有路径。
+
+## 10. 第 29 批实测回填（真实编号）
+
+| 项 | 实测 |
+|---|---|
+| 代码 commit | `7863ba3c91193b29f5b9ac65e26f8c6e071078e3`（10 改 / 2 新增，v0.2.13） |
+| push CI | `44278333971` **success**，17 步全绿，新增 `CategoryDisplayTest` 由单测步骤覆盖 |
+| release | `44279468270` **success**，23 步绿 / 5 步按 input 跳过；**上传到坚果云 success** |
+| 制品（Actions artifact 压缩后尺寸） | `offline-ledger-release-v0.2.13` 12319433 B；`offline-ledger-mapping-v0.2.13` 3674144 B；`offline-ledger-metrics-v0.2.13-p-m-nsfalse` 270 B |
+| 坚果云 | `nsfalse`（认证 / 建目录 / PUT 均未失败）；HEAD 落盘校验只写日志不中断，不当作已验证 HEAD 200 |
+| 静态检查 | 六个 `check_*.py` 本地与 CI 均 PASS |
+
+**产物口径复核**：坚果云上传步骤日志已打印 `构建形态：minify=on`、原始字节与
+mapping 存在性；约 24M 是 R8 release APK 的原始字节，Actions Artifacts 页面
+约 12M 是 zip 二次压缩尺寸。上传选择逻辑未改（`rename` 本来就优先取
+`*-release-*.apk`），未实施会误伤 CI 的体积断言。
