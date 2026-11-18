@@ -226,8 +226,12 @@ Q5 预制账户 / 分类是 `SeedData` 代码常量，首次建库写进表，�
 ### 11.3 三级回退顺序（若 CI 红）
 
 1. 先只修 Kotlin 编译错误（import / `ExperimentalMaterial3Api` opt-in / 重载解析），不动布局；
-2. 若 `PullToRefreshBox` 在当前 BOM 解析不到，退到 `rememberPullToRefreshState` +
-   `Modifier.pullRefresh` + `PullRefreshIndicator`，仍零第三方依赖；
+2. 首轮 CI 实测命中第 1 条：`PullToRefreshBox` 报 `Unresolved reference` 的根因是
+   **包名写错**——官方在 `androidx.compose.material3.pulltorefresh` 子包，不在
+   `androidx.compose.material3` 根包；不是 BOM 缺 API。只改一行 import 即全绿，
+   第 2 / 3 条回退均未启用。若将来确实缺该 API，再退到
+   `rememberPullToRefreshState` + `Modifier.pullRefresh` + `PullRefreshIndicator`，
+   仍零第三方依赖；
 3. 若横屏动态高度导致 Canvas 溢出，退到固定 `chartHeight = 180.dp` + 底部
    `navigationBarsPadding()`，不再动 insets 分层。
 
@@ -235,7 +239,13 @@ Q5 预制账户 / 分类是 `SeedData` 代码常量，首次建库写进表，�
 
 | 项 | 结果 |
 |---|---|
-| 代码 commit | 待回填 |
-| push CI | 待回填 |
-| release | 待回填 |
-| 制品 | 待回填 |
+| 代码 commit | `eec6e9409fd17aa5f6c264a1be94d298fd3c97ed`（8 文件，v0.2.8）→ 首轮 CI 红 → 修复 + 清理诊断通道 `d39bf68135ada345ff3c26adf95816f283890069`（最终 HEAD） |
+| push CI | `44230612494` **failure**（`PullToRefreshBox` import 包名错）；临时 diag workflow `44230973142` 回传 gradle 日志定位；修复后 `44231434403` **success**（17 步全绿） |
+| release | `44232196858` **success**，23 步绿 / 5 步按 input 跳过；**「上传到坚果云」步骤 success** |
+| 制品 | `offline-ledger-release-v0.2.8` 12,317,033 B；`offline-ledger-mapping-v0.2.8` 3,656,535 B；`offline-ledger-metrics-v0.2.8-p-m-nsfalse` 272 B |
+| 仓库卫生 | 307↔307 blob、sha 零差异 PASS；`diag/` 零残留、workflow 仅 build/release；六个静态检查全 PASS |
+
+安装口径：表结构仍 v2 不变 → **v0.2.7 上覆盖安装即可**；从 v0.2.6 及更早升上来仍须卸载重装。
+`nsfalse` 只表示认证 / 建目录 / PUT 均未失败，HEAD 落盘校验只写日志不中断，
+不当作已验证 HEAD 200。**真机复核仍由使用者装机确认**：导入完成提示、
+下拉刷新手感与结果反馈、横屏三键 / 手势导航两种模式下底部时间轴完整性。

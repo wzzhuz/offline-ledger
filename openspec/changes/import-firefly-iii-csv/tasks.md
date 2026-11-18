@@ -64,6 +64,12 @@
 - [x] `backup-restore` delta 中「顶部下滑刷新窄条」表述按最终行为整块修订（指南 §5）
 - [x] 活文档 §7.10 补记「平台级手势优先官方组件 / insets 分层 / 不加无障碍按钮的决策」
 - [x] 六个静态检查本地全 PASS；Kotlin 引号与括号自检
-- [ ] push CI / release / 坚果云上传实测编号与制品字节回填（本批执行后填）
+- [x] 首轮 push CI `44230612494` **failure**（`PullToRefreshBox` 包名写错 → `Unresolved reference`）；
+  临时 diag workflow `44230973142` 回传 gradle 日志定位唯一根因；修复 commit
+  `d39bf68135ad` 同步删除 `diag.yml` 与 `diag/unit.log` → push CI `44231434403`
+  **success**（17 步全绿）；release `44232196858` **success**（23 步绿 / 5 跳过，
+  上传到坚果云 success）；制品 `release-v0.2.8` 12,317,033 B、
+  `mapping-v0.2.8` 3,656,535 B、`metrics-v0.2.8-p-m-nsfalse` 272 B；
+  远端 307↔307 blob sha 零差异、`diag/` 零残留
 - [ ] 真机复核：导入完成提示、下拉刷新手感与反馈、横屏三键/手势导航两种模式下
   底部时间轴完整（**由使用者装机确认**）
