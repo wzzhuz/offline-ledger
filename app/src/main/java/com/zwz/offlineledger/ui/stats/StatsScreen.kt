@@ -828,7 +828,6 @@ private data class TrendPoint(
     val label: String, val expenseCents: Long, val incomeCents: Long
 )
 
-@Composable
 /** 第 26 批：竖屏常驻标签用简化值，避免 12 点 27dp 间距下重叠。 */
 private fun compactCents(c: Long): String {
     val abs = kotlin.math.abs(c)
@@ -841,6 +840,7 @@ private fun compactCents(c: Long): String {
     }
 }
 
+@Composable
 private fun ChartZoomButton(
     title: String,
     values: LongArray,

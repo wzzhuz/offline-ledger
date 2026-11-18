@@ -40,7 +40,9 @@ data class RecordRow(
     val categoryColorHex: String?,
     val fromAccountName: String?,
     val toAccountName: String?,
-    val counterparty: String = ""
+    val counterparty: String = "",
+    val importSource: String = "",
+    val sourceId: String = ""
 )
 
 /** 账户详情专属流水行。 */
@@ -183,6 +185,8 @@ interface RecordDao {
                r.yearMonth AS yearMonth, r.note AS note,
                r.excludeFromStats AS excludeFromStats,
                COALESCE(r.counterparty, '') AS counterparty,
+               COALESCE(r.importSource, '') AS importSource,
+               COALESCE(r.sourceId, '') AS sourceId,
                c.name AS categoryName, c.colorHex AS categoryColorHex,
                fa.name AS fromAccountName, ta.name AS toAccountName
           FROM records r
