@@ -11,6 +11,6 @@
 - [x] `AppDatabase.version = 3`，DatabaseModule 注册新 DAO，SeedCallback 传 Context
 - [x] `SeedDataTest` / 新增 `SeedCatalogTest` / `CounterpartyNormalizerTest`
 - [x] 六个静态检查本地全 PASS，版本 0.2.14
-- [ ] push CI 与 release 实测回填、坚果云上传（执行后补编号）
+- [x] push CI 与 release 实测回填、坚果云上传（代码 `544eea4347512738eca9d5a1cdb21959711ab089` / CI `44315079195` / release `44316439006`；制品 12329153 B / 3684448 B / 268 B；上传到坚果云 success）
 - [ ] 真机复核：零账户首启、模板 3 击建账户 + 后四位、停用后记一笔隐藏但统计仍算、
       恢复内置、A 方案类目、别名归一命中、卸载重装后 FF3 重导幂等（由使用者装机确认）

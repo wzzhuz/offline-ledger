@@ -31,3 +31,22 @@
 
 ## 版本
 `defaultVersionName = "0.2.14"`，`AppDatabase.version = 3`，`Migrations.ALL` 仍为空（测试期不注册迁移）。
+
+## 第 30 批实测回填（真实编号）
+
+| 项 | 实测 |
+|---|---|
+| 代码 commit | `544eea4347512738eca9d5a1cdb21959711ab089`（44 文件，v0.2.14） |
+| push CI | `44315079195` **success**，17 步全绿，首轮 Kotlin 编译零错误；`SeedCatalogTest` / `CounterpartyNormalizerTest` 通过 |
+| release | `44316439006` **success**，23 步绿 / 5 步按 input 跳过；**「上传到坚果云」completed success** |
+| 制品（Actions artifact zip 压缩后尺寸） | `offline-ledger-release-v0.2.14` 12329153 B；`offline-ledger-mapping-v0.2.14` 3684448 B；`offline-ledger-metrics-v0.2.14-p-m-nsfalse` 268 B |
+| 坚果云 | `nsfalse`（认证 / 建目录 / PUT 均未失败）；HEAD 落盘校验只写日志不中断，不当作已验证 HEAD 200 |
+| 静态检查 | 六个 `check_*.py` 本地与 CI 均 PASS |
+
+**产物口径**：约 24M 是 R8 release APK 原始字节，Actions 制品页约 12M 是 zip
+二次压缩尺寸，两者同一个文件；不是 debug 变体，未实施会误伤 CI 的体积断言。
+
+**按 A 方案已落盘**：`assets/default_categories.json` 中「居住」只含
+房租 / 水费 / 电费 / 燃气 / 物业 / 宽带；代缴父母水电归「人情 / 赡养·代缴水电」；
+养车、宠物独立一级且默认停用；取消各一级下的同名「其他」二级。
+`AppDatabase.version = 3`，测试期无迁移 → 必须卸载重装、装前先导出。
