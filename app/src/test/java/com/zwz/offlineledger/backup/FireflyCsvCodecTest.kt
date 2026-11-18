@@ -110,9 +110,12 @@ class FireflyCsvCodecTest {
     }
 
     @Test
-    fun journal_id_is_embedded_in_note_for_idempotent_import() {
+    fun note_keeps_ff3_original_and_source_id_is_separate() {
         val plan = FireflyCsvCodec.buildPlan(FireflyCsvCodec.parse(bytes(withdrawal())))
-        assertTrue(plan.entries.single().note.contains("ff3:1937"))
+        val e = plan.entries.single()
+        assertFalse(e.note.contains("ff3:"))
+        assertFalse(e.note.contains("分组："))
+        assertEquals("1937", e.journalId)
     }
 
     @Test

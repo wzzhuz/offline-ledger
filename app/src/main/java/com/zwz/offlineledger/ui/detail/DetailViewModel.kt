@@ -146,6 +146,22 @@ class DetailViewModel(
         )
     }
 
+    /** 第 26 批：统计页点分类带筛选跳明细；清掉其它条件，仅留分类与币种。 */
+    fun filterByCategory(
+        categoryId: Long,
+        isRoot: Boolean,
+        yearMonth: Int,
+        currencyCode: String?
+    ) {
+        _filter.value = RecordFilter(
+            yearMonth = yearMonth,
+            revision = _filter.value.revision + 1,
+            rootCategoryId = if (isRoot) categoryId else null,
+            categoryId = if (isRoot) null else categoryId,
+            currencyCode = currencyCode
+        )
+    }
+
     fun clearFilter() {
         _filter.value = _filter.value.copy(
             fromDate = null, toDate = null, accountId = null, type = null,

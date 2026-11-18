@@ -195,18 +195,11 @@ object FireflyCsvCodec {
                 categoryKey = ck.key()
             }
 
-            val noteParts = mutableListOf<String>()
-            if (r.description.isNotBlank()) noteParts += r.description
-            if (r.groupTitle.isNotBlank()) noteParts += "分组：" + r.groupTitle
-            if (r.tags.isNotBlank()) noteParts += "标签：" + r.tags
-            if (r.notes.isNotBlank()) noteParts += "原备注：" + r.notes
-            if (r.budget.isNotBlank()) noteParts += "原预算：" + r.budget
-            if (kind == FireflyKind.TRANSFER && r.categoryRaw.isNotBlank()) {
-                noteParts += "FF3分类：" + r.categoryRaw
-            }
-            // 第 23 批：幂等改由 records(importSource, sourceId) 唯一索引保证；
-            // 备注里的 ff3:<journal_id> 只保留作人类可读的追溯线索。
-            noteParts += "ff3:" + r.journalId
+            // 第 26 批：备注逐字保留 Firefly III `notes` 原文，不再拼接
+            // description / 分组 / 标签 / 预算 / FF3分类，也不再写 ff3: 前缀。
+            // 来源完全由 (importSource, sourceId) 字段承载；无对应字段的元数据
+            // 不塞进备注，在导入结果与规格里统一说明未迁移。
+            val note = r.notes
 
             val amountYuan = if (kind == FireflyKind.OPENING) {
                 bd.setScale(2, RoundingMode.HALF_UP).toPlainString()
@@ -226,7 +219,7 @@ object FireflyCsvCodec {
                 epochMilli = ts,
                 localDate = ld.localDate,
                 yearMonth = ld.yearMonth,
-                note = noteParts.joinToString(" · "),
+                note = note,
                 skipReason = skipReason
             )
             if (kind != FireflyKind.SKIPPED) {

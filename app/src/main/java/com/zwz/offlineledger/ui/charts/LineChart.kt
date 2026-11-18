@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -49,7 +50,9 @@ fun LineChart(
     annotateAll: Boolean = false,
     selectedIndex: Int? = null,
     zeroLine: Boolean = false,
-    onPointTap: ((Int) -> Unit)? = null
+    onPointTap: ((Int) -> Unit)? = null,
+    staggerLabels: Boolean = false,
+    guideIndex: Int? = null
 ) {
     val textMeasurer = rememberTextMeasurer()
     Column(modifier = modifier.fillMaxWidth()) {
@@ -152,6 +155,20 @@ fun LineChart(
                         }
                     }
 
+                    guideIndex?.let { gi ->
+                        if (gi in 0 until n) {
+                            val gStep = if (n > 1) (w - padX * 2f) / (n - 1) else 0f
+                            val gx = padX + gStep * gi
+                            drawLine(
+                                color = LedgerColors.Neutral.copy(alpha = 0.5f),
+                                start = Offset(gx, padTop),
+                                end = Offset(gx, padTop + plotH),
+                                strokeWidth = 1f,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f))
+                            )
+                        }
+                    }
+
                     if (valueLabels.isNotEmpty()) {
                         val marked = ChartData.annotationIndices(
                             series.first().values, selectedIndex, annotateAll
@@ -169,10 +186,20 @@ fun LineChart(
                             val layout = textMeasurer.measure(label, labelStyle)
                             val maxX = (w - layout.size.width.toFloat()).coerceAtLeast(0f)
                             val tx = (p.x - layout.size.width / 2f).coerceIn(0f, maxX)
-                            val ty = if (p.y < 30f) {
+                            val ty = if (staggerLabels) {
+                                if (idx % 2 == 1) {
+                                    (p.y + 6f).coerceAtMost(
+                                        h - layout.size.height.toFloat()
+                                    )
+                                } else {
+                                    (p.y - layout.size.height.toFloat() - 6f)
+                                        .coerceAtLeast(0f)
+                                }
+                            } else if (p.y < 30f) {
                                 (p.y + 8f).coerceAtLeast(0f)
                             } else {
-                                (p.y - layout.size.height.toFloat() - 6f).coerceAtLeast(0f)
+                                (p.y - layout.size.height.toFloat() - 6f)
+                                    .coerceAtLeast(0f)
                             }
                             drawText(layout, topLeft = Offset(tx, ty))
                         }

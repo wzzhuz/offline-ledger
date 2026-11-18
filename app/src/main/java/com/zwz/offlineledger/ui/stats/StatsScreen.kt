@@ -57,7 +57,8 @@ private enum class RankDim { CATEGORY, COUNTERPARTY, ACCOUNT }
 @Composable
 fun StatsScreen(
     refreshTick: Int = 0,
-    onOpenCategories: () -> Unit = {}
+    onOpenCategories: () -> Unit = {},
+    onOpenCategoryInDetail: (Long, Boolean, Int, String) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val vm: StatsViewModel = viewModel(
@@ -115,19 +116,24 @@ fun StatsScreen(
                 vm = vm,
                 pointIndex = pointIndex,
                 pointMode = pointMode,
-                onPoint = { idx, mode -> pointIndex = idx; pointMode = mode },
+                onPoint = { idx, mode ->
+                    pointIndex = if (idx < 0) null else idx
+                    pointMode = mode
+                },
                 yLabels = { max -> yLabels(max) }
             )
             DonutInsightCard(
                 state = state,
                 vm = vm,
-                onOpenCategories = onOpenCategories
+                onOpenCategories = onOpenCategories,
+                onOpenCategoryInDetail = onOpenCategoryInDetail
             )
             RankInsightCard(
                 state = state,
                 vm = vm,
                 rankDim = rankDim,
-                onRankDim = { rankDim = it }
+                onRankDim = { rankDim = it },
+                onOpenCategoryInDetail = onOpenCategoryInDetail
             )
             if (state.mode == StatsMode.YEAR) {
                 AssetCard(
@@ -198,58 +204,16 @@ fun StatsScreen(
     }
 
     if (state.drillRootId != null || state.drillCategoryId != null) {
-        DrillDownDialog(state = state, vm = vm)
-    }
-
-    pointIndex?.let { idx ->
-        val daily = state.daily.getOrNull(idx)
-        val month = state.monthly.getOrNull(idx)
-        val year = state.yearly.getOrNull(idx)
-        val income: Long = when (pointMode) {
-            StatsMode.MONTH -> daily?.incomeCents ?: 0L
-            StatsMode.YEAR -> month?.incomeCents ?: 0L
-            StatsMode.MULTI_YEAR -> year?.incomeCents ?: 0L
-        }
-        val expense: Long = when (pointMode) {
-            StatsMode.MONTH -> daily?.expenseCents ?: 0L
-            StatsMode.YEAR -> month?.expenseCents ?: 0L
-            StatsMode.MULTI_YEAR -> year?.expenseCents ?: 0L
-        }
-        val title = when (pointMode) {
-            StatsMode.MONTH ->
-                MonthRange.label(state.yearMonth) + " · " + (daily?.day ?: (idx + 1)) + " 日"
-            StatsMode.YEAR -> state.year.toString() + " 年 " + (idx + 1) + " 月"
-            StatsMode.MULTI_YEAR -> (year?.year ?: state.year).toString() + " 年"
-        }
-        AlertDialog(
-            onDismissRequest = { pointIndex = null },
-            title = { Text(title) },
-            text = {
-                Column {
-                    Text("收入 " + formatCents(income) + " 元")
-                    Text("支出 " + formatCents(expense) + " 元")
-                    Text("净结余 " + formatCents(income - expense) + " 元")
-                    if (pointMode == StatsMode.YEAR) {
-                        Text(
-                            "月末资产 " +
-                                formatCents(state.assetTrend.getOrElse(idx) { 0L }) + " 元"
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Row {
-                    if (pointMode == StatsMode.MULTI_YEAR && year != null) {
-                        TextButton(onClick = {
-                            vm.openYear(year.year)
-                            pointIndex = null
-                        }) { Text("查看该年") }
-                    }
-                    TextButton(onClick = { pointIndex = null }) { Text("关闭") }
-                }
+        DrillDownDialog(
+            state = state,
+            vm = vm,
+            onOpenCategoryInDetail = { id ->
+                vm.closeDrill()
+                onOpenCategoryInDetail(id, false, state.yearMonth, state.currencyCode)
             }
         )
     }
+
 
 
 }
@@ -373,7 +337,8 @@ private fun MiniBar(ratio: Float, isOver: Boolean) {
 private fun DonutInsightCard(
     state: StatsUiState,
     vm: StatsViewModel,
-    onOpenCategories: () -> Unit
+    onOpenCategories: () -> Unit,
+    onOpenCategoryInDetail: (Long, Boolean, Int, String) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -413,13 +378,15 @@ private fun DonutInsightCard(
                     val id = slices.getOrNull(i)?.id
                     if (id != null) {
                         if (state.sliceLevel == SliceLevel.ROOT) vm.openRoot(id)
-                        else vm.openCategory(id)
+                        else onOpenCategoryInDetail(
+                            id, false, state.yearMonth, state.currencyCode
+                        )
                     }
                 }
             )
             Text(
                 text = "点击扇区" + if (state.sliceLevel == SliceLevel.ROOT)
-                    "展开该大类下的二级构成" else "查看该分类明细",
+                    "展开该大类下的二级构成" else "跳到明细页查看该分类流水",
                 style = MaterialTheme.typography.labelSmall,
                 color = LedgerColors.Neutral
             )
@@ -435,7 +402,8 @@ private fun RankInsightCard(
     state: StatsUiState,
     vm: StatsViewModel,
     rankDim: RankDim,
-    onRankDim: (RankDim) -> Unit
+    onRankDim: (RankDim) -> Unit,
+    onOpenCategoryInDetail: (Long, Boolean, Int, String) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -480,13 +448,17 @@ private fun RankInsightCard(
                     RankRowView(
                         row = row,
                         onClick = {
-                            if (rankDim == RankDim.CATEGORY) row.id?.let { vm.openRoot(it) }
+                            if (rankDim == RankDim.CATEGORY) row.id?.let {
+                                onOpenCategoryInDetail(
+                                    it, true, state.yearMonth, state.currencyCode
+                                )
+                            }
                         }
                     )
                 }
                 Text(
                     text = if (rankDim == RankDim.CATEGORY)
-                        "点分类可展开二级构成；排行与占比卡共用同一份净支出切片。"
+                        "点分类跳明细页带筛选；排行与占比卡共用同一份净支出切片。"
                     else "按当前币种统计，不跨币种混算；金额来自 SQL 聚合。",
                     style = MaterialTheme.typography.labelSmall,
                     color = LedgerColors.Neutral,
@@ -633,11 +605,38 @@ private fun TrendCard(
                 series = series,
                 xLabels = labels,
                 yLabels = axis,
-                valueLabels = shownValues.map { formatCents(it) },
+                valueLabels = shownValues.map { compactCents(it) },
                 selectedIndex = if (pointMode == state.mode) pointIndex else null,
+                staggerLabels = state.mode != StatsMode.MONTH,
+                guideIndex = if (pointMode == state.mode) pointIndex else null,
                 zeroLine = signed,
                 onPointTap = { idx -> onPoint(idx, state.mode) }
             )
+            if (pointIndex != null && pointMode == state.mode) {
+                val i = pointIndex ?: 0
+                val inc = incomeValues.getOrElse(i) { 0L }
+                val exp = expenseValues.getOrElse(i) { 0L }
+                Text(
+                    text = "已选 " + labels.getOrElse(i) { "" } +
+                        " · 收入 " + formatCents(inc) +
+                        " · 支出 " + formatCents(exp) +
+                        " · 净结余 " + formatCents(inc - exp) + " 元",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+                Row {
+                    if (state.mode == StatsMode.MULTI_YEAR) {
+                        TextButton(onClick = {
+                            state.yearly.getOrNull(i)?.let { vm.openYear(it.year) }
+                            onPoint(-1, state.mode)
+                        }) { Text("查看该年") }
+                    }
+                    TextButton(onClick = { onPoint(-1, state.mode) }) {
+                        Text("清除选中")
+                    }
+                }
+            }
             if (state.mode == StatsMode.MULTI_YEAR) {
                 Text(
                     text = "点某年的数据点可回到该年的年度视图",
@@ -830,6 +829,18 @@ private data class TrendPoint(
 )
 
 @Composable
+/** 第 26 批：竖屏常驻标签用简化值，避免 12 点 27dp 间距下重叠。 */
+private fun compactCents(c: Long): String {
+    val abs = kotlin.math.abs(c)
+    val sign = if (c < 0L) "-" else ""
+    val yuan = abs / 100.0
+    return when {
+        yuan >= 10000.0 -> sign + (kotlin.math.round(yuan / 1000.0) / 10.0).toString() + "万"
+        yuan >= 1000.0 -> sign + (kotlin.math.round(yuan / 100.0) / 10.0).toString() + "k"
+        else -> sign + kotlin.math.round(yuan).toLong().toString()
+    }
+}
+
 private fun ChartZoomButton(
     title: String,
     values: LongArray,

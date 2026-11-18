@@ -162,7 +162,11 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
             composable("stats") {
                 StatsScreen(
                     refreshTick = refreshTick,
-                    onOpenCategories = { navController.navigate("categories") }
+                    onOpenCategories = { navController.navigate("categories") },
+                    onOpenCategoryInDetail = { id, isRoot, ym, cc ->
+                        detailVm.filterByCategory(id, isRoot, ym, cc)
+                        navController.navigate("detail") { launchSingleTop = true }
+                    }
                 )
             }
             composable("settings") {

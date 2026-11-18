@@ -22,7 +22,11 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /** 一级 → 二级构成 → 分类明细；明细走带 LIMIT 的 SQL，不全量加载。 */
 @Composable
-fun DrillDownDialog(state: StatsUiState, vm: StatsViewModel) {
+fun DrillDownDialog(
+    state: StatsUiState,
+    vm: StatsViewModel,
+    onOpenCategoryInDetail: (Long) -> Unit = {}
+) {
     Dialog(
         onDismissRequest = { vm.closeDrill() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -58,7 +62,12 @@ fun DrillDownDialog(state: StatsUiState, vm: StatsViewModel) {
                             ) {
                                 Text(text = c.name, modifier = Modifier.weight(1f))
                                 Text(text = formatCents(c.cents) + " 元")
-                                TextButton(onClick = { c.id?.let(vm::openCategory) }) {
+                                TextButton(onClick = {
+                                    c.id?.let {
+                                        vm.closeDrill()
+                                        onOpenCategoryInDetail(it)
+                                    }
+                                }) {
                                     Text("明细")
                                 }
                             }

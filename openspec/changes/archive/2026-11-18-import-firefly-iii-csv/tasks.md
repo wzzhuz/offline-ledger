@@ -95,3 +95,11 @@
   `metrics-v0.2.9-p-m-nsfalse` 270 B
 - [ ] 真机复核：1916 行导入完成结果卡可见（含耗时 / 行数）、失败也出卡、
   资产页下拉刷新手感与反馈（**由使用者装机确认**）
+
+## 归档收口
+
+- [x] 使用者「导入有结果显示了」授权归档
+- [x] 第 22–25 批 delta 合并进 `specs/`（ADDED 追加 + MODIFIED 按标题整块替换）
+- [x] change 移入 `archive/2026-11-18-import-firefly-iii-csv/`
+- [x] `project.md` 阶段计划与活文档 §8 基线回填
+- [x] 第 26 批起单独 change `polish-stats-and-import-metadata`

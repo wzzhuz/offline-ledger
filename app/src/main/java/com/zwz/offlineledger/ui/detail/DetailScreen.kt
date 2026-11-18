@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -125,6 +126,20 @@ fun DetailScreen(
                     onNext = { vm.switchMonth(1) },
                     onFilter = { showFilter = true }
                 )
+                if (filter.categoryId != null || filter.rootCategoryId != null) {
+                    val cid = filter.categoryId ?: filter.rootCategoryId
+                    val cname = categories.firstOrNull { it.id == cid }?.name ?: "分类"
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilterChip(
+                            selected = true,
+                            onClick = { vm.clearFilter() },
+                            label = { Text("分类筛选：" + cname + "  ✕") }
+                        )
+                    }
+                }
 
                 LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
                     items(
@@ -167,6 +182,15 @@ fun DetailScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = LedgerColors.Neutral
                     )
+                    if (target.importSource.isNotBlank()) {
+                        Text(
+                            text = "来源：" + target.importSource +
+                                if (target.sourceId.isNotBlank())
+                                    " · " + target.sourceId else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral
+                        )
+                    }
                     TextButton(
                         onClick = { actionRow = null; onEdit(target.id) },
                         modifier = Modifier.fillMaxWidth()
