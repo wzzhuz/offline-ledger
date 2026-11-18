@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -90,6 +92,7 @@ fun DetailScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        PullToRefreshStrip(onRefresh = { vm.bumpRevision() })
         MonthOverviewCard(
             overview = overview,
             activeFilterCount = filter.activeCount(),
@@ -452,4 +455,41 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
         )
     }
     ListDivider(Modifier.padding(horizontal = 16.dp))
+}
+
+
+/**
+ * 第 23 批：明细页顶部的下拉刷新条。
+ * 只在这条 28dp 区域内接管手势，MUST NOT 挂到整个列表上——
+ * 否则会与 LazyColumn 争 pointer，正常滚动反而失效（第 17/18 批拖拽踩过同型坑）。
+ */
+@Composable
+private fun PullToRefreshStrip(onRefresh: () -> Unit) {
+    var drag by remember { mutableStateOf(0f) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 28.dp)
+            .padding(horizontal = 16.dp, vertical = 2.dp)
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragEnd = {
+                        if (drag > 70f) onRefresh()
+                        drag = 0f
+                    },
+                    onDragCancel = { drag = 0f }
+                ) { change, d ->
+                    if (d.y > 0f) drag += d.y
+                    change.consume()
+                }
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "↓ 从此向下滑刷新当前月份",
+            style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral
+        )
+    }
 }

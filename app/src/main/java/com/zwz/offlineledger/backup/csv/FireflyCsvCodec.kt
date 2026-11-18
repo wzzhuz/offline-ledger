@@ -204,7 +204,8 @@ object FireflyCsvCodec {
             if (kind == FireflyKind.TRANSFER && r.categoryRaw.isNotBlank()) {
                 noteParts += "FF3分类：" + r.categoryRaw
             }
-            // ff3:<journal_id> 是零表结构的幂等键，重复导入靠它跳过。
+            // 第 23 批：幂等改由 records(importSource, sourceId) 唯一索引保证；
+            // 备注里的 ff3:<journal_id> 只保留作人类可读的追溯线索。
             noteParts += "ff3:" + r.journalId
 
             val amountYuan = if (kind == FireflyKind.OPENING) {

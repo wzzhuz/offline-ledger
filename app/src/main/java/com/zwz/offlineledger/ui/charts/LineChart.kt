@@ -48,6 +48,7 @@ fun LineChart(
     valueLabels: List<String> = emptyList(),
     annotateAll: Boolean = false,
     selectedIndex: Int? = null,
+    zeroLine: Boolean = false,
     onPointTap: ((Int) -> Unit)? = null
 ) {
     val textMeasurer = rememberTextMeasurer()
@@ -115,6 +116,15 @@ fun LineChart(
                     drawLine(
                         color = LedgerColors.Neutral.copy(alpha = 0.15f),
                         start = Offset(0f, y), end = Offset(w, y), strokeWidth = 1f
+                    )
+                }
+                // 第 23 批：净结余线允许负值，0 落在绘图区正中，画一条醒目的零线。
+                if (zeroLine) {
+                    val y0 = padTop + plotH / 2f
+                    drawLine(
+                        color = LedgerColors.Neutral.copy(alpha = 0.45f),
+                        start = Offset(0f, y0), end = Offset(w, y0),
+                        strokeWidth = 1.5f
                     )
                 }
 

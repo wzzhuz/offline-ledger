@@ -99,7 +99,17 @@ data class CsvSourceRow(
     val accountName: String,
     val rootName: String,
     val categoryName: String,
-    val counterparty: String = ""
+    val counterparty: String = "",
+    val importSource: String = "",
+    val sourceId: String = ""
+)
+
+/** 第 23 批：账单导入前的疑似匹配候选（金额 + 账户 + 时间窗）。 */
+data class ImportCandidateRow(
+    val id: Long,
+    val localDate: Int,
+    val amountCents: Long,
+    val note: String
 )
 
 @Dao
@@ -425,6 +435,8 @@ interface RecordDao {
                r.localDate AS localDate, COALESCE(r.note, '') AS note,
                r.currencyCode AS currencyCode,
                COALESCE(r.counterparty, '') AS counterparty,
+               COALESCE(r.importSource, '') AS importSource,
+               COALESCE(r.sourceId, '') AS sourceId,
                COALESCE(a.name, '') AS accountName,
                COALESCE(rc.name, '') AS rootName,
                COALESCE(c.name, '') AS categoryName
@@ -452,6 +464,31 @@ interface RecordDao {
     suspend fun countDuplicate(
         accountId: Long, amountCents: Long, localDate: Int, note: String
     ): Int
+
+    /** 第 23 批：数据库级导入幂等。复合唯一索引之外的显式查重入口。 */
+    @Query("SELECT COUNT(*) FROM records WHERE importSource = :source AND sourceId = :id")
+    suspend fun countByImportSource(source: String, id: String): Int
+
+    /**
+     * 第 23 批：手工流水 vs 第三方账单的「疑似匹配」只读查询。
+     * 只按金额分 + 账户 + localDate 窗口找候选，刻意不比较备注文本：
+     * 「盒马」与「南京盒马网络科技有限公司」永远不相等。
+     */
+    @Query(
+        """
+        SELECT id, localDate, amountCents, COALESCE(note, '') AS note
+          FROM records
+         WHERE amountCents = :amountCents
+           AND (fromAccountId = :accountId OR toAccountId = :accountId)
+           AND localDate BETWEEN :fromDate AND :toDate
+           AND type IN ('EXPENSE', 'INCOME')
+         ORDER BY localDate DESC
+         LIMIT 5
+        """
+    )
+    suspend fun importCandidates(
+        accountId: Long, amountCents: Long, fromDate: Int, toDate: Int
+    ): List<ImportCandidateRow>
 
     /** 阶段 7：常用收款方自动补全，纯本地 DISTINCT，最多 20 个。 */
     @Query("SELECT DISTINCT counterparty FROM records WHERE counterparty IS NOT NULL AND counterparty <> '' ORDER BY counterparty ASC LIMIT 20")

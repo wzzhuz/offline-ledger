@@ -20,11 +20,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class StatsMode { MONTH, YEAR }
+enum class StatsMode { MONTH, YEAR, MULTI_YEAR }
 enum class SliceLevel { ROOT, CHILD }
 
 /** 阶段 8：月度趋势默认单线，避免收支量级差大时贴底看不清。 */
-enum class TrendMetric { EXPENSE, INCOME, BOTH }
+enum class TrendMetric { EXPENSE, INCOME, BOTH, NET }
 
 /** 一条预算规则的当月进度，纯展示数据。 */
 data class BudgetItem(
@@ -52,6 +52,8 @@ data class StatsUiState(
     val totalsCheck: ChartData.TotalsCheck? = null,
     val daily: List<ChartData.DailyPoint> = emptyList(),
     val monthly: List<ChartData.MonthPoint> = emptyList(),
+    /** 第 23 批：近 5 年逐年汇总，MULTI_YEAR 视图用。 */
+    val yearly: List<ChartData.YearPoint> = emptyList(),
     /** 阶段 8：年度逐月末资产余额，按当前币种、不混算。 */
     val assetTrend: List<Long> = emptyList(),
     val trendMetric: TrendMetric = TrendMetric.EXPENSE,
@@ -87,6 +89,14 @@ class StatsViewModel(
 
     fun setMode(mode: StatsMode) {
         _state.value = _state.value.copy(mode = mode, drillRootId = null)
+        reload()
+    }
+
+    /** 第 23 批：多年视图点某年数据点，下钻回该年的年度视图。 */
+    fun openYear(year: Int) {
+        _state.value = _state.value.copy(
+            year = year, mode = StatsMode.YEAR, drillRootId = null
+        )
         reload()
     }
 
@@ -249,6 +259,21 @@ class StatsViewModel(
                 )
             } else emptyList()
 
+            // 第 23 批：多年视图复用同一条 monthlyTrendForCurrency 只读聚合，
+            // 在纯 JVM 层按年归并，不新增 SQL、不跨币种混算。
+            val yearly = if (s.mode == StatsMode.MULTI_YEAR) {
+                val rows = (s.year - 4..s.year).map { y ->
+                    val inc = yearTrend.filter {
+                        it.yearMonth / 100 == y && it.type == "INCOME"
+                    }.sumOf { it.totalCents }
+                    val exp = yearTrend.filter {
+                        it.yearMonth / 100 == y && it.type == "EXPENSE"
+                    }.sumOf { it.totalCents }
+                    ChartData.YearPoint(y, inc, exp)
+                }
+                ChartData.fillYearlySeries(s.year, 5, rows)
+            } else emptyList()
+
             val monthly = if (s.mode == StatsMode.YEAR) {
                 ChartData.fillYearSeries(
                     s.year,
@@ -280,9 +305,17 @@ class StatsViewModel(
             val accItems = recordDao.insightTopAccounts(from, to, cc, 5)
                 .map { InsightData.RankItem(accNames[it.id]?.name ?: ("账户 " + it.id), it.totalCents, it.cnt) }
             val catItems = roots.map { InsightData.RankItem(it.name, it.cents, 0, it.id) }
-            val units = if (s.mode == StatsMode.MONTH)
-                (MonthRange.of(s.yearMonth).second % 100).coerceAtLeast(1) else 12
-            val avgLabel = if (s.mode == StatsMode.MONTH) "日均" else "月均"
+            val units = when (s.mode) {
+                StatsMode.MONTH ->
+                    (MonthRange.of(s.yearMonth).second % 100).coerceAtLeast(1)
+                StatsMode.YEAR -> 12
+                StatsMode.MULTI_YEAR -> 5
+            }
+            val avgLabel = when (s.mode) {
+                StatsMode.MONTH -> "日均"
+                StatsMode.YEAR -> "月均"
+                StatsMode.MULTI_YEAR -> "年均"
+            }
 
             _state.value = s.copy(
                 recordCount = count,
@@ -302,15 +335,18 @@ class StatsViewModel(
                 totalsCheck = check,
                 daily = daily,
                 monthly = monthly,
+                yearly = yearly,
                 assetTrend = assetTrend,
                 loading = false
             )
         }
     }
 
-    private fun range(s: StatsUiState): Pair<Int, Int> =
-        if (s.mode == StatsMode.MONTH) s.yearMonth to s.yearMonth
-        else (s.year * 100 + 1) to (s.year * 100 + 12)
+    private fun range(s: StatsUiState): Pair<Int, Int> = when (s.mode) {
+        StatsMode.MONTH -> s.yearMonth to s.yearMonth
+        StatsMode.YEAR -> (s.year * 100 + 1) to (s.year * 100 + 12)
+        StatsMode.MULTI_YEAR -> ((s.year - 4) * 100 + 1) to (s.year * 100 + 12)
+    }
 
     private suspend fun categoryName(id: Long): String =
         categoryDao.byId(id)?.name ?: "未分类"

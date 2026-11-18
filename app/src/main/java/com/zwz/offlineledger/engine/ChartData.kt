@@ -51,6 +51,9 @@ object ChartData {
 
     data class MonthPoint(val month: Int, val incomeCents: Long, val expenseCents: Long)
 
+    /** 第 23 批：多年视图的逐年汇总点。 */
+    data class YearPoint(val year: Int, val incomeCents: Long, val expenseCents: Long)
+
     data class TotalsCheck(
         val rootCents: Long,
         val childCents: Long,
@@ -101,6 +104,14 @@ object ChartData {
     fun fillYearSeries(year: Int, rows: List<MonthPoint>): List<MonthPoint> {
         val byMonth = rows.associateBy { it.month }
         return (1..12).map { m -> byMonth[m] ?: MonthPoint(m, 0L, 0L) }
+    }
+
+    /** 第 23 批：多年视图固定「近 5 年」，缺年补 0，不按有流水的年数折算。 */
+    fun fillYearlySeries(endYear: Int, years: Int, rows: List<YearPoint>): List<YearPoint> {
+        val byYear = rows.associateBy { it.year }
+        return (endYear - years + 1..endYear).map { y ->
+            byYear[y] ?: YearPoint(y, 0L, 0L)
+        }
     }
 
     // ---------------------------------------------------------------
@@ -167,6 +178,22 @@ object ChartData {
     fun seriesMaxSingle(values: List<Long>): Long =
         (values.maxOrNull() ?: 0L).coerceAtLeast(0L)
 
+    /**
+     * 第 23 批：净结余线（收入 - 支出）允许负值。
+     * 以绝对值的最大值为半轴，把 [-max, +max] 映射到 [0, 1]，0 落在正中。
+     */
+    fun seriesMaxAbsSigned(values: List<Long>): Long =
+        (values.maxOfOrNull { abs(it) } ?: 0L).coerceAtLeast(1L)
+
+    fun normalizeSigned(values: List<Long>, maxAbs: Long): List<Float> =
+        values.map { ((it.toFloat() / maxAbs.toFloat()) + 1f) / 2f }
+
+    /** 有符号竖轴 5 个刻度：+max / +max/2 / 0 / -max/2 / -max。 */
+    fun yAxisLabelsSigned(maxAbs: Long): List<String> =
+        (4 downTo 0).map { i ->
+            java.math.BigDecimal.valueOf(maxAbs * (i - 2).toLong() / 2L, 2).toPlainString()
+        }
+
     /** 竖轴 5 个刻度（元，两位小数）；纯 JVM 可单测，不做金额运算。 */
     fun yAxisLabels(maxCents: Long): List<String> {
         if (maxCents <= 0L) return List(5) { "0.00" }
@@ -193,6 +220,26 @@ object ChartData {
 
     /** 分类颜色统一入口：优先 colorHex，失败回退调色板。 */
     fun sliceArgb(hex: String?, index: Int): Long = parseHexArgb(hex) ?: fallbackArgb(index)
+
+    // ---------------------------------------------------------------
+    /**
+     * 第 23 批：图表专用低饱和同色系色板。
+     * 分类标识（列表 / chip）仍保持中性单色圆，图表扇区才需要区分度；
+     * 自动生成的分类 colorHex 恒为 #888888，直接读它会让所有扇区一个颜色。
+     * 按分类 id 取模分配，MUST NOT 按金额排名索引分配 —— 否则每次占比变化就变色。
+     */
+    private val CHART_PALETTE = longArrayOf(
+        0xFF3F6C8BL, 0xFF5B8AA6L, 0xFF77A6B6L, 0xFF94BFC7L,
+        0xFF6E8F7BL, 0xFF8FAE91L, 0xFFB3C9A9L, 0xFF7A7FA8L,
+        0xFF9C9BC0L, 0xFFB98F7BL
+    )
+
+    fun chartArgb(id: Long?, index: Int): Long {
+        val seed = id ?: index.toLong()
+        val k = ((kotlin.math.abs(seed) % CHART_PALETTE.size).toInt()
+                + CHART_PALETTE.size) % CHART_PALETTE.size
+        return CHART_PALETTE[k]
+    }
 
     // ---------------------------------------------------------------
     /**

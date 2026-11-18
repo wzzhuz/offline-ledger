@@ -67,11 +67,14 @@
   只有使用者显式打开「覆盖已有账户的期初余额」且同名映射时才写回。
   理由：悄悄改掉使用者正在核对的余额，比少一条期初更糟。
 
-## 5. 幂等与去重（零表结构）
+## 5. 幂等与去重（第 23 批已改为数据库级）
 
-`note` 末尾固定带 `ff3:<journal_id>`，复用既有
-`recordDao.countDuplicate(账户, 金额, 日期, 备注)`。同一份文件选两次，
-第二次全部跳过，不新增字段、不加表、不改 `AppDatabase.version`。
+> 本节为第 22 批旧实现，已被 §7.2 取代，保留仅为决策史；**当前实现以 §7.2 为准**。
+> 旧做法：`note` 末尾带 `ff3:<journal_id>`，靠 `countDuplicate` 四元组判重，
+> 零表结构。第 23 批按使用者 3-C 授权改为
+> `records(importSource, sourceId)` 复合唯一索引 + 写前 `countByImportSource`，
+> `AppDatabase.version = 2`、无 Migration，**必须卸载重装**。
+> 备注里的 `ff3:<journal_id>` 仅保留作人类可读线索，不再承担幂等职责。
 
 ## 6. 事务与一致性
 
@@ -120,3 +123,67 @@ HEAD 落盘校验只写日志不中断，不当作已验证 HEAD 200。
 映射预览与结果报告在 6.73 寸上的可读性 —— 这三项由使用者装机确认，
 CI 全绿只证明编译与单测通过。
 
+
+
+## 7. 第 23 批：导入闭环、数据库级幂等与统计增强
+
+### 7.1 根因（先写再动手，指南 §6.1）
+
+| 反馈 | 根因 |
+|---|---|
+| 导入完没提示 | 事务提交后只写 `state.message`，`firefly=null` 让页面回到「选文件」分支，摘要被说明文本挤到屏幕外 |
+| 切月份才刷新 | `DetailViewModel.pagingData` 由 `_filter` 参数触发；导入写库不改 `_filter`，`cachedIn` 的旧 PagingData 一直用着。只加下拉手势不改数据源，拉了也刷不出来 |
+| 环形图全同色 | `CategoryEntity.colorHex` 默认 `#888888`；自动生成的分类全部同色，`sliceArgb` 优先读它，扇区糊成一块 |
+| 横屏压状态栏 | 全屏 `Surface` 没吃 WindowInsets，标题行与状态栏时间/电量叠在一起 |
+| 缺净结余 / 多年 | 趋势卡只有 EXPENSE / INCOME / BOTH 三档，`StatsMode` 只有 MONTH / YEAR |
+
+### 7.2 3-C 表结构与回退顺序
+
+`records(importSource, sourceId)` 复合唯一索引，两列可空：
+SQLite 唯一索引里 NULL 互不冲突，手工记账恒 `null`，不受影响。
+`trash` 同步两列，删除→恢复不丢来源。备份 DTO / CSV 导出都带两列，
+旧备份靠默认值、旧 CSV 靠「缺列按空」继续可导。
+
+`AppDatabase.version = 2`，`Migrations.ALL` 仍空、`fallbackToDestructiveMigration`
+仍被静态检查硬禁 —— 所以**卸载重装是唯一安装路径**，不允许覆盖安装。
+
+三级回退顺序（若 CI 红）：
+1. 先只修 Kotlin 编译错误（import / 重载 / 参数），不动结构；
+2. 若 Room schema 校验报错，核对 `@ColumnInfo` 名与索引列名，不改 version 语义；
+3. 若唯一索引导致导入事务抛约束异常，退回「写前 `countByImportSource` + 快照回滚」，
+   不引入 `OnConflictStrategy.IGNORE` 掩盖问题。
+
+### 7.3 五项对齐落地
+
+- 结果摘要：`SettingsState.fireflyResult` 独立于 message，页面内常驻卡 +
+  「去看明细 / 关闭结果」；CSV 导入结果带「疑似匹配 K 项、按勾选跳过 J 行」。
+  **范围如实说明**：疑似匹配本次只实现「跳过该行 / 仍导入」二选，
+  不提供「用账单覆盖手工」写路径——避免静默改写手工流水，也避免给手工行
+  赋 `sourceId` 触发唯一键冲突；若后续要补，走 `updateRecord` 且保持
+  `importSource = null`，单独建 change。
+- 刷新：`DataRefreshBus`（进程内 SharedFlow）→ `LedgerApp.refreshTick` →
+  明细 `bumpRevision()` / 资产 `vm.reload()` / 统计 `vm.reload()`。
+  明细页顶部 28dp 条接管下滑手势，MUST NOT 挂整个列表（第 17/18 批同型坑）。
+- 图表：`ChartData.chartArgb(id, index)` 按分类 id 稳定取色，扇区与图例共用；
+  分类标识仍中性单色圆，不恢复 `colorHex` 可配、不用高饱和跳色。
+- 净结余：`seriesMaxAbsSigned` / `normalizeSigned` / `yAxisLabelsSigned`，
+  0 落在绘图区正中，横屏页也带 `EXTRA_SIGNED`，仅同币种、不跨币种混算。
+- 多年：`StatsMode.MULTI_YEAR`，复用 `monthlyTrendForCurrency` 在纯 JVM 层按年归并，
+  不新增 SQL；点年份 `vm.openYear()` 下钻回 YEAR。
+
+### 7.4 五个疑问的答复写进规格
+
+Q1 重复导入不会双份，按 `(importSource, sourceId)` 唯一索引 + 写前查重；
+Q2 现在**有**类似 `journal_id` 的唯一标记了（数据库级）；
+Q3 CSV 明文含 11 列（含来源），加密备份 DTO 含两字段；按 B 方案**不写 V1→V2
+   schema 迁移兼容层**，重建主路径是「卸载重装 → 重跑同一份 FF3 CSV」，
+   手工补录 / 模板 / 预算等不在 FF3 CSV 内的部分按使用者授权接受重建；
+   旧备份 JSON 因新字段带默认值仍可解析，但**不承诺完整重建**；
+Q4 跨来源对账是「疑似匹配预览」而非自动去重，逐笔确认、禁止静默合并；
+Q5 预制账户 / 分类是 `SeedData` 代码常量，首次建库写进表，之后是普通行。
+
+### 7.5 规格修订（指南 §5）
+
+本 change 未归档，`backup-restore` 里「MUST NOT 新增字段」「ff3 前缀实现幂等」
+两条旧表述按 3-C **直接修订为最终行为**，不追加 ADDED 制造相反文本。
+`reporting-ui` / `ledger-transactions` 各补结果摘要与唯一标记的 ADDED。

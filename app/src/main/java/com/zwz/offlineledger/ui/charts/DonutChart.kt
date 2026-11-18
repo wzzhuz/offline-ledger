@@ -87,7 +87,7 @@ fun DonutChart(
                 } else {
                     sectors.forEachIndexed { i, s ->
                         drawArc(
-                            color = Color(ChartData.sliceArgb(s.slice.colorHex, i).toInt()),
+                            color = Color(ChartData.chartArgb(s.slice.id, i).toInt()),
                             startAngle = s.startAngle,
                             sweepAngle = s.sweepAngle,
                             useCenter = false,
@@ -122,7 +122,7 @@ fun DonutChart(
                         ) {
                             Canvas(modifier = Modifier.size(10.dp)) {
                                 drawCircle(
-                                    color = Color(ChartData.sliceArgb(s.slice.colorHex, i).toInt())
+                                    color = Color(ChartData.chartArgb(s.slice.id, i).toInt())
                                 )
                             }
                             Text(

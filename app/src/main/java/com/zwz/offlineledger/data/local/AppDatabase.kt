@@ -21,10 +21,11 @@ import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 
 /**
- * 稳定版前按使用者授权重置为 version 1、不注册任何 Migration。
- * 使用者只会用测试数据且在满意前不会长期使用，不需要保留升级路径；
- * 全新安装走 onCreate，按 Entity 直接建含 counterparty 列的最新表结构。
- * 三段迁移 SQL 常量保留在 Migrations.kt 供历史追溯与测试，但 ALL 为空。
+ * 第 23 批：按使用者明确授权「大胆改表结构」，version 升到 2，
+ * records / trash 增加 importSource + sourceId 与复合唯一索引。
+ * 仍不注册 Migration（ALL 为空），因此**必须卸载重装**，覆盖安装会开库失败。
+ * 卸载前 MUST 先导出 CSV 或加密备份带走历史数据；重装后用「导入账单」重建。
+ * 三段迁移 SQL 常量保留在 Migrations.kt 供历史追溯与测试。
  * exportSchema = false：CI 无模拟器跑不了 MigrationTestHelper。
  */
 @Database(
@@ -38,7 +39,7 @@ import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
         RecurringRuleEntity::class,
         BudgetEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

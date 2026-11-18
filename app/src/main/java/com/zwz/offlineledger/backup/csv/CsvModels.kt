@@ -14,7 +14,10 @@ data class CsvRow(
     val note: String,
     val currencyCode: String,
     /** 阶段 7：收款方。带默认值，旧 8 列 CSV 仍能解析成空串。 */
-    val counterparty: String = ""
+    val counterparty: String = "",
+    /** 第 23 批：导出必带、导入缺列按空串处理（旧 CSV 兼容）。 */
+    val importSource: String = "",
+    val sourceId: String = ""
 ) {
     /**
      * 导入去重键 = 账户 + 金额 + 日期 + 备注。
@@ -34,3 +37,15 @@ data class CsvParseResult(
 
 /** 事务化导入的执行结果。 */
 data class CsvImportOutcome(val written: Int, val skipped: Int)
+
+/**
+ * 第 23 批：跨来源对账的「疑似匹配」候选。
+ * 只表示「可能是同一笔」，MUST NOT 自动合并或静默丢弃，由使用者逐笔确认。
+ */
+data class ImportCandidate(
+    val rowIndex: Int,
+    val existingId: Long,
+    val existingNote: String,
+    val localDate: Int,
+    val amountCents: Long
+)

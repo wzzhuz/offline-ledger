@@ -30,6 +30,7 @@ import com.zwz.offlineledger.data.model.LedgerAdjustment
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.model.LedgerCategory
 import com.zwz.offlineledger.backup.csv.CsvImportOutcome
+import com.zwz.offlineledger.backup.csv.ImportCandidate
 import com.zwz.offlineledger.backup.csv.CsvRow
 import com.zwz.offlineledger.backup.csv.FireflyKind
 import com.zwz.offlineledger.backup.csv.FireflyMapping
@@ -157,7 +158,9 @@ class LedgerRepository @Inject constructor(
                 excludeFromStats = it.excludeFromStats,
                 linkedRecordId = it.linkedRecordId,
                 currencyCode = it.currencyCode,
-                counterparty = it.counterparty
+                counterparty = it.counterparty,
+                importSource = it.importSource,
+                sourceId = it.sourceId
             )
         },
         exportedAtEpochMilli = System.currentTimeMillis(),
@@ -561,15 +564,61 @@ class LedgerRepository @Inject constructor(
             category = r.categoryName,
             note = r.note,
             currencyCode = r.currencyCode,
-            counterparty = r.counterparty
+            counterparty = r.counterparty,
+            importSource = r.importSource,
+            sourceId = r.sourceId
         )
     }
 
     /**
+     * 第 23 批：跨来源对账的「疑似匹配」预览。只读、不写库、不自动合并。
+     * 口径：金额分完全相同 + 同一账户 + localDate ±1 天；
+     * 刻意不比较备注文本（商户全称与手工简写永远不相等）。
+     * 返回候选由使用者逐笔决定「跳过 / 仍导入」，MUST NOT 静默丢弃。
+     */
+    suspend fun findImportCandidates(rows: List<CsvRow>): List<ImportCandidate> {
+        val accounts = accountDao.all().filter { !it.isArchived }
+        val out = mutableListOf<ImportCandidate>()
+        rows.forEachIndexed { index, row ->
+            val acc = accounts.firstOrNull { it.name == row.accountName }
+                ?: return@forEachIndexed
+            val cents = try {
+                Cents.fromYuan(row.amountYuan).value
+            } catch (e: IllegalArgumentException) {
+                return@forEachIndexed
+            }
+            val ld = row.date.replace("-", "").toIntOrNull()
+                ?: return@forEachIndexed
+            val hits = recordDao.importCandidates(
+                acc.id, cents, shiftLocalDate(ld, -1), shiftLocalDate(ld, 1)
+            )
+            hits.forEach { h ->
+                out += ImportCandidate(
+                    rowIndex = index, existingId = h.id,
+                    existingNote = h.note, localDate = h.localDate,
+                    amountCents = h.amountCents
+                )
+            }
+        }
+        return out
+    }
+
+    /** Int 型 YYYYMMDD 的跨月安全日期平移；纯 JVM，不碰设备时区。 */
+    private fun shiftLocalDate(ld: Int, days: Long): Int {
+        val s = ld.toString().padStart(8, '0')
+        val d = java.time.LocalDate.of(
+            s.substring(0, 4).toInt(), s.substring(4, 6).toInt(),
+            s.substring(6, 8).toInt()
+        ).plusDays(days)
+        return d.year * 10000 + d.monthValue * 100 + d.dayOfMonth
+    }
+
+    /**
      * 阶段 6c-2：账单导入。单事务批量写入 + 末尾一次重算，
-     * 任一行解析失败整体回滚；去重按「账户 + 金额 + 日期 + 备注」，不加字段。
-     * 每条都经过 withResolvedRoot（含一级分类解析与 withCurrency 币种继承），
-     * 与 insertRecord 完全同构，不新开写余额的分支。
+     * 任一行解析失败整体回滚。
+     * 第 23 批：去重优先按 records(importSource, sourceId) 复合唯一键，
+     * 旧 CSV 没带来源列时用「账户 + 金额 + 日期 + 备注」派生 sourceId，
+     * 再叠加原有四元组判重；每条都经过 withResolvedRoot，不新开写余额分支。
      */
     suspend fun importRecords(rows: List<CsvRow>): CsvImportOutcome = db.withTransaction {
         val accounts = accountDao.all().filter { !it.isArchived }
@@ -593,7 +642,11 @@ class LedgerRepository @Inject constructor(
                 ?: throw IllegalArgumentException("日期非法：" + row.date)
             val amountCents = Cents.fromYuan(row.amountYuan).value
             val type = RecordType.valueOf(row.type)
-            if (recordDao.countDuplicate(account.id, amountCents, ld, row.note) > 0) {
+            val sourceId = row.sourceId.ifBlank { row.duplicateKey() }
+            val importSource = row.importSource.ifBlank { "CSV" }
+            val already = recordDao.countByImportSource(importSource, sourceId) > 0 ||
+                recordDao.countDuplicate(account.id, amountCents, ld, row.note) > 0
+            if (already) {
                 skipped++
                 return@forEach
             }
@@ -609,7 +662,9 @@ class LedgerRepository @Inject constructor(
                 yearMonth = ld / 100,
                 note = row.note,
                 excludeFromStats = false,
-                counterparty = row.counterparty
+                counterparty = row.counterparty,
+                importSource = importSource,
+                sourceId = sourceId
             )
             recordDao.insert(withResolvedRoot(entity))
             written++
@@ -621,7 +676,8 @@ class LedgerRepository @Inject constructor(
     /**
      * 第 22 批：Firefly III 6.6.x transactions.csv 迁移。
      * 单事务：按需新建账户 / 两级分类 -> 批量写流水 -> 末尾重算余额。
-     * 零表结构变更；去重靠 note 里的 ff3:<journal_id> 前缀。
+     * 第 23 批：幂等改由 records(importSource, sourceId) 复合唯一索引保证，
+     * 不再依赖备注前缀；备注里的 ff3:<journal_id> 仅作人类可读线索。
      * 映射到已有账户时默认不覆盖其期初余额，需显式授权才改。
      */
     suspend fun importFirefly(
@@ -746,7 +802,7 @@ class LedgerRepository @Inject constructor(
             if (amountCents <= 0L) {
                 throw IllegalArgumentException("第 " + e.lineNo + " 行金额必须大于 0")
             }
-            if (recordDao.countDuplicate(accId, amountCents, e.localDate, e.note) > 0) {
+            if (recordDao.countByImportSource("FIREFLY_III", e.journalId) > 0) {
                 skipped++
                 return@forEach
             }
@@ -771,7 +827,9 @@ class LedgerRepository @Inject constructor(
                 yearMonth = e.yearMonth,
                 note = e.note,
                 excludeFromStats = false,
-                counterparty = e.counterparty
+                counterparty = e.counterparty,
+                importSource = "FIREFLY_III",
+                sourceId = e.journalId
             )
             recordDao.insert(withResolvedRoot(entity))
             written++

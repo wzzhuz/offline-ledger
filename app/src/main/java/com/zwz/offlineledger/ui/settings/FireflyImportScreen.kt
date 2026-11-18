@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -33,10 +34,14 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 /**
  * 第 22 批：Firefly III 迁移二级页。
  * 选文件 -> 全量解析 -> 账户/分类映射预览 -> 二次确认 -> 单事务写入。
- * 不新增 NavHost 之外的依赖，不改表结构、不申请任何权限。
+ * 不新增 NavHost 之外的依赖，不申请任何权限；
+ * 第 23 批起库结构为 v2（导入来源唯一索引），安装需卸载重装。
  */
 @Composable
-fun FireflyImportScreen(onBack: () -> Unit) {
+fun FireflyImportScreen(
+    onBack: () -> Unit,
+    onGoDetail: () -> Unit = {}
+) {
     val context = LocalContext.current
     val vm = settingsVm()
     val state by vm.state.collectAsState()
@@ -51,6 +56,40 @@ fun FireflyImportScreen(onBack: () -> Unit) {
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         SettingsPageTopBar("导入 Firefly III", onBack)
+        state.fireflyResult?.let { result ->
+            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "迁移完成",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "写入 " + result.written + " 条流水 · 跳过 " +
+                            result.skipped + " 条重复",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "新建 " + result.newAccounts + " 个账户 / " +
+                            result.newCategories + " 个分类；期初余额应用 " +
+                            result.openingsApplied + " 条、跳过 " +
+                            result.openingsSkipped + " 条",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LedgerColors.Neutral
+                    )
+                    Text(
+                        text = "余额已重算；任一行失败会整体回滚，不会有半套数据。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LedgerColors.Neutral
+                    )
+                    Row(modifier = Modifier.padding(top = 8.dp)) {
+                        Button(onClick = onGoDetail) { Text("去看明细") }
+                        TextButton(onClick = { vm.clearFireflyResult() }) {
+                            Text("关闭结果")
+                        }
+                    }
+                }
+            }
+        }
         if (st == null) {
             Button(
                 onClick = {

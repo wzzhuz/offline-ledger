@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.zwz.offlineledger.backup.BackupExporter
 import com.zwz.offlineledger.backup.csv.CsvCodec
 import com.zwz.offlineledger.backup.csv.CsvRow
+import com.zwz.offlineledger.backup.csv.ImportCandidate
+import com.zwz.offlineledger.core.DataRefreshBus
 import com.zwz.offlineledger.backup.csv.FireflyAccountChoice
 import com.zwz.offlineledger.backup.csv.FireflyCategoryChoice
 import com.zwz.offlineledger.backup.csv.FireflyCsvCodec
@@ -36,7 +38,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** 导入前的确认计划：只有解析全通过才生成，进入此状态时不写任何数据。 */
-data class CsvImportPlan(val rows: List<CsvRow>)
+data class CsvImportPlan(
+    val rows: List<CsvRow>,
+    /** 第 23 批：疑似匹配候选与逐笔勾选（勾选＝跳过该行不导入）。 */
+    val candidates: List<ImportCandidate> = emptyList(),
+    val skipRowIndexes: Set<Int> = emptySet()
+)
 
 /** 第 22 批：Firefly III 导入预览状态，进入此状态时不写任何数据。 */
 data class FireflyImportState(
@@ -59,6 +66,8 @@ data class SettingsState(
     val hasPin: Boolean = false,
     val csvPlan: CsvImportPlan? = null,
     val firefly: FireflyImportState? = null,
+    /** 第 23 批：导入完成后的结果摘要，独立于 message，页面内常驻可见。 */
+    val fireflyResult: FireflyImportOutcome? = null,
     val defaultCurrency: String = LedgerCurrency.DEFAULT,
     val accounts: List<AccountEntity> = emptyList(),
     val defaultAccountId: Long = 0L,
@@ -209,6 +218,7 @@ class SettingsViewModel(
                         "${file.payload.records.size} 条流水；" +
                         "自检检查 ${health.checkedAccounts} 个账户，修复 ${health.repairedAccounts} 个。"
                 }
+                DataRefreshBus.notifyChanged()
                 loadCategories()
                 _state.value = _state.value.copy(busy = false, message = result)
             } catch (e: Exception) {
@@ -266,8 +276,16 @@ class SettingsViewModel(
                         error = "账单文件有问题，账本未改动：\n" + parsed.errors.joinToString("\n")
                     )
                 } else {
+                    val candidates = withContext(Dispatchers.IO) {
+                        repository.findImportCandidates(parsed.rows)
+                    }
                     _state.value = _state.value.copy(
-                        busy = false, csvPlan = CsvImportPlan(parsed.rows)
+                        busy = false,
+                        csvPlan = CsvImportPlan(
+                            rows = parsed.rows,
+                            candidates = candidates,
+                            skipRowIndexes = candidates.map { it.rowIndex }.toSet()
+                        )
                     )
                 }
             } catch (e: Exception) {
@@ -283,19 +301,34 @@ class SettingsViewModel(
         _state.value = _state.value.copy(csvPlan = null)
     }
 
+    /** 第 23 批：逐笔切换「跳过该行 / 仍导入」，绝不自动合并或删除。 */
+    fun toggleCsvCandidate(rowIndex: Int) {
+        val plan = _state.value.csvPlan ?: return
+        val next = plan.skipRowIndexes.toMutableSet()
+        if (!next.add(rowIndex)) next.remove(rowIndex)
+        _state.value = _state.value.copy(
+            csvPlan = plan.copy(skipRowIndexes = next)
+        )
+    }
+
     /** 确认后单事务批量写入；任一步失败整体回滚（Repository 内保证）。 */
     fun confirmCsvImport() {
         val plan = _state.value.csvPlan ?: return
+        val rows = plan.rows.filterIndexed { i, _ -> i !in plan.skipRowIndexes }
+        val skippedByUser = plan.rows.size - rows.size
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = true, message = "", error = "")
             try {
                 val outcome = withContext(Dispatchers.IO) {
-                    repository.importRecords(plan.rows)
+                    repository.importRecords(rows)
                 }
+                DataRefreshBus.notifyChanged()
                 _state.value = _state.value.copy(
                     busy = false, csvPlan = null,
-                    message = "导入完成：写入 ${outcome.written} 条，" +
-                        "跳过 ${outcome.skipped} 条重复；余额已重算。"
+                    message = "导入完成：写入 ${outcome.written} 条、" +
+                        "跳过 ${outcome.skipped} 条重复；疑似匹配 " +
+                        plan.candidates.size + " 项，按你的勾选跳过 " +
+                        skippedByUser + " 行；余额已重算。"
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
@@ -406,6 +439,10 @@ class SettingsViewModel(
         _state.value = _state.value.copy(firefly = null)
     }
 
+    fun clearFireflyResult() {
+        _state.value = _state.value.copy(fireflyResult = null)
+    }
+
     fun confirmFireflyImport() {
         val cur = _state.value.firefly ?: return
         val mapping = FireflyMapping(
@@ -419,10 +456,11 @@ class SettingsViewModel(
                 val outcome: FireflyImportOutcome = withContext(Dispatchers.IO) {
                     repository.importFirefly(cur.plan, mapping)
                 }
+                DataRefreshBus.notifyChanged()
                 loadCategories()
                 loadAccounts()
                 _state.value = _state.value.copy(
-                    busy = false, firefly = null,
+                    busy = false, firefly = null, fireflyResult = outcome,
                     message = "Firefly III 迁移完成：写入 " + outcome.written +
                         " 条流水、跳过 " + outcome.skipped + " 条重复；新建 " +
                         outcome.newAccounts + " 个账户 / " + outcome.newCategories +

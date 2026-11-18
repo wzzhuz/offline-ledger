@@ -63,7 +63,7 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
-fun AssetsScreen() {
+fun AssetsScreen(refreshTick: Int = 0) {
     val context = LocalContext.current
     val vm: AssetsViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
@@ -96,7 +96,7 @@ fun AssetsScreen() {
         accountOrder.move(from.key, to.key)
     }
 
-    LaunchedEffect(Unit) { vm.reload() }
+    LaunchedEffect(refreshTick) { vm.reload() }
 
     LazyColumn(
         state = listState,

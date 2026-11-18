@@ -35,3 +35,19 @@ Reconciliation 与未知类型 → 跳过并在报告列出。
 
 **理由**：6.6.6 的真实导出每个 split 独立一行，合并会丢金额与分类明细；
 本项目本来就是「一笔流水一个分类」，按行落库才是保真映射。
+
+
+### Requirement: 导入来源唯一标记
+
+`records` 与 `trash` SHALL 各带 `importSource` / `sourceId` 两列与复合唯一索引，
+两列 MUST 允许 NULL（手工记账恒为 NULL，SQLite 唯一索引不把 NULL 视为相等）。
+CSV 明文导出与加密备份 DTO SHALL 带这两列，旧格式缺列 MUST 按空值兼容解析。
+删除→恢复 MUST 保留来源标记。自定义极简 CSV 未带来源列时 SHALL 用
+「账户 + 金额 + 日期 + 备注」派生 `sourceId` 并标记 `importSource = CSV`。
+
+#### Scenario: 同一份文件导入两次
+
+- **GIVEN** 一份带 `importSource` / `sourceId` 的自有 CSV 导出
+- **WHEN** 清库后导入一次，再往同一账本导入第二次
+- **THEN** 第一次写入 N 条，第二次写入 0 条、跳过 N 条
+- **AND** 数据库不出现任何重复流水

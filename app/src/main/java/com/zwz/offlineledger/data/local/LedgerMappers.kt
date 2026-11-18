@@ -29,7 +29,8 @@ fun RecordEntity.toTrash(deletedAt: Long): TrashEntryEntity = TrashEntryEntity(
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
     note = note, excludeFromStats = excludeFromStats,
     linkedRecordId = linkedRecordId, currencyCode = currencyCode,
-    counterparty = counterparty, deletedAt = deletedAt
+    counterparty = counterparty, importSource = importSource,
+    sourceId = sourceId, deletedAt = deletedAt
 )
 
 fun TrashEntryEntity.toRecord(): RecordEntity = RecordEntity(
@@ -39,7 +40,8 @@ fun TrashEntryEntity.toRecord(): RecordEntity = RecordEntity(
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
     note = note, excludeFromStats = excludeFromStats,
     linkedRecordId = linkedRecordId, currencyCode = currencyCode,
-    counterparty = counterparty
+    counterparty = counterparty, importSource = importSource,
+    sourceId = sourceId
 )
 
 fun AccountEntity.toDto(): BackupAccount = BackupAccount(
@@ -79,7 +81,8 @@ fun RecordEntity.toDto(): BackupRecord = BackupRecord(
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
     note = note, excludeFromStats = excludeFromStats,
     linkedRecordId = linkedRecordId, currencyCode = currencyCode,
-    counterparty = counterparty
+    counterparty = counterparty, importSource = importSource,
+    sourceId = sourceId
 )
 
 fun BackupRecord.toEntity(): RecordEntity = RecordEntity(
@@ -89,7 +92,8 @@ fun BackupRecord.toEntity(): RecordEntity = RecordEntity(
     timestamp = timestamp, localDate = localDate, yearMonth = yearMonth,
     note = note, excludeFromStats = excludeFromStats,
     linkedRecordId = linkedRecordId, currencyCode = currencyCode,
-    counterparty = counterparty
+    counterparty = counterparty, importSource = importSource,
+    sourceId = sourceId
 )
 
 fun BalanceAdjustmentEntity.toDto(): BackupAdjustment = BackupAdjustment(

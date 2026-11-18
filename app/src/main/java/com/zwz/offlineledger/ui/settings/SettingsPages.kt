@@ -12,16 +12,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -48,6 +52,7 @@ import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
+import com.zwz.offlineledger.ui.components.formatCents
 
 @Composable
 internal fun settingsVm(): SettingsViewModel {
@@ -240,9 +245,13 @@ fun BackupSettingsScreen(
                     "note 备注（可选）\n" +
                     "currencyCode 币种：CNY / HKD / USD，留空按账户继承（可选）\n" +
                     "counterparty 收款方或付款方（可选，缺列按空处理）\n" +
-                    "示例：2026-11-15,EXPENSE,38.50,中国银行7375,餐饮,正餐,午餐,CNY,好优特生活超市\n" +
-                    "导入前整体校验，任何一行不合法都不写入；" +
-                    "按「账户 + 金额 + 日期 + 备注」自动跳过重复流水。",
+                    "importSource 导入来源（可选，导出必带，如 FIREFLY_III / CSV）\n" +
+                    "sourceId 来源系统内的稳定流水号（可选，导出必带）\n" +
+                    "示例：2026-11-15,EXPENSE,38.50,中国银行7375,餐饮,正餐,午餐,CNY,好优特生活超市,,\n" +
+                    "导入前整体校验，任何一行不合法都不写入。" +
+                    "导出文件带 importSource/sourceId，清库后原样导入可重建且不会双份；" +
+                    "往已有账本再导同一份会按复合唯一键全部跳过。" +
+                    "手工记录与第三方账单另按「金额 + 账户 + ±1 天」给疑似匹配，逐笔确认后才写。",
                 style = MaterialTheme.typography.labelSmall,
                 color = LedgerColors.Neutral
             )
@@ -260,14 +269,51 @@ fun BackupSettingsScreen(
     }
 
     state.csvPlan?.let { plan ->
+        val willWrite = plan.rows.size - plan.skipRowIndexes.size
         AlertDialog(
             onDismissRequest = { vm.cancelCsvImport() },
             title = { Text("导入账单") },
             text = {
-                Text(
-                    "将写入 ${plan.rows.size} 条流水（重复项自动跳过）。" +
-                        "确认后一次性写入；失败会整体回滚，账本不变。"
-                )
+                Column {
+                    Text(
+                        "共 " + plan.rows.size + " 条，确认写入 " + willWrite +
+                            " 条；重复项自动跳过。"
+                    )
+                    if (plan.candidates.isNotEmpty()) {
+                        Text(
+                            text = "疑似匹配 " + plan.candidates.size +
+                                " 项（金额 + 账户 + ±1 天）。默认勾选＝跳过该行，" +
+                                "取消勾选＝仍导入；不会自动合并或删除已有流水。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                        LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                            items(plan.candidates) { c ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(
+                                        checked = c.rowIndex in plan.skipRowIndexes,
+                                        onCheckedChange = {
+                                            vm.toggleCsvCandidate(c.rowIndex)
+                                        }
+                                    )
+                                    Text(
+                                        text = "第 " + (c.rowIndex + 2) + " 行 → 已有 " +
+                                            formatCents(c.amountCents) + " 元 · " +
+                                            c.localDate + " · " + c.existingNote.take(14),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Text(
+                        text = "确认后一次性写入；失败会整体回滚，账本不变。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LedgerColors.Neutral
+                    )
+                }
             },
             confirmButton = {
                 TextButton(onClick = { vm.confirmCsvImport() }) { Text("确认写入") }

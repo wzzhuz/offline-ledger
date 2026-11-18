@@ -17,7 +17,9 @@ import com.zwz.offlineledger.data.model.RecordType
         Index(value = ["amountCents"]),
         Index(value = ["fromAccountId"]),
         Index(value = ["toAccountId"]),
-        Index(value = ["categoryId"])
+        Index(value = ["categoryId"]),
+        /** 第 23 批：导入来源的复合唯一键；两列均可空，手工记账为 NULL 不参与唯一约束。 */
+        Index(value = ["importSource", "sourceId"], unique = true)
     ],
     foreignKeys = [
         ForeignKey(entity = AccountEntity::class, parentColumns = ["id"],
@@ -50,5 +52,11 @@ data class RecordEntity(
     val currencyCode: String = LedgerCurrency.DEFAULT,
     /** 阶段 7：收款方自由文本。不是账户、不产生复式分录、不参与余额联动。 */
     @ColumnInfo(name = "counterparty", defaultValue = "''")
-    val counterparty: String = ""
+    val counterparty: String = "",
+    /** 导入来源标记；手工记账恒为 null，NULL 在 SQLite 唯一索引里互不冲突。 */
+    @ColumnInfo(name = "importSource")
+    val importSource: String? = null,
+    /** 来源系统内的稳定流水号：FF3 用 journal_id，自有 CSV 用去重键。 */
+    @ColumnInfo(name = "sourceId")
+    val sourceId: String? = null
 )

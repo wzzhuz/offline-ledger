@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.core.view.WindowCompat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,17 +41,20 @@ class ChartFullscreenActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 第 23 批：全屏横屏页显式接管 insets，标题行不再压到状态栏的时间 / 电量。
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "趋势"
         val values = (intent.getLongArrayExtra(EXTRA_VALUES) ?: longArrayOf()).toList()
         val labels = intent.getStringArrayListExtra(EXTRA_LABELS) ?: arrayListOf()
+        val signed = intent.getBooleanExtra(EXTRA_SIGNED, false)
         val color = when (intent.getStringExtra(EXTRA_COLOR)) {
             "INCOME", "ASSET" -> LedgerColors.IncomeGreen
             else -> LedgerColors.ExpenseRed
         }
         setContent {
             LedgerTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    FullscreenChart(title, values, labels, color) { finish() }
+                Surface(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
+                    FullscreenChart(title, values, labels, color, signed) { finish() }
                 }
             }
         }
@@ -60,18 +65,21 @@ class ChartFullscreenActivity : ComponentActivity() {
         private const val EXTRA_VALUES = "chart_values"
         private const val EXTRA_LABELS = "chart_labels"
         private const val EXTRA_COLOR = "chart_color"
+        private const val EXTRA_SIGNED = "chart_signed"
 
         fun intentFor(
             context: Context,
             title: String,
             values: LongArray,
             labels: ArrayList<String>,
-            colorName: String
+            colorName: String,
+            signed: Boolean = false
         ): Intent = Intent(context, ChartFullscreenActivity::class.java)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_VALUES, values)
             .putStringArrayListExtra(EXTRA_LABELS, labels)
             .putExtra(EXTRA_COLOR, colorName)
+            .putExtra(EXTRA_SIGNED, signed)
     }
 }
 
@@ -81,11 +89,17 @@ private fun FullscreenChart(
     values: List<Long>,
     labels: List<String>,
     color: androidx.compose.ui.graphics.Color,
+    signed: Boolean = false,
     onClose: () -> Unit
 ) {
     var scaleX by remember { mutableStateOf(1f) }
     var tapped by remember { mutableStateOf<Int?>(null) }
-    val max = ChartData.seriesMaxSingle(values)
+    val max = if (signed) ChartData.seriesMaxAbsSigned(values)
+        else ChartData.seriesMaxSingle(values)
+    val normalized = if (signed) ChartData.normalizeSigned(values, max)
+        else ChartData.normalize(values, max)
+    val axis = if (signed) ChartData.yAxisLabelsSigned(max)
+        else ChartData.yAxisLabels(max)
 
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -99,10 +113,11 @@ private fun FullscreenChart(
         }
         LineChart(
             series = listOf(
-                LineSeries(title, color, ChartData.normalize(values, max))
+                LineSeries(title, color, normalized)
             ),
             xLabels = labels,
-            yLabels = ChartData.yAxisLabels(max),
+            yLabels = axis,
+            zeroLine = signed,
             chartHeight = 300.dp,
             labelEvery = 1,
             valueLabels = values.map { formatCents(it) },

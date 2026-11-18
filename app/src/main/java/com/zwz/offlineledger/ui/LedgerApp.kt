@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.core.time.LedgerClock
+import com.zwz.offlineledger.core.DataRefreshBus
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -83,6 +84,12 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    // 第 23 批：导入 / 恢复发生在设置二级页，EventBus 让明细 / 资产 / 统计立即重查，
+    // 不再需要「切月份再切回来」才触发刷新。
+    LaunchedEffect(Unit) {
+        DataRefreshBus.events.collect { refreshTick += 1 }
+    }
 
     LaunchedEffect(Unit) {
         runCatching {
@@ -151,9 +158,12 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                     onEdit = { id -> openEditor(id) }
                 )
             }
-            composable("assets") { AssetsScreen() }
+            composable("assets") { AssetsScreen(refreshTick = refreshTick) }
             composable("stats") {
-                StatsScreen(onOpenCategories = { navController.navigate("categories") })
+                StatsScreen(
+                    refreshTick = refreshTick,
+                    onOpenCategories = { navController.navigate("categories") }
+                )
             }
             composable("settings") {
                 SettingsScreen(onOpen = { route -> navController.navigate(route) })
@@ -164,7 +174,12 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                     onOpenFirefly = { navController.navigate("firefly") }
                 )
             }
-            composable("firefly") { FireflyImportScreen(onBack = { goBack() }) }
+            composable("firefly") {
+                FireflyImportScreen(
+                    onBack = { goBack() },
+                    onGoDetail = { navController.navigate("detail") }
+                )
+            }
             composable("security") { SecuritySettingsScreen(onBack = { goBack() }) }
             composable("prefs") { PreferenceSettingsScreen(onBack = { goBack() }) }
             composable("ledger") {
