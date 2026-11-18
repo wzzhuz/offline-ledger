@@ -187,3 +187,20 @@ Q5 预制账户 / 分类是 `SeedData` 代码常量，首次建库写进表，�
 本 change 未归档，`backup-restore` 里「MUST NOT 新增字段」「ff3 前缀实现幂等」
 两条旧表述按 3-C **直接修订为最终行为**，不追加 ADDED 制造相反文本。
 `reporting-ui` / `ledger-transactions` 各补结果摘要与唯一标记的 ADDED。
+
+
+## 10. 第 23 批实测回填（2026-11-18）
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | `2e6b227cfd5f73b9202afdf6e906262c4810adf0`（单次 commit，34 文件：2 新增 + 32 修改、零删除） |
+| push CI | `44221209264` **success**，17 步全绿，**首轮 Kotlin 编译零错误**；未走临时诊断通道 |
+| release | `44222024298` **success**，23 步绿 / 5 步按 input 跳过；**「上传到坚果云」步骤 success** |
+| 制品 | `offline-ledger-release-v0.2.7` 12,285,184 B；`offline-ledger-mapping-v0.2.7` 3,603,885 B；`offline-ledger-metrics-v0.2.7-p-m-nsfalse` 270 B |
+| 差异校验 | 推送前「远端 305 ↔ 本地 307 blob」差异集合断言 PASS；`diag/` 零残留、workflow 仅 build/release |
+| 静态检查 | 六个脚本本地全 PASS；Kotlin 大括号 / 引号粗检 0 个不平衡文件 |
+
+**安装口径（B 方案）**：`AppDatabase.version = 2`、无 Migration，
+**必须卸载重装，不允许覆盖安装**。重建主路径为「卸载重装 → 重跑同一份 FF3 CSV」；
+不写 V1→V2 schema 兼容层，手工补录 / 模板 / 预算等不在 FF3 CSV 内的部分
+按使用者授权接受重建。装前必须提醒「先导出，再看目录」。

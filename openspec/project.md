@@ -318,7 +318,7 @@ MUST 重新启用显式 `Migration`、`MIN_SUPPORTED` 向后兼容、
 
 ## 阶段计划补录（第 23 批，2026-11-18）
 
-- v0.2.7：导入闭环 + 数据库级幂等（`importSource` / `sourceId` 复合唯一索引，
+- v0.2.7（实测 commit `2e6b227cfd5f` / CI `44221209264` / release `44222024298`）：导入闭环 + 数据库级幂等（`importSource` / `sourceId` 复合唯一索引，
   `AppDatabase.version = 2`、无 Migration）+ 统计图表增强（净结余 / 多年 / 稳定色板 /
   横屏 insets）+ 跨来源疑似匹配预览。
 - **本批必须卸载重装**：库内已有 Firefly III 真实迁移数据，覆盖安装会因无 Migration
