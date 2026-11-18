@@ -2,7 +2,7 @@ name: 临时诊断
 'on':
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   actions: write
 jobs:
   diag:
@@ -25,8 +25,12 @@ jobs:
           set +e
           gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/unit.log
           exit 0
-      - name: 上传日志
-        uses: actions/upload-artifact@v4
-        with:
-          name: p26-unit-log
-          path: /tmp/unit.log
+      - name: 回传日志到仓库
+        run: |
+          mkdir -p diag
+          cp /tmp/unit.log diag/unit.log
+          git config user.email "diag@local"
+          git config user.name "diag"
+          git add -f diag/unit.log
+          git commit -m "diag: unit test log" || true
+          git push origin HEAD:refs/heads/main || true
