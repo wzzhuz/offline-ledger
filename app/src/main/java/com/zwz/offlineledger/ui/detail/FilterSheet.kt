@@ -1,5 +1,7 @@
 package com.zwz.offlineledger.ui.detail
 
+import com.zwz.offlineledger.data.display.CategoryDisplay
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -96,7 +98,7 @@ fun FilterSheet(
                 val parent = c.parentId?.let { pid ->
                     categories.firstOrNull { it.id == pid }?.name
                 }
-                if (parent != null) parent + " / " + c.name else c.name
+                CategoryDisplay.resolve(parent, c.name)
             }
         })
     }
@@ -128,7 +130,7 @@ fun FilterSheet(
             .flatMap { root ->
                 listOf(root.name to ("r:" + root.id)) +
                     categories.filter { it.parentId == root.id && !it.isArchived }
-                        .map { c -> (root.name + " / " + c.name) to ("c:" + c.id) }
+                        .map { c -> CategoryDisplay.resolve(root.name, c.name) to ("c:" + c.id) }
             }
 
     Dialog(onDismissRequest = onDismiss) {

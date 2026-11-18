@@ -457,7 +457,16 @@ jobs:
           log "目标路径：坚果云 /$PARENT/$DIR/$APK_NAME"
           log "本地文件：$APK_PATH"
           [ -f "$APK_PATH" ] || fail "本地找不到 APK，无法上传"
-          log "文件大小：$(du -h "$APK_PATH" | cut -f1)"
+          log "文件大小：$(du -h "$APK_PATH" | cut -f1)（$(stat -c%s "$APK_PATH") 字节，未压缩）"
+          # 第 29 批：把「装的是哪个构建形态」写进日志，避免再把体积差误读成变体。
+          # 本文件由 rename 步骤优先选中 *-release-*.apk（minify=on 走 R8 分支），
+          # 与 mapping 配套；GitHub Actions Artifacts 页面显示的是 zip 二次压缩后
+          # 的大小（约 12M），坚果云这里约 24M 就是同一个 release APK 的原始字节。
+          log "构建形态：minify=${{ inputs.minify }}，产物 $APK_NAME（R8 release，文件名含短 sha）"
+          if ls app/build/outputs/mapping/release/mapping.txt >/dev/null 2>&1; then
+            log "混淆映射表：存在（mapping-v${{ steps.ver.outputs.version }} 已随制品上传）"
+          fi
+          log "口径：Artifacts 页面约 12M 为 zip 压缩后尺寸，非另一个构建变体"
           log ""
 
           # ---- 第 1 步：认证连通性（只读，不消耗流量）----

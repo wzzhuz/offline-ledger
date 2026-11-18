@@ -14,6 +14,7 @@ import com.zwz.offlineledger.engine.BudgetEngine
 import com.zwz.offlineledger.engine.BudgetProgress
 import com.zwz.offlineledger.engine.ChartData
 import com.zwz.offlineledger.engine.ChartData.ChartSlice
+import com.zwz.offlineledger.data.display.CategoryDisplay
 import com.zwz.offlineledger.engine.InsightData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -188,6 +189,14 @@ class StatsViewModel(
             val categories = categoryDao.all().associateBy { it.id }
             val nameOf: (Long) -> String = { id -> categories[id]?.name ?: "未分类" }
             val colorOf: (Long) -> String? = { id -> categories[id]?.colorHex }
+            // 第 29 批：二级切片显示名 MUST 带父级，否则不同一级下的同名
+            // 「其他」在图例 / 下钻 chip 里完全无法分辨。统一走 CategoryDisplay，
+            // 与筛选面板、明细 chip 同一出口，MUST NOT 各自拼 " / "。
+            val nameOfChild: (Long) -> String = { id ->
+                val c = categories[id]
+                val parentName = c?.parentId?.let { pid -> categories[pid]?.name }
+                CategoryDisplay.resolve(parentName, c?.name ?: "未分类")
+            }
 
             val totalExpense: Long
             val totalIncome: Long
@@ -220,7 +229,7 @@ class StatsViewModel(
             val netTotal = (totalExpense - settleTotal).coerceAtLeast(0L)
 
             val roots = ChartData.netSlices(toSlices(rootRows, nameOf, colorOf), settleRoot)
-            val children = ChartData.netSlices(toSlices(childRows, nameOf, colorOf), settleChild)
+            val children = ChartData.netSlices(toSlices(childRows, nameOfChild, colorOf), settleChild)
             val check = ChartData.checkTotals(roots, children, netTotal)
 
             // 第 27 批：排行卡「点一级展开二级」复用已有 childSlices 聚合，
@@ -229,7 +238,9 @@ class StatsViewModel(
                 val cid = sl.id ?: return@mapNotNull null
                 val parent = categories[cid]?.parentId ?: return@mapNotNull null
                 parent to InsightData.RankRow(
-                    sl.name, sl.cents, 0,
+                    // 排行已在父级下展开，保留裸二级名避免重复父名；
+                    // 占比图例与下钻 chip 仍用 sl.name（带父级）。
+                    categories[cid]?.name ?: sl.name, sl.cents, 0,
                     InsightData.ratio(sl.cents, netTotal), cid
                 )
             }.groupBy({ it.first }, { it.second })

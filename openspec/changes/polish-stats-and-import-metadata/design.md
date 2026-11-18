@@ -166,3 +166,36 @@ completed success。制品 `offline-ledger-release-v0.2.11` 12,320,054 B、
    第 27 批起该参数化短路已存在，本批零新增聚合 SQL 出口。
 3. 「12M 是 release、24M 是 debug」的归因是错的：两者是同一个 R8 release 包，
    GitHub Actions artifact 显示的是二次压缩后的 zip 大小。本批只改产物名，不改上传源。
+
+## 9. 第 29 批根因与回退顺序（v0.2.13）
+
+**根因**：分类显示名在三个消费方各自拼装——`StatsViewModel.toSlices` 的
+`nameOf` 只返回裸二级名（占比图例据此渲染、扇区点击据此传 `displayName`），
+`FilterSheet` 第 96/131 行自己拼 `parent + " / " + name`，`DetailScreen` chip
+兜底反查也只取裸名。所以「手工选显示 餐饮/其他，统计跳转却只有 其他」，
+且不同一级下的同名「其他」在饼图里无法分辨。这不是 SQL 或条件对象的问题，
+`rootCategoryId` / `categoryId` 一直传对了。
+
+**修法**：新增纯 JVM `CategoryDisplay.resolve(parentName, leafName)` 作唯一出口；
+`StatsViewModel` 增 `nameOfChild` 让 `childSlices` 的 name 带父级（图例与下钻
+自动受益），排行内联展开改回裸名避免在父级下重复；`FilterSheet` 两处拼接与
+`DetailScreen` 兜底反查全部改调 `resolve`；新增 `CategoryDisplayTest` 锁死
+三种入口输出一致。零表结构、零 DAO 改动、零新增 SQL 出口。
+
+**第 3 条前提更正（重要）**：第 28 批实测回填已查明「GitHub Actions Artifacts
+页面约 12M 是 artifact zip 二次压缩后尺寸，坚果云约 24M 是同一个 R8 release
+APK 的原始字节」，`release.yml` 的 rename 步骤本来就优先选 `*-release-*.apk`
+且文件名已带短 sha。第 29 批门禁里退回「24M = debug 未收缩」并设计
+「体积断言 11–13M 否则 fail」是错误结论——照做会让 CI 必然失败。
+本批**不改上传选择逻辑、不加体积断言**，只在坚果云步骤补形态证据日志
+（minify input / 原始字节 / mapping 存在性 / artifact 口径说明），并把口径写进
+活文档 §7.14，避免再次误判。
+
+**三级回退顺序**：
+1. 若 `childSlices` 带父级名导致排行 / 合计校验文本异常 → 只在
+   `DonutInsightCard` 渲染前 map 一份带父级副本，不动 ViewModel 聚合。
+2. 若 `CategoryDisplay` 引入编译解析问题 → 退到各文件内私有扩展函数，
+   仍保持单一文案常量。
+3. 若新单测在 CI 崩溃 → 先移除单测文件，保留实现，单独诊断 JVM 测试源集。
+
+按指南 §4，所有替换断言「每处唯一匹配」，新增文件不覆盖既有路径。

@@ -1,5 +1,7 @@
 package com.zwz.offlineledger.ui.detail
 
+import com.zwz.offlineledger.data.display.CategoryDisplay
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -132,7 +134,13 @@ fun DetailScreen(
                     filter.categoryId != null || filter.rootCategoryId != null ->
                         "分类筛选：" + (filter.categoryDisplayName ?: run {
                             val cid = filter.categoryId ?: filter.rootCategoryId
-                            categories.firstOrNull { it.id == cid }?.name ?: "分类"
+                            val c = cid?.let { id -> categories.firstOrNull { it.id == id } }
+                            if (c == null) "分类" else {
+                                val parent = c.parentId?.let { pid ->
+                                    categories.firstOrNull { it.id == pid }?.name
+                                }
+                                CategoryDisplay.resolve(parent, c.name)
+                            }
                         })
                     filter.counterpartyQuery != null ->
                         "交易对方包含：" +

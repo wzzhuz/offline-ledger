@@ -75,3 +75,16 @@
 - push CI `44271311112` success（17 步）/ release `44272571557` success（23 绿 / 5 跳过，坚果云 success）
 - 制品：`offline-ledger-release-v0.2.12` 12319640 B · `offline-ledger-mapping-v0.2.12` 3672809 B · `offline-ledger-metrics-v0.2.12-p-m-nsfalse` 271 B
 - 第 12 项已完成；第 13 项真机复核仍由使用者装机确认，保留 `[ ]`
+
+# 第 29 批任务（v0.2.13 · 显示名单一出口 + 产物口径收口）
+
+- [x] 1. 新增纯 JVM `CategoryDisplay.resolve` 与 `CategoryDisplayTest`
+- [x] 2. `StatsViewModel` 增 `nameOfChild` 让二级切片带父级；排行展开保留裸名
+- [x] 3. `FilterSheet` 两处拼接、`DetailScreen` chip 兜底改调唯一出口
+- [x] 4. `release.yml` 坚果云步骤补形态证据日志（不改上传源、不加体积断言）
+- [x] 5. 版本 `0.2.12 → 0.2.13`；design/proposal/tasks/delta 与活文档 §7.14 同步
+- [x] 6. 六个静态检查本地 PASS（待 CI 复核）
+- [ ] 7. push CI 与 release 实测回填、坚果云上传（执行后由 `_p29_backfill.py` 补编号）
+- [ ] 8. **真机复核（由使用者装机确认）**：二级视图图例显示「餐饮 / 其他」等
+      带父级全名；从统计页二级下钻 chip 与筛选面板同样带父级、与手工选一致；
+      一级下钻仍只有一级名；同名二级可分辨；相邻色块与下拉刷新不回退
