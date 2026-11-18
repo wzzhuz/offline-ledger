@@ -47,3 +47,23 @@
 - [ ] 真机复核：卸载重装后重新导入真实 1916 行样本、核对余额 / 明细 / 统计（**由使用者装机确认**）
 - [ ] 真机复核：结果摘要、当前月立即刷新、下拉刷新、环形图可辨、横屏不压状态栏、
   净结余含负值、多年下钻、疑似匹配逐笔确认（**由使用者装机确认**）
+
+
+## 第 24 批（导入四态 + 官方下拉刷新 + 横屏 insets 分层，v0.2.8）
+
+- [x] 开场核对本地 ↔ 远端 `43062e868839` 307 blob 零差异；复读指南 §2.6 / §7.8 / §8
+- [x] `design.md` §11 先写根因与三级回退顺序，再动代码
+- [x] `FireflyImportScreen`：四态状态机（idle / confirming / running / result），
+  整页结果视图 + Snackbar + 「去看明细 / 完成」，不自动返回
+- [x] `SettingsViewModel.confirmFireflyImport` 事务路径不变，仅由页面呈现 running 态
+- [x] `DetailScreen`：官方 `PullToRefreshBox` 替换自造 28dp 窄条，删教手势小字，
+  Snackbar 反馈刷新结果，`isRefreshing` 与首屏加载分离
+- [x] **按使用者要求不加 TopAppBar 无障碍刷新按钮**，不新增业务入口
+- [x] `ChartFullscreenActivity`：拆掉整块 `systemBarsPadding`，改 `BoxWithConstraints`
+  动态 `chartHeight`，底部说明行独立吃 `navigationBarsPadding()`
+- [x] `backup-restore` delta 中「顶部下滑刷新窄条」表述按最终行为整块修订（指南 §5）
+- [x] 活文档 §7.10 补记「平台级手势优先官方组件 / insets 分层 / 不加无障碍按钮的决策」
+- [x] 六个静态检查本地全 PASS；Kotlin 引号与括号自检
+- [ ] push CI / release / 坚果云上传实测编号与制品字节回填（本批执行后填）
+- [ ] 真机复核：导入完成提示、下拉刷新手感与反馈、横屏三键/手势导航两种模式下
+  底部时间轴完整（**由使用者装机确认**）

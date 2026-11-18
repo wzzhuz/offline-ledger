@@ -204,3 +204,38 @@ Q5 预制账户 / 分类是 `SeedData` 代码常量，首次建库写进表，�
 **必须卸载重装，不允许覆盖安装**。重建主路径为「卸载重装 → 重跑同一份 FF3 CSV」；
 不写 V1→V2 schema 兼容层，手工补录 / 模板 / 预算等不在 FF3 CSV 内的部分
 按使用者授权接受重建。装前必须提醒「先导出，再看目录」。
+
+
+## 11. 第 24 批：把 v0.2.7 的三个「半成品」收口（v0.2.8）
+
+### 11.1 根因（先写再动手，指南 §6.1）
+
+| 反馈 | 根因 |
+|---|---|
+| 导入完没提示 | v0.2.7 的结果卡挂在 `Column` 顶部，与「选文件」分支并列；`firefly=null` 后页面回到说明文本，卡被挤出视野。且状态机只有 idle/confirming/result 三态，缺 `running`——1916 行写入期间只有按钮置灰，用户只能去明细页猜 |
+| 横屏底部时间轴被压没 | 第 23 批把 `systemBarsPadding()` 套在整块 `Surface` 上，横屏下 statusBars + navigationBars + captionBar 一起扣掉可用高度；`LineChart(chartHeight=300.dp)` 又是固定值，横轴标签槽首当其冲被裁 |
+| 「下滑提示小字」不对 | 第 23 批自造了 28dp 窄条 + `detectDragGestures`，既不是通用做法，也写教手势的常驻小字。官方 Pull-to-Refresh 的定义就是「内容在 Index 0、不能继续上划时向下拉，过阈值松手触发，指示器一直留到刷新完成」 |
+
+### 11.2 落地
+
+- 导入页 `when { result / st==null / else }` 四态：`result` 为**整页结果视图**（不自动返回）+ Snackbar；`busy` 时显示「正在写入 N 条」+ `LinearProgressIndicator`；`fireflyResult` 独立于 `message`，避免被说明文本挤掉。
+- 明细页用 `androidx.compose.material3.PullToRefreshBox` 替换自造条；删掉《从此向下滑刷新当前月份》小字；`isRefreshing` 与首屏加载标志分离，刷新结束 `SnackbarHost` 反馈「已刷新当前月份 · N 条记录」；`DataRefreshBus` 驱动的自动刷新保持不动，不产生双转圈。**按使用者要求不加 TopAppBar 无障碍刷新入口**。
+- 横屏页：`Surface` 不再整体吃 inset；`BoxWithConstraints.statusBarsPadding()` 算可用高度，`chartHeight` 由 `maxHeight - reserved` 动态得出（预留标题 / 横轴标签 / 说明 / 导航栏）；只有底部说明行吃 `navigationBarsPadding()`。
+- 版本 0.2.7 → 0.2.8；表结构仍 v2 不变 → **v0.2.7 上覆盖安装即可**，但从更早版本升上来仍须卸载重装。
+
+### 11.3 三级回退顺序（若 CI 红）
+
+1. 先只修 Kotlin 编译错误（import / `ExperimentalMaterial3Api` opt-in / 重载解析），不动布局；
+2. 若 `PullToRefreshBox` 在当前 BOM 解析不到，退到 `rememberPullToRefreshState` +
+   `Modifier.pullRefresh` + `PullRefreshIndicator`，仍零第三方依赖；
+3. 若横屏动态高度导致 Canvas 溢出，退到固定 `chartHeight = 180.dp` + 底部
+   `navigationBarsPadding()`，不再动 insets 分层。
+
+### 11.4 实测回填
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | 待回填 |
+| push CI | 待回填 |
+| release | 待回填 |
+| 制品 | 待回填 |

@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,8 +25,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PullToRefreshBox
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,8 +64,10 @@ import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.components.signedAmount
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(
     refreshTick: Int,
@@ -87,33 +91,60 @@ fun DetailScreen(
     var settleError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
+    /** 第 24 批：官方 PullToRefreshBox，手势只在列表已到顶部时接管；
+     *  刻意不加 TopAppBar 无障碍刷新按钮（使用者明确要求不多出业务按钮）。
+     *  isRefreshing 与首次加载标志分离，避免两个转圈。 */
+    var isRefreshing by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
     LaunchedEffect(refreshTick) {
         if (refreshTick > 0) vm.bumpRevision()
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        PullToRefreshStrip(onRefresh = { vm.bumpRevision() })
-        MonthOverviewCard(
-            overview = overview,
-            activeFilterCount = filter.activeCount(),
-            onPrev = { vm.switchMonth(-1) },
-            onNext = { vm.switchMonth(1) },
-            onFilter = { showFilter = true }
-        )
-
-        LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
-            items(
-                count = pagingItems.itemCount,
-                key = pagingItems.itemKey { it.id }
-            ) { index ->
-                val row = pagingItems[index] ?: return@items
-                val previous = if (index > 0) pagingItems[index - 1] else null
-                if (previous == null || previous.localDate != row.localDate) {
-                    DayHeader(row.localDate, overview.dailyTotals[row.localDate])
+    Box(modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                vm.bumpRevision()
+                isRefreshing = true
+                scope.launch {
+                    delay(420)
+                    isRefreshing = false
+                    snackbarHostState.showSnackbar(
+                        "已刷新当前月份 · " + pagingItems.itemCount + " 条记录"
+                    )
                 }
-                RecordRowCard(row = row, onClick = { actionRow = row })
+            },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                MonthOverviewCard(
+                    overview = overview,
+                    activeFilterCount = filter.activeCount(),
+                    onPrev = { vm.switchMonth(-1) },
+                    onNext = { vm.switchMonth(1) },
+                    onFilter = { showFilter = true }
+                )
+
+                LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
+                    items(
+                        count = pagingItems.itemCount,
+                        key = pagingItems.itemKey { it.id }
+                    ) { index ->
+                        val row = pagingItems[index] ?: return@items
+                        val previous = if (index > 0) pagingItems[index - 1] else null
+                        if (previous == null || previous.localDate != row.localDate) {
+                            DayHeader(row.localDate, overview.dailyTotals[row.localDate])
+                        }
+                        RecordRowCard(row = row, onClick = { actionRow = row })
+                    }
+                }
             }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     // 第 4 批：行内不再塞报销 / 删除按钮，改为点击行弹出动作菜单，
@@ -458,38 +489,3 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
 }
 
 
-/**
- * 第 23 批：明细页顶部的下拉刷新条。
- * 只在这条 28dp 区域内接管手势，MUST NOT 挂到整个列表上——
- * 否则会与 LazyColumn 争 pointer，正常滚动反而失效（第 17/18 批拖拽踩过同型坑）。
- */
-@Composable
-private fun PullToRefreshStrip(onRefresh: () -> Unit) {
-    var drag by remember { mutableStateOf(0f) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 28.dp)
-            .padding(horizontal = 16.dp, vertical = 2.dp)
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragEnd = {
-                        if (drag > 70f) onRefresh()
-                        drag = 0f
-                    },
-                    onDragCancel = { drag = 0f }
-                ) { change, d ->
-                    if (d.y > 0f) drag += d.y
-                    change.consume()
-                }
-            },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "↓ 从此向下滑刷新当前月份",
-            style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral
-        )
-    }
-}

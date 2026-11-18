@@ -6,12 +6,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.core.view.WindowCompat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +43,8 @@ class ChartFullscreenActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 第 23 批：全屏横屏页显式接管 insets，标题行不再压到状态栏的时间 / 电量。
+        // 第 24 批：insets 分层处理。第 23 批把 systemBarsPadding 套在整块 Surface 上，
+        // 横屏下 statusBars + navigationBars 一起扣到 Canvas，底部时间轴被挤出屏幕。
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "趋势"
         val values = (intent.getLongArrayExtra(EXTRA_VALUES) ?: longArrayOf()).toList()
@@ -53,7 +56,8 @@ class ChartFullscreenActivity : ComponentActivity() {
         }
         setContent {
             LedgerTheme {
-                Surface(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
+                // 整页不再整体吃 systemBarsPadding；由内层分别吃顶部与底部。
+                Surface(modifier = Modifier.fillMaxSize()) {
                     FullscreenChart(title, values, labels, color, signed) { finish() }
                 }
             }
@@ -101,43 +105,57 @@ private fun FullscreenChart(
     val axis = if (signed) ChartData.yAxisLabelsSigned(max)
         else ChartData.yAxisLabels(max)
 
-    Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.weight(1f)
-            )
-            Text("竖轴单位：元 · 双指缩放 $scaleX 倍", style = MaterialTheme.typography.labelSmall)
-            TextButton(onClick = onClose) { Text("关闭") }
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().statusBarsPadding()
+    ) {
+        // 横屏可用高度很紧：标题行 + 绘图区 + 横轴标签槽 + 说明行 + 底部导航栏
+        // 必须一起算，固定 300dp 的绘图区会把时间轴挤出屏幕。
+        val reserved = 56.dp + 26.dp + 24.dp + 16.dp + 24.dp
+        val chartH = if (maxHeight > reserved + 120.dp) {
+            maxHeight - reserved
+        } else {
+            120.dp
         }
-        LineChart(
-            series = listOf(
-                LineSeries(title, color, normalized)
-            ),
-            xLabels = labels,
-            yLabels = axis,
-            zeroLine = signed,
-            chartHeight = 300.dp,
-            labelEvery = 1,
-            valueLabels = values.map { formatCents(it) },
-            annotateAll = true,
-            selectedIndex = tapped,
-            onPointTap = { tapped = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .scale(scaleX = scaleX, scaleY = 1f)
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, _, zoom, _ ->
-                        scaleX = (scaleX * zoom).coerceIn(1f, 4f)
+        Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Text("竖轴单位：元 · 双指缩放 $scaleX 倍", style = MaterialTheme.typography.labelSmall)
+                TextButton(onClick = onClose) { Text("关闭") }
+            }
+            LineChart(
+                series = listOf(
+                    LineSeries(title, color, normalized)
+                ),
+                xLabels = labels,
+                yLabels = axis,
+                zeroLine = signed,
+                chartHeight = chartH,
+                labelEvery = 1,
+                valueLabels = values.map { formatCents(it) },
+                annotateAll = true,
+                selectedIndex = tapped,
+                onPointTap = { tapped = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .scale(scaleX = scaleX, scaleY = 1f)
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, _, zoom, _ ->
+                            scaleX = (scaleX * zoom).coerceIn(1f, 4f)
+                        }
                     }
-                }
-        )
-        Text(
-            text = "每个点常驻显示金额；点击数据点也可查看明细。横轴标签全量铺开。",
-            style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral
-        )
+            )
+            Text(
+                text = "每个点常驻显示金额；点击数据点也可查看明细。横轴标签全量铺开。",
+                style = MaterialTheme.typography.labelSmall,
+                color = LedgerColors.Neutral,
+                // 只有底部说明行吃导航栏 inset，横轴标签槽留在绘图区内不再被压没。
+                modifier = Modifier.navigationBarsPadding()
+            )
+        }
     }
 
     tapped?.let { idx ->

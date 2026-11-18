@@ -77,14 +77,17 @@ MUST NOT 引入网络权限或含网络行为的依赖。
 
 ### Requirement: 导入结果反馈与当前页刷新
 
-所有导入 / 备份恢复成功后，系统 SHALL 在对应页面给出常驻可见的结果摘要
-（写入 / 跳过 / 新建账户 / 新建分类 / 期初应用 / 期初跳过），
-MUST NOT 只用一行容易被挤出屏幕的 message。
-Firefly III 结果摘要 SHALL 提供「去看明细」入口。
+所有导入 / 备份恢复成功后，系统 SHALL 在对应页面给出整页结果视图
+（写入 / 跳过 / 新建账户 / 新建分类 / 期初应用 / 期初跳过）并附一次 Snackbar 反馈，
+MUST NOT 只用一行容易被挤出屏幕的 message，也 MUST NOT 在写入完成后自动返回。
+写入期间 SHALL 显示「正在写入 N 条」与进度指示，MUST NOT 只把确认按钮置灰。
+Firefly III 结果视图 SHALL 提供「去看明细」与「完成」入口。
 写操作成功后 SHALL 发一次进程内数据变更事件，明细 / 资产 / 统计 MUST
 在**当前月份 / 当前币种**立即重查，使用者 MUST NOT 靠「切月份再切回来」触发刷新。
-明细页 SHALL 额外提供顶部下滑刷新作为手动兜底，手势 MUST 只挂在顶部窄条上，
-MUST NOT 与 LazyColumn 的正常滚动争 pointer。
+明细页 SHALL 使用官方 `PullToRefreshBox` 提供下拉刷新：手势只在可滚动内容已到顶部、
+不能继续上划时接管，超过阈值松手触发，刷新完成 SHALL 给出结果反馈；
+MUST NOT 用教手势的常驻小字、MUST NOT 自造拖动动画、MUST NOT 额外增加
+TopAppBar 无障碍刷新按钮（使用者明确要求不增加业务按钮）。
 
 #### Scenario: 导入后不切月份
 
