@@ -18,6 +18,7 @@
 
     <application
         android:name=".OfflineLedgerApp"
+        android:hasFragileUserData="true"
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
