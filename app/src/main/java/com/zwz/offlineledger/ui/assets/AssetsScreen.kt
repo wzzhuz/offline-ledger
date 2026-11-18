@@ -28,7 +28,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,10 +62,12 @@ import com.zwz.offlineledger.ui.components.rememberKeyedReorder
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import com.zwz.offlineledger.ui.reconcile.ReconcileDialog
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssetsScreen(refreshTick: Int = 0) {
     val context = LocalContext.current
@@ -72,6 +78,11 @@ fun AssetsScreen(refreshTick: Int = 0) {
     )
     val state by vm.state.collectAsState()
     val scope = rememberCoroutineScope()
+
+    /** 第 25 批：资产页专用刷新标志，与明细页 / 首屏加载三分离，避免双转圈。
+     *  导入后的自动刷新仍由 LedgerApp 的 refreshTick 通道驱动，这里不重复发事件。 */
+    var isRefreshing by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var showAdd by remember { mutableStateOf(false) }
     var addError by remember { mutableStateOf<String?>(null) }
@@ -98,11 +109,24 @@ fun AssetsScreen(refreshTick: Int = 0) {
 
     LaunchedEffect(refreshTick) { vm.reload() }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        item(key = "assets-header") {
+    Box(modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                vm.reload()
+                scope.launch {
+                    delay(420)
+                    isRefreshing = false
+                    snackbarHostState.showSnackbar("已刷新资产 · 账户与余额已重算")
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {        item(key = "assets-header") {
             Column {
                 Text(text = "资产", style = MaterialTheme.typography.headlineMedium)
                 CurrencyGroupsCard(state)
@@ -183,6 +207,12 @@ fun AssetsScreen(refreshTick: Int = 0) {
                 modifier = Modifier.padding(top = 10.dp)
             )
         }
+            }
+        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     if (showAdd) {

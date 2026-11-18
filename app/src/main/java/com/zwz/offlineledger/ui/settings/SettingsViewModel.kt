@@ -33,6 +33,7 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -97,24 +98,24 @@ class SettingsViewModel(
 
     private fun loadAccounts() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(
+            _state.update { st -> st.copy(
                 accounts = accountDao.all(),
                 defaultAccountId = prefs.defaultAccountId
-            )
+            ) }
         }
     }
 
     /** 第 6 批：默认账户只作记一笔与模板填充的兜底，不自动改已有流水。 */
     fun setDefaultAccountId(id: Long) {
         prefs.defaultAccountId = id
-        _state.value = _state.value.copy(
+        _state.update { st -> st.copy(
             defaultAccountId = id,
             message = if (id == 0L) "已清除默认账户" else "默认账户已更新"
-        )
+        ) }
     }
 
     fun refreshPrefs() {
-        _state.value = _state.value.copy(
+        _state.update { st -> st.copy(
             thresholdYuan = yuan(prefs.reconcileThresholdCents),
             reverseColors = prefs.reverseColors,
             flagSecure = prefs.flagSecureEnabled,
@@ -122,18 +123,18 @@ class SettingsViewModel(
             hasPin = prefs.hasPin(),
             defaultCurrency = prefs.defaultCurrency,
             hideAmounts = prefs.hideAmounts
-        )
+        ) }
     }
 
     private fun yuan(cents: Long): String =
         java.math.BigDecimal.valueOf(cents, 2).toPlainString()
 
     fun message(text: String) {
-        _state.value = _state.value.copy(message = text, error = "")
+        _state.update { st -> st.copy(message = text, error = "") }
     }
 
     fun fail(text: String) {
-        _state.value = _state.value.copy(error = text, message = "")
+        _state.update { st -> st.copy(error = text, message = "") }
     }
 
     /** 只改默认值，绝不自动改已有账户与流水。 */
@@ -141,16 +142,16 @@ class SettingsViewModel(
     fun setHideAmounts(hidden: Boolean) {
         prefs.hideAmounts = hidden
         com.zwz.offlineledger.ui.components.AmountMask.hidden = hidden
-        _state.value = _state.value.copy(hideAmounts = hidden)
+        _state.update { st -> st.copy(hideAmounts = hidden) }
     }
 
     fun setDefaultCurrency(code: String) {
         require(code in LedgerCurrency.SUPPORTED) { "不支持的币种" }
         prefs.defaultCurrency = code
-        _state.value = _state.value.copy(
+        _state.update { st -> st.copy(
             defaultCurrency = code,
             message = "默认币种已设为 $code，只影响之后新建的账户。"
-        )
+        ) }
     }
 
     /** 显式批量统一：单事务改三张表标签并重算，金额一分不动。 */
@@ -159,15 +160,15 @@ class SettingsViewModel(
             val code = prefs.defaultCurrency
             runCatching { repository.applyCurrencyToAll(code) }
                 .onSuccess {
-                    _state.value = _state.value.copy(
+                    _state.update { st -> st.copy(
                         message = "已把现有账户、流水与回收站的币种标签统一为 $code（金额未变）。",
                         error = ""
-                    )
+                    ) }
                 }
                 .onFailure {
-                    _state.value = _state.value.copy(
+                    _state.update { st -> st.copy(
                         error = "统一币种失败：" + (it.message ?: it.javaClass.simpleName)
-                    )
+                    ) }
                 }
         }
     }
@@ -176,7 +177,7 @@ class SettingsViewModel(
     /** SAF 导出：JSON → Gzip → AES-GCM → 用户选择的 URI，全流式写出。 */
     fun exportTo(context: Context, uri: Uri, passphrase: CharArray) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            _state.update { st -> st.copy(busy = true, message = "", error = "") }
             try {
                 val result = withContext(Dispatchers.IO) {
                     val snapshot = repository.exportSnapshot()
@@ -189,12 +190,12 @@ class SettingsViewModel(
                     "已导出加密备份（${blob.size} 字节，${snapshot.records.size} 条流水）。" +
                         "请妥善保管口令：口令不落盘，遗忘后无法恢复。"
                 }
-                _state.value = _state.value.copy(busy = false, message = result)
+                _state.update { st -> st.copy(busy = false, message = result) }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
+                _state.update { st -> st.copy(
                     busy = false,
                     error = "导出失败：" + (e.message ?: e.javaClass.simpleName)
-                )
+                ) }
             }
         }
     }
@@ -202,7 +203,7 @@ class SettingsViewModel(
     /** SAF 导入：解密 → 解析 → 单事务全量替换。任一步失败都不写账本。 */
     fun importFrom(context: Context, uri: Uri, passphrase: CharArray) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            _state.update { st -> st.copy(busy = true, message = "", error = "") }
             try {
                 val result = withContext(Dispatchers.IO) {
                     val blob = context.contentResolver.openInputStream(uri)?.use {
@@ -220,12 +221,12 @@ class SettingsViewModel(
                 }
                 DataRefreshBus.notifyChanged()
                 loadCategories()
-                _state.value = _state.value.copy(busy = false, message = result)
+                _state.update { st -> st.copy(busy = false, message = result) }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
+                _state.update { st -> st.copy(
                     busy = false,
                     error = "导入失败，原账本未改动：" + (e.message ?: e.javaClass.simpleName)
-                )
+                ) }
             }
         }
     }
@@ -238,7 +239,7 @@ class SettingsViewModel(
     // ---------------------------------------------------------------
     fun exportCsvTo(context: Context, uri: Uri) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            _state.update { st -> st.copy(busy = true, message = "", error = "") }
             try {
                 val result = withContext(Dispatchers.IO) {
                     val rows = repository.exportCsvRows()
@@ -249,12 +250,12 @@ class SettingsViewModel(
                     } ?: throw IllegalStateException("无法打开所选位置的输出流")
                     "已导出 CSV 明文文件：${rows.size} 条流水。文件由你自行保管，应用不会上传任何数据。"
                 }
-                _state.value = _state.value.copy(busy = false, message = result)
+                _state.update { st -> st.copy(busy = false, message = result) }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
+                _state.update { st -> st.copy(
                     busy = false,
                     error = "导出失败：" + (e.message ?: e.javaClass.simpleName)
-                )
+                ) }
             }
         }
     }
@@ -262,7 +263,7 @@ class SettingsViewModel(
     /** 先纯 JVM 全量解析；有错只报告，不进入写入事务。 */
     fun readCsvPlan(context: Context, uri: Uri) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, message = "", error = "", csvPlan = null)
+            _state.update { st -> st.copy(busy = true, message = "", error = "", csvPlan = null) }
             try {
                 val parsed = withContext(Dispatchers.IO) {
                     val bytes = context.contentResolver.openInputStream(uri)?.use {
@@ -271,34 +272,34 @@ class SettingsViewModel(
                     CsvCodec.parseImport(bytes)
                 }
                 if (!parsed.ok) {
-                    _state.value = _state.value.copy(
+                    _state.update { st -> st.copy(
                         busy = false,
                         error = "账单文件有问题，账本未改动：\n" + parsed.errors.joinToString("\n")
-                    )
+                    ) }
                 } else {
                     val candidates = withContext(Dispatchers.IO) {
                         repository.findImportCandidates(parsed.rows)
                     }
-                    _state.value = _state.value.copy(
+                    _state.update { st -> st.copy(
                         busy = false,
                         csvPlan = CsvImportPlan(
                             rows = parsed.rows,
                             candidates = candidates,
                             skipRowIndexes = candidates.map { it.rowIndex }.toSet()
                         )
-                    )
+                    ) }
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
+                _state.update { st -> st.copy(
                     busy = false,
                     error = "读取失败，账本未改动：" + (e.message ?: e.javaClass.simpleName)
-                )
+                ) }
             }
         }
     }
 
     fun cancelCsvImport() {
-        _state.value = _state.value.copy(csvPlan = null)
+        _state.update { st -> st.copy(csvPlan = null) }
     }
 
     /** 第 23 批：逐笔切换「跳过该行 / 仍导入」，绝不自动合并或删除。 */
@@ -306,9 +307,9 @@ class SettingsViewModel(
         val plan = _state.value.csvPlan ?: return
         val next = plan.skipRowIndexes.toMutableSet()
         if (!next.add(rowIndex)) next.remove(rowIndex)
-        _state.value = _state.value.copy(
+        _state.update { st -> st.copy(
             csvPlan = plan.copy(skipRowIndexes = next)
-        )
+        ) }
     }
 
     /** 确认后单事务批量写入；任一步失败整体回滚（Repository 内保证）。 */
@@ -317,25 +318,25 @@ class SettingsViewModel(
         val rows = plan.rows.filterIndexed { i, _ -> i !in plan.skipRowIndexes }
         val skippedByUser = plan.rows.size - rows.size
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            _state.update { st -> st.copy(busy = true, message = "", error = "") }
             try {
                 val outcome = withContext(Dispatchers.IO) {
                     repository.importRecords(rows)
                 }
                 DataRefreshBus.notifyChanged()
-                _state.value = _state.value.copy(
+                _state.update { st -> st.copy(
                     busy = false, csvPlan = null,
                     message = "导入完成：写入 ${outcome.written} 条、" +
                         "跳过 ${outcome.skipped} 条重复；疑似匹配 " +
                         plan.candidates.size + " 项，按你的勾选跳过 " +
                         skippedByUser + " 行；余额已重算。"
-                )
+                ) }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
+                _state.update { st -> st.copy(
                     busy = false, csvPlan = null,
                     error = "导入失败，已整体回滚，账本未改动：" +
                         (e.message ?: e.javaClass.simpleName)
-                )
+                ) }
             }
         }
     }
@@ -345,9 +346,9 @@ class SettingsViewModel(
     // 解析与计划生成都在纯 JVM 层；确认前零写入，确认后单事务。
     fun readFireflyPlan(context: Context, uri: Uri) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(
+            _state.update { st -> st.copy(
                 busy = true, message = "", error = "", firefly = null
-            )
+            ) }
             try {
                 val parsed = withContext(Dispatchers.IO) {
                     val bytes = context.contentResolver.openInputStream(uri)?.use {
@@ -356,11 +357,11 @@ class SettingsViewModel(
                     FireflyCsvCodec.parse(bytes)
                 }
                 if (!parsed.ok) {
-                    _state.value = _state.value.copy(
+                    _state.update { st -> st.copy(
                         busy = false,
                         error = "Firefly III 导出文件有问题，账本未改动：" +
                             parsed.errors.take(12).joinToString("；")
-                    )
+                    ) }
                     return@launch
                 }
                 val plan = withContext(Dispatchers.Default) {
@@ -395,54 +396,61 @@ class SettingsViewModel(
                         skip = false
                     )
                 }
-                _state.value = _state.value.copy(
+                _state.update { st -> st.copy(
                     busy = false,
                     firefly = FireflyImportState(plan, accountChoices, categoryChoices)
-                )
+                ) }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
+                _state.update { st -> st.copy(
                     busy = false,
                     error = "读取失败，账本未改动：" + (e.message ?: e.javaClass.simpleName)
-                )
+                ) }
             }
         }
     }
 
     fun updateFireflyAccount(choice: FireflyAccountChoice) {
         val cur = _state.value.firefly ?: return
-        _state.value = _state.value.copy(
+        _state.update { st -> st.copy(
             firefly = cur.copy(
                 accounts = cur.accounts.map {
                     if (it.sourceName == choice.sourceName) choice else it
                 }
             )
-        )
+        ) }
     }
 
     fun updateFireflyCategory(choice: FireflyCategoryChoice) {
         val cur = _state.value.firefly ?: return
-        _state.value = _state.value.copy(
+        _state.update { st -> st.copy(
             firefly = cur.copy(
                 categories = cur.categories.map {
                     if (it.key == choice.key) choice else it
                 }
             )
-        )
+        ) }
     }
 
     fun setFireflyOverwriteOpening(value: Boolean) {
         val cur = _state.value.firefly ?: return
-        _state.value = _state.value.copy(firefly = cur.copy(overwriteOpening = value))
+        _state.update { st -> st.copy(firefly = cur.copy(overwriteOpening = value)) }
     }
 
     fun cancelFireflyImport() {
-        _state.value = _state.value.copy(firefly = null)
+        _state.update { st -> st.copy(firefly = null) }
     }
 
     fun clearFireflyResult() {
-        _state.value = _state.value.copy(fireflyResult = null)
+        _state.update { st -> st.copy(fireflyResult = null) }
     }
 
+    /**
+     * 第 25 批：状态机单一出口。原实现先 launch loadCategories()/loadAccounts()，
+     * 再用非原子的 `_state.value = _state.value.copy(...)` 写结果；并行 reload
+     * 协程基于旧快照回写时会把 fireflyResult 覆盖回 null、busy 覆盖回 true，
+     * 真机表现就是「只有正在导入动画」。现在全部状态写走 update（原子），
+     * 结果只在成功分支赋一次，finally 只兜底复位 busy；失败同样出结果卡。
+     */
     fun confirmFireflyImport() {
         val cur = _state.value.firefly ?: return
         val mapping = FireflyMapping(
@@ -450,36 +458,55 @@ class SettingsViewModel(
             categories = cur.categories.associateBy { it.key },
             overwriteOpeningForExisting = cur.overwriteOpening
         )
+        val totalRows = cur.plan.recordCount + cur.plan.openingCount + cur.plan.skippedCount
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            val started = System.currentTimeMillis()
+            _state.update {
+                st -> st.copy(busy = true, message = "", error = "", fireflyResult = null)
+            }
             try {
-                val outcome: FireflyImportOutcome = withContext(Dispatchers.IO) {
+                val outcome = withContext(Dispatchers.IO) {
                     repository.importFirefly(cur.plan, mapping)
                 }
+                val result = outcome.copy(
+                    success = true,
+                    durationMs = System.currentTimeMillis() - started,
+                    totalRows = totalRows
+                )
                 DataRefreshBus.notifyChanged()
+                _state.update { st ->
+                    st.copy(
+                        busy = false, firefly = null, fireflyResult = result,
+                        message = "Firefly III 迁移完成：写入 " + result.written +
+                            " 条流水、跳过 " + result.skipped + " 条重复；余额已重算。"
+                    )
+                }
                 loadCategories()
                 loadAccounts()
-                _state.value = _state.value.copy(
-                    busy = false, firefly = null, fireflyResult = outcome,
-                    message = "Firefly III 迁移完成：写入 " + outcome.written +
-                        " 条流水、跳过 " + outcome.skipped + " 条重复；新建 " +
-                        outcome.newAccounts + " 个账户 / " + outcome.newCategories +
-                        " 个分类；期初余额应用 " + outcome.openingsApplied +
-                        " 条、跳过 " + outcome.openingsSkipped + " 条；余额已重算。"
-                )
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    busy = false,
-                    error = "迁移失败，已整体回滚，账本未改动：" +
-                        (e.message ?: e.javaClass.simpleName)
-                )
+                val reason = e.message ?: e.javaClass.simpleName
+                _state.update { st ->
+                    st.copy(
+                        busy = false,
+                        fireflyResult = FireflyImportOutcome(
+                            written = 0, skipped = 0, newAccounts = 0,
+                            newCategories = 0, openingsApplied = 0, openingsSkipped = 0,
+                            success = false, errorMessage = reason,
+                            durationMs = System.currentTimeMillis() - started,
+                            totalRows = totalRows
+                        ),
+                        error = "迁移失败，已整体回滚，账本未改动：" + reason
+                    )
+                }
+            } finally {
+                _state.update { st -> st.copy(busy = false) }
             }
         }
     }
 
     // ---------------------------------------------------------------
     fun setThresholdYuan(text: String) {
-        _state.value = _state.value.copy(thresholdYuan = text)
+        _state.update { st -> st.copy(thresholdYuan = text) }
         val cents = try {
             com.zwz.offlineledger.core.money.Cents.fromYuan(text).value
         } catch (e: Exception) {
@@ -533,7 +560,7 @@ class SettingsViewModel(
                 val h = repository.checkAndRepair()
                 val text = "账本自检：检查 ${h.checkedAccounts} 个账户，" +
                     "修复 ${h.repairedAccounts} 个，偏差合计 ${h.driftCents} 分。"
-                _state.value = _state.value.copy(healthText = text, message = text, error = "")
+                _state.update { st -> st.copy(healthText = text, message = text, error = "") }
             } catch (e: Exception) {
                 fail("自检失败：" + (e.message ?: e.javaClass.simpleName))
             }
@@ -550,7 +577,7 @@ class SettingsViewModel(
             }
             val parentOf = all.associate { it.id to it.parentId }
             val counts = InsightData.rollupCounts(direct, parentOf)
-            _state.value = _state.value.copy(categories = all, categoryCounts = counts)
+            _state.update { st -> st.copy(categories = all, categoryCounts = counts) }
         }
     }
 
@@ -560,14 +587,14 @@ class SettingsViewModel(
             val rows = withContext(Dispatchers.IO) {
                 recordDao.insightCategoryDetailRows(id, 30)
             }
-            _state.value = _state.value.copy(
+            _state.update { st -> st.copy(
                 categoryDetailName = name, categoryDetail = rows
-            )
+            ) }
         }
     }
 
     fun closeCategoryDetail() {
-        _state.value = _state.value.copy(categoryDetailName = "", categoryDetail = emptyList())
+        _state.update { st -> st.copy(categoryDetailName = "", categoryDetail = emptyList()) }
     }
 
     fun createCategory(name: String, type: RecordType, parentId: Long?) {

@@ -73,3 +73,20 @@
   远端 307↔307 blob sha 零差异、`diag/` 零残留
 - [ ] 真机复核：导入完成提示、下拉刷新手感与反馈、横屏三键/手势导航两种模式下
   底部时间轴完整（**由使用者装机确认**）
+
+
+## 第 25 批（导入结果原子化 + 资产页下拉刷新，v0.2.9）
+
+- [x] 开场核对远端 HEAD `6ac2666ba57ac`、本地 ↔ 远端 307 blob 零差异；复读指南 §2.6 / §7.10 / §8
+- [x] `design.md` §12 先写根因与三级回退顺序，再动代码
+- [x] 根因定位：44 处非原子状态写 + reload 协程竞态覆盖 `fireflyResult` / `busy`
+- [x] `SettingsViewModel` 全量改 `MutableStateFlow.update`；`confirmFireflyImport` 单一出口，失败也出结果卡
+- [x] `FireflyImportOutcome` 补 success / errorMessage / failRows / durationMs / totalRows（默认值，repository 不动）
+- [x] 结果卡显示耗时与总行数；`showConfirm` 在结果态强制复位
+- [x] `AssetsScreen` 官方 `PullToRefreshBox` + 专用刷新标志 + Snackbar；不加无障碍按钮
+- [x] `backup-restore` / `reporting-ui` 两份 delta 按最终行为整块修订（指南 §5）
+- [x] 活文档补第 6 次状态事故、§7.11 与 §8 版本继承
+- [x] 六个静态检查本地全 PASS；Kotlin 引号与括号自检
+- [x] 单次 commit → push CI → release → 坚果云（编号待回填）
+- [ ] 真机复核：1916 行导入完成结果卡可见（含耗时 / 行数）、失败也出卡、
+  资产页下拉刷新手感与反馈（**由使用者装机确认**）

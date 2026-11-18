@@ -109,5 +109,11 @@ data class FireflyImportOutcome(
     val newAccounts: Int,
     val newCategories: Int,
     val openingsApplied: Int,
-    val openingsSkipped: Int
+    val openingsSkipped: Int,
+    /** 第 25 批：结果视图单一出口所需状态；repository 用位置参数构造时走默认值。 */
+    val success: Boolean = true,
+    val errorMessage: String = "",
+    val failRows: List<Int> = emptyList(),
+    val durationMs: Long = 0L,
+    val totalRows: Int = 0
 )

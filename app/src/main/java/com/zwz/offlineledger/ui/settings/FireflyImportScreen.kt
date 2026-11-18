@@ -62,12 +62,17 @@ fun FireflyImportScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val result = state.fireflyResult
 
-    /** 第 24 批：结果态出现时给一次可见反馈，避免只靠「按钮置灰」猜完成。 */
+    /** 第 25 批：结果态出现时清掉确认弹窗并给一次可见反馈；失败也报原因。 */
     LaunchedEffect(result) {
         if (result != null) {
+            showConfirm = false
             snackbarHostState.showSnackbar(
-                "迁移完成：写入 " + result.written + " 条、跳过 " +
-                    result.skipped + " 条重复"
+                if (result.success) {
+                    "迁移完成：写入 " + result.written + " 条、跳过 " +
+                        result.skipped + " 条重复"
+                } else {
+                    "迁移未写入：" + result.errorMessage
+                }
             )
         }
     }
@@ -216,7 +221,7 @@ fun FireflyImportScreen(
         )
     }
 
-    if (showConfirm && st != null) {
+    if (showConfirm && st != null && result == null) {
         AlertDialog(
             onDismissRequest = { showConfirm = false },
             title = { Text("确认迁移") },
@@ -246,13 +251,40 @@ private fun FireflyResultView(
     onClose: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(top = 24.dp)) {
-        Text(text = "迁移完成", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            text = if (result.success) "迁移完成" else "迁移未写入",
+            style = MaterialTheme.typography.headlineSmall,
+            color = if (result.success) MaterialTheme.colorScheme.onSurface
+            else LedgerColors.ExpenseRed
+        )
         Text(
             text = "写入 " + result.written + " 条流水 · 跳过 " +
                 result.skipped + " 条重复",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 12.dp)
         )
+        Text(
+            text = "耗时 " + result.durationMs + " ms · 共 " + result.totalRows + " 行",
+            style = MaterialTheme.typography.bodyMedium,
+            color = LedgerColors.Neutral,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        if (!result.success) {
+            Text(
+                text = "失败原因：" + result.errorMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = LedgerColors.ExpenseRed,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+        if (result.failRows.isNotEmpty()) {
+            Text(
+                text = "失败行号：" + result.failRows.joinToString("、"),
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.ExpenseRed,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -267,7 +299,11 @@ private fun FireflyResultView(
                     modifier = Modifier.padding(top = 6.dp)
                 )
                 Text(
-                    text = "余额已重算；任一行失败会整体回滚，不会留下半套数据。",
+                    text = if (result.success) {
+                        "余额已重算；任一行失败会整体回滚，不会留下半套数据。"
+                    } else {
+                        "账本未改动；可返回重试同一份文件。"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = LedgerColors.Neutral,
                     modifier = Modifier.padding(top = 6.dp)
@@ -275,15 +311,19 @@ private fun FireflyResultView(
             }
         }
         Row {
-            Button(onClick = onGoDetail) { Text("去看明细") }
+            if (result.success) {
+                Button(onClick = onGoDetail) { Text("去看明细") }
+            }
             TextButton(onClick = onClose) { Text("完成") }
         }
-        Text(
-            text = "再次导入同一份文件会全部跳过，不会写入重复流水。",
-            style = MaterialTheme.typography.bodySmall,
-            color = LedgerColors.Neutral,
-            modifier = Modifier.padding(top = 12.dp)
-        )
+        if (result.success) {
+            Text(
+                text = "再次导入同一份文件会全部跳过，不会写入重复流水。",
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.Neutral,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+        }
     }
 }
 

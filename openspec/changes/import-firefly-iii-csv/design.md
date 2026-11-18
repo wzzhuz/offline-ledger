@@ -249,3 +249,54 @@ Q5 预制账户 / 分类是 `SeedData` 代码常量，首次建库写进表，�
 `nsfalse` 只表示认证 / 建目录 / PUT 均未失败，HEAD 落盘校验只写日志不中断，
 不当作已验证 HEAD 200。**真机复核仍由使用者装机确认**：导入完成提示、
 下拉刷新手感与结果反馈、横屏三键 / 手势导航两种模式下底部时间轴完整性。
+
+
+## 12. 第 25 批：导入结果真正可见 + 资产页下拉刷新（v0.2.9）
+
+### 12.1 根因（先写再动手，指南 §6.1）
+
+真机反馈「导入结果还是没显示，只有正在导入动画」= 卡在 `running`。
+第 24 批已把 `result` 做成整页 `when` 第一分支、也写了 `fireflyResult = outcome`，
+但 `SettingsViewModel` 全文件 44 处状态写都是
+`_state.value = _state.value.copy(...)`——**读 + 改 + 写非原子**。
+`confirmFireflyImport` 在结果赋值**之前**先 `launch` 了 `loadCategories()` /
+`loadAccounts()`；这两个协程各自 `withContext(IO)` 挂起后基于旧快照回写，
+完全可能把刚赋上的 `fireflyResult` 覆盖回 `null`、`busy` 覆盖回 `true`。
+状态机分支写得再对，状态本身被覆盖就永远进不去 `result`。
+这是指南 §3 T7「作用域错误」的并发变体，也是第 6 次「把准备做的状态当已验证结果」。
+
+### 12.2 落地
+
+- `SettingsViewModel` 44 处状态写统一改成 `MutableStateFlow.update { st -> st.copy(...) }`
+  （lambda 参数命名 `st`，避免遮蔽参数内可能存在的 `it`）；
+  `confirmFireflyImport` 改 `try/catch/finally` 单一出口：结果只在成功分支赋一次，
+  `finally` 只兜底复位 `busy`，`loadCategories()` / `loadAccounts()` 移到结果赋值之后。
+- `FireflyImportOutcome` 加 `success / errorMessage / failRows / durationMs / totalRows`
+  （全带默认值，repository 的 6 参数位置构造不动）；结果卡显示耗时与文件总行数，
+  **失败同样出结果卡**并给原因与「完成 / 重试」路径，不再只留一行 error。
+- 结果出现时 `LaunchedEffect` 强制 `showConfirm = false`；确认弹窗条件补 `result == null`。
+- 资产页复用明细页已验证的官方 `PullToRefreshBox`：专用 `isRefreshing` 标志、
+  `vm.reload()` + Snackbar「已刷新资产 · 账户与余额已重算」、零第三方坐标、
+  **不加无障碍按钮**（第 24 批使用者口径）。导入后的自动刷新仍由 `LedgerApp`
+  的 `refreshTick` 通道驱动，手动下拉不重复发 `DataRefreshBus` 事件，避免双转圈。
+- 表结构仍 `version = 2` 不变 → **v0.2.8 上覆盖安装即可**。
+
+### 12.3 三级回退顺序（若 CI 红）
+
+1. 先只修编译错误（`update` import / `ExperimentalMaterial3Api` opt-in / 括号），不动逻辑；
+2. 若 `update` 与当前协程版本不兼容，退到手写 `while(true) { compareAndSet }` 原子循环，
+   仍不用非原子写；
+3. 若资产页 `PullToRefreshBox` 与 `rememberReorderableLazyListState` 手势冲突，
+   退到只把 `CurrencyGroupsCard` 以上的头部包进刷新容器，账户列表不动。
+
+### 12.4 实测回填
+
+| 项 | 结果 |
+|---|---|
+| 代码 commit | 待回填 |
+| push CI | 待回填 |
+| release | 待回填 |
+| 制品 | 待回填 |
+
+真机复核仍由使用者装机确认：1916 行走完后结果卡可见（含耗时 / 行数）、
+失败也出卡、资产页到顶下拉出圆形指示器且松手有反馈、明细自动刷新不回退。
