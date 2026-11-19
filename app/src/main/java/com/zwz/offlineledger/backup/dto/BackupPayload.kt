@@ -53,10 +53,6 @@ data class BackupAdjustment(
 @Serializable
 data class BackupAlias(val pattern: String, val shortName: String)
 
-/** 第 34 批：商户别名归一规则，恢复时随备份一起重建。 */
-@Serializable
-data class BackupAlias(val pattern: String, val shortName: String)
-
 @Serializable
 data class BackupPayload(
     val accounts: List<BackupAccount> = emptyList(),
