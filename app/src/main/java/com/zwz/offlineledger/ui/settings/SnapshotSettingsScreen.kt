@@ -216,7 +216,7 @@ fun SnapshotSettingsScreen(onBack: () -> Unit) {
         OutlinedTextField(
             value = pass,
             onValueChange = { pass = it },
-            label = { Text("备份口令（自动快照与恢复共用）") },
+            label = { Text("备份口令（自动快照 / 加密备份 / 恢复共用）") },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth()
@@ -226,7 +226,7 @@ fun SnapshotSettingsScreen(onBack: () -> Unit) {
                 onClick = { vm.savePass(context, pass.toCharArray()) },
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("保存口令") }
+            ) { Text("记住口令") }
             Button(
                 onClick = { vm.writeNow(context) },
                 enabled = !state.busy && state.treeReady,

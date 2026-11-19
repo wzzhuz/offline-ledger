@@ -172,6 +172,11 @@ class LedgerRepository @Inject constructor(
         templates = templateDao.all().map { it.toDto() },
         recurringRules = ruleDao.all().map { it.toDto() },
         budgets = budgetDao.all().map { it.toDto() },
+        counterpartyAliases = aliasDao.all().map {
+            com.zwz.offlineledger.backup.dto.BackupAlias(
+                pattern = it.pattern, shortName = it.shortName
+            )
+        },
         trash = trashDao.all().map {
             com.zwz.offlineledger.backup.dto.BackupRecord(
                 id = it.originalId, type = it.type.name, amountCents = it.amountCents,
@@ -191,19 +196,37 @@ class LedgerRepository @Inject constructor(
         currencyCode = LedgerCurrency.DEFAULT
     )
 
-    /** 全量替换的覆盖导入：先清子表再清父表，事务末尾强制重算。 */
+    /**
+     * 全量替换的覆盖导入。
+     *
+     * 第 34 批修复 FOREIGN KEY constraint failed (code 1811)：
+     * categories 自引用且 onDelete=RESTRICT，DELETE FROM categories 逐行删时
+     * 先删父行会让子行 parentId 悬空；备份数组也不保证父级排在子级之前。
+     * 事务内 PRAGMA defer_foreign_keys=ON 把约束检查推迟到提交；清空前
+     * 先把 parentId 置空断开自引用；插入按父先子后的拓扑序；提交前
+     * PRAGMA foreign_key_check 兜底。任一步抛错整个事务回滚，不留半截库。
+     * 事务内写 PRAGMA foreign_keys=OFF 是 no-op，这里刻意不用。
+     */
     suspend fun importBackup(file: BackupFile) = db.withTransaction {
+        val handle = db.openHelper.writableDatabase
+        handle.execSQL("PRAGMA defer_foreign_keys = ON")
+        handle.execSQL("UPDATE categories SET parentId = NULL")
+
         recordDao.clear()
         trashDao.clear()
         adjustmentDao.clear()
         templateDao.clear()
         ruleDao.clear()
         budgetDao.clear()
+        aliasDao.clear()
         categoryDao.clear()
         accountDao.clear()
 
         file.payload.accounts.forEach { accountDao.insert(it.toEntity()) }
-        file.payload.categories.forEach { categoryDao.insert(it.toEntity()) }
+        val orderedCategories = file.payload.categories
+            .map { it.toEntity() }
+            .sortedBy { if (it.parentId == null) 0 else 1 }
+        orderedCategories.forEach { categoryDao.insert(it) }
         file.payload.records.forEach { recordDao.insert(it.toEntity()) }
         file.payload.balanceAdjustments.forEach { adjustmentDao.insert(it.toEntity()) }
         // v1 备份缺这两个键时已被解析成空列表，覆盖导入会清空现有模板 / 规则，
@@ -211,8 +234,24 @@ class LedgerRepository @Inject constructor(
         file.payload.templates.forEach { templateDao.insert(it.toEntity()) }
         file.payload.recurringRules.forEach { ruleDao.insert(it.toEntity()) }
         file.payload.budgets.forEach { budgetDao.insert(it.toEntity()) }
+        file.payload.counterpartyAliases.forEach {
+            aliasDao.insert(
+                com.zwz.offlineledger.data.local.entity.CounterpartyAliasEntity(
+                    pattern = it.pattern, shortName = it.shortName
+                )
+            )
+        }
         file.payload.trash.forEach {
             trashDao.insert(it.toEntity().toTrash(System.currentTimeMillis()))
+        }
+
+        val fkCursor = handle.query("PRAGMA foreign_key_check")
+        try {
+            if (fkCursor.count > 0) {
+                throw IllegalStateException("恢复数据存在悬空外键，已整体回滚")
+            }
+        } finally {
+            fkCursor.close()
         }
         rebuildAllBalancesInternal()
     }

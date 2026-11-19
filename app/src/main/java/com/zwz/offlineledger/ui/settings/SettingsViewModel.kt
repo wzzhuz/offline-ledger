@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zwz.offlineledger.backup.BackupExporter
 import com.zwz.offlineledger.backup.csv.CsvCodec
+import com.zwz.offlineledger.backup.csv.CsvFormat
+import com.zwz.offlineledger.backup.csv.CsvParseResult
 import com.zwz.offlineledger.backup.csv.CsvRow
 import com.zwz.offlineledger.backup.csv.ImportCandidate
 import com.zwz.offlineledger.core.DataRefreshBus
@@ -43,7 +45,10 @@ data class CsvImportPlan(
     val rows: List<CsvRow>,
     /** 第 23 批：疑似匹配候选与逐笔勾选（勾选＝跳过该行不导入）。 */
     val candidates: List<ImportCandidate> = emptyList(),
-    val skipRowIndexes: Set<Int> = emptySet()
+    val skipRowIndexes: Set<Int> = emptySet(),
+    /** 第 34 批：重建模式里被明确跳过的行说明，结果摘要要展示。 */
+    val notices: List<String> = emptyList(),
+    val rebuild: Boolean = false
 )
 
 /** 第 22 批：Firefly III 导入预览状态，进入此状态时不写任何数据。 */
@@ -188,7 +193,8 @@ class SettingsViewModel(
                         out.flush()
                     } ?: throw IllegalStateException("无法打开所选位置的输出流")
                     "已导出加密备份（${blob.size} 字节，${snapshot.records.size} 条流水）。" +
-                        "请妥善保管口令：口令不落盘，遗忘后无法恢复。"
+                        "文件始终由口令加密；若勾选「在本机记住口令」，" +
+                        "口令仅经 Keystore 加密存于本机、卸载即失效，遗忘口令仍无法恢复。"
                 }
                 _state.update { st -> st.copy(busy = false, message = result) }
             } catch (e: Exception) {
@@ -260,8 +266,13 @@ class SettingsViewModel(
         }
     }
 
-    /** 先纯 JVM 全量解析；有错只报告，不进入写入事务。 */
-    fun readCsvPlan(context: Context, uri: Uri) {
+    /**
+     * 先纯 JVM 全量解析；有错只报告，不进入写入事务。
+     * 第 34 批：按表头嗅探分流。第三方账单走 parseImport；
+     * 本 App 导出文件必须走「从 CSV 重建」（parseRebuild），
+     * 直接投进「导入账单」会被行级校验拒绝，这里改成明确的引导文案。
+     */
+    fun readCsvPlan(context: Context, uri: Uri, rebuild: Boolean = false) {
         viewModelScope.launch {
             _state.update { st -> st.copy(busy = true, message = "", error = "", csvPlan = null) }
             try {
@@ -269,7 +280,17 @@ class SettingsViewModel(
                     val bytes = context.contentResolver.openInputStream(uri)?.use {
                         it.readBytes()
                     } ?: throw IllegalStateException("无法打开所选文件")
-                    CsvCodec.parseImport(bytes)
+                    if (!rebuild && CsvCodec.detectFormat(bytes) == CsvFormat.OWN) {
+                        return@withContext CsvParseResult(
+                            emptyList(),
+                            listOf(
+                                "这是本 App 导出的 CSV（11 列自有格式）。" +
+                                    "「导入账单」用于支付宝 / 微信 / Firefly III 等第三方账单；" +
+                                    "本文件请改用「从 CSV 重建」，完整重建请用「从加密备份恢复」。"
+                            )
+                        )
+                    }
+                    if (rebuild) CsvCodec.parseRebuild(bytes) else CsvCodec.parseImport(bytes)
                 }
                 if (!parsed.ok) {
                     _state.update { st -> st.copy(
@@ -285,7 +306,9 @@ class SettingsViewModel(
                         csvPlan = CsvImportPlan(
                             rows = parsed.rows,
                             candidates = candidates,
-                            skipRowIndexes = candidates.map { it.rowIndex }.toSet()
+                            skipRowIndexes = candidates.map { it.rowIndex }.toSet(),
+                            notices = parsed.notices,
+                            rebuild = rebuild
                         )
                     ) }
                 }
@@ -329,7 +352,13 @@ class SettingsViewModel(
                     message = "导入完成：写入 ${outcome.written} 条、" +
                         "跳过 ${outcome.skipped} 条重复；疑似匹配 " +
                         plan.candidates.size + " 项，按你的勾选跳过 " +
-                        skippedByUser + " 行；余额已重算。"
+                        skippedByUser + " 行；余额已重算。" +
+                        (if (plan.notices.isEmpty()) ""
+                         else " 格式跳过 " + plan.notices.size + " 行：" +
+                             plan.notices.take(3).joinToString("；") +
+                             (if (plan.notices.size > 3) " 等" else "")) +
+                        (if (plan.rebuild && plan.notices.isNotEmpty())
+                            " 完整重建（含转账、账户、模板）请用加密备份。" else "")
                 ) }
             } catch (e: Exception) {
                 _state.update { st -> st.copy(

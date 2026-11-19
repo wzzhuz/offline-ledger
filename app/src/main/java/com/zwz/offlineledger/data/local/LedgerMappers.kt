@@ -50,7 +50,8 @@ fun AccountEntity.toDto(): BackupAccount = BackupAccount(
     creditLimitCents = creditLimitCents, includeInTotal = includeInTotal,
     isArchived = isArchived, sortOrder = sortOrder, currencyCode = currencyCode,
     lastReconciledAt = lastReconciledAt,
-    lastReconciledBalanceCents = lastReconciledBalanceCents
+    lastReconciledBalanceCents = lastReconciledBalanceCents,
+    cardLast4 = cardLast4
 )
 
 fun BackupAccount.toEntity(): AccountEntity = AccountEntity(
@@ -59,19 +60,20 @@ fun BackupAccount.toEntity(): AccountEntity = AccountEntity(
     creditLimitCents = creditLimitCents, includeInTotal = includeInTotal,
     isArchived = isArchived, sortOrder = sortOrder, currencyCode = currencyCode,
     lastReconciledAt = lastReconciledAt,
-    lastReconciledBalanceCents = lastReconciledBalanceCents
+    lastReconciledBalanceCents = lastReconciledBalanceCents,
+    cardLast4 = cardLast4
 )
 
 fun CategoryEntity.toDto(): BackupCategory = BackupCategory(
     id = id, name = name, type = type.name, parentId = parentId, level = level,
     iconName = iconName, colorHex = colorHex, sortOrder = sortOrder,
-    isArchived = isArchived
+    isArchived = isArchived, enabled = enabled
 )
 
 fun BackupCategory.toEntity(): CategoryEntity = CategoryEntity(
     id = id, name = name, type = RecordType.valueOf(type), parentId = parentId,
     level = level, iconName = iconName, colorHex = colorHex,
-    sortOrder = sortOrder, isArchived = isArchived
+    sortOrder = sortOrder, isArchived = isArchived, enabled = enabled
 )
 
 fun RecordEntity.toDto(): BackupRecord = BackupRecord(

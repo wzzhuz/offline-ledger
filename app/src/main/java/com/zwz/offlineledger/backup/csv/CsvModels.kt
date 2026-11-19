@@ -27,10 +27,15 @@ data class CsvRow(
     fun duplicateKey(): String = "$accountName|$amountYuan|$date|$note"
 }
 
+/** 第 34 批：自有导出格式 vs 第三方账单格式。 */
+enum class CsvFormat { OWN, OTHER }
+
 /** 全量解析结果：errors 非空时调用方 MUST NOT 进入写入事务。 */
 data class CsvParseResult(
     val rows: List<CsvRow>,
-    val errors: List<String>
+    val errors: List<String>,
+    /** 第 34 批：明确跳过但不属于错误的行说明，重建结果摘要里要展示。 */
+    val notices: List<String> = emptyList()
 ) {
     val ok: Boolean get() = errors.isEmpty()
 }

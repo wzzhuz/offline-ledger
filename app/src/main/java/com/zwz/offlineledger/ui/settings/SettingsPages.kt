@@ -184,6 +184,9 @@ fun BackupSettingsScreen(
     val csvImportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) vm.readCsvPlan(context, uri) }
+    val csvRebuildLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) vm.readCsvPlan(context, uri, rebuild = true) }
 
     Column(
         modifier = Modifier
@@ -214,13 +217,18 @@ fun BackupSettingsScreen(
                 onClick = { csvExportLauncher.launch("offline-ledger.csv") },
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("导出 CSV") }
+            ) { Text("导出 CSV（核对 / 重建用）") }
             Button(
                 onClick = { csvImportLauncher.launch(arrayOf("text/csv", "text/plain", "*/*")) },
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("导入账单") }
+            ) { Text("导入账单（第三方账单）") }
         }
+        Button(
+            onClick = { csvRebuildLauncher.launch(arrayOf("text/csv", "text/plain", "*/*")) },
+            enabled = !state.busy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("从 CSV 重建（本 App 导出文件）") }
         Button(
             onClick = onOpenFirefly,
             enabled = !state.busy,
@@ -240,7 +248,9 @@ fun BackupSettingsScreen(
         }
         Text(
             text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
-                "Firefly III 迁移会先给出账户与分类的映射预览，确认后才写入。",
+                "「导入账单」吃支付宝 / 微信 / 银行 / Firefly III 等第三方账单；" +
+                "「从 CSV 重建」吃本 App 自己导出的 11 列文件；" +
+                "完整重建（含转账、账户、模板、别名）请用加密备份或自动快照。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral
         )
@@ -263,8 +273,9 @@ fun BackupSettingsScreen(
                     "sourceId 来源系统内的稳定流水号（可选，导出必带）\n" +
                     "示例：2026-11-15,EXPENSE,38.50,中国银行7375,餐饮,正餐,午餐,CNY,好优特生活超市,,\n" +
                     "导入前整体校验，任何一行不合法都不写入。" +
-                    "导出文件带 importSource/sourceId，清库后原样导入可重建且不会双份；" +
-                    "往已有账本再导同一份会按复合唯一键全部跳过。" +
+                    "导出文件带 importSource/sourceId；清库后请用「从 CSV 重建」" +
+                    "（仅支出 / 收入，转账行会明确列出跳过）或「从加密备份恢复」" +
+                    "（全量），二次重建按复合唯一键幂等、不会双份。" +
                     "手工记录与第三方账单另按「金额 + 账户 + ±1 天」给疑似匹配，逐笔确认后才写。",
                 style = MaterialTheme.typography.labelSmall,
                 color = LedgerColors.Neutral
@@ -341,10 +352,16 @@ fun BackupSettingsScreen(
     passwordMode?.let { mode ->
         BackupPasswordDialog(
             mode = mode,
+            initialPassphrase = com.zwz.offlineledger.backup.snapshot
+                .SnapshotPrefs.loadPassphrase(context),
             onDismiss = { passwordMode = null; pendingUri = null },
-            onConfirm = { pass ->
+            onConfirm = { pass, rememberOnDevice ->
                 val uri = pendingUri
                 if (uri != null) {
+                    if (rememberOnDevice) {
+                        com.zwz.offlineledger.backup.snapshot
+                            .SnapshotPrefs.savePassphrase(context, pass)
+                    }
                     if (mode == PasswordMode.EXPORT) vm.exportTo(context, uri, pass)
                     else vm.importFrom(context, uri, pass)
                 }

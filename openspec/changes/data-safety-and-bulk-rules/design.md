@@ -71,3 +71,59 @@
 数据与备份页新增「自动快照与恢复」「批量规整」两个入口；
 `LedgerRepository.applyBulkTargets` 登记进写方法清单。
 `AppDatabase.version = 3` 未变 → v0.2.14 上覆盖安装即可，不用卸载。
+
+## 第 34 批：恢复 1811 与两套 CSV 契约（真实源码前置核查）
+
+### 根因（读码后修正门禁里的推测）
+
+1. **1811 主因**：`categories` 自引用且 `onDelete = ForeignKey.RESTRICT`。
+   原 `importBackup` 用 `DELETE FROM categories` 逐行清表，行顺序不保证，
+   先删父行会让子行 `parentId` 悬空；插入时 `file.payload.categories`
+   来自导出查询结果，也不保证父级排在子级之前。Room 默认外键是 immediate，
+   事务末尾补齐也来不及。事务内写 `PRAGMA foreign_keys = OFF` 是 no-op。
+2. **全量替换漏表**：`counterparty_aliases`（第 30 批新增）既不 clear 也不
+   在 `BackupPayload` 里，恢复后残留旧规则；`enabled` / `cardLast4` 同样
+   不在 DTO 里，恢复后回默认值。
+3. **CSV 失败真因与门禁推测不同**：`CsvCodec.export` 与 `parseImport` 用的是
+   **同一套 11 列表头**，表头并不冲突。失败发生在行级校验：
+   导出是全量流水（含 `TRANSFER`、无账户、无一级分类），而账单解析器
+   只接受 `EXPENSE` / `INCOME` 且要求账户名与一级分类非空，
+   任一行不合法就整份拒绝。
+
+### 修法
+
+- `importBackup`：`db.openHelper.writableDatabase` 在事务内执行
+  `PRAGMA defer_foreign_keys = ON`（提交时统一检查），先
+  `UPDATE categories SET parentId = NULL` 断开自引用，再按
+  records/trash/adjustments/templates/rules/budgets/aliases → categories →
+  accounts 清空；插入 accounts → categories（父先子后）→ 其余；
+  `PRAGMA foreign_key_check` 有行即抛异常，整个事务回滚；末尾重算余额。
+- DTO：`BackupAccount.cardLast4` / `BackupCategory.enabled` /
+  `BackupAlias` + `BackupPayload.counterpartyAliases`，全部带默认值，
+  `ignoreUnknownKeys` 下旧备份缺键自动补空，不破坏 V1/V2/V3 兼容。
+- 口令：`SnapshotPrefs` 已是 Keystore AES-256/GCM 加密存本机、卸载失效；
+  手动备份对话框复用它做「预填 + 记住」。文件加密本体与恢复解密路径不改。
+- CSV：`CsvCodec.detectFormat` 按首行必填列判定 OWN / OTHER（不靠文件名）；
+  `parseRebuild` 只对 OWN 生效，跳过行写 `notices` 而非 `errors`；
+  `SettingsViewModel.readCsvPlan(..., rebuild)` 一个入口按标志分流，
+  不复制第二套确认流程。
+
+### 三级回退（第 34 批）
+
+1. 若 `defer_foreign_keys` 在 SQLCipher 版本上提交时不生效 →
+   退到纯拓扑排序 + 事务外短暂关闭 FK，仍保留 `foreign_key_check`。
+2. 若 `UPDATE categories SET parentId = NULL` 触发布尔态问题 →
+   退到「先按 level 降序逐行删子级，再删父级」的显式删除序。
+3. 若 `parseRebuild` 的跳过行太多导致重建不完整 → 结果摘要直接建议
+   改用加密备份恢复，不自动补齐转账。
+
+### 硬约束
+
+MUST NOT 删 FK 约束或用事务内 `foreign_keys=OFF` 绕错；
+MUST NOT 留半截库；MUST NOT 把明文做成默认；
+MUST NOT 让「导入账单」静默吞自有格式；
+自有 CSV 重建 MUST 带来源字段；表结构不变 → 覆盖安装即可。
+
+## 第 34 批实测回填（真实编号，由推送脚本补入）
+
+见 `tasks.md` 阶段三与指南 §8 补记。

@@ -25,17 +25,22 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 enum class PasswordMode { EXPORT, IMPORT }
 
 /**
- * 导出让用户输入至少 6 位口令；导入额外要求勾选「我明白将全量替换」。
- * 取消 MUST NOT 触发任何写操作。
+ * 第 34 批：口令始终必填，但可勾选「在本机记住」，由 SnapshotPrefs
+ * 经 AndroidKeystore 加密存本机，卸载即失效；文件本身永远是加密的。
+ * 导入额外要求勾选「我明白将全量替换」。取消 MUST NOT 触发任何写操作。
  */
 @Composable
 fun BackupPasswordDialog(
     mode: PasswordMode,
+    initialPassphrase: CharArray? = null,
     onDismiss: () -> Unit,
-    onConfirm: (CharArray) -> Unit
+    onConfirm: (CharArray, Boolean) -> Unit
 ) {
-    var pass by remember { mutableStateOf("") }
+    var pass by remember {
+        mutableStateOf(initialPassphrase?.let { String(it) } ?: "")
+    }
     var confirmed by remember { mutableStateOf(false) }
+    var rememberOnDevice by remember { mutableStateOf(initialPassphrase != null) }
     var error by remember { mutableStateOf("") }
     val isImport = mode == PasswordMode.IMPORT
 
@@ -46,14 +51,14 @@ fun BackupPasswordDialog(
             Column {
                 if (isImport) {
                     Text(
-                        text = "⚠ 将全量替换现有全部数据。当前账本会被覆盖，此操作不可撤销。",
+                        text = "将全量替换现有全部数据。当前账本会被覆盖，此操作不可撤销。",
                         color = LedgerColors.ExpenseRed,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 } else {
                     Text(
                         text = "备份采用口令加密（PBKDF2 + AES-256/GCM）。" +
-                            "口令不落盘，遗忘后无法恢复，请自行保管。",
+                            "文件始终加密；不勾选记住时口令不落盘，遗忘后无法恢复。",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -68,10 +73,23 @@ fun BackupPasswordDialog(
                     ),
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
                 )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    Checkbox(
+                        checked = rememberOnDevice,
+                        onCheckedChange = { rememberOnDevice = it }
+                    )
+                    Text(
+                        text = "在本机记住口令（Keystore 加密，卸载即失效）",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 if (isImport) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(top = 4.dp)
                     ) {
                         Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
                         Text(
@@ -95,7 +113,7 @@ fun BackupPasswordDialog(
                     !isImport && pass.length < 6 -> error = "口令至少 6 位"
                     isImport && pass.isBlank() -> error = "请输入备份口令"
                     isImport && !confirmed -> error = "请先勾选覆盖确认"
-                    else -> onConfirm(pass.toCharArray())
+                    else -> onConfirm(pass.toCharArray(), rememberOnDevice)
                 }
             }) { Text(if (isImport) "确认恢复" else "确认导出") }
         },

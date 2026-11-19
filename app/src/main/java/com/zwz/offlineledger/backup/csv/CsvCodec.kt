@@ -121,6 +121,103 @@ object CsvCodec {
             "\"" + s.replace("\"", "\"\"") + "\""
         } else s
 
+    /**
+     * 第 34 批：按首行表头判定是不是本 App 自己导出的 11 列文件。
+     * 只看必填列，允许旧版缺 counterparty / importSource / sourceId。
+     * 不靠文件名，避免改名后误判。
+     */
+    fun detectFormat(bytes: ByteArray): CsvFormat {
+        val text = String(bytes, Charsets.UTF_8).removePrefix("\uFEFF")
+        val first = text.substringBefore('\n')
+        if (first.isBlank()) return CsvFormat.OTHER
+        val delim = if (first.contains('\t')) '\t' else ','
+        val head = parseRows(first + "\n", delim).firstOrNull().orEmpty()
+            .map { it.trim() }
+        val required = HEADER.filter {
+            it !in setOf("counterparty", "importSource", "sourceId")
+        }
+        return if (required.all { it in head }) CsvFormat.OWN else CsvFormat.OTHER
+    }
+
+    /**
+     * 第 34 批：自有导出文件的重建解析。
+     *
+     * 与 parseImport 同表头，但按导出的真实内容放宽：转账 / 结算、
+     * 无账户、无一级分类的行明确列入 notices 跳过，不算错误、不静默丢弃。
+     * importSource / sourceId 原样保留，二次重建仍按复合唯一键幂等。
+     * 完整重建（含转账、账户、模板、别名）请用「从加密备份恢复」。
+     */
+    fun parseRebuild(bytes: ByteArray): CsvParseResult {
+        if (detectFormat(bytes) != CsvFormat.OWN) {
+            return CsvParseResult(emptyList(), listOf("不是本 App 导出的 CSV 格式"))
+        }
+        val text = String(bytes, Charsets.UTF_8).removePrefix("\uFEFF")
+        val firstLine = text.substringBefore('\n')
+        val delim = if (firstLine.contains('\t')) '\t' else ','
+        val raw = parseRows(text, delim).filter { row -> row.any { it.isNotBlank() } }
+        if (raw.size < 2) {
+            return CsvParseResult(emptyList(), listOf("文件只有表头，没有数据行"))
+        }
+        val header = raw.first()
+        val idx = HEADER.associateWith { name -> header.indexOf(name.trim()) }
+        val optional = setOf("counterparty", "importSource", "sourceId")
+        val missing = idx.filter { it.value < 0 }.keys.toList().filter { it !in optional }
+        if (missing.isNotEmpty()) {
+            return CsvParseResult(emptyList(), listOf("表头缺少列：" + missing.joinToString(", ")))
+        }
+
+        val rows = mutableListOf<CsvRow>()
+        val errors = mutableListOf<String>()
+        val notices = mutableListOf<String>()
+        raw.drop(1).forEachIndexed { i, r ->
+            val lineNo = i + 2
+            fun get(name: String): String {
+                val k = idx.getValue(name)
+                return if (k >= 0 && k < r.size) r[k].trim() else ""
+            }
+            val date = get("date")
+            val type = get("type")
+            val amount = get("amount")
+            val account = get("account")
+            val root = get("categoryRoot")
+            if (type == "TRANSFER" || type == "SETTLEMENT") {
+                notices += "第 $lineNo 行：$type 不走 CSV 重建，请用加密备份恢复"
+                return@forEachIndexed
+            }
+            if (account.isBlank() || root.isBlank()) {
+                notices += "第 $lineNo 行：账户或一级分类为空，CSV 重建跳过"
+                return@forEachIndexed
+            }
+            val cents = try {
+                Cents.fromYuan(amount).value
+            } catch (e: IllegalArgumentException) {
+                errors += "第 $lineNo 行：金额格式非法"
+                return@forEachIndexed
+            }
+            if (!DATE_RE.matches(date) || !validDate(date)) {
+                errors += "第 $lineNo 行：日期非法（应为 YYYY-MM-DD）"
+                return@forEachIndexed
+            }
+            if (type != "EXPENSE" && type != "INCOME") {
+                errors += "第 $lineNo 行：类型非法"
+                return@forEachIndexed
+            }
+            if (cents <= 0L) {
+                errors += "第 $lineNo 行：金额必须大于 0"
+                return@forEachIndexed
+            }
+            rows += CsvRow(
+                date, type, amount, account, root, get("category"),
+                get("note"), get("currencyCode"), get("counterparty"),
+                get("importSource"), get("sourceId")
+            )
+        }
+        if (rows.isEmpty() && errors.isEmpty() && notices.isEmpty()) {
+            errors += "没有可重建的数据行"
+        }
+        return CsvParseResult(rows, errors, notices)
+    }
+
     /** 逐字符状态机：正确处理引号内的逗号、双引号转义与换行。 */
     internal fun parseRows(text: String, delim: Char): List<List<String>> {
         val rows = mutableListOf<List<String>>()

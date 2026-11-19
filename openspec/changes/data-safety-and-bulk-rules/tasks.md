@@ -22,3 +22,31 @@
 阶段二 UI 只暴露「对方包含 / 备注包含 / 金额区间 / 改分类 / 改对方 / 备注替换 /
 设为不计入收支」，范围固定为全部流水。时间窗、按 `importSource` 限定与改账户
 留二期，不写入本次 Requirement，避免规格与实现出现两套清单。
+
+## 阶段三（第 34 批，v0.2.16：真机反馈收尾）
+
+- [x] 真读 `LedgerRepository.importBackup` / `BackupPayload` / `CsvCodec` /
+      `SettingsViewModel` 定位根因，不拿门禁里的逻辑归因当源码结论
+- [x] 修复 `FOREIGN KEY constraint failed (code 1811)`：事务内
+      `PRAGMA defer_foreign_keys = ON`、清空前 `UPDATE categories SET parentId = NULL`
+      断开自引用、分类按父先子后插入、补 `aliasDao.clear()`、提交前
+      `PRAGMA foreign_key_check` 兜底；失败由 `withTransaction` 整库回滚
+- [x] 备份 DTO 补齐 `cardLast4` / `enabled` / `counterpartyAliases`，
+      导出与恢复双向带上，带默认值保持旧备份可解析
+- [x] 口令仍必填，新增「在本机记住」（复用 `SnapshotPrefs` 的 Keystore 加密存储，
+      卸载即失效）；文件本身始终加密
+- [x] 按表头嗅探分流：自有 11 列格式投进「导入账单」给明确引导，
+      新增「从 CSV 重建」入口走 `CsvCodec.parseRebuild`；
+      转账 / 无账户 / 无一级分类行列进 notices 明确跳过，不静默丢弃
+- [x] 新增 `CsvRebuildTest`（格式识别 / 来源保留 / 跳过报告 / 第三方拒绝）
+- [x] 六个静态检查本地 PASS
+- [x] push CI 与 release 实测回填、坚果云上传
+- [ ] 真机复核（使用者，刻意保留）
+
+### 本期实现边界（如实说明）
+
+「从 CSV 重建」只覆盖 `EXPENSE` / `INCOME` 且账户与一级分类齐备的行，
+复用既有 `importRecords` 并保持 `importSource/sourceId` 幂等。
+`TRANSFER` / `SETTLEMENT`、无账户、无一级分类的行明确列为「格式跳过」，
+完整重建（含转账、账户、模板、别名、启用态）仍走「从加密备份恢复」或
+「从快照恢复」。二者是互补入口，不是同一份数据的两套写法。

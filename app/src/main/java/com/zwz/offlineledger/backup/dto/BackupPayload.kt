@@ -11,7 +11,9 @@ data class BackupAccount(
     val includeInTotal: Boolean = true, val isArchived: Boolean = false,
     val sortOrder: Int = 0, val currencyCode: String = "HKD",
     val lastReconciledAt: Long? = null,
-    val lastReconciledBalanceCents: Long? = null
+    val lastReconciledBalanceCents: Long? = null,
+    /** 第 34 批：卡号后四位，带默认值兼容旧备份，恢复时不再丢失。 */
+    val cardLast4: String? = null
 )
 
 @Serializable
@@ -19,7 +21,9 @@ data class BackupCategory(
     val id: Long, val name: String, val type: String,
     val parentId: Long? = null, val level: Int = 0,
     val iconName: String = "", val colorHex: String = "#888888",
-    val sortOrder: Int = 0, val isArchived: Boolean = false
+    val sortOrder: Int = 0, val isArchived: Boolean = false,
+    /** 第 34 批：启用态，带默认值兼容旧备份。 */
+    val enabled: Boolean = true
 )
 
 @Serializable
@@ -45,6 +49,14 @@ data class BackupAdjustment(
     val createdAt: Long = 0L, val isRevoked: Boolean = false
 )
 
+/** 第 34 批：商户别名归一规则，恢复时随备份一起重建。 */
+@Serializable
+data class BackupAlias(val pattern: String, val shortName: String)
+
+/** 第 34 批：商户别名归一规则，恢复时随备份一起重建。 */
+@Serializable
+data class BackupAlias(val pattern: String, val shortName: String)
+
 @Serializable
 data class BackupPayload(
     val accounts: List<BackupAccount> = emptyList(),
@@ -56,7 +68,9 @@ data class BackupPayload(
     // kotlinx.serialization 的 ignoreUnknownKeys + 默认值会把缺失键补成空列表。
     val templates: List<BackupTemplate> = emptyList(),
     val recurringRules: List<BackupRecurringRule> = emptyList(),
-    val budgets: List<BackupBudget> = emptyList()
+    val budgets: List<BackupBudget> = emptyList(),
+    /** 第 34 批：默认空列表，旧备份缺失该键时解析成空，不会破坏兼容。 */
+    val counterpartyAliases: List<BackupAlias> = emptyList()
 )
 
 /** 顶层信封。BackupEnvelope 的四项头部字段一个字不改。 */
@@ -76,6 +90,7 @@ data class LedgerSnapshot(
     val templates: List<BackupTemplate> = emptyList(),
     val recurringRules: List<BackupRecurringRule> = emptyList(),
     val budgets: List<BackupBudget> = emptyList(),
+    val counterpartyAliases: List<BackupAlias> = emptyList(),
     val exportedAtEpochMilli: Long = 0L,
     val currencyCode: String = "HKD",
     val schemaVersion: Int = BackupSchema.CURRENT
