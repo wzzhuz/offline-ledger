@@ -11,7 +11,14 @@ data class BulkTarget(
     val categoryId: Long?,
     val amountCents: Long,
     val bookedAtEpochMilli: Long,
-    val excludedFromTotals: Boolean
+    val excludedFromTotals: Boolean,
+    /**
+     * 第 37 批：只读条件字段，供规则按账户 / 币种 / 导入来源圈定范围。
+     * applyBulkTargets 不回写这三项，规则动作 MUST NOT 改动账户与币种，避免动余额口径。
+     */
+    val accountId: Long? = null,
+    val currencyCode: String = "CNY",
+    val importSource: String = ""
 )
 
 data class BulkConditions(

@@ -268,3 +268,55 @@ Firefly III 的规则是「条件组 + 动作组 + 规则组有序 + strict/非 
 v0.2.17 覆盖安装会开库失败。约 24M 是 R8 release APK 原始字节，
 Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；不是 debug 变体。
 `data-safety-and-bulk-rules` 与 `preset-data-and-counterparty` 仍进行中，未擅自归档。
+
+
+## 第 37 批：规则编辑器三段式（v0.2.19）
+
+**根因（先写再改，本节与实现同 commit）**：引擎早就通用——`RuleField` / `RuleOp` /
+`RuleActionSpec` 支持「字段 + 操作符 + 值」与多动作，`RuleEngine` 支持 ALL/ANY、取反、
+组顺序、`changeset` 撤销。v0.2.18 的 `RuleManagerDialog` 却只暴露四个写死槽位
+（对方包含 / 备注包含 / 对方改为 / 备注替换），使用者不能自选「这次按分类圈、按金额圈、
+还是按 importSource 圈」。上一批把 Firefly III 的**能力清单**误读成**表单项清单**，
+还用独立「分类迁移映射表」打补丁，舍本逐末。分类调整本就是一条普通规则，
+不该是第二个功能。
+
+**三张截图对齐**：FF3 条件下拉把「字段 + 操作符」合成一个超长单选（文字截断、
+含 SEPA / 对账 / 日志 ID / 创建更新时间等本项目没有的字段），规则编辑页是四列硬表格、
+窄屏挤压，动作值全靠手打。本项目改为两级短选择 + 卡片式动态行 + 值控件分派；
+FF3 `description` = 本项目交易对方、`notes` = 备注，故不加独立 description 列；
+「设置目标账户」映射成「交易对方改为」（不建对方账户、不引复式）。
+
+**改什么**：`RuleEditorCatalog`（目录单一来源）、`RuleModels` 枚举末尾追加值 /
+`BulkTarget` 三个只读条件字段、`RuleEngine` 支持账户 / 币种 / 来源 / 布尔字段与
+NOT_EQUALS / APPEND_NOTE、`RecordDao.searchNotes` 限量联想、
+`RuleManagerScreen` 重写为独立全屏动态编辑器、`BulkEditScreen` 入口早返回、
+`specs/bulk-edit/spec.md` 整块替换、版本 0.2.19。
+
+**不改**：`rule_groups` + `rule_definitions` 两张表、`AppDatabase.version = 4`、
+`BackupPayload` / `BackupExporter` / 恢复拓扑序、`applyBulkTargets` 写入字段、
+`SecureBackupCodec`、统计口径唯一出口、两页下拉刷新、无障碍刷新按钮、`release.yml`。
+
+**执行第一步（已做，非推断）**：真读 `RuleModels` / `RuleManagerScreen` /
+`CategoryDao` / `RecordDao` / `LedgerRepository`，确认「通用模型是否完整暴露」
+（是，但枚举不全且 UI 写死）、「分类选择器是否过滤停用项」（旧 UI 用 `categoryDao.all()`
+按名匹配，根本没弹窗；新弹窗用 `all()` 含停用与归档）、「是否真的零改表」（是，
+只扩纯 JVM 模型与 UI，Room schema 未动）。
+
+**回退顺序**：
+1. 若动态行编译不过 → 保留 `RuleManagerDialog` 全屏封装，退回 `Dialog` 内滚动布局
+2. 若 ID 型条件不匹配 → `RuleEngine.rawMatch` 已改为按 id 判定，不再拿显示名比字符串
+3. 若联想误伤 → `suggest` 降到只按对方，备注联想关掉
+4. 若「保存并立即应用」时序不稳 → 退成「保存 + 预览 + 手动确认写入」两步
+5. 都不行 → 恢复 v0.2.18 的 `RuleManagerDialog` 文件（已进 git，可整文件回滚），
+   不动规则表与备份 DTO
+
+**一处安全加固**：空关键词 + 空 ID + 空区间的条件现在直接不命中，
+`saveDraft` 另校验「至少一条有效条件」与「SET_CATEGORY 必须选了分类」，
+避免新规则默认空行把全库分类清空。
+
+**两处如实边界**：① 独立全屏页用 `RuleManagerScreen` + `BulkEditScreen` 早返回实现，
+没有新增 NavHost 路由（避免动 4 Tab 结构）；`RuleManagerDialog` 保留为全屏 Dialog
+兼容封装。② 编辑态 `draft` 存在 ViewModel 而非 `rememberSaveable`——
+`RuleDefinition` 非 Parcelable，ViewModel 跨旋转更稳。
+
+**零改表 → v0.2.18 上覆盖安装即可，不用卸载。**

@@ -513,6 +513,10 @@ interface RecordDao {
     @Query("SELECT DISTINCT counterparty FROM records WHERE counterparty IS NOT NULL AND counterparty <> '' AND counterparty LIKE '%' || :q || '%' ORDER BY counterparty ASC LIMIT 10")
     suspend fun searchCounterparties(q: String): List<String>
 
+    /** 第 37 批：规则编辑器备注联想，纯本地 DISTINCT、限量 10 条，不把全历史灌进内存。 */
+    @Query("SELECT DISTINCT note FROM records WHERE note IS NOT NULL AND note <> '' AND note LIKE '%' || :q || '%' ORDER BY note ASC LIMIT 10")
+    suspend fun searchNotes(q: String): List<String>
+
     /** 阶段 8：指定日期之后的账户使用频次，用于记账页常用账户置顶。 */
     @Query("SELECT accountId AS id, COUNT(*) AS uses FROM (SELECT fromAccountId AS accountId FROM records WHERE localDate >= :fromDate AND fromAccountId IS NOT NULL UNION ALL SELECT toAccountId AS accountId FROM records WHERE localDate >= :fromDate AND toAccountId IS NOT NULL) GROUP BY accountId ORDER BY uses DESC")
     suspend fun recentAccountUsage(fromDate: Int): List<AccountUsageRow>

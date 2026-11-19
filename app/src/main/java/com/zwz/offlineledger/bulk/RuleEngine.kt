@@ -9,10 +9,37 @@ object RuleEngine {
         RuleField.CATEGORY -> t.categoryId?.toString() ?: ""
         RuleField.AMOUNT -> t.amountCents.toString()
         RuleField.DATE -> t.bookedAtEpochMilli.toString()
+        RuleField.ACCOUNT -> t.accountId?.toString() ?: ""
+        RuleField.CURRENCY -> t.currencyCode
+        RuleField.IMPORT_SOURCE -> t.importSource
+        RuleField.EXCLUDED -> t.excludedFromTotals.toString()
     }
 
     private fun rawMatch(t: BulkTarget, c: RuleCondition): Boolean {
-        if (c.field == RuleField.CATEGORY && c.categoryId != null && t.categoryId != c.categoryId) return false
+        // 第 37 批：分类 / 账户是 ID 型字段，值控件给的是「一级 / 二级」显示名，
+        // MUST 按 id 判定，不能拿显示名去比 categoryId.toString()，否则永远不匹配。
+        if (c.field == RuleField.CATEGORY && c.categoryId != null) {
+            return when (c.op) {
+                RuleOp.EQUALS -> t.categoryId == c.categoryId
+                RuleOp.NOT_EQUALS -> t.categoryId != c.categoryId
+                RuleOp.EMPTY -> t.categoryId == null
+                else -> false
+            }
+        }
+        if (c.field == RuleField.ACCOUNT && c.accountId != null) {
+            return when (c.op) {
+                RuleOp.EQUALS -> t.accountId == c.accountId
+                RuleOp.NOT_EQUALS -> t.accountId != c.accountId
+                RuleOp.EMPTY -> t.accountId == null
+                else -> false
+            }
+        }
+        // 空关键词不得命中全库；EMPTY 与 ID / 区间型条件由各自分支处理。
+        if (c.op != RuleOp.EMPTY && c.value.isBlank() &&
+            c.categoryId == null && c.accountId == null &&
+            c.minAmountCents == null && c.maxAmountCents == null &&
+            c.fromEpochMilli == null && c.toEpochMilli == null
+        ) return false
         val min = c.minAmountCents
         val max = c.maxAmountCents
         val from = c.fromEpochMilli
@@ -22,9 +49,17 @@ object RuleEngine {
         if (from != null && t.bookedAtEpochMilli < from) return false
         if (to != null && t.bookedAtEpochMilli > to) return false
         val s = valueOf(t, c.field)
+        // 金额 / 日期用上下限表达；EQUALS 且填了区间时，区间已通过即命中。
+        if (c.field == RuleField.AMOUNT && c.op == RuleOp.EQUALS &&
+            (min != null || max != null)
+        ) return true
+        if (c.field == RuleField.DATE && c.op == RuleOp.EQUALS &&
+            (from != null || to != null)
+        ) return true
         return when (c.op) {
             RuleOp.CONTAINS -> s.contains(c.value, ignoreCase = true)
             RuleOp.EQUALS -> s.equals(c.value, ignoreCase = true)
+            RuleOp.NOT_EQUALS -> !s.equals(c.value, ignoreCase = true)
             RuleOp.STARTS_WITH -> s.startsWith(c.value, ignoreCase = true)
             RuleOp.ENDS_WITH -> s.endsWith(c.value, ignoreCase = true)
             RuleOp.NOT_CONTAINS -> !s.contains(c.value, ignoreCase = true)
@@ -59,6 +94,7 @@ object RuleEngine {
                     note = if (a.from.isEmpty()) cur.note else cur.note.replace(a.from, a.to)
                 )
                 RuleActionKind.SET_EXCLUDED -> cur.copy(excludedFromTotals = a.excluded)
+                RuleActionKind.APPEND_NOTE -> cur.copy(note = cur.note + a.text)
             }
         }
         return cur

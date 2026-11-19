@@ -1,13 +1,18 @@
 package com.zwz.offlineledger.ui.bulk
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -19,25 +24,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.bulk.BulkChange
 import com.zwz.offlineledger.bulk.BulkTarget
-import com.zwz.offlineledger.bulk.CategoryMigration
 import com.zwz.offlineledger.bulk.RuleActionKind
 import com.zwz.offlineledger.bulk.RuleActionSpec
 import com.zwz.offlineledger.bulk.RuleCondition
 import com.zwz.offlineledger.bulk.RuleDefinition
+import com.zwz.offlineledger.bulk.RuleEditorCatalog
 import com.zwz.offlineledger.bulk.RuleEngine
 import com.zwz.offlineledger.bulk.RuleField
 import com.zwz.offlineledger.bulk.RuleGroupDef
 import com.zwz.offlineledger.bulk.RuleOp
+import com.zwz.offlineledger.bulk.RuleValueKind
 import com.zwz.offlineledger.core.DataRefreshBus
+import com.zwz.offlineledger.data.display.CategoryDisplay
 import com.zwz.offlineledger.data.local.AppDatabase
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
@@ -46,12 +55,16 @@ import com.zwz.offlineledger.data.local.entity.RuleGroupEntity
 import com.zwz.offlineledger.data.repository.LedgerRepository
 import com.zwz.offlineledger.ui.ledgerFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+
+data class RuleOption(val id: Long, val label: String)
 
 data class RuleUiState(
     val busy: Boolean = false,
@@ -61,7 +74,14 @@ data class RuleUiState(
     val rules: List<RuleDefinition> = emptyList(),
     val preview: List<BulkChange> = emptyList(),
     val applied: List<BulkChange> = emptyList(),
-    val report: String = ""
+    val report: String = "",
+    val draft: RuleDefinition = RuleDefinition(),
+    val editingId: Long? = null,
+    val selectedGroupId: Long? = null,
+    /** 含停用与归档，否则导入的旧分类圈不出来；label 已带「停用 / 归档」标记。 */
+    val categories: List<RuleOption> = emptyList(),
+    val accounts: List<RuleOption> = emptyList(),
+    val suggestions: List<String> = emptyList()
 )
 
 class RuleViewModel(
@@ -74,8 +94,12 @@ class RuleViewModel(
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val _state = MutableStateFlow(RuleUiState())
     val state: StateFlow<RuleUiState> = _state.asStateFlow()
+    private var suggestJob: Job? = null
 
-    init { reload() }
+    init {
+        reload()
+        loadOptions()
+    }
 
     private suspend fun targetsFromDb(): List<BulkTarget> = withContext(Dispatchers.IO) {
         recordDao.all().map { e ->
@@ -86,7 +110,10 @@ class RuleViewModel(
                 categoryId = e.categoryId,
                 amountCents = e.amountCents,
                 bookedAtEpochMilli = e.timestamp,
-                excludedFromTotals = e.excludeFromStats
+                excludedFromTotals = e.excludeFromStats,
+                accountId = e.fromAccountId ?: e.toAccountId,
+                currencyCode = e.currencyCode,
+                importSource = e.importSource ?: ""
             )
         }
     }
@@ -106,15 +133,48 @@ class RuleViewModel(
                     }
                 }
             }
-            _state.value = _state.value.copy(groups = gs, rules = rs)
+            val gid = _state.value.selectedGroupId ?: gs.firstOrNull()?.id
+            val draft = _state.value.draft
+            _state.value = _state.value.copy(
+                groups = gs,
+                rules = rs,
+                selectedGroupId = gid,
+                draft = if (draft.groupId == 0L && gid != null) draft.copy(groupId = gid) else draft
+            )
         }
+    }
+
+    private fun loadOptions() {
+        viewModelScope.launch {
+            val cats = withContext(Dispatchers.IO) { categoryDao.all() }
+            val byId = cats.associateBy { it.id }
+            val catOpts = cats.map { c ->
+                val parent = c.parentId?.let { byId[it] }
+                val base = CategoryDisplay.resolve(parent?.name, c.name)
+                val suffix = (if (!c.enabled) "（停用）" else "") + (if (c.isArchived) "（归档）" else "")
+                RuleOption(c.id, base + suffix)
+            }
+            val accOpts = withContext(Dispatchers.IO) { db.accountDao().all() }.map { a ->
+                RuleOption(a.id, a.name + (if (a.isArchived) "（归档）" else ""))
+            }
+            _state.value = _state.value.copy(categories = catOpts, accounts = accOpts)
+        }
+    }
+
+    fun selectGroup(id: Long) {
+        _state.value = _state.value.copy(
+            selectedGroupId = id,
+            draft = _state.value.draft.copy(groupId = id)
+        )
     }
 
     fun addGroup(name: String) {
         if (name.isBlank()) return
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                db.ruleDao().insertGroup(RuleGroupEntity(name = name.trim(), sortOrder = _state.value.groups.size))
+                db.ruleDao().insertGroup(
+                    RuleGroupEntity(name = name.trim(), sortOrder = _state.value.groups.size)
+                )
             }
             reload()
         }
@@ -139,28 +199,47 @@ class RuleViewModel(
                 }
                 db.ruleDao().deleteGroup(g.id)
             }
+            _state.value = _state.value.copy(selectedGroupId = null)
             reload()
         }
     }
 
-    /** 一条规则 = 一个「对方包含」条件 + 一个「改分类」动作；AND/OR 与取反可在 def 里扩。 */
-    fun addRule(groupId: Long, name: String, keyword: String, anyMode: Boolean, targetCategoryId: Long?) {
-        if (keyword.isBlank() || targetCategoryId == null) return
-        val def = RuleDefinition(
-            groupId = groupId,
-            name = name.ifBlank { keyword },
-            sortOrder = _state.value.rules.count { it.groupId == groupId },
-            matchMode = if (anyMode) "ANY" else "ALL",
-            conditions = listOf(RuleCondition(field = RuleField.COUNTERPARTY, op = RuleOp.CONTAINS, value = keyword.trim())),
-            actions = listOf(RuleActionSpec(kind = RuleActionKind.SET_CATEGORY, categoryId = targetCategoryId))
+    fun newDraft() {
+        val gid = _state.value.selectedGroupId ?: 0L
+        _state.value = _state.value.copy(
+            editingId = null,
+            draft = RuleDefinition(
+                groupId = gid,
+                sortOrder = _state.value.rules.count { it.groupId == gid },
+                conditions = listOf(RuleCondition()),
+                actions = listOf(RuleActionSpec())
+            ),
+            message = "",
+            error = ""
         )
+    }
+
+    fun editRule(r: RuleDefinition) {
+        _state.value = _state.value.copy(
+            editingId = r.id,
+            selectedGroupId = r.groupId,
+            draft = r,
+            message = "",
+            error = ""
+        )
+    }
+
+    fun duplicateRule(r: RuleDefinition) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 db.ruleDao().insertDefinition(
                     RuleEntity(
-                        groupId = groupId,
-                        sortOrder = def.sortOrder,
-                        definitionJson = json.encodeToString(RuleDefinition.serializer(), def)
+                        groupId = r.groupId,
+                        sortOrder = _state.value.rules.size,
+                        definitionJson = json.encodeToString(
+                            RuleDefinition.serializer(),
+                            r.copy(id = 0, name = r.name + " 副本")
+                        )
                     )
                 )
             }
@@ -168,41 +247,177 @@ class RuleViewModel(
         }
     }
 
-    fun addRuleByName(
-        groupId: Long, name: String, keyword: String,
-        anyMode: Boolean, targetCategoryName: String
-    ) {
-        viewModelScope.launch {
-            val id = withContext(Dispatchers.IO) {
-                categoryDao.all().firstOrNull { it.name == targetCategoryName.trim() }?.id
-            }
-            if (id == null) {
-                _state.value = _state.value.copy(error = "目标分类名不存在：" + targetCategoryName)
-                return@launch
-            }
-            addRule(groupId, name, keyword, anyMode, id)
-        }
+    fun updateDraft(d: RuleDefinition) {
+        _state.value = _state.value.copy(draft = d)
     }
 
     fun deleteRule(r: RuleDefinition) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { db.ruleDao().deleteDefinition(r.id) }
+            if (_state.value.editingId == r.id) newDraft()
             reload()
         }
     }
 
-    fun previewGroup(groupId: Long) {
-        val g = _state.value.groups.firstOrNull { it.id == groupId } ?: return
-        val rules = _state.value.rules.filter { it.groupId == groupId }
+    /** 联想：DAO 限量 10 条 + 200ms 防抖，MUST NOT 把全历史灌进内存。 */
+    fun suggest(q: String, field: RuleField) {
+        suggestJob?.cancel()
+        suggestJob = viewModelScope.launch {
+            delay(200)
+            val list = withContext(Dispatchers.IO) {
+                when (field) {
+                    RuleField.NOTE -> recordDao.searchNotes(q)
+                    RuleField.COUNTERPARTY -> recordDao.searchCounterparties(q)
+                    else -> emptyList()
+                }
+            }
+            _state.value = _state.value.copy(suggestions = list)
+        }
+    }
+
+    fun saveDraft(applyNow: Boolean) {
+        val d = _state.value.draft
+        if (d.conditions.isEmpty() || d.actions.isEmpty()) {
+            _state.value = _state.value.copy(error = "至少要有 1 条触发条件和 1 个动作")
+            return
+        }
+        fun condReady(c: RuleCondition): Boolean = when (RuleEditorCatalog.valueKind(c.field)) {
+            RuleValueKind.CATEGORY -> c.categoryId != null
+            RuleValueKind.ACCOUNT -> c.accountId != null
+            RuleValueKind.AMOUNT_RANGE -> c.minAmountCents != null || c.maxAmountCents != null
+            RuleValueKind.DATE_RANGE -> c.fromEpochMilli != null || c.toEpochMilli != null
+            RuleValueKind.FLAG -> c.value.isNotBlank()
+            else -> c.op == RuleOp.EMPTY || c.value.isNotBlank()
+        }
+        if (d.conditions.none { condReady(it) }) {
+            _state.value = _state.value.copy(error = "触发条件还没填值；空关键词不会命中任何记录")
+            return
+        }
+        if (d.actions.any { it.kind == RuleActionKind.SET_CATEGORY && it.categoryId == null }) {
+            _state.value = _state.value.copy(error = "「设置分类为」还没选分类")
+            return
+        }
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, message = "", error = "")
+            _state.value = _state.value.copy(busy = true, error = "")
+            try {
+                val eid = _state.value.editingId ?: 0L
+                withContext(Dispatchers.IO) {
+                    db.ruleDao().insertDefinition(
+                        RuleEntity(
+                            id = eid,
+                            groupId = d.groupId,
+                            sortOrder = d.sortOrder,
+                            definitionJson = json.encodeToString(RuleDefinition.serializer(), d)
+                        )
+                    )
+                }
+                reload()
+                if (applyNow) {
+                    val changes = withContext(Dispatchers.IO) {
+                        RuleEngine.applyGroup(targetsFromDb(), listOf(d), true)
+                    }
+                    withContext(Dispatchers.IO) {
+                        repository.applyBulkTargets(changes.map { it.after })
+                    }
+                    DataRefreshBus.notifyChanged()
+                    _state.value = _state.value.copy(
+                        busy = false,
+                        preview = emptyList(),
+                        applied = changes,
+                        message = "规则已保存并立即应用 " + changes.size + " 条；可一键撤销。"
+                    )
+                } else {
+                    _state.value = _state.value.copy(busy = false, message = "规则已保存。")
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    busy = false,
+                    error = "保存失败：" + (e.message ?: "unknown")
+                )
+            }
+        }
+    }
+
+    /** 批量录入生成的是普通规则，共用同一 RuleEngine 与撤销链路，不另开写入口。 */
+    fun generateBatch(text: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, error = "", report = "")
+            try {
+                val gid = _state.value.selectedGroupId ?: _state.value.groups.firstOrNull()?.id
+                if (gid == null) {
+                    _state.value = _state.value.copy(busy = false, error = "请先新建一个规则组")
+                    return@launch
+                }
+                val cats = withContext(Dispatchers.IO) { categoryDao.all() }
+                val byId = cats.associateBy { it.id }
+                fun resolve(n: String): Long? {
+                    val q = n.trim()
+                    return cats.firstOrNull { c ->
+                        val parent = c.parentId?.let { byId[it] }
+                        c.name == q || CategoryDisplay.resolve(parent?.name, c.name) == q
+                    }?.id
+                }
+                val start = _state.value.rules.count { it.groupId == gid }
+                val rules = RuleEditorCatalog.batchRules(text, gid, start) { resolve(it) }
+                if (rules.isEmpty()) {
+                    _state.value = _state.value.copy(
+                        busy = false,
+                        error = "未解析出有效映射；每行格式：旧分类名或对方关键词|新分类名"
+                    )
+                    return@launch
+                }
+                val ts = withContext(Dispatchers.IO) { targetsFromDb() }
+                val hits = RuleEditorCatalog.batchReport(ts, rules)
+                val sb = StringBuilder()
+                for (h in hits) {
+                    sb.append("第 ").append(h.index + 1).append(" 组 ").append(h.label)
+                        .append("：命中 ").append(h.hits).append(" 条")
+                    if (h.conflicts.isNotEmpty()) {
+                        sb.append("，与第 ")
+                            .append(h.conflicts.joinToString { (it + 1).toString() })
+                            .append(" 组冲突")
+                    }
+                    if (h.hits == 0) sb.append("（未命中）")
+                    sb.append('\n')
+                }
+                withContext(Dispatchers.IO) {
+                    for (r in rules) {
+                        db.ruleDao().insertDefinition(
+                            RuleEntity(
+                                groupId = r.groupId,
+                                sortOrder = r.sortOrder,
+                                definitionJson = json.encodeToString(RuleDefinition.serializer(), r)
+                            )
+                        )
+                    }
+                }
+                reload()
+                _state.value = _state.value.copy(
+                    busy = false,
+                    report = sb.toString(),
+                    message = "已生成 " + rules.size + " 条规则；冲突按组内顺序首次命中优先。"
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    busy = false,
+                    error = "批量生成失败：" + (e.message ?: "unknown")
+                )
+            }
+        }
+    }
+
+    fun previewRule(r: RuleDefinition) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, error = "")
             try {
                 val changes = withContext(Dispatchers.IO) {
-                    RuleEngine.applyGroup(targetsFromDb(), rules, g.enabled)
+                    RuleEngine.applyGroup(targetsFromDb(), listOf(r), true)
                 }
                 _state.value = _state.value.copy(
-                    busy = false, preview = changes, applied = emptyList(),
-                    message = "规则组「" + g.name + "」命中 " + changes.size + " 条；确认后才写入。"
+                    busy = false,
+                    preview = changes,
+                    applied = emptyList(),
+                    message = "规则「" + r.name + "」命中 " + changes.size + " 条；确认后才写入。"
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(busy = false, error = "预览失败：" + (e.message ?: "unknown"))
@@ -210,44 +425,23 @@ class RuleViewModel(
         }
     }
 
-    /** 每行：旧分类名或对方关键词|新分类名；两段都可写分类名，第二段必填。 */
-    fun previewMigration(text: String) {
+    fun previewGroup(groupId: Long) {
+        val g = _state.value.groups.firstOrNull { it.id == groupId } ?: return
+        val rules = _state.value.rules.filter { it.groupId == groupId }
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, message = "", error = "", report = "")
+            _state.value = _state.value.copy(busy = true, error = "")
             try {
-                val (ts, cats) = withContext(Dispatchers.IO) {
-                    Pair(targetsFromDb(), categoryDao.all())
+                val changes = withContext(Dispatchers.IO) {
+                    RuleEngine.applyGroup(targetsFromDb(), rules, g.enabled)
                 }
-                fun idOf(s: String): Long? = cats.firstOrNull { it.name == s.trim() }?.id
-                val mappings = text.lines().map { it.trim() }.filter { it.isNotBlank() }.mapNotNull { line ->
-                    val parts = line.split("|").map { it.trim() }
-                    if (parts.size < 2) return@mapNotNull null
-                    val toId = idOf(parts[1]) ?: return@mapNotNull null
-                    val fromId = idOf(parts[0])
-                    CategoryMigration(
-                        fromCategoryId = fromId,
-                        counterpartyContains = if (fromId == null) parts[0] else "",
-                        toCategoryId = toId,
-                        label = parts[0] + " -> " + parts[1]
-                    )
-                }
-                val report = RuleEngine.migrationReport(ts, mappings)
-                val sb = StringBuilder()
-                mappings.forEachIndexed { i, m ->
-                    val h = report[i]
-                    sb.append(m.label).append("：命中 ").append(h.hits).append(" 条")
-                    if (h.conflicts.isNotEmpty()) sb.append("，与第 ").append(h.conflicts.joinToString { (it + 1).toString() }).append(" 组冲突")
-                    sb.append('\n')
-                }
-                if (mappings.isEmpty()) sb.append("未解析出有效映射，请检查分类名是否与库内一致。\n")
-                val changes = RuleEngine.migrate(ts, mappings)
                 _state.value = _state.value.copy(
-                    busy = false, preview = changes, applied = emptyList(),
-                    report = sb.toString(),
-                    message = "分类迁移将写入 " + changes.size + " 条；冲突组按首次命中优先。"
+                    busy = false,
+                    preview = changes,
+                    applied = emptyList(),
+                    message = "规则组「" + g.name + "」命中 " + changes.size + " 条；确认后才写入。"
                 )
             } catch (e: Exception) {
-                _state.value = _state.value.copy(busy = false, error = "迁移预览失败：" + (e.message ?: "unknown"))
+                _state.value = _state.value.copy(busy = false, error = "预览失败：" + (e.message ?: "unknown"))
             }
         }
     }
@@ -258,10 +452,14 @@ class RuleViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = true, error = "")
             try {
-                withContext(Dispatchers.IO) { repository.applyBulkTargets(changes.map { it.after }) }
+                withContext(Dispatchers.IO) {
+                    repository.applyBulkTargets(changes.map { it.after })
+                }
                 DataRefreshBus.notifyChanged()
                 _state.value = _state.value.copy(
-                    busy = false, applied = changes, preview = emptyList(),
+                    busy = false,
+                    applied = changes,
+                    preview = emptyList(),
                     message = "已调整 " + changes.size + " 条；可一键撤销。"
                 )
             } catch (e: Exception) {
@@ -281,7 +479,8 @@ class RuleViewModel(
                 }
                 DataRefreshBus.notifyChanged()
                 _state.value = _state.value.copy(
-                    busy = false, applied = emptyList(),
+                    busy = false,
+                    applied = emptyList(),
                     message = "已逐字段撤销 " + changes.size + " 条变更。"
                 )
             } catch (e: Exception) {
@@ -291,8 +490,29 @@ class RuleViewModel(
     }
 }
 
+/** 独立全屏页：动态行较多，Dialog 高度不够，FF3 本身也是整页编辑。 */
+@Composable
+fun RuleManagerScreen(onBack: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxSize()) {
+        RuleManagerContent(onBack = onBack)
+    }
+}
+
+/** 兼容旧调用点：全屏 Dialog，视觉与独立页一致。 */
 @Composable
 fun RuleManagerDialog(onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            RuleManagerContent(onBack = onDismiss)
+        }
+    }
+}
+
+@Composable
+private fun RuleManagerContent(onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: RuleViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
@@ -301,129 +521,471 @@ fun RuleManagerDialog(onDismiss: () -> Unit) {
     )
     val state by vm.state.collectAsState()
     var groupName by remember { mutableStateOf("") }
-    var keyword by remember { mutableStateOf("") }
-    var ruleName by remember { mutableStateOf("") }
-    var anyMode by remember { mutableStateOf(false) }
-    var targetCategoryName by remember { mutableStateOf("") }
-    var migrationText by remember { mutableStateOf("") }
+    var batchText by remember { mutableStateOf("") }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 3.dp) {
-            Column(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .heightIn(max = 560.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text("规则与分类迁移", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    "规则可保存、按组内顺序执行；分类迁移一次填 N 组映射。" +
-                        "所有写入都先预览、单事务、可撤销。",
-                    style = MaterialTheme.typography.labelSmall
-                )
-
-                Text("规则组", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
-                state.groups.forEach { g ->
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text(g.name + if (g.enabled) "" else "（停用）", modifier = Modifier.weight(1f), maxLines = 1)
-                        TextButton(onClick = { vm.toggleGroup(g) }) { Text(if (g.enabled) "停用" else "启用") }
-                        TextButton(onClick = { vm.deleteGroup(g) }) { Text("删除") }
-                    }
-                    state.rules.filter { it.groupId == g.id }.forEach { r ->
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text("  · " + r.name, modifier = Modifier.weight(1f), maxLines = 1)
-                            TextButton(onClick = { vm.deleteRule(r) }) { Text("移除") }
-                        }
-                    }
-                    TextButton(onClick = { vm.previewGroup(g.id) }) { Text("预览「" + g.name + "」并应用") }
+    Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack) { Text("返回", maxLines = 1) }
+            Text(
+                "规则编辑器",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
+                maxLines = 1
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            SectionTitle("规则组")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("当前组：", maxLines = 1)
+                val gLabels = state.groups.map { it.name }
+                val gSel = state.groups.indexOfFirst { it.id == state.selectedGroupId }
+                EnumDropdown("选择组", gLabels, gSel) { idx ->
+                    vm.selectGroup(state.groups[idx].id)
                 }
-                OutlinedTextField(
-                    value = groupName, onValueChange = { groupName = it },
-                    label = { Text("新规则组名称") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(onClick = { vm.addGroup(groupName); groupName = "" }, modifier = Modifier.fillMaxWidth()) {
-                    Text("新建规则组", maxLines = 1)
-                }
-
-                Text("新增规则", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
-                OutlinedTextField(
-                    value = keyword, onValueChange = { keyword = it },
-                    label = { Text("对方包含关键词") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = targetCategoryName, onValueChange = { targetCategoryName = it },
-                    label = { Text("改到分类（填库内分类名）") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = ruleName, onValueChange = { ruleName = it },
-                    label = { Text("规则名（可留空）") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text("匹配：", modifier = Modifier.padding(top = 12.dp))
-                    TextButton(onClick = { anyMode = false }) { Text(if (anyMode) "全部满足" else "● 全部满足") }
-                    TextButton(onClick = { anyMode = true }) { Text(if (anyMode) "● 任一满足" else "任一满足") }
-                }
-                Button(
-                    onClick = {
-                        val gid = state.groups.firstOrNull()?.id
-                        if (gid != null) {
-                            vm.addRuleByName(gid, ruleName, keyword, anyMode, targetCategoryName)
-                            keyword = ""; ruleName = ""; targetCategoryName = ""
-                        } else {
-                            vm.addGroup("默认规则组")
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("保存到第一个规则组", maxLines = 1) }
-
-                Text("分类迁移映射表", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
-                Text(
-                    "每行：旧分类名或对方关键词|新分类名；冲突按首次命中优先，未命中的组会列出。",
-                    style = MaterialTheme.typography.labelSmall
-                )
-                OutlinedTextField(
-                    value = migrationText, onValueChange = { migrationText = it },
-                    label = { Text("每行一组映射") }, minLines = 3,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(onClick = { vm.previewMigration(migrationText) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("预览迁移", maxLines = 1)
-                }
-                if (state.report.isNotBlank()) {
-                    Text(state.report, style = MaterialTheme.typography.labelSmall)
-                }
-
-                if (state.message.isNotBlank()) {
-                    Text(state.message, style = MaterialTheme.typography.bodySmall)
-                }
-                if (state.error.isNotBlank()) {
-                    Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-                if (state.preview.isNotEmpty()) {
+            }
+            OutlinedTextField(
+                value = groupName,
+                onValueChange = { groupName = it },
+                label = { Text("新规则组名称") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(onClick = { vm.addGroup(groupName); groupName = "" }, modifier = Modifier.fillMaxWidth()) {
+                Text("新建规则组", maxLines = 1)
+            }
+            state.groups.forEach { g ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "前后对比（前 10 条，共 " + state.preview.size + " 条）",
-                        style = MaterialTheme.typography.titleSmall
+                        g.name + if (g.enabled) "" else "（停用）",
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1
                     )
-                    state.preview.take(10).forEach { c ->
-                        Text(
-                            "#" + c.before.id + " 分类 " + c.before.categoryId + " → " + c.after.categoryId,
-                            style = MaterialTheme.typography.labelSmall, maxLines = 1
+                    TextButton(onClick = { vm.toggleGroup(g) }) { Text(if (g.enabled) "停用" else "启用", maxLines = 1) }
+                    TextButton(onClick = { vm.deleteGroup(g) }) { Text("删除", maxLines = 1) }
+                }
+            }
+
+            SectionTitle("已保存规则")
+            state.rules.filter { it.groupId == state.selectedGroupId }.forEach { r ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        (if (r.enabled) "" else "（停用）") + r.name,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1
+                    )
+                    TextButton(onClick = { vm.editRule(r) }) { Text("编辑", maxLines = 1) }
+                    TextButton(onClick = { vm.previewRule(r) }) { Text("预览", maxLines = 1) }
+                    TextButton(onClick = { vm.duplicateRule(r) }) { Text("复制", maxLines = 1) }
+                    TextButton(onClick = { vm.deleteRule(r) }) { Text("删", maxLines = 1) }
+                }
+            }
+            TextButton(onClick = { vm.newDraft() }) { Text("+ 新建一条规则", maxLines = 1) }
+
+            SectionTitle(if (state.editingId == null) "新建规则" else "编辑规则")
+            OutlinedTextField(
+                value = state.draft.name,
+                onValueChange = { vm.updateDraft(state.draft.copy(name = it)) },
+                label = { Text("规则标题") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("匹配：", maxLines = 1)
+                TextButton(onClick = { vm.updateDraft(state.draft.copy(matchMode = "ALL")) }) {
+                    Text(if (state.draft.matchMode == "ANY") "全部满足" else "● 全部满足", maxLines = 1)
+                }
+                TextButton(onClick = { vm.updateDraft(state.draft.copy(matchMode = "ANY")) }) {
+                    Text(if (state.draft.matchMode == "ANY") "● 任一满足" else "任一满足", maxLines = 1)
+                }
+                Checkbox(
+                    checked = state.draft.enabled,
+                    onCheckedChange = { vm.updateDraft(state.draft.copy(enabled = it)) }
+                )
+                Text("启用", maxLines = 1)
+            }
+
+            Text("规则触发于", style = MaterialTheme.typography.titleSmall)
+            state.draft.conditions.forEachIndexed { i, c ->
+                ConditionCard(
+                    cond = c,
+                    state = state,
+                    vm = vm,
+                    onChange = { nc ->
+                        vm.updateDraft(
+                            state.draft.copy(
+                                conditions = state.draft.conditions.toMutableList().also { it[i] = nc }
+                            )
+                        )
+                    },
+                    onRemove = {
+                        vm.updateDraft(
+                            state.draft.copy(
+                                conditions = state.draft.conditions.toMutableList().also { it.removeAt(i) }
+                            )
                         )
                     }
-                    Button(onClick = { vm.commit() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-                        Text("确认写入 " + state.preview.size + " 条", maxLines = 1)
-                    }
+                )
+            }
+            TextButton(
+                onClick = {
+                    vm.updateDraft(
+                        state.draft.copy(conditions = state.draft.conditions + RuleCondition())
+                    )
                 }
-                if (state.applied.isNotEmpty()) {
-                    Button(onClick = { vm.revert() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-                        Text("一键撤销 " + state.applied.size + " 条", maxLines = 1)
+            ) { Text("+ 添加触发条件", maxLines = 1) }
+
+            Text("规则将执行", style = MaterialTheme.typography.titleSmall)
+            state.draft.actions.forEachIndexed { i, a ->
+                ActionCard(
+                    spec = a,
+                    state = state,
+                    vm = vm,
+                    onChange = { na ->
+                        vm.updateDraft(
+                            state.draft.copy(
+                                actions = state.draft.actions.toMutableList().also { it[i] = na }
+                            )
+                        )
+                    },
+                    onRemove = {
+                        vm.updateDraft(
+                            state.draft.copy(
+                                actions = state.draft.actions.toMutableList().also { it.removeAt(i) }
+                            )
+                        )
                     }
+                )
+            }
+            TextButton(
+                onClick = {
+                    vm.updateDraft(
+                        state.draft.copy(actions = state.draft.actions + RuleActionSpec())
+                    )
                 }
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("关闭") }
+            ) { Text("+ 添加动作", maxLines = 1) }
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { vm.saveDraft(false) },
+                    enabled = !state.busy,
+                    modifier = Modifier.weight(1f).padding(end = 4.dp)
+                ) { Text("保存规则", maxLines = 1) }
+                Button(
+                    onClick = { vm.saveDraft(true) },
+                    enabled = !state.busy,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp)
+                ) { Text("保存并立即应用", maxLines = 1) }
+            }
+
+            SectionTitle("批量录入（分类迁移）")
+            Text(
+                "每行：旧分类名或对方关键词|新分类名。一次生成 N 条普通规则，" +
+                    "与单独配置的规则共用同一预览、写入与撤销链路。",
+                style = MaterialTheme.typography.labelSmall
+            )
+            OutlinedTextField(
+                value = batchText,
+                onValueChange = { batchText = it },
+                label = { Text("每行一组映射") },
+                minLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(onClick = { vm.generateBatch(batchText) }, modifier = Modifier.fillMaxWidth()) {
+                Text("生成规则并看命中报告", maxLines = 1)
+            }
+            if (state.report.isNotBlank()) {
+                Text(state.report, style = MaterialTheme.typography.labelSmall)
+            }
+            val gid = state.selectedGroupId
+            if (gid != null) {
+                TextButton(onClick = { vm.previewGroup(gid) }) { Text("预览整个规则组", maxLines = 1) }
+            }
+
+            if (state.message.isNotBlank()) {
+                Text(state.message, style = MaterialTheme.typography.bodySmall)
+            }
+            if (state.error.isNotBlank()) {
+                Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            if (state.preview.isNotEmpty()) {
+                Text(
+                    "前后对比（前 10 条，共 " + state.preview.size + " 条）",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                state.preview.take(10).forEach { c ->
+                    Text(
+                        "#" + c.before.id + " 分类 " + c.before.categoryId + " → " + c.after.categoryId +
+                            " / 对方 " + c.before.counterparty + " → " + c.after.counterparty,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
+                    )
+                }
+                Button(onClick = { vm.commit() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+                    Text("确认写入 " + state.preview.size + " 条", maxLines = 1)
+                }
+            }
+            if (state.applied.isNotEmpty()) {
+                Button(onClick = { vm.revert() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+                    Text("一键撤销 " + state.applied.size + " 条", maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+        maxLines = 1
+    )
+}
+
+@Composable
+private fun EnumDropdown(hint: String, labels: List<String>, selected: Int, onPick: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Text(
+                (if (selected in labels.indices) labels[selected] else hint) + " ▾",
+                maxLines = 1
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            labels.forEachIndexed { i, l ->
+                DropdownMenuItem(
+                    text = { Text(l, maxLines = 1) },
+                    onClick = { onPick(i); expanded = false }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PickerField(current: String, options: List<RuleOption>, onPick: (RuleOption) -> Unit) {
+    var show by remember { mutableStateOf(false) }
+    var q by remember { mutableStateOf("") }
+    TextButton(onClick = { show = true }) { Text(current + " ▾", maxLines = 1) }
+    if (show) {
+        Dialog(onDismissRequest = { show = false }) {
+            Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 3.dp) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("选择（含停用与归档）", style = MaterialTheme.typography.titleSmall)
+                    OutlinedTextField(
+                        value = q,
+                        onValueChange = { q = it },
+                        label = { Text("搜索") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 360.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        options.filter { it.label.contains(q, ignoreCase = true) }.forEach { o ->
+                            TextButton(
+                                onClick = { onPick(o); show = false },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text(o.label, maxLines = 1) }
+                        }
+                    }
+                    TextButton(onClick = { show = false }) { Text("关闭", maxLines = 1) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextFieldWithSuggestions(
+    value: String,
+    label: String,
+    suggestions: List<String>,
+    onValue: (String) -> Unit
+) {
+    Column {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValue,
+            label = { Text(label) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (suggestions.isNotEmpty()) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                suggestions.take(4).forEach { s ->
+                    TextButton(onClick = { onValue(s) }) { Text(s, maxLines = 1) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConditionCard(
+    cond: RuleCondition,
+    state: RuleUiState,
+    vm: RuleViewModel,
+    onChange: (RuleCondition) -> Unit,
+    onRemove: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val fields = RuleEditorCatalog.fields()
+            EnumDropdown(
+                "字段",
+                fields.map { RuleEditorCatalog.fieldLabel(it) },
+                fields.indexOf(cond.field)
+            ) { idx ->
+                val f = fields[idx]
+                onChange(cond.copy(field = f, op = RuleEditorCatalog.opsFor(f).first()))
+            }
+            val ops = RuleEditorCatalog.opsFor(cond.field)
+            EnumDropdown(
+                "操作符",
+                ops.map { RuleEditorCatalog.opLabel(it) },
+                ops.indexOf(cond.op).coerceAtLeast(0)
+            ) { idx -> onChange(cond.copy(op = ops[idx])) }
+            Checkbox(checked = cond.negate, onCheckedChange = { onChange(cond.copy(negate = it)) })
+            Text("反", maxLines = 1)
+            TextButton(onClick = onRemove) { Text("删", maxLines = 1) }
+        }
+        when (RuleEditorCatalog.valueKind(cond.field)) {
+            RuleValueKind.CATEGORY -> PickerField(
+                current = state.categories.firstOrNull { it.id == cond.categoryId }?.label ?: "选择分类",
+                options = state.categories,
+                onPick = { onChange(cond.copy(categoryId = it.id, value = it.label)) }
+            )
+            RuleValueKind.ACCOUNT -> PickerField(
+                current = state.accounts.firstOrNull { it.id == cond.accountId }?.label ?: "选择账户",
+                options = state.accounts,
+                onPick = { onChange(cond.copy(accountId = it.id, value = it.label)) }
+            )
+            RuleValueKind.AMOUNT_RANGE -> Row(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = cond.minAmountCents?.toString() ?: "",
+                    onValueChange = { onChange(cond.copy(minAmountCents = it.toLongOrNull())) },
+                    label = { Text("最小金额(分)") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).padding(end = 4.dp)
+                )
+                OutlinedTextField(
+                    value = cond.maxAmountCents?.toString() ?: "",
+                    onValueChange = { onChange(cond.copy(maxAmountCents = it.toLongOrNull())) },
+                    label = { Text("最大金额(分)") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp)
+                )
+            }
+            RuleValueKind.DATE_RANGE -> Row(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = cond.fromEpochMilli?.toString() ?: "",
+                    onValueChange = { onChange(cond.copy(fromEpochMilli = it.toLongOrNull())) },
+                    label = { Text("起始毫秒") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).padding(end = 4.dp)
+                )
+                OutlinedTextField(
+                    value = cond.toEpochMilli?.toString() ?: "",
+                    onValueChange = { onChange(cond.copy(toEpochMilli = it.toLongOrNull())) },
+                    label = { Text("结束毫秒") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp)
+                )
+            }
+            RuleValueKind.FLAG -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = cond.value == "true",
+                    onCheckedChange = { onChange(cond.copy(value = it.toString())) }
+                )
+                Text("不计入收支 = 真", maxLines = 1)
+            }
+            else -> TextFieldWithSuggestions(
+                value = cond.value,
+                label = "触发值（可联想）",
+                suggestions = state.suggestions,
+                onValue = {
+                    onChange(cond.copy(value = it))
+                    vm.suggest(it, cond.field)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActionCard(
+    spec: RuleActionSpec,
+    state: RuleUiState,
+    vm: RuleViewModel,
+    onChange: (RuleActionSpec) -> Unit,
+    onRemove: () -> Unit
+) {
+    val kinds = RuleEditorCatalog.actions()
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            EnumDropdown(
+                "动作",
+                kinds.map { RuleEditorCatalog.actionLabel(it) },
+                kinds.indexOf(spec.kind).coerceAtLeast(0)
+            ) { idx -> onChange(spec.copy(kind = kinds[idx])) }
+            TextButton(onClick = onRemove) { Text("删", maxLines = 1) }
+        }
+        when (RuleEditorCatalog.actionValueKind(spec.kind)) {
+            RuleValueKind.CATEGORY -> PickerField(
+                current = state.categories.firstOrNull { it.id == spec.categoryId }?.label ?: "选择分类",
+                options = state.categories,
+                onPick = { onChange(spec.copy(categoryId = it.id)) }
+            )
+            RuleValueKind.FLAG -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = spec.excluded,
+                    onCheckedChange = { onChange(spec.copy(excluded = it)) }
+                )
+                Text("标记为不计入收支", maxLines = 1)
+            }
+            else -> when (spec.kind) {
+                RuleActionKind.RENAME_COUNTERPARTY -> TextFieldWithSuggestions(
+                    value = spec.text,
+                    label = "新交易对方（可联想）",
+                    suggestions = state.suggestions,
+                    onValue = {
+                        onChange(spec.copy(text = it))
+                        vm.suggest(it, RuleField.COUNTERPARTY)
+                    }
+                )
+                RuleActionKind.REPLACE_NOTE -> Row(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = spec.from,
+                        onValueChange = { onChange(spec.copy(from = it)) },
+                        label = { Text("把") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f).padding(end = 4.dp)
+                    )
+                    OutlinedTextField(
+                        value = spec.to,
+                        onValueChange = { onChange(spec.copy(to = it)) },
+                        label = { Text("换成") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f).padding(start = 4.dp)
+                    )
+                }
+                RuleActionKind.APPEND_NOTE -> OutlinedTextField(
+                    value = spec.text,
+                    onValueChange = { onChange(spec.copy(text = it)) },
+                    label = { Text("追加到备注末尾") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                else -> Unit
             }
         }
     }

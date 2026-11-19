@@ -167,3 +167,21 @@ Firefly III 的规则是「条件组 + 动作组 + 规则组有序 + strict/非 
 v0.2.17 覆盖安装会开库失败。约 24M 是 R8 release APK 原始字节，
 Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；不是 debug 变体。
 `data-safety-and-bulk-rules` 与 `preset-data-and-counterparty` 仍进行中，未擅自归档。
+
+
+## 第 37 批：规则编辑器三段式（v0.2.19）
+
+- [x] 真读 `RuleModels` / `RuleManagerScreen` / 分类选择器 / 联想 DAO，确认零改表
+- [x] `RuleEditorCatalog` 目录单一来源（字段 → 操作符 / 值控件、动作 → 值控件、批量生成）
+- [x] 枚举末尾追加值、BulkTarget 只读字段、RuleEngine 新字段 / NOT_EQUALS / APPEND_NOTE
+- [x] `RecordDao.searchNotes` 限量联想 + 200ms 防抖
+- [x] `RuleManagerScreen` 独立全屏动态行编辑器（标题 / ALL-ANY / 取反 / 多动作 / 启停）
+- [x] 分类与账户弹窗含停用归档、显示「一级 / 二级」；对方与备注联想
+- [x] 删独立映射表 UI，改「批量录入」生成 N 条普通规则，命中 / 冲突 / 未命中报告
+- [x] 「保存并立即应用到历史」复用预览 → 单事务 → 末尾重算 → 撤销
+- [x] `specs/bulk-edit/spec.md` 整块替换，删「固定动作清单 / 独立映射表」矛盾表述
+- [x] 版本 0.2.19、六个静态检查本地 PASS
+- [ ] push CI / release / 坚果云实测回填（执行后填真实编号）
+- [ ] 真机复核（使用者，刻意保留）：自建「分类等于旧类 → 设置分类为新类」并命中；
+      对方 / 备注联想、分类弹窗能选到停用旧类；一条规则两动作、ANY + 取反命中散乱记录；
+      批量录入冲突可见；撤销逐字段还原；导出恢复后规则仍在

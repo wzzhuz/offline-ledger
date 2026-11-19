@@ -176,6 +176,12 @@ fun BulkEditScreen(onBack: () -> Unit) {
     val state by vm.state.collectAsState()
     var showRules by remember { mutableStateOf(false) }
 
+    // 第 37 批：规则编辑器改为独立全屏页，不再塞进滚动列末尾的弹层。
+    if (showRules) {
+        RuleManagerScreen(onBack = { showRules = false })
+        return
+    }
+
     var cpContains by remember { mutableStateOf("") }
     var noteContains by remember { mutableStateOf("") }
     var minYuan by remember { mutableStateOf("") }
@@ -344,9 +350,6 @@ fun BulkEditScreen(onBack: () -> Unit) {
         Button(
             onClick = { showRules = true },
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-        ) { Text("规则与分类迁移", maxLines = 1) }
-    }
-    if (showRules) {
-        RuleManagerDialog(onDismiss = { showRules = false })
+        ) { Text("规则编辑器", maxLines = 1) }
     }
 }
