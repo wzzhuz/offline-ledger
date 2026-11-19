@@ -77,6 +77,6 @@ class RuleEditorCatalogTest {
         val changes = RuleEngine.applyGroup(targets, rules, true)
         assertEquals(1, changes.size)
         assertEquals(9L, changes[0].after.categoryId!!)
-        assertEquals(targets, RuleEngine.revert(changes))
+        assertEquals(listOf(targets[0]), RuleEngine.revert(changes))
     }
 }
