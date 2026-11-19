@@ -53,6 +53,19 @@ data class BackupAdjustment(
 @Serializable
 data class BackupAlias(val pattern: String, val shortName: String)
 
+/** 第 36 批：规则定义随备份走，默认空列表兼容旧备份。 */
+@Serializable
+data class BackupRuleGroup(
+    val id: Long, val name: String, val enabled: Boolean = true,
+    val sortOrder: Int = 0, val definitions: List<BackupRule> = emptyList()
+)
+
+@Serializable
+data class BackupRule(
+    val id: Long, val groupId: Long, val sortOrder: Int = 0,
+    val definitionJson: String = ""
+)
+
 @Serializable
 data class BackupPayload(
     val accounts: List<BackupAccount> = emptyList(),
@@ -66,7 +79,9 @@ data class BackupPayload(
     val recurringRules: List<BackupRecurringRule> = emptyList(),
     val budgets: List<BackupBudget> = emptyList(),
     /** 第 34 批：默认空列表，旧备份缺失该键时解析成空，不会破坏兼容。 */
-    val counterpartyAliases: List<BackupAlias> = emptyList()
+    val counterpartyAliases: List<BackupAlias> = emptyList(),
+    /** 第 36 批：旧备份缺此键时解析为空列表，规则不会凭空出现。 */
+    val ruleGroups: List<BackupRuleGroup> = emptyList()
 )
 
 /** 顶层信封。BackupEnvelope 的四项头部字段一个字不改。 */
@@ -87,6 +102,7 @@ data class LedgerSnapshot(
     val recurringRules: List<BackupRecurringRule> = emptyList(),
     val budgets: List<BackupBudget> = emptyList(),
     val counterpartyAliases: List<BackupAlias> = emptyList(),
+    val ruleGroups: List<BackupRuleGroup> = emptyList(),
     val exportedAtEpochMilli: Long = 0L,
     val currencyCode: String = "HKD",
     val schemaVersion: Int = BackupSchema.CURRENT

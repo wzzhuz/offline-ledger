@@ -3,6 +3,7 @@ package com.zwz.offlineledger.ui
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.zwz.offlineledger.data.local.AppDatabase
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.BudgetDao
@@ -25,6 +26,7 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 interface LedgerEntryPoint {
     fun ledgerRepository(): LedgerRepository
+    fun appDatabase(): AppDatabase
     fun accountDao(): AccountDao
     fun categoryDao(): CategoryDao
     fun recordDao(): RecordDao

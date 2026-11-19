@@ -179,6 +179,17 @@ class LedgerRepository @Inject constructor(
                 pattern = it.pattern, shortName = it.shortName
             )
         },
+        ruleGroups = db.ruleDao().groups().map { g ->
+            com.zwz.offlineledger.backup.dto.BackupRuleGroup(
+                id = g.id, name = g.name, enabled = g.enabled, sortOrder = g.sortOrder,
+                definitions = db.ruleDao().definitions()
+                    .filter { it.groupId == g.id }
+                    .map { d -> com.zwz.offlineledger.backup.dto.BackupRule(
+                        id = d.id, groupId = d.groupId, sortOrder = d.sortOrder,
+                        definitionJson = d.definitionJson
+                    ) }
+            )
+        },
         trash = trashDao.all().map {
             com.zwz.offlineledger.backup.dto.BackupRecord(
                 id = it.originalId, type = it.type.name, amountCents = it.amountCents,
@@ -221,6 +232,8 @@ class LedgerRepository @Inject constructor(
         ruleDao.clear()
         budgetDao.clear()
         aliasDao.clear()
+        db.ruleDao().clearDefinitions()
+        db.ruleDao().clearGroups()
         categoryDao.clear()
         accountDao.clear()
 
@@ -242,6 +255,21 @@ class LedgerRepository @Inject constructor(
                     pattern = it.pattern, shortName = it.shortName
                 )
             )
+        }
+        file.payload.ruleGroups.forEach { g ->
+            db.ruleDao().insertGroup(
+                com.zwz.offlineledger.data.local.entity.RuleGroupEntity(
+                    id = g.id, name = g.name, enabled = g.enabled, sortOrder = g.sortOrder
+                )
+            )
+            g.definitions.forEach { d ->
+                db.ruleDao().insertDefinition(
+                    com.zwz.offlineledger.data.local.entity.RuleEntity(
+                        id = d.id, groupId = d.groupId, sortOrder = d.sortOrder,
+                        definitionJson = d.definitionJson
+                    )
+                )
+            }
         }
         file.payload.trash.forEach {
             trashDao.insert(it.toEntity().toTrash(System.currentTimeMillis()))

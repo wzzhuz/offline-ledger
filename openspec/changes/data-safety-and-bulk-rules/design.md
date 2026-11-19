@@ -211,3 +211,32 @@ v0.2.14 又删了预制账户、换了分类清单 → 清库 / 重装后**必�
 **产物口径**：约 24M 是 R8 release APK 原始字节，Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；不是 debug 变体。
 `AppDatabase.version = 3` 未变 → **v0.2.16 上覆盖安装即可，不用卸载**。
 `data-safety-and-bulk-rules` 与 `preset-data-and-counterparty` 仍进行中，未擅自归档。
+
+
+## 第 36 批（v0.2.18）：规则 2.0 与分类迁移映射表
+
+**根因**：一期「即时批量规整」只有 AND 条件、单一固定目标值、规则用完即弃，
+无法表达「旧分类 A/B/C 或对方关键词散乱记录一次圈出」与「20 组旧分类一次映射到新分类」。
+Firefly III 的规则是「条件组 + 动作组 + 规则组有序 + strict/非 strict + 对历史回溯应用」，
+本批借其模型，不引触发器自动跑 / 表达式引擎 / 标签体系 / stop processing。
+
+**实现取舍（与门禁描述的一处偏差，如实登记）**：门禁写「规则四表」，
+实作收敛为 `rule_groups` + `rule_definitions` **两张表**，条件与动作序列化为 JSON 列、零外键。
+理由：四种操作符各建表会把恢复链路的 FK 拓扑序再拉长一层，v0.2.16 刚修完 1811，
+不为结构纯度再冒一次风险；能力范围（可保存、有序、AND/OR、取反、多动作、回溯）不缩水。
+
+| 项 | 落地 |
+|---|---|
+| 纯 JVM 内核 | `RuleModels.kt` / `RuleEngine.kt`：ALL/ANY、negate、七种操作符（含正则、为空、不等于）、多动作、组内 sortOrder 有序、`changeset` 逐字段撤销 |
+| 分类迁移 | `CategoryMigration` + `migrationReport`（每组命中数 / 冲突组 / 未命中）+ 首次命中优先，与规则组共用同一 `applyBulkTargets` 写路径 |
+| 持久化 | `AppDatabase.version = 4`，两张表零外键；恢复按 groups → definitions 顺序插入，纳入 `defer_foreign_keys` / `foreign_key_check` 同一事务 |
+| 备份 | `BackupPayload.ruleGroups` 带默认值，旧备份缺键解析为空列表；导出与自动快照自动带上规则 |
+| UI | 设置页按钮文案精简为「从 CSV 重建」并给同排按钮 `maxLines = 1`；「批量规整」页新增「规则与分类迁移」弹层，预览 → 单事务 → 末尾重算 → 一键撤销 |
+| 不做 | 导入后自动触发（触发器默认关）、规则组嵌套、表达式引擎、标签/预算联动、stop processing |
+
+**测试**：`RuleEngineTest` 6 条（ANY/ALL/取反/组顺序/映射命中与冲突/撤销还原）、
+`RuleBackupRoundTripTest` 2 条（规则随备份往返、旧备份缺键仍可解析）。
+门禁里写的「恢复 androidTest」未做：CI 无模拟器不跑 androidTest，
+改为纯 JVM 备份往返单测覆盖 DTO 层，恢复链路仍待真机「导出→清数据→重装恢复」复核。
+
+**`version = 4` → 必须卸载重装、装之前先导出**；v0.2.17 覆盖安装会开库失败。

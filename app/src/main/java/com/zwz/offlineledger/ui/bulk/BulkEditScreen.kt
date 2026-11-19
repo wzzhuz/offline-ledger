@@ -174,6 +174,7 @@ fun BulkEditScreen(onBack: () -> Unit) {
         }
     )
     val state by vm.state.collectAsState()
+    var showRules by remember { mutableStateOf(false) }
 
     var cpContains by remember { mutableStateOf("") }
     var noteContains by remember { mutableStateOf("") }
@@ -340,5 +341,12 @@ fun BulkEditScreen(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             ) { Text("一键撤销 " + state.applied.size + " 条") }
         }
+        Button(
+            onClick = { showRules = true },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        ) { Text("规则与分类迁移", maxLines = 1) }
+    }
+    if (showRules) {
+        RuleManagerDialog(onDismiss = { showRules = false })
     }
 }

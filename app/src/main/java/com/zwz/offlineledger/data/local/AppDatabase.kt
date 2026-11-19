@@ -9,6 +9,7 @@ import com.zwz.offlineledger.data.local.dao.BudgetDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.CounterpartyAliasDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
+import com.zwz.offlineledger.data.local.dao.RuleDao
 import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
 import com.zwz.offlineledger.data.local.dao.TemplateDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
@@ -18,11 +19,15 @@ import com.zwz.offlineledger.data.local.entity.BudgetEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.CounterpartyAliasEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
+import com.zwz.offlineledger.data.local.entity.RuleEntity
+import com.zwz.offlineledger.data.local.entity.RuleGroupEntity
 import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
 import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 
 /**
+ * 第 36 批：version 升到 4（rule_groups / rule_definitions，零外键）。
+ * 仍不注册 Migration，测试期 MUST 卸载重装、装之前先导出。
  * 第 30 批：version 升到 3（categories.enabled / accounts.cardLast4 /
  * counterparty_aliases）。仍不注册 Migration，测试期覆盖安装会开库失败，
  * MUST 卸载重装；装之前先导出。第 23 批：version 升到 2，
@@ -42,9 +47,11 @@ import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
         RecordTemplateEntity::class,
         RecurringRuleEntity::class,
         BudgetEntity::class,
-        CounterpartyAliasEntity::class
+        CounterpartyAliasEntity::class,
+        RuleGroupEntity::class,
+        RuleEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -58,6 +65,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun recurringRuleDao(): RecurringRuleDao
     abstract fun budgetDao(): BudgetDao
     abstract fun counterpartyAliasDao(): CounterpartyAliasDao
+    abstract fun ruleDao(): RuleDao
 
     companion object {
         const val DATABASE_NAME = "offline_ledger.db"

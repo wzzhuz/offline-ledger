@@ -46,7 +46,8 @@ object BackupExporter {
                     templates = snapshot.templates,
                     recurringRules = snapshot.recurringRules,
                     budgets = snapshot.budgets,
-                    counterpartyAliases = snapshot.counterpartyAliases
+                    counterpartyAliases = snapshot.counterpartyAliases,
+                    ruleGroups = snapshot.ruleGroups
                 )
             )
         )

@@ -205,46 +205,46 @@ fun BackupSettingsScreen(
                 onClick = { exportLauncher.launch("offline-ledger-backup.olbk") },
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("导出加密备份") }
+            ) { Text("导出加密备份", maxLines = 1) }
             Button(
                 onClick = { importLauncher.launch(arrayOf("application/octet-stream", "*/*")) },
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("从备份恢复") }
+            ) { Text("从备份恢复", maxLines = 1) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = { csvExportLauncher.launch("offline-ledger.csv") },
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("导出 CSV（Excel 核对用）") }
+            ) { Text("导出 CSV（Excel 核对用）", maxLines = 1) }
             Button(
                 onClick = { csvImportLauncher.launch(arrayOf("text/csv", "text/plain", "*/*")) },
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("导入账单（第三方账单）") }
+            ) { Text("导入账单（第三方账单）", maxLines = 1) }
         }
         Button(
             onClick = { csvRebuildLauncher.launch(arrayOf("text/csv", "text/plain", "*/*")) },
             enabled = !state.busy,
             modifier = Modifier.fillMaxWidth()
-        ) { Text("从 CSV 重建（本 App 导出文件，需已有账户与分类）") }
+        ) { Text("从 CSV 重建", maxLines = 1) }
         Button(
             onClick = onOpenFirefly,
             enabled = !state.busy,
             modifier = Modifier.fillMaxWidth()
-        ) { Text("导入 Firefly III 导出（CSV）") }
+        ) { Text("导入 Firefly III 导出（CSV）", maxLines = 1) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = onOpenSnapshots,
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("自动快照与恢复") }
+            ) { Text("自动快照与恢复", maxLines = 1) }
             Button(
                 onClick = onOpenBulk,
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("批量规整") }
+            ) { Text("批量规整", maxLines = 1) }
         }
         Text(
             text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
