@@ -44,6 +44,20 @@ data class CsvParseResult(
 data class CsvImportOutcome(val written: Int, val skipped: Int)
 
 /**
+ * 第 35 批：自有导出文件「从 CSV 重建」的执行结果。
+ *
+ * 与 CsvImportOutcome 的区别：缺账户 / 缺分类 **不是异常**，
+ * 只跳过该行并逐项列进报告；归档账户、停用分类也不算缺失。
+ */
+data class CsvRebuildOutcome(
+    val written: Int,
+    val skippedDuplicate: Int,
+    val skippedMissing: Int,
+    val missingAccounts: List<String>,
+    val missingCategories: List<String>
+)
+
+/**
  * 第 23 批：跨来源对账的「疑似匹配」候选。
  * 只表示「可能是同一笔」，MUST NOT 自动合并或静默丢弃，由使用者逐笔确认。
  */

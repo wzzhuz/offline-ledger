@@ -8,6 +8,7 @@ import com.zwz.offlineledger.backup.BackupExporter
 import com.zwz.offlineledger.backup.csv.CsvCodec
 import com.zwz.offlineledger.backup.csv.CsvFormat
 import com.zwz.offlineledger.backup.csv.CsvParseResult
+import com.zwz.offlineledger.backup.csv.CsvRebuildOutcome
 import com.zwz.offlineledger.backup.csv.CsvRow
 import com.zwz.offlineledger.backup.csv.ImportCandidate
 import com.zwz.offlineledger.core.DataRefreshBus
@@ -286,7 +287,8 @@ class SettingsViewModel(
                             listOf(
                                 "这是本 App 导出的 CSV（11 列自有格式）。" +
                                     "「导入账单」用于支付宝 / 微信 / Firefly III 等第三方账单；" +
-                                    "本文件请改用「从 CSV 重建」，完整重建请用「从加密备份恢复」。"
+                                    "本文件请改用「从 CSV 重建」（需当前库已有同名账户与分类）；" +
+                                    "清库 / 换机后的完整重建请用「从加密备份恢复」或「自动快照与恢复」。"
                             )
                         )
                     }
@@ -343,31 +345,77 @@ class SettingsViewModel(
         viewModelScope.launch {
             _state.update { st -> st.copy(busy = true, message = "", error = "") }
             try {
-                val outcome = withContext(Dispatchers.IO) {
-                    repository.importRecords(rows)
+                if (plan.rebuild) {
+                    val outcome = withContext(Dispatchers.IO) {
+                        repository.rebuildFromOwnCsv(rows)
+                    }
+                    DataRefreshBus.notifyChanged()
+                    _state.update { st -> st.copy(
+                        busy = false, csvPlan = null,
+                        message = buildRebuildMessage(outcome, plan, skippedByUser)
+                    ) }
+                } else {
+                    val outcome = withContext(Dispatchers.IO) {
+                        repository.importRecords(rows)
+                    }
+                    DataRefreshBus.notifyChanged()
+                    _state.update { st -> st.copy(
+                        busy = false, csvPlan = null,
+                        message = "导入完成：写入 ${outcome.written} 条、" +
+                            "跳过 ${outcome.skipped} 条重复；疑似匹配 " +
+                            plan.candidates.size + " 项，按你的勾选跳过 " +
+                            skippedByUser + " 行；余额已重算。" +
+                            (if (plan.notices.isEmpty()) ""
+                             else " 格式跳过 " + plan.notices.size + " 行：" +
+                                  plan.notices.take(3).joinToString("；") +
+                                  (if (plan.notices.size > 3) " 等" else ""))
+                    ) }
                 }
-                DataRefreshBus.notifyChanged()
-                _state.update { st -> st.copy(
-                    busy = false, csvPlan = null,
-                    message = "导入完成：写入 ${outcome.written} 条、" +
-                        "跳过 ${outcome.skipped} 条重复；疑似匹配 " +
-                        plan.candidates.size + " 项，按你的勾选跳过 " +
-                        skippedByUser + " 行；余额已重算。" +
-                        (if (plan.notices.isEmpty()) ""
-                         else " 格式跳过 " + plan.notices.size + " 行：" +
-                             plan.notices.take(3).joinToString("；") +
-                             (if (plan.notices.size > 3) " 等" else "")) +
-                        (if (plan.rebuild && plan.notices.isNotEmpty())
-                            " 完整重建（含转账、账户、模板）请用加密备份。" else "")
-                ) }
             } catch (e: Exception) {
                 _state.update { st -> st.copy(
                     busy = false, csvPlan = null,
-                    error = "导入失败，已整体回滚，账本未改动：" +
+                    error = (if (plan.rebuild) "CSV 重建失败" else "导入失败") +
+                        "，已整体回滚，账本未改动：" +
                         (e.message ?: e.javaClass.simpleName)
                 ) }
             }
         }
+    }
+
+    /** 第 35 批：自有 CSV 重建的结果摘要，缺项逐项列出并给可操作的重建引导。 */
+    private fun buildRebuildMessage(
+        o: CsvRebuildOutcome,
+        plan: CsvImportPlan,
+        skippedByUser: Int
+    ): String {
+        val sb = StringBuilder()
+        sb.append("CSV 重建完成：写入 ").append(o.written).append(" 条、重复跳过 ")
+            .append(o.skippedDuplicate).append(" 条、缺账户/分类跳过 ")
+            .append(o.skippedMissing).append(" 条；疑似匹配 ")
+            .append(plan.candidates.size).append(" 项，按勾选跳过 ")
+            .append(skippedByUser).append(" 行；余额已重算。")
+        if (o.missingAccounts.isNotEmpty()) {
+            sb.append(" 缺少账户：")
+                .append(o.missingAccounts.take(6).joinToString("、"))
+                .append(if (o.missingAccounts.size > 6) " 等" else "").append("。")
+        }
+        if (o.missingCategories.isNotEmpty()) {
+            sb.append(" 缺少分类：")
+                .append(o.missingCategories.take(6).joinToString("、"))
+                .append(if (o.missingCategories.size > 6) " 等" else "").append("。")
+        }
+        if (plan.notices.isNotEmpty()) {
+            sb.append(" 格式跳过 ").append(plan.notices.size).append(" 行：")
+                .append(plan.notices.take(3).joinToString("；"))
+                .append(if (plan.notices.size > 3) " 等" else "").append("。")
+        }
+        if (o.skippedMissing > 0) {
+            sb.append(" 请先建立上述账户 / 分类再重建；分类名在 v0.2.14 换过清单，")
+                .append("旧文件按名匹配不上会在这里列出，不是数据损坏。")
+        }
+        sb.append(" 清库 / 换机的完整重建（含转账、账户、模板、别名）请用")
+            .append("「从加密备份恢复」或「自动快照与恢复」；二次重建按复合唯一键幂等。")
+        return sb.toString()
     }
 
     // ---------------------------------------------------------------

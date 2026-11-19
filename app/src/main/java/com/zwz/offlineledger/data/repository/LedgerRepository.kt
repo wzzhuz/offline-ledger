@@ -32,6 +32,8 @@ import com.zwz.offlineledger.data.model.LedgerAdjustment
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.model.LedgerCategory
 import com.zwz.offlineledger.backup.csv.CsvImportOutcome
+import com.zwz.offlineledger.backup.csv.CsvRebuildOutcome
+import com.zwz.offlineledger.backup.csv.CsvRebuildResolver
 import com.zwz.offlineledger.backup.csv.ImportCandidate
 import com.zwz.offlineledger.backup.csv.CsvRow
 import com.zwz.offlineledger.backup.csv.FireflyKind
@@ -735,6 +737,86 @@ class LedgerRepository @Inject constructor(
         }
         rebuildAllBalancesInternal()
         CsvImportOutcome(written, skipped)
+    }
+
+    /**
+     * 第 35 批：本 App 自有导出 CSV 的回灌重建，与 importRecords 严格分开。
+     *
+     * 根因：importRecords 是「第三方账单」语义，要求当前库已有同名且未归档的
+     * 账户 / 一级 / 二级分类，第一行匹配不上就抛
+     * "账户不存在或已归档" 并整批回滚。但自有 11 列 CSV 不含账户表与分类树，
+     * v0.2.14 起又删了预制账户、换了分类清单 → 清库/重装后必失败。
+     *
+     * 本路径语义：CSV 只负责「在已有体系上回灌 EXPENSE / INCOME 流水」。
+     * 归档账户、停用分类不作为拒绝条件；缺项不抛异常，逐项收集到结果报告，
+     * 受影响行跳过、其余照常写。完整重建（转账 / 账户 / 模板 / 别名 / 启用态）
+     * 走「从加密备份恢复」或「自动快照与恢复」。
+     *
+     * 单事务 + 末尾重算 + 失败整库回滚，与 importBackup 同一套骨架；
+     * importSource / sourceId 原样回写，二次重建按复合唯一键幂等。
+     */
+    suspend fun rebuildFromOwnCsv(rows: List<CsvRow>): CsvRebuildOutcome = db.withTransaction {
+        // 含归档 / 停用：历史归属仍有效，不能因为「不再新选」就拒绝回灌。
+        val accounts = accountDao.all()
+        val categories = categoryDao.all()
+        val aliases = aliasDao.all()
+        val rootsById = categories.filter { it.level == 0 }.associateBy { it.id }
+        val categoryPaths = linkedSetOf<String>()
+        categories.forEach { c ->
+            if (c.level == 0) {
+                categoryPaths += c.name
+            } else {
+                val parent = rootsById[c.parentId]?.name
+                if (parent != null) categoryPaths += parent + "/" + c.name
+            }
+        }
+        val resolution = CsvRebuildResolver.resolve(
+            rows, accounts.map { it.name }.toSet(), categoryPaths
+        )
+        var written = 0
+        var skippedDuplicate = 0
+        resolution.ready.forEach { row ->
+            val account = accounts.first { it.name == row.accountName }
+            val root = categories.first { it.level == 0 && it.name == row.categoryRoot }
+            val child = if (row.category.isBlank()) null else categories.firstOrNull { c ->
+                c.level == 1 && c.parentId == root.id && c.name == row.category
+            }
+            val ld = row.date.replace("-", "").toIntOrNull()
+                ?: throw IllegalArgumentException("日期非法：" + row.date)
+            val amountCents = Cents.fromYuan(row.amountYuan).value
+            val type = RecordType.valueOf(row.type)
+            val sourceId = row.sourceId.ifBlank { row.duplicateKey() }
+            val importSource = row.importSource.ifBlank { "CSV" }
+            val already = recordDao.countByImportSource(importSource, sourceId) > 0 ||
+                recordDao.countDuplicate(account.id, amountCents, ld, row.note) > 0
+            if (already) {
+                skippedDuplicate++
+                return@forEach
+            }
+            val entity = RecordEntity(
+                type = type,
+                amountCents = amountCents,
+                categoryId = child?.id ?: root.id,
+                rootCategoryId = root.id,
+                fromAccountId = if (type == RecordType.EXPENSE) account.id else null,
+                toAccountId = if (type == RecordType.INCOME) account.id else null,
+                timestamp = RecurringSchedule.toEpochMilli(ld),
+                localDate = ld,
+                yearMonth = ld / 100,
+                note = row.note,
+                excludeFromStats = false,
+                counterparty = CounterpartyNormalizer.normalize(row.counterparty, aliases),
+                importSource = importSource,
+                sourceId = sourceId
+            )
+            recordDao.insert(withResolvedRoot(entity))
+            written++
+        }
+        rebuildAllBalancesInternal()
+        CsvRebuildOutcome(
+            written, skippedDuplicate, resolution.skippedMissing,
+            resolution.missingAccounts, resolution.missingCategories
+        )
     }
 
     /**

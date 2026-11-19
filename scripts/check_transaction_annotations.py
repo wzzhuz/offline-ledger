@@ -37,7 +37,9 @@ WRITE_METHODS = [
     'deleteAccountIfUnused', 'reorderAccounts',
     'deleteCategory', 'restoreCategory',
     # 第 31 批阶段二：批量规整单事务写入
-    'applyBulkTargets'
+    'applyBulkTargets',
+    # 第 35 批：自有 CSV 重建专用写路径
+    'rebuildFromOwnCsv'
 ]
 
 TEMPLATE_SQL_COLS = [

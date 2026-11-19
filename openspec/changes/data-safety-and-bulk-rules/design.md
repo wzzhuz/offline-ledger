@@ -147,3 +147,52 @@ MUST NOT 让「导入账单」静默吞自有格式；
 **真实落盘**：`importBackup` 的 defer_foreign_keys / 断开自引用 / 父先子后 / foreign_key_check、备份 DTO 三处补齐、口令本机记住、`CsvCodec.detectFormat` + `parseRebuild`、设置页「从 CSV 重建」入口、`CsvRebuildTest`、两份 MODIFIED delta 与指南 §7.17。
 `AppDatabase.version = 3` 未变 → **v0.2.15 上覆盖安装即可，不用卸载**。
 `data-safety-and-bulk-rules` 与 `preset-data-and-counterparty` 仍进行中，未擅自归档。
+
+## 第 35 批：「从 CSV 重建」报「账户不存在或已归档」（v0.2.17）
+
+### 根因（真读源码后确认，不是门禁推测）
+
+`SettingsPages.kt` 的「从 CSV 重建」按钮 → `SettingsViewModel.confirmCsvImport()`
+无论 `plan.rebuild` 与否都调 `repository.importRecords(rows)`。
+而 `LedgerRepository.importRecords` 是**第三方账单**语义：
+`accountDao.all().filter { !it.isArchived }`，第一行匹配不上就抛
+`IllegalArgumentException("账户不存在或已归档：" + row.accountName)`；
+分类同样要求一级 / 二级存在且未归档。自有 11 列 CSV 不带账户表与分类树，
+v0.2.14 又删了预制账户、换了分类清单 → 清库 / 重装后**必然**失败。
+
+更该记的是两处相反文案（均出自第 34 批）：`SettingsPages` 帮助文本写
+「清库后请用『从 CSV 重建』」，`CsvCodec.parseRebuild` 注释却写
+「完整重建请用『从加密备份恢复』」。代码注释对了、UI 把人导向必失败的入口。
+
+### 修法
+
+1. **拆专用写路径** `rebuildFromOwnCsv`，不复用 `importRecords`：
+   `db.withTransaction` → 归档账户 / 停用分类一并纳入已知集合 →
+   `CsvRebuildResolver` 一次性收集缺失项 → 仅对 ready 行组装
+   `RecordEntity`（`withResolvedRoot`、来源字段原样回写、复合唯一键去重）→
+   末尾 `rebuildAllBalancesInternal()`；任一步抛错由 `withTransaction` 整库回滚。
+2. **缺项不是异常**：跳过受影响行，`CsvRebuildOutcome` 带回
+   `missingAccounts` / `missingCategories` / `skippedMissing`，
+   摘要逐项列出，并说明 v0.2.14 换过清单导致按名失配不是数据损坏。
+3. **纯 JVM 判定**：`CsvRebuildResolver.resolve(rows, accountNames, categoryPaths)`
+   让「归档不拒 / 空库全缺 / 换名清单 / 同名二级分父级」四条可单测，
+   不依赖 Room；`categoryPaths` 元素形如 `居住` 或 `居住/水费`。
+4. **文案掰正**：导出按钮改「Excel 核对用」，重建按钮标明「需已有账户与分类」，
+   帮助文本删掉「清库后用 CSV 重建」，嗅探引导补「清库 / 换机走加密备份或快照」，
+   弹窗标题按 `plan.rebuild` 区分并加缺项说明。
+5. **写方法清单**登记 `rebuildFromOwnCsv`（第 42 个），保持六个静态检查全绿。
+
+### 回退顺序
+
+1. 若 `CsvRebuildResolver` 判 `一级/二级` 与 `CategoryDisplay.resolve` 口径冲突 →
+   退到只按一级名判定、二级缺失时落到一级并计入 notices，不新增 SQL。
+2. 若缺项行太多导致重建结果不可用 → 摘要直接建议改用加密备份 / 快照恢复，
+   **不自动新建账户或分类**（会污染现有体系，也不该由 CSV 决定）。
+3. 若 `rebuildFromOwnCsv` 与 `importRecords` 出现重复逻辑 → 只抽「组装
+   `RecordEntity`」的私有函数，两条路径的校验语义 MUST 保持不同。
+
+### 硬约束
+
+`importRecords` 第三方账单严格语义 MUST NOT 放宽；归档 / 停用 MUST NOT
+当成缺失；缺项 MUST NOT 静默丢弃或整批抛异常；CSV MUST NOT 被扩成
+自包含格式；表结构不变 → 覆盖安装即可；MUST NOT 改 `release.yml`。

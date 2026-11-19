@@ -41,12 +41,14 @@
 - [x] 新增 `CsvRebuildTest`（格式识别 / 来源保留 / 跳过报告 / 第三方拒绝）
 - [x] 六个静态检查本地 PASS
 - [x] push CI 与 release 实测回填、坚果云上传
-- [ ] 真机复核（使用者，刻意保留）
+- [x] 第 34 批恢复闭环真机复核（使用者 2026-11-19 反馈：导出加密备份 → 恢复、
+      自动快照 → 恢复均暂未发现问题）；「从 CSV 重建」入口另在阶段四收尾
 
 ### 本期实现边界（如实说明）
 
-「从 CSV 重建」只覆盖 `EXPENSE` / `INCOME` 且账户与一级分类齐备的行，
-复用既有 `importRecords` 并保持 `importSource/sourceId` 幂等。
+「从 CSV 重建」只覆盖 `EXPENSE` / `INCOME` 且账户与一级分类齐备的行；
+第 34 批复用 `importRecords` 导致「账户不存在或已归档」，第 35 批起
+拆 `rebuildFromOwnCsv` 专用路径并保持 `importSource/sourceId` 幂等。
 `TRANSFER` / `SETTLEMENT`、无账户、无一级分类的行明确列为「格式跳过」，
 完整重建（含转账、账户、模板、别名、启用态）仍走「从加密备份恢复」或
 「从快照恢复」。二者是互补入口，不是同一份数据的两套写法。
@@ -70,3 +72,26 @@
 **真实落盘**：`importBackup` 的 defer_foreign_keys / 断开自引用 / 父先子后 / foreign_key_check、备份 DTO 三处补齐、口令本机记住、`CsvCodec.detectFormat` + `parseRebuild`、设置页「从 CSV 重建」入口、`CsvRebuildTest`、两份 MODIFIED delta 与指南 §7.17。
 `AppDatabase.version = 3` 未变 → **v0.2.15 上覆盖安装即可，不用卸载**。
 `data-safety-and-bulk-rules` 与 `preset-data-and-counterparty` 仍进行中，未擅自归档。
+
+## 阶段四（第 35 批，v0.2.17：自有 CSV 重建入口收尾）
+
+- [x] 真读 `SettingsPages.kt` / `SettingsViewModel.kt` / `LedgerRepository.kt` /
+      `CsvCodec.kt` 定位「账户不存在或已归档」根因，不拿门禁里的逻辑归因当源码结论
+- [x] 拆 `LedgerRepository.rebuildFromOwnCsv` 专用写路径：单事务、末尾重算、
+      失败整库回滚，与 `importBackup` 同骨架；`importRecords` 严格语义不动
+- [x] 新增纯 JVM `CsvRebuildResolver`：归档账户 / 停用分类视为已知，
+      缺项一次性收集而非首行抛异常；同名二级按 `一级/二级` 分别判定
+- [x] `SettingsViewModel.confirmCsvImport` 按 `plan.rebuild` 分流，
+      结果摘要含写入 / 重复跳过 / 缺项跳过 / 缺失账户与分类清单 / 重建引导
+- [x] 改正两处自相矛盾文案：设置页帮助文本「清库后请用从 CSV 重建」、
+      读文件嗅探里的「完整重建请用加密备份」表述；弹窗标题按模式区分
+- [x] 新增 `CsvRebuildResolverTest`（归档不拒 / 空库逐项报告 / 换名清单 / 同名二级）
+- [x] `check_transaction_annotations.py` 写方法清单登记 `rebuildFromOwnCsv`
+- [x] 六个静态检查本地 PASS
+- [ ] push CI 与 release 实测回填、坚果云上传
+- [ ] 真机复核（使用者，刻意保留）
+
+### 本期实现边界（如实说明）
+
+自有 CSV 仍不自包含：不带账户 / 分类 / 模板 / 别名 / 转账，完整重建只能走
+加密备份或自动快照。表结构 `version = 3` 未变 → v0.2.16 上覆盖安装即可。

@@ -217,7 +217,7 @@ fun BackupSettingsScreen(
                 onClick = { csvExportLauncher.launch("offline-ledger.csv") },
                 enabled = !state.busy,
                 modifier = Modifier.weight(1f)
-            ) { Text("导出 CSV（核对 / 重建用）") }
+            ) { Text("导出 CSV（Excel 核对用）") }
             Button(
                 onClick = { csvImportLauncher.launch(arrayOf("text/csv", "text/plain", "*/*")) },
                 enabled = !state.busy,
@@ -228,7 +228,7 @@ fun BackupSettingsScreen(
             onClick = { csvRebuildLauncher.launch(arrayOf("text/csv", "text/plain", "*/*")) },
             enabled = !state.busy,
             modifier = Modifier.fillMaxWidth()
-        ) { Text("从 CSV 重建（本 App 导出文件）") }
+        ) { Text("从 CSV 重建（本 App 导出文件，需已有账户与分类）") }
         Button(
             onClick = onOpenFirefly,
             enabled = !state.busy,
@@ -249,8 +249,10 @@ fun BackupSettingsScreen(
         Text(
             text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
                 "「导入账单」吃支付宝 / 微信 / 银行 / Firefly III 等第三方账单；" +
-                "「从 CSV 重建」吃本 App 自己导出的 11 列文件；" +
-                "完整重建（含转账、账户、模板、别名）请用加密备份或自动快照。",
+                "「从 CSV 重建」吃本 App 自己导出的 11 列文件，仅支出 / 收入，" +
+                "且需当前库已存在同名账户与分类，缺项会在结果里逐项列出并跳过；" +
+                "清库 / 换机后的完整重建（含转账、账户、模板、别名）" +
+                "请用加密备份或自动快照，不要用 CSV。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral
         )
@@ -273,9 +275,10 @@ fun BackupSettingsScreen(
                     "sourceId 来源系统内的稳定流水号（可选，导出必带）\n" +
                     "示例：2026-11-15,EXPENSE,38.50,中国银行7375,餐饮,正餐,午餐,CNY,好优特生活超市,,\n" +
                     "导入前整体校验，任何一行不合法都不写入。" +
-                    "导出文件带 importSource/sourceId；清库后请用「从 CSV 重建」" +
-                    "（仅支出 / 收入，转账行会明确列出跳过）或「从加密备份恢复」" +
-                    "（全量），二次重建按复合唯一键幂等、不会双份。" +
+                    "导出文件带 importSource/sourceId；「从 CSV 重建」仅支出 / 收入、" +
+                    "需已有同名账户与分类，缺项逐项列出，转账行明确跳过；" +
+                    "清库 / 换机全量重建请用「从加密备份恢复」或「自动快照与恢复」。" +
+                    "二次重建按复合唯一键幂等、不会双份。" +
                     "手工记录与第三方账单另按「金额 + 账户 + ±1 天」给疑似匹配，逐笔确认后才写。",
                 style = MaterialTheme.typography.labelSmall,
                 color = LedgerColors.Neutral
@@ -297,13 +300,23 @@ fun BackupSettingsScreen(
         val willWrite = plan.rows.size - plan.skipRowIndexes.size
         AlertDialog(
             onDismissRequest = { vm.cancelCsvImport() },
-            title = { Text("导入账单") },
+            title = { Text(if (plan.rebuild) "从 CSV 重建" else "导入账单") },
             text = {
                 Column {
                     Text(
                         "共 " + plan.rows.size + " 条，确认写入 " + willWrite +
                             " 条；重复项自动跳过。"
                     )
+                    if (plan.rebuild) {
+                        Text(
+                            text = "自有导出文件回灌：需当前库已有同名账户与分类；" +
+                                "缺账户 / 分类的行会跳过并在结果里列出，不会整批失败。" +
+                                "清库 / 换机请改用「从加密备份恢复」或「自动快照与恢复」。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
                     if (plan.candidates.isNotEmpty()) {
                         Text(
                             text = "疑似匹配 " + plan.candidates.size +
