@@ -251,3 +251,16 @@ Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；�
 - [x] 删入口不丢已存规则：此前批量录入生成的规则仍是普通 `rule_definitions` 行
 - [ ] 真机复核（使用者，刻意保留）：编辑页改完条件直接看命中数、返回仍在编辑器且草稿不丢、
       列表「应用」返回列表、批量录入入口消失且旧规则仍在、撤销逐字段还原
+
+## 第 40 批实测回填（v0.2.22）
+
+- 代码 commit：`ed79fd47a022b8589904f6db6831302693f8c36b`（9 文件：0 新增 / 9 修改 / 0 删除）
+- push CI：`44508328826` **success**，17 步全 success / 0 跳过，首轮 Kotlin 编译与纯 JVM 单测均零错误
+- release：`44509707175` **success**，28 步 = 23 success / 5 skipped，**「上传到坚果云」completed success**，head_sha 为代码 commit
+- 制品：`offline-ledger-release-v0.2.22` 12389471 B（Actions 制品页 zip 压缩口径）、
+  `offline-ledger-mapping-v0.2.22` 3786885 B、`offline-ledger-metrics-v0.2.22-p-m-nsfalse` 269 B
+- `nsfalse` 只表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
+  坚果云目录以使用者实际看到的短 sha 为准
+- 零改表（`version = 4` 未变）→ **v0.2.21 上覆盖安装即可，不用卸载**
+- 真机复核仍留 `[ ]`：编辑页草稿预览命中数、返回仍在编辑器且草稿不丢、
+  列表「应用」返回列表、批量录入入口消失且旧规则仍在、撤销逐字段还原
