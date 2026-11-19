@@ -434,3 +434,45 @@ NOT_EQUALS / APPEND_NOTE、`RecordDao.searchNotes` 限量联想、
 - 零改表（`version = 4` 未变）→ **v0.2.21 上覆盖安装即可，不用卸载**
 - 真机复核仍留 `[ ]`：编辑页草稿预览命中数、返回仍在编辑器且草稿不丢、
   列表「应用」返回列表、批量录入入口消失且旧规则仍在、撤销逐字段还原
+
+## 第 41 批（v0.2.23）：年月一步直达 + 时间范围语义解耦
+
+**根因（真读源码确认，不是推断）**：`RecordFilter.effectiveFromDate()/effectiveToDate()`
+在 `fromDate/toDate` 为 null 时返回 `MonthRange.of(yearMonth)` 的首尾日，
+即「筛选时间范围留空」被隐式注入成「只查当前查看月份」；
+`switchMonth` 还会清掉 `fromDate/toDate` → 切月丢筛选条件。
+明细页月份条与记一笔 / 筛选面板的 M3 DatePicker 都只有左右箭头翻月，
+年份虽能点网格，月份却要翻 N 次，跨月查看成本被放大。
+
+**选型查证**：Compose Material 3 **没有**独立 `YearMonthPicker`；官方
+`DatePickerState.displayedMonthMillis` 是可写属性，能一步跳到任意年月，
+日视图 / 闰年 / 无障碍继续由官方负责（minSdk 26 满足）。第三方库
+KEZ Lab compose-pickers（滚轮）、Max Keppeler Sheets（仍是日期日历）、
+Kizitonwose Calendar（只给月计算、格子仍自写）都不符合「12 格一次点到」，
+且引入坐标 / 维护风险。故 A′：**零新依赖、零自造动画**，只做一层静态选择浮层。
+
+**实现**：
+- `YearMonthMath`（纯 JVM）：12 格、年份列表、月末 clamp、UTC 月初毫秒
+- `YearMonthPickerDialog`：年份直达 + 3×4 月格 + 回到本月 + 命中数角标；
+  明细页月份条、记一笔 DatePicker、筛选面板起止日期三处复用
+- 记一笔：保留官方 `DatePicker` 日视图，加「跳转年月」→
+  `displayedMonthMillis` / `selectedDateMillis` 同步跳转，1/31 → 2/28 不丢不崩
+- `RecordFilter.allMonths`：`effective*` 改为返回 `Int?`，null 交给既有
+  `(:fromDate IS NULL OR ...)` 短路，**不新增 SQL 出口**、不动统计口径唯一出口
+- 时间范围快捷段（当前月 / 近3月 / 今年 / 全部），`timeSummary()` 单一出口明示语义；
+  左右箭头切月保留筛选条件；Picker 选月 = 明确「看这一月」退出跨月模式
+- `RecordDao.monthCounts` 一条 GROUP BY 取 12 格角标，不为每月各跑全表
+
+**三级回退顺序**：
+1. `displayedMonthMillis` 在当前 BOM 不可写 → 退到
+   `rememberDatePickerState(initialDisplayedMonthMillis=...)` + `key(ym)` 重建 state
+2. 跨月列表与「按月概览 / 日头」观感冲突 → 退到「跨月只走筛选面板，
+   月份条在跨月模式下禁用左右箭头并标注『范围生效』」
+3. 12 格角标在 5 万条上明显卡顿 → 退到只显示当前年角标、切年异步刷新
+   （本批已按年一次 GROUP BY，不逐月查）
+
+**硬约束**：零表结构（`version = 4`）→ 覆盖安装；MUST NOT 引入第三方日期库；
+MUST NOT 自造带动画的整套日期选择器；切月 MUST 保留筛选条件；
+时间范围与月份 MUST NOT 双重夹击；时间语义 MUST 在 UI 明示；
+`RuleEngine` / `applyBulkTargets` / `changeset` / 两张规则表 /
+备份 DTO / 恢复链路 / CSV 重建 / 两页下拉刷新一律不动。

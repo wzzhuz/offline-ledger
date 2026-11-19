@@ -54,7 +54,9 @@ data class FilterValues(
     /** 第 28 批：三条只读展示名按维度独立，不进 SQL、不进 activeCount()。 */
     val categoryDisplayName: String? = null,
     val counterpartyDisplayName: String? = null,
-    val accountDisplayName: String? = null
+    val accountDisplayName: String? = null,
+    /** 第 41 批：全部月份视图模式，非筛选条件。 */
+    val allMonths: Boolean = false
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -99,7 +101,12 @@ class DetailViewModel(
     private val _counterparties = MutableStateFlow<List<String>>(emptyList())
     val counterparties: StateFlow<List<String>> = _counterparties.asStateFlow()
 
+    /** 第 41 批：YearMonthPicker 的 12 格命中数角标，一条 GROUP BY 取回。 */
+    private val _monthCounts = MutableStateFlow<Map<Int, Int>>(emptyMap())
+    val monthCounts: StateFlow<Map<Int, Int>> = _monthCounts.asStateFlow()
+
     init {
+        viewModelScope.launch { refreshMonthCounts(MonthRange.currentYearMonth() / 100) }
         viewModelScope.launch { _accounts.value = accountDao.all() }
         viewModelScope.launch { _categories.value = categoryDao.all() }
         viewModelScope.launch { _counterparties.value = recordDao.allCounterparties() }
@@ -122,11 +129,37 @@ class DetailViewModel(
             dailyTotals = daily,
             currencyCode = cc
         )
+        refreshMonthCounts(f.yearMonth / 100)
     }
 
+    private suspend fun refreshMonthCounts(year: Int) {
+        val cc = _filter.value.currencyCode
+        _monthCounts.value = recordDao
+            .monthCounts(year * 100 + 1, year * 100 + 12, cc)
+            .associate { it.ym to it.cnt }
+    }
+
+    /** Picker 切年时按年重查角标，不为 12 个月各跑一次全表。 */
+    fun loadMonthCounts(year: Int) {
+        viewModelScope.launch { refreshMonthCounts(year) }
+    }
+
+    /**
+     * 第 41 批：左右箭头切月 MUST 保留全部筛选条件（含时间范围与全部月份模式），
+     * 旧实现在这里清掉 fromDate/toDate 是「切月丢筛选」的根因。
+     */
     fun switchMonth(deltaMonths: Int) {
         _filter.value = _filter.value.copy(
             yearMonth = MonthRange.shift(_filter.value.yearMonth, deltaMonths),
+            revision = _filter.value.revision + 1
+        )
+    }
+
+    /** YearMonthPicker 一步跳到任意年月：明确「看这一月」，退出跨月模式。 */
+    fun selectMonth(yearMonth: Int) {
+        _filter.value = _filter.value.copy(
+            yearMonth = yearMonth,
+            allMonths = false,
             fromDate = null,
             toDate = null,
             revision = _filter.value.revision + 1
@@ -149,6 +182,7 @@ class DetailViewModel(
             categoryDisplayName = v.categoryDisplayName,
             counterpartyDisplayName = v.counterpartyDisplayName,
             accountDisplayName = v.accountDisplayName,
+            allMonths = v.allMonths,
             revision = _filter.value.revision + 1
         )
     }
@@ -204,7 +238,7 @@ class DetailViewModel(
             minAmountCents = null, maxAmountCents = null, noteQuery = null,
             currencyCode = null, counterpartyQuery = null,
             categoryDisplayName = null, counterpartyDisplayName = null,
-            accountDisplayName = null,
+            accountDisplayName = null, allMonths = false,
             revision = _filter.value.revision + 1
         )
     }

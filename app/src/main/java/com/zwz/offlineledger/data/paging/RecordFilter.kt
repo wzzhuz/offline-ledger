@@ -33,10 +33,36 @@ data class RecordFilter(
      */
     val categoryDisplayName: String? = null,
     val counterpartyDisplayName: String? = null,
-    val accountDisplayName: String? = null
+    val accountDisplayName: String? = null,
+    /**
+     * 第 41 批：true = 时间范围留空时不按月份夹击，列表跨月查看。
+     * 这是「视图模式」而非筛选条件，MUST NOT 计入 activeCount()。
+     */
+    val allMonths: Boolean = false
 ) {
-    fun effectiveFromDate(): Int = fromDate ?: MonthRange.of(yearMonth).first
-    fun effectiveToDate(): Int = toDate ?: MonthRange.of(yearMonth).second
+    /**
+     * 第 41 批：返回 null 交给 SQL 的 `:fromDate IS NULL` 短路，
+     * MUST NOT 再把「当前查看月份」隐式注入成筛选条件。
+     * - 显式范围任一端填了 → 另一端不设限（跨月，不与月份双重夹击）
+     * - 全空 + allMonths → 全部月份
+     * - 全空 + 按月视图 → 当前查看月份
+     */
+    fun effectiveFromDate(): Int? = fromDate
+        ?: if (allMonths || toDate != null) null else MonthRange.of(yearMonth).first
+    fun effectiveToDate(): Int? = toDate
+        ?: if (allMonths || fromDate != null) null else MonthRange.of(yearMonth).second
+
+    /** 是否跨月模式，用于 UI 明示「月份条只作定位」。 */
+    fun isCrossMonth(): Boolean = allMonths || fromDate != null || toDate != null
+
+    /** 第 41 批：时间语义单一出口，chip 与月份条共用，不允许各处自己拼。 */
+    fun timeSummary(): String = when {
+        fromDate != null || toDate != null ->
+            "时间：" + (fromDate?.let { MonthRange.dateLabel(it) } ?: "不限") +
+                " ~ " + (toDate?.let { MonthRange.dateLabel(it) } ?: "不限")
+        allMonths -> "时间：全部月份 · 当前显示 " + MonthRange.label(yearMonth)
+        else -> "时间：当前月 " + MonthRange.label(yearMonth) + "（切月看其他月）"
+    }
 
     fun activeCount(): Int = listOf(
         fromDate, toDate, accountId, type, rootCategoryId,

@@ -85,6 +85,8 @@ data class ReviewRow(
 )
 
 /** 日期头用的整月按日合计，最多 31 行，不随分页加载跳变。 */
+data class MonthCountRow(val ym: Int, val cnt: Int)
+
 data class DailyTotalRow(
     val localDate: Int,
     val expenseCents: Long,
@@ -232,6 +234,24 @@ interface RecordDao {
         """
     )
     suspend fun dailyTotals(ym: Int, currencyCode: String?): List<DailyTotalRow>
+
+    /**
+     * 第 41 批：一条 GROUP BY 取某年 12 个月的「列表命中数」角标。
+     * 刻意不带 excludeFromStats：角标口径与 pagedFiltered 一致，
+     * 不是统计口径，MUST NOT 复用 StatRules.SQL_STAT_RELEVANT。
+     * 名字不以任何 check_stat_rules marker 为前缀，避免回溯到错误的 @Query。
+     */
+    @Query(
+        """
+        SELECT yearMonth AS ym, COUNT(*) AS cnt
+          FROM records
+         WHERE yearMonth BETWEEN :fromYm AND :toYm
+           AND (:currencyCode IS NULL OR currencyCode = :currencyCode)
+         GROUP BY yearMonth
+         ORDER BY yearMonth
+        """
+    )
+    suspend fun monthCounts(fromYm: Int, toYm: Int, currencyCode: String?): List<MonthCountRow>
 
 
     /**

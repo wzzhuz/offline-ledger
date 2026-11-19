@@ -45,6 +45,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.zwz.offlineledger.core.money.Cents
+import com.zwz.offlineledger.core.time.MonthRange
+import com.zwz.offlineledger.core.time.YearMonthMath
+import com.zwz.offlineledger.ui.components.YearMonthPickerDialog
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.paging.RecordFilter
@@ -74,6 +77,17 @@ fun FilterSheet(
 ) {
     var fromDate by remember { mutableStateOf(initial.fromDate) }
     var toDate by remember { mutableStateOf(initial.toDate) }
+    /** 第 41 批：全部月份视图模式 + 时间快捷段的选中态，纯 UI 态。 */
+    var allMonths by remember { mutableStateOf(initial.allMonths) }
+    var timePresetKey by remember {
+        mutableStateOf(
+            when {
+                initial.allMonths -> "all"
+                initial.fromDate != null || initial.toDate != null -> "custom"
+                else -> "month"
+            }
+        )
+    }
     // 修掉原实现「金额区间不从 initial 回填 → 重新打开点应用即静默清空」的 bug。
     var minText by remember {
         mutableStateOf(initial.minAmountCents?.let { Cents(it).toYuanString() } ?: "")
@@ -172,8 +186,47 @@ fun FilterSheet(
                     toDate = toDate,
                     onFrom = { dateTarget = 1 },
                     onTo = { dateTarget = 2 },
-                    onClear = { fromDate = null; toDate = null }
+                    onClear = {
+                        fromDate = null; toDate = null
+                        allMonths = false; timePresetKey = "month"
+                    }
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        "当前月" to "month", "近3月" to "recent3",
+                        "今年" to "year", "全部" to "all"
+                    ).forEach { (label, key) ->
+                        FilterChip(
+                            selected = timePresetKey == key,
+                            onClick = {
+                                timePresetKey = key
+                                val (f, t, a) = timePreset(key, initial.yearMonth)
+                                fromDate = f; toDate = t; allMonths = a
+                            },
+                            label = {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1
+                                )
+                            },
+                            modifier = Modifier.weight(1f).heightIn(min = 32.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = if (allMonths)
+                        "全部月份：跨月查看，顶部月份条只作定位"
+                    else
+                        "留空 = 当前月；填起止或选快捷段 = 跨月，不再按月份重复夹击",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                ThinLine()
 
                 PickRow("账户", displayLabel(accountOptions, accountId?.toString())) {
                     picker = "account"
@@ -264,7 +317,8 @@ fun FilterSheet(
                                     categoryDisplayName = displayName,
                                     counterpartyDisplayName =
                                         partyText.takeIf { it.isNotBlank() },
-                                    accountDisplayName = null
+                                    accountDisplayName = null,
+                                    allMonths = allMonths
                                 )
                             )
                             onDismiss()
@@ -276,27 +330,47 @@ fun FilterSheet(
     }
 
     // 日期用 UTC 锚点往返，与设备时区解耦，避免 M3 DatePicker 串一天。
+    // 第 41 批：官方 DatePicker 只保留日视图，加「跳转年月」复用共享浮层。
     dateTarget?.let { target ->
         val initialMillis = when (target) {
             1 -> fromDate?.toUtcMillis()
             else -> toDate?.toUtcMillis()
         } ?: System.currentTimeMillis()
         val dateState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-        DatePickerDialog(
-            onDismissRequest = { dateTarget = null },
-            confirmButton = {
-                TextButton(onClick = {
-                    dateState.selectedDateMillis?.let { ms ->
-                        val d = ms.toDateInt()
-                        if (target == 1) fromDate = d else toDate = d
+        var jump by remember(target) { mutableStateOf(false) }
+        if (jump) {
+            YearMonthPickerDialog(
+                initial = (if (target == 1) fromDate else toDate)?.let { it / 100 }
+                    ?: initial.yearMonth,
+                monthCounts = emptyMap(),
+                onYearShown = {},
+                onDismiss = { jump = false },
+                onConfirm = { ym ->
+                    dateState.displayedMonthMillis = YearMonthMath.firstDayUtcMillis(ym)
+                    jump = false
+                }
+            )
+        } else {
+            DatePickerDialog(
+                onDismissRequest = { dateTarget = null },
+                confirmButton = {
+                    Row {
+                        TextButton(onClick = { jump = true }) { Text("跳转年月") }
+                        TextButton(onClick = {
+                            dateState.selectedDateMillis?.let { ms ->
+                                val d = ms.toDateInt()
+                                if (target == 1) fromDate = d else toDate = d
+                            }
+                            timePresetKey = "custom"
+                            dateTarget = null
+                        }) { Text("确定") }
                     }
-                    dateTarget = null
-                }) { Text("确定") }
-            },
-            dismissButton = {
-                TextButton(onClick = { dateTarget = null }) { Text("取消") }
-            }
-        ) { DatePicker(state = dateState) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { dateTarget = null }) { Text("取消") }
+                }
+            ) { DatePicker(state = dateState) }
+        }
     }
 
     // 全量单选弹层：高度固定，不随账户 / 分类数量增长，长名称完整可见。
@@ -582,4 +656,22 @@ private fun parseCents(text: String): Long? {
     } catch (e: IllegalArgumentException) {
         null
     }
+}
+
+/**
+ * 第 41 批：时间范围快捷段。返回 (from, to, allMonths)。
+ * 近 3 月按「当前定位月往前两个月」算，今年按自然年，全部月份走 allMonths；
+ * 填范围时两端都给值，避免 effective* 把另一端又落回当前月造成双重夹击。
+ */
+private fun timePreset(kind: String, anchorYm: Int): Triple<Int?, Int?, Boolean> = when (kind) {
+    "recent3" -> {
+        val startYm = MonthRange.shift(anchorYm, -2)
+        Triple(MonthRange.of(startYm).first, MonthRange.of(anchorYm).second, false)
+    }
+    "year" -> {
+        val y = anchorYm / 100
+        Triple(MonthRange.of(y * 100 + 1).first, MonthRange.of(y * 100 + 12).second, false)
+    }
+    "all" -> Triple(null, null, true)
+    else -> Triple(null, null, false)
 }

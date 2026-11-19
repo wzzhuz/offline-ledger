@@ -54,14 +54,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
+import com.zwz.offlineledger.core.time.YearMonthMath
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.components.CategoryIcon
+import com.zwz.offlineledger.ui.components.YearMonthPickerDialog
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 
 /**
@@ -584,7 +587,12 @@ private fun DateTimeRow(
     }
 }
 
-/** 日历回传 UTC 午夜毫秒，ViewModel 再换算回本地时区，避免差一天。 */
+/**
+ * 日历回传 UTC 午夜毫秒，ViewModel 再换算回本地时区，避免差一天。
+ * 第 41 批：保留官方 DatePicker 日视图，只补「跳转年月」入口；
+ * 选完年月同时写 displayedMonthMillis 与 selectedDateMillis，
+ * 1/31 跳到 2 月按 min(day, 月天数) 收敛，不静默丢日期、不崩。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LedgerDatePicker(
@@ -597,15 +605,36 @@ private fun LedgerDatePicker(
     val utcMillis = localDate.atStartOfDay(ZoneOffset.UTC)
         .toInstant().toEpochMilli()
     val pickerState = rememberDatePickerState(initialSelectedDateMillis = utcMillis)
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = { pickerState.selectedDateMillis?.let(onConfirm) }) {
-                Text("确定")
+    var jump by remember { mutableStateOf(false) }
+    if (jump) {
+        YearMonthPickerDialog(
+            initial = localDate.year * 100 + localDate.monthValue,
+            monthCounts = emptyMap(),
+            onYearShown = {},
+            onDismiss = { jump = false },
+            onConfirm = { ym ->
+                val day = YearMonthMath.clampDay(ym, localDate.dayOfMonth)
+                val target = LocalDate.of(ym / 100, ym % 100, day)
+                pickerState.selectedDateMillis = target
+                    .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+                pickerState.displayedMonthMillis = YearMonthMath.firstDayUtcMillis(ym)
+                jump = false
             }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
-    ) { DatePicker(state = pickerState) }
+        )
+    } else {
+        DatePickerDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                Row {
+                    TextButton(onClick = { jump = true }) { Text("跳转年月") }
+                    TextButton(onClick = { pickerState.selectedDateMillis?.let(onConfirm) }) {
+                        Text("确定")
+                    }
+                }
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        ) { DatePicker(state = pickerState) }
+    }
 }
 
 /** 阶段 7：纯数字键盘，无加减乘除与括号。空字符串占位只做 Spacer。 */

@@ -264,3 +264,27 @@ Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；�
 - 零改表（`version = 4` 未变）→ **v0.2.21 上覆盖安装即可，不用卸载**
 - 真机复核仍留 `[ ]`：编辑页草稿预览命中数、返回仍在编辑器且草稿不丢、
   列表「应用」返回列表、批量录入入口消失且旧规则仍在、撤销逐字段还原
+
+## 第 41 批（v0.2.23）：年月一步直达 + 时间范围语义解耦
+
+- [x] 真读 `RecordFilter` / `RecordPagingSource` / `DetailViewModel` /
+      `DetailScreen` / `FilterSheet` / `RecordEditorDialog`，确认
+      「时间范围留空 = 隐式只查当前月」与「switchMonth 清掉范围」两处根因
+- [x] 查证 Compose M3 无独立 YearMonthPicker、`displayedMonthMillis` 可写、
+      三个开源库均不适配 → 按 A′ 零新依赖实现
+- [x] `YearMonthMath` 纯 JVM 内核 + `YearMonthMathTest` 4 条
+- [x] `YearMonthPickerDialog` 共享浮层：年份直达 + 12 格 + 回到本月 + 命中数角标
+- [x] 明细页月份条可点、顶部 `timeSummary()` 明示时间语义
+- [x] 记一笔与筛选面板起止日期的官方 DatePicker 加「跳转年月」，月末 clamp
+- [x] `RecordFilter.allMonths` + `effective*` 返回 `Int?` 交 SQL 短路；
+      `timeSummary()` / `isCrossMonth()` 单一出口
+- [x] `switchMonth` 不再清筛选条件；新增 `selectMonth(ym)` 供 Picker 一步跳转
+- [x] 筛选面板时间快捷段（当前月 / 近3月 / 今年 / 全部）
+- [x] `RecordDao.monthCounts` 一条 GROUP BY 取 12 格角标（按年查，不逐月查）
+- [x] `RecordFilterTest` 补 2 条（全部月份不注入当月 / 单端范围不双重夹击）
+- [x] 版本 0.2.23、六个静态检查本地 PASS
+- [x] push CI / release / 坚果云实测回填（执行后填真实编号）
+- [ ] 真机复核（使用者，刻意保留）：点月份标题弹 12 格并一次跳到任意年月、
+      记一笔 1/31 跳 2 月不丢不崩、时间留空时摘要明示、
+      选「全部」跨月生效、切月筛选不丢、快捷段范围与月份不双重夹击、
+      月格命中角标正确、规则与 CSV 重建不回退

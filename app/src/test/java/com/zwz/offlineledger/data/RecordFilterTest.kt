@@ -3,6 +3,7 @@ package com.zwz.offlineledger.data
 import com.zwz.offlineledger.data.paging.RecordFilter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class RecordFilterTest {
@@ -42,6 +43,26 @@ class RecordFilterTest {
             noteQuery = "午饭"
         )
         assertEquals(7, f.activeCount())
+    }
+
+    /** 第 41 批：全部月份模式不把「当前查看月」隐式注入成筛选条件。 */
+    @Test
+    fun `all months mode does not inject current month`() {
+        val f = RecordFilter(202611, allMonths = true)
+        assertNull(f.effectiveFromDate())
+        assertNull(f.effectiveToDate())
+        assertEquals(0, f.activeCount())
+        assertEquals(true, f.isCrossMonth())
+        assertEquals("时间：全部月份 · 当前显示 2026-11", f.timeSummary())
+    }
+
+    /** 第 41 批：范围只填一端时另一端不设限，不与月份双重夹击。 */
+    @Test
+    fun `one sided range does not double clamp with month`() {
+        val f = RecordFilter(202611, fromDate = 20250101)
+        assertEquals(20250101, f.effectiveFromDate())
+        assertNull(f.effectiveToDate())
+        assertEquals(true, f.isCrossMonth())
     }
 
     /** 6c-2 加了 currencyCode 维度，用相对断言而非手写常数。 */

@@ -58,6 +58,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.ui.components.ListDivider
+import com.zwz.offlineledger.ui.components.YearMonthPickerDialog
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
 import com.zwz.offlineledger.data.local.dao.RecordRow
@@ -87,6 +88,9 @@ fun DetailScreen(
     val counterparties by vm.counterparties.collectAsState()
 
     var showFilter by remember { mutableStateOf(false) }
+    /** 第 41 批：月份条点开 YearMonthPicker，一次点到任意年月。 */
+    var showMonthPicker by remember { mutableStateOf(false) }
+    val monthCounts by vm.monthCounts.collectAsState()
     var actionRow by remember { mutableStateOf<RecordRow?>(null) }
     var pendingDelete by remember { mutableStateOf<RecordRow?>(null) }
     var settleRow by remember { mutableStateOf<RecordRow?>(null) }
@@ -124,8 +128,10 @@ fun DetailScreen(
                 MonthOverviewCard(
                     overview = overview,
                     activeFilterCount = filter.activeCount(),
+                    timeSummary = filter.timeSummary(),
                     onPrev = { vm.switchMonth(-1) },
                     onNext = { vm.switchMonth(1) },
+                    onPickMonth = { showMonthPicker = true },
                     onFilter = { showFilter = true }
                 )
                 // 第 28 批：三条只读展示名按维度独立读取，MUST NOT 共用一个字段，
@@ -312,6 +318,16 @@ fun DetailScreen(
         )
     }
 
+    if (showMonthPicker) {
+        YearMonthPickerDialog(
+            initial = overview.yearMonth,
+            monthCounts = monthCounts,
+            onYearShown = { vm.loadMonthCounts(it) },
+            onDismiss = { showMonthPicker = false },
+            onConfirm = { vm.selectMonth(it); showMonthPicker = false }
+        )
+    }
+
     pendingDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
@@ -342,8 +358,10 @@ fun DetailScreen(
 private fun MonthOverviewCard(
     overview: MonthOverview,
     activeFilterCount: Int,
+    timeSummary: String,
     onPrev: () -> Unit,
     onNext: () -> Unit,
+    onPickMonth: () -> Unit,
     onFilter: () -> Unit
 ) {
     Column(
@@ -357,9 +375,10 @@ private fun MonthOverviewCard(
                 Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "上个月")
             }
             Text(
-                text = MonthRange.label(overview.yearMonth),
+                text = MonthRange.label(overview.yearMonth) + " ▾",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f).clickable(onClick = onPickMonth)
             )
             IconButton(onClick = onNext) {
                 Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "下个月")
@@ -377,6 +396,13 @@ private fun MonthOverviewCard(
                 ?: "全部币种（可在筛选中按币种查看）",
             style = MaterialTheme.typography.bodySmall,
             color = LedgerColors.Neutral
+        )
+        Text(
+            text = timeSummary,
+            style = MaterialTheme.typography.bodySmall,
+            color = LedgerColors.Neutral,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
