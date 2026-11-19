@@ -374,3 +374,24 @@ NOT_EQUALS / APPEND_NOTE、`RecordDao.searchNotes` 限量联想、
 
 **不动**：`RuleEngine` / `applyBulkTargets` / `changeset` / 两张规则表 / `version = 4` /
 备份 DTO 与恢复拓扑序 / CSV 重建按钮文案 / 两页下拉刷新 / 无障碍刷新按钮 / Manifest / `release.yml`。
+
+## 第 39 批（v0.2.21）：4 条反馈的根因与回退顺序
+
+第 38 批只落了「列表 / 编辑器 / 查看匹配记录」三页与设置一级入口，使用者实测后仍发现
+「新建分组内联在列表」「按钮满宽等权」「批量录入只认半角竖线且整批一句报错」「分类切到对方时
+旧分类 id 残留」。根因是编辑态与导航的契约没补齐，不是引擎能力不足：RuleEditorCatalog
+本就是「字段 → 操作符 → 值控件」单一来源。本批只改编辑态、解析、导航与视觉：
+
+| 反馈 | 修法 |
+|---|---|
+| 生成规则报「未解析出有效映射」 | batchRules 加 issues 逐行收集；正则容错 `|｜→Tab` 与前后空格；空行 / `#` 跳过；新分类由弹窗回填全名，不再靠键盘猜名字 |
+| 触发条件切到交易对方值没清空 | 字段切换时 copy 清空 value 与全部类型化字段，其余行不动 |
+| 带文字提示的边框 | 全部 OutlinedTextField 的 label lambda 改 placeholder，去掉悬浮边框文字 |
+| 分组与列表混页 / 无分类预览 | 新增 RuleGroupContent 独立页；ruleSummary 把条件与动作按 CategoryDisplay 的全名渲染在列表行 |
+| 新建按钮太大 | 主操作单个实心不 fillMaxWidth，次操作 TextButton，行内操作紧凑，Arrangement.End 靠右 |
+
+**回退顺序**：若 Kotlin 的 `split(Regex, limit)` 在当前 stdlib 解析不到，退到手动 indexOf 多分隔符；
+若 ruleSummary 因 RuleUiState 字段缺失编译不过，退到只显示 r.name + 条件数量，不引入新 DAO 查询；
+若 placeholder 在 BOM 版本上不可用，退回 label 但去掉文字（保持单行）。
+
+零改表 → v0.2.20 上覆盖安装即可。`version = 4` 未变。

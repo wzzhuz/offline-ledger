@@ -1,5 +1,6 @@
 package com.zwz.offlineledger.ui.bulk
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -368,17 +369,21 @@ class RuleViewModel(
                     }?.id
                 }
                 val start = _state.value.rules.count { it.groupId == gid }
-                val rules = RuleEditorCatalog.batchRules(text, gid, start) { resolve(it) }
+                val issues = mutableListOf<String>()
+                val rules = RuleEditorCatalog.batchRules(text, gid, start, issues) { resolve(it) }
                 if (rules.isEmpty()) {
                     _state.value = _state.value.copy(
                         busy = false,
-                        error = "未解析出有效映射；每行格式：旧分类名或对方关键词|新分类名"
+                        error = "没有生成规则。" +
+                            (if (issues.isEmpty()) "每行：旧分类名或对方关键词 | 新分类名"
+                             else "\n" + issues.joinToString("\n"))
                     )
                     return@launch
                 }
                 val ts = withContext(Dispatchers.IO) { targetsFromDb() }
                 val hits = RuleEditorCatalog.batchReport(ts, rules)
                 val sb = StringBuilder()
+                for (msg in issues) sb.append("⚠ ").append(msg).append('\n')
                 for (h in hits) {
                     sb.append("第 ").append(h.index + 1).append(" 组 ").append(h.label)
                         .append("：命中 ").append(h.hits).append(" 条")
@@ -565,7 +570,7 @@ fun RuleEditorContent(vm: RuleViewModel, onBack: () -> Unit) {
             OutlinedTextField(
                 value = state.draft.name,
                 onValueChange = { vm.updateDraft(state.draft.copy(name = it)) },
-                label = { Text("规则标题") },
+                placeholder = { Text("规则标题") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -644,34 +649,52 @@ fun RuleEditorContent(vm: RuleViewModel, onBack: () -> Unit) {
                 }
             ) { Text("+ 添加动作", maxLines = 1) }
 
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Button(
-                    onClick = { vm.saveDraft(false) },
-                    enabled = !state.busy,
-                    modifier = Modifier.weight(1f).padding(end = 4.dp)
-                ) { Text("保存规则", maxLines = 1) }
-                Button(
-                    onClick = { vm.saveDraft(true) },
-                    enabled = !state.busy,
-                    modifier = Modifier.weight(1f).padding(start = 4.dp)
-                ) { Text("保存并立即应用", maxLines = 1) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = { vm.saveDraft(true) }, enabled = !state.busy) {
+                    Text("保存并立即应用", maxLines = 1)
+                }
+                Button(onClick = { vm.saveDraft(false) }, enabled = !state.busy) {
+                    Text("保存规则", maxLines = 1)
+                }
             }
 
             SectionTitle("批量录入（分类迁移）")
             Text(
-                "每行：旧分类名或对方关键词|新分类名。一次生成 N 条普通规则，" +
-                    "与单独配置的规则共用同一预览、写入与撤销链路。",
+                "每行一组：旧分类名或对方关键词 | 新分类名；支持全角｜、→、Tab 与分隔前后空格，空行与 # 注释跳过。" +
+                    "一次生成 N 条普通规则，与单独配置的规则共用同一预览、写入与撤销链路。",
                 style = MaterialTheme.typography.labelSmall
             )
             OutlinedTextField(
                 value = batchText,
                 onValueChange = { batchText = it },
-                label = { Text("每行一组映射") },
+                placeholder = { Text("每行一组映射，如：盒马 | 三餐 / 买菜做饭") },
                 minLines = 3,
                 modifier = Modifier.fillMaxWidth()
             )
-            Button(onClick = { vm.generateBatch(batchText) }, modifier = Modifier.fillMaxWidth()) {
-                Text("生成规则并看命中报告", maxLines = 1)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = {
+                    batchText = "# 每行一组：旧值 | 新分类\n盒马|三餐 / 买菜做饭\n南京盒马网络科技有限公司|三餐 / 买菜做饭"
+                }) { Text("填入示例", maxLines = 1) }
+                PickerField(
+                    current = "选新分类插入",
+                    options = state.categories,
+                    onPick = { o ->
+                        batchText = (batchText.trimEnd() + "\n旧分类名或对方关键词|" + o.label)
+                    }
+                )
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { vm.generateBatch(batchText) }, enabled = !state.busy) {
+                    Text("生成规则并看命中报告", maxLines = 1)
+                }
             }
             if (state.report.isNotBlank()) {
                 Text(state.report, style = MaterialTheme.typography.labelSmall)
@@ -734,7 +757,7 @@ private fun PickerField(current: String, options: List<RuleOption>, onPick: (Rul
                     OutlinedTextField(
                         value = q,
                         onValueChange = { q = it },
-                        label = { Text("搜索") },
+                        placeholder = { Text("搜索") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -768,7 +791,7 @@ private fun TextFieldWithSuggestions(
         OutlinedTextField(
             value = value,
             onValueChange = onValue,
-            label = { Text(label) },
+            placeholder = { Text(label) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
@@ -799,7 +822,19 @@ private fun ConditionCard(
                 fields.indexOf(cond.field)
             ) { idx ->
                 val f = fields[idx]
-                onChange(cond.copy(field = f, op = RuleEditorCatalog.opsFor(f).first()))
+                onChange(
+                    cond.copy(
+                        field = f,
+                        op = RuleEditorCatalog.opsFor(f).first(),
+                        value = "",
+                        categoryId = null,
+                        accountId = null,
+                        minAmountCents = null,
+                        maxAmountCents = null,
+                        fromEpochMilli = null,
+                        toEpochMilli = null
+                    )
+                )
             }
             val ops = RuleEditorCatalog.opsFor(cond.field)
             EnumDropdown(
@@ -826,14 +861,14 @@ private fun ConditionCard(
                 OutlinedTextField(
                     value = cond.minAmountCents?.toString() ?: "",
                     onValueChange = { onChange(cond.copy(minAmountCents = it.toLongOrNull())) },
-                    label = { Text("最小金额(分)") },
+                    placeholder = { Text("最小金额(分)") },
                     singleLine = true,
                     modifier = Modifier.weight(1f).padding(end = 4.dp)
                 )
                 OutlinedTextField(
                     value = cond.maxAmountCents?.toString() ?: "",
                     onValueChange = { onChange(cond.copy(maxAmountCents = it.toLongOrNull())) },
-                    label = { Text("最大金额(分)") },
+                    placeholder = { Text("最大金额(分)") },
                     singleLine = true,
                     modifier = Modifier.weight(1f).padding(start = 4.dp)
                 )
@@ -842,14 +877,14 @@ private fun ConditionCard(
                 OutlinedTextField(
                     value = cond.fromEpochMilli?.toString() ?: "",
                     onValueChange = { onChange(cond.copy(fromEpochMilli = it.toLongOrNull())) },
-                    label = { Text("起始毫秒") },
+                    placeholder = { Text("起始毫秒") },
                     singleLine = true,
                     modifier = Modifier.weight(1f).padding(end = 4.dp)
                 )
                 OutlinedTextField(
                     value = cond.toEpochMilli?.toString() ?: "",
                     onValueChange = { onChange(cond.copy(toEpochMilli = it.toLongOrNull())) },
-                    label = { Text("结束毫秒") },
+                    placeholder = { Text("结束毫秒") },
                     singleLine = true,
                     modifier = Modifier.weight(1f).padding(start = 4.dp)
                 )
@@ -919,14 +954,14 @@ private fun ActionCard(
                     OutlinedTextField(
                         value = spec.from,
                         onValueChange = { onChange(spec.copy(from = it)) },
-                        label = { Text("把") },
+                        placeholder = { Text("把") },
                         singleLine = true,
                         modifier = Modifier.weight(1f).padding(end = 4.dp)
                     )
                     OutlinedTextField(
                         value = spec.to,
                         onValueChange = { onChange(spec.copy(to = it)) },
-                        label = { Text("换成") },
+                        placeholder = { Text("换成") },
                         singleLine = true,
                         modifier = Modifier.weight(1f).padding(start = 4.dp)
                     )
@@ -934,7 +969,7 @@ private fun ActionCard(
                 RuleActionKind.APPEND_NOTE -> OutlinedTextField(
                     value = spec.text,
                     onValueChange = { onChange(spec.copy(text = it)) },
-                    label = { Text("追加到备注末尾") },
+                    placeholder = { Text("追加到备注末尾") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

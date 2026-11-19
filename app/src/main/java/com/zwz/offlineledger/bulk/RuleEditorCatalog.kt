@@ -108,18 +108,35 @@ object RuleEditorCatalog {
      * 生成的是普通规则（条件 + SET_CATEGORY 动作），不是第二套执行引擎；
      * 已存规则照常保留，删掉的只是「独立映射表」这个 UI 入口。
      */
+    /**
+     * 第 39 批：分隔符容错（半角 | / 全角 ｜ / → / Tab，分隔前后允许空格），
+     * 空行与 # 注释跳过；不能解析的行不是静默丢弃，而是逐行写进 issues。
+     * 新分类名支持「一级 / 二级」全名（弹窗插入时回填的就是全名）。
+     */
     fun batchRules(
         text: String,
         groupId: Long,
         startOrder: Int,
+        issues: MutableList<String>? = null,
         resolveCategory: (String) -> Long?
     ): List<RuleDefinition> {
-        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val sep = Regex("\s*[|｜]\s*|\s*→\s*|\t+")
         val out = ArrayList<RuleDefinition>()
-        for ((i, line) in lines.withIndex()) {
-            val parts = line.split('|').map { it.trim() }
-            if (parts.size < 2 || parts[1].isEmpty()) continue
-            val toId = resolveCategory(parts[1]) ?: continue
+        var row = 0
+        for (raw in text.lines()) {
+            val line = raw.trim()
+            if (line.isEmpty() || line.startsWith("#")) continue
+            row += 1
+            val parts = line.split(sep, limit = 2).map { it.trim() }
+            if (parts.size < 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
+                issues?.add("第 " + row + " 行：缺分隔符或两侧为空（" + line + "）")
+                continue
+            }
+            val toId = resolveCategory(parts[1])
+            if (toId == null) {
+                issues?.add("第 " + row + " 行：新分类「" + parts[1] + "」不存在，请用「选新分类」插入")
+                continue
+            }
             val fromId = resolveCategory(parts[0])
             val cond = if (fromId != null) {
                 RuleCondition(
@@ -139,7 +156,7 @@ object RuleEditorCatalog {
                 RuleDefinition(
                     groupId = groupId,
                     name = parts[0] + " → " + parts[1],
-                    sortOrder = startOrder + i,
+                    sortOrder = startOrder + out.size,
                     matchMode = "ALL",
                     conditions = listOf(cond),
                     actions = listOf(
