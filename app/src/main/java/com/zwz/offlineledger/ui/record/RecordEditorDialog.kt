@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zwz.offlineledger.core.AccountQuickCandidates
+import com.zwz.offlineledger.core.AccountQuickItem
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
@@ -449,7 +451,9 @@ private fun AccountStrip(
     onFrom: (Long) -> Unit,
     onTo: (Long) -> Unit
 ) {
-    val visible = accounts.filter { !it.isArchived }
+    // 第 44 批：归档账户 MUST 仍可见（历史归属有效），只在选择器里标注，
+    // MUST NOT 因为「不再常用」就从编辑态里过滤掉。
+    val visible = accounts
     // 0 = 支出/转出，1 = 收入/转入；null = 关闭
     var pickerTarget by remember { mutableStateOf<Int?>(null) }
     var query by remember { mutableStateOf("") }
@@ -519,7 +523,13 @@ private fun AccountStrip(
                                 TextButton(
                                     onClick = { onSelect(a.id); pickerTarget = null },
                                     modifier = Modifier.fillMaxWidth()
-                                ) { Text(a.name + " · " + a.currencyCode) }
+                                ) {
+                                    Text(
+                                        AccountQuickCandidates.labelOf(
+                                            AccountQuickItem(a.id, a.name, a.isArchived)
+                                        ) + " · " + a.currencyCode
+                                    )
+                                }
                             }
                     }
                 }
@@ -550,16 +560,36 @@ private fun AccountQuickRow(
                 .padding(vertical = 6.dp)
         )
     }
+    // 第 44 批：候选 = 常用前 N 个 + 当前选中项（冷门 / 归档也一定可见）。
+    val items = accounts.map { AccountQuickItem(it.id, it.name, it.isArchived) }
+    val shown = AccountQuickCandidates.select(items, selectedId, QUICK_COUNT)
+    val current = AccountQuickCandidates.currentOrNull(items, selectedId)
+    // 明确写出「当前是谁」，避免一排 chip 没一个选中时被误读成默认账户。
+    val currentText = when {
+        current != null -> "当前：" + AccountQuickCandidates.labelOf(current)
+        selectedId != null -> "原账户已删除，请重新指定"
+        else -> "未选择账户"
+    }
+    Text(
+        text = currentText,
+        style = MaterialTheme.typography.labelSmall,
+        color = if (selectedId != null && current == null)
+            MaterialTheme.colorScheme.error else LedgerColors.Neutral,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+    )
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        accounts.take(QUICK_COUNT).forEach { a ->
+        shown.forEach { a ->
             FilterChip(
                 selected = a.id == selectedId,
                 onClick = { onSelect(a.id) },
                 label = {
-                    Text(a.name, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        AccountQuickCandidates.labelOf(a),
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 },
                 leadingIcon = {},
                 modifier = Modifier.padding(end = 4.dp)

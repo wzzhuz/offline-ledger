@@ -165,16 +165,16 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                 StatsScreen(
                     refreshTick = refreshTick,
                     onOpenCategories = { navController.navigate("categories") },
-                    onOpenCategoryInDetail = { id, isRoot, ym, cc, name ->
-                        detailVm.filterByCategory(id, isRoot, ym, cc, name)
+                    onOpenCategoryInDetail = { id, isRoot, r, cc, name ->
+                        detailVm.filterByCategory(id, isRoot, r, cc, name)
                         navController.navigate("detail") { launchSingleTop = true }
                     },
-                    onOpenCounterpartyInDetail = { name, ym, cc ->
-                        detailVm.filterByCounterparty(name, ym, cc)
+                    onOpenCounterpartyInDetail = { name, r, cc ->
+                        detailVm.filterByCounterparty(name, r, cc)
                         navController.navigate("detail") { launchSingleTop = true }
                     },
-                    onOpenAccountInDetail = { id, name, ym, cc ->
-                        detailVm.filterByAccount(id, name, ym, cc)
+                    onOpenAccountInDetail = { id, name, r, cc ->
+                        detailVm.filterByAccount(id, name, r, cc)
                         navController.navigate("detail") { launchSingleTop = true }
                     }
                 )

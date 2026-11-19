@@ -41,6 +41,8 @@ data class RecordFilter(
      * 这是「视图模式」而非筛选条件，MUST NOT 计入 activeCount()。
      * false 仅在主动选「当前月」快捷段 / 明确切按月视图时置位。
      */
+    /** 第 44 批：统计下钻带进明细的周期只读展示名，不进 SQL、不进 activeCount()。 */
+    val periodDisplayName: String? = null,
     val allMonths: Boolean = true
 ) {
     /**
@@ -62,6 +64,7 @@ data class RecordFilter(
      * totalCount 由 UI 传已加载命中数，不另跑聚合查询。
      */
     fun timeSummary(totalCount: Int? = null): String = when {
+        periodDisplayName != null -> "时间：" + periodDisplayName + "（来自统计）"
         fromDate != null || toDate != null ->
             "时间：" + (fromDate?.let { MonthRange.dateLabel(it) } ?: "不限") +
                 " ~ " + (toDate?.let { MonthRange.dateLabel(it) } ?: "不限")
@@ -93,15 +96,21 @@ data class RecordFilter(
             rootCategoryId: Long?,
             categoryId: Long?,
             currencyCode: String?,
-            categoryDisplayName: String?
+            categoryDisplayName: String?,
+            fromDate: Int? = null,
+            toDate: Int? = null,
+            periodDisplayName: String? = null
         ): RecordFilter = RecordFilter(
             yearMonth = yearMonth,
             revision = revision,
-            allMonths = true,
+            fromDate = fromDate,
+            toDate = toDate,
+            allMonths = fromDate == null && toDate == null,
             rootCategoryId = rootCategoryId,
             categoryId = categoryId,
             currencyCode = currencyCode,
-            categoryDisplayName = categoryDisplayName
+            categoryDisplayName = categoryDisplayName,
+            periodDisplayName = periodDisplayName
         )
 
         fun forCounterparty(
@@ -109,14 +118,20 @@ data class RecordFilter(
             revision: Int,
             counterpartyQuery: String,
             currencyCode: String?,
-            counterpartyDisplayName: String?
+            counterpartyDisplayName: String?,
+            fromDate: Int? = null,
+            toDate: Int? = null,
+            periodDisplayName: String? = null
         ): RecordFilter = RecordFilter(
             yearMonth = yearMonth,
             revision = revision,
-            allMonths = true,
+            fromDate = fromDate,
+            toDate = toDate,
+            allMonths = fromDate == null && toDate == null,
             counterpartyQuery = counterpartyQuery,
             currencyCode = currencyCode,
-            counterpartyDisplayName = counterpartyDisplayName
+            counterpartyDisplayName = counterpartyDisplayName,
+            periodDisplayName = periodDisplayName
         )
 
         fun forAccount(
@@ -124,14 +139,20 @@ data class RecordFilter(
             revision: Int,
             accountId: Long,
             currencyCode: String?,
-            accountDisplayName: String?
+            accountDisplayName: String?,
+            fromDate: Int? = null,
+            toDate: Int? = null,
+            periodDisplayName: String? = null
         ): RecordFilter = RecordFilter(
             yearMonth = yearMonth,
             revision = revision,
-            allMonths = true,
+            fromDate = fromDate,
+            toDate = toDate,
+            allMonths = fromDate == null && toDate == null,
             accountId = accountId,
             currencyCode = currencyCode,
-            accountDisplayName = accountDisplayName
+            accountDisplayName = accountDisplayName,
+            periodDisplayName = periodDisplayName
         )
     }
 }

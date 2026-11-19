@@ -404,3 +404,10 @@ FF3 `description` = 本项目「交易对方」、`notes` = 「备注」，因�
 - 使用者实测：从 Firefly III 导入的数据丢失 `description`（对方被写成「虚拟-不记录」，备注另有信息，结果不知道这笔干嘛）。
 - 按 1-A / 2-A' / 3-A：加独立 `description` 列（`version = 5`），打通 FF3 导入、自有 CSV、加密备份/自动快照、记一笔、明细行主标题、筛选与规则字段；明细主标题动态回退（有描述用描述、空着用交易对方）。
 - 先归档 `data-safety-and-bulk-rules` 与 `preset-data-and-counterparty`，再新建 `ff3-description-field`，决策史不混。
+
+## 第 44 批（v0.2.26）
+
+- 使用者实测：统计页跳转明细不带时间；转账编辑的冷门 / 归档账户显示不对。
+- 按 1-A / 2-A / 3-A：新建 `detail-filter-and-transfer-edit`，`StatsDrillRange` 单一出口给三类共 7 个下钻入口带周期；账户快捷候选合并当前选中项、归档可见、已删除拦截。
+- 零改表（`AppDatabase.version = 5` 未变）→ v0.2.25 上覆盖安装即可，不用卸载。
+- `ff3-description-field` 保持进行中，待 description 真机验收后再归档。

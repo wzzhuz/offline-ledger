@@ -267,6 +267,19 @@ class RecordEditorViewModel(
             )
             _state.value = s
         }
+        // 第 44 批：编辑态引用的账户若已删除，MUST 显式拦截，
+        // MUST NOT 静默兜底成常用账户（否则「什么都没改、直接保存」会改掉归属）。
+        val knownIds = _accounts.value.map { it.id }.toSet()
+        if (s.type == RecordType.EXPENSE || s.type == RecordType.TRANSFER) {
+            s.fromAccountId?.let {
+                if (it !in knownIds) return "原支出 / 转出账户已删除，请重新指定"
+            }
+        }
+        if (s.type == RecordType.INCOME || s.type == RecordType.TRANSFER) {
+            s.toAccountId?.let {
+                if (it !in knownIds) return "原收入 / 转入账户已删除，请重新指定"
+            }
+        }
         // 纯数字输入直接转分；不再经过表达式求值器（真机反馈：不需要运算符）。
         val amountCents = try {
             Cents.fromYuan(s.amountExpr.trim()).value

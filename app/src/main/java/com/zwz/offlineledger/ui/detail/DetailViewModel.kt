@@ -17,6 +17,7 @@ import com.zwz.offlineledger.data.paging.RecordFilter
 import com.zwz.offlineledger.data.paging.RecordPagingSource
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
+import com.zwz.offlineledger.ui.stats.StatsDrillRange
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -198,6 +199,7 @@ class DetailViewModel(
             categoryDisplayName = v.categoryDisplayName,
             counterpartyDisplayName = v.counterpartyDisplayName,
             accountDisplayName = v.accountDisplayName,
+            periodDisplayName = null,
             allMonths = v.allMonths,
             revision = _filter.value.revision + 1
         )
@@ -209,41 +211,50 @@ class DetailViewModel(
     fun filterByCategory(
         categoryId: Long,
         isRoot: Boolean,
-        yearMonth: Int,
+        range: StatsDrillRange,
         currencyCode: String?,
         displayName: String? = null
     ) {
         val parentId = if (isRoot) null
         else _categories.value.firstOrNull { it.id == categoryId }?.parentId
         _filter.value = RecordFilter.forCategory(
-            yearMonth = yearMonth,
+            yearMonth = range.yearMonth,
             revision = _filter.value.revision + 1,
             rootCategoryId = if (isRoot) categoryId else parentId,
             categoryId = if (isRoot) null else categoryId,
             currencyCode = currencyCode,
-            categoryDisplayName = displayName
+            categoryDisplayName = displayName,
+            fromDate = range.fromDate,
+            toDate = range.toDate,
+            periodDisplayName = range.label
         )
     }
 
     /** 第 27 批：排行「收款方」跳明细，交易对方是自由文本，用包含匹配。 */
-    fun filterByCounterparty(name: String, yearMonth: Int, currencyCode: String?) {
+    fun filterByCounterparty(name: String, range: StatsDrillRange, currencyCode: String?) {
         _filter.value = RecordFilter.forCounterparty(
-            yearMonth = yearMonth,
+            yearMonth = range.yearMonth,
             revision = _filter.value.revision + 1,
             counterpartyQuery = name,
             currencyCode = currencyCode,
-            counterpartyDisplayName = name
+            counterpartyDisplayName = name,
+            fromDate = range.fromDate,
+            toDate = range.toDate,
+            periodDisplayName = range.label
         )
     }
 
     /** 第 27 批：排行「账户」跳明细，带账户 id 与只读展示名。 */
-    fun filterByAccount(accountId: Long, name: String, yearMonth: Int, currencyCode: String?) {
+    fun filterByAccount(accountId: Long, name: String, range: StatsDrillRange, currencyCode: String?) {
         _filter.value = RecordFilter.forAccount(
-            yearMonth = yearMonth,
+            yearMonth = range.yearMonth,
             revision = _filter.value.revision + 1,
             accountId = accountId,
             currencyCode = currencyCode,
-            accountDisplayName = name
+            accountDisplayName = name,
+            fromDate = range.fromDate,
+            toDate = range.toDate,
+            periodDisplayName = range.label
         )
     }
 
@@ -254,7 +265,7 @@ class DetailViewModel(
             minAmountCents = null, maxAmountCents = null, noteQuery = null,
             currencyCode = null, counterpartyQuery = null, descriptionQuery = null,
             categoryDisplayName = null, counterpartyDisplayName = null,
-            accountDisplayName = null, allMonths = true,
+            accountDisplayName = null, periodDisplayName = null, allMonths = true,
             revision = _filter.value.revision + 1
         )
     }

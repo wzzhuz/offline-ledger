@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class StatsMode { MONTH, YEAR, MULTI_YEAR }
 enum class SliceLevel { ROOT, CHILD }
 
 /** 阶段 8：月度趋势默认单线，避免收支量级差大时贴底看不清。 */
@@ -75,7 +74,11 @@ data class StatsUiState(
     /** 第 27 批：一级分类 -> 该级下二级排行，供排行卡内联展开，零新增 SQL。 */
     val rankChildren: Map<Long, List<InsightData.RankRow>> = emptyMap(),
     val loading: Boolean = false
-)
+) {
+    /** 第 44 批：下钻周期单一出口，MUST NOT 在各下钻入口自己换算。 */
+    val drillRange: StatsDrillRange
+        get() = StatsDrillRange.of(mode, yearMonth, year)
+}
 
 /** 只读 ViewModel：6c-1 不新增任何写方法与事务，所有聚合只统计当前币种。 */
 class StatsViewModel(
@@ -368,10 +371,10 @@ class StatsViewModel(
         }
     }
 
-    private fun range(s: StatsUiState): Pair<Int, Int> = when (s.mode) {
-        StatsMode.MONTH -> s.yearMonth to s.yearMonth
-        StatsMode.YEAR -> (s.year * 100 + 1) to (s.year * 100 + 12)
-        StatsMode.MULTI_YEAR -> ((s.year - 4) * 100 + 1) to (s.year * 100 + 12)
+    /** 第 44 批：复用 StatsDrillRange 的单一出口，换算回 YYYYMM 区间。 */
+    private fun range(s: StatsUiState): Pair<Int, Int> {
+        val r = s.drillRange
+        return (r.fromDate / 100) to (r.toDate / 100)
     }
 
     private suspend fun categoryName(id: Long): String =

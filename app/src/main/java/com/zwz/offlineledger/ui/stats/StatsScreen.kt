@@ -59,9 +59,9 @@ private enum class RankDim { CATEGORY, COUNTERPARTY, ACCOUNT }
 fun StatsScreen(
     refreshTick: Int = 0,
     onOpenCategories: () -> Unit = {},
-    onOpenCategoryInDetail: (Long, Boolean, Int, String, String) -> Unit = { _, _, _, _, _ -> },
-    onOpenCounterpartyInDetail: (String, Int, String) -> Unit = { _, _, _ -> },
-    onOpenAccountInDetail: (Long, String, Int, String) -> Unit = { _, _, _, _ -> }
+    onOpenCategoryInDetail: (Long, Boolean, StatsDrillRange, String, String) -> Unit = { _, _, _, _, _ -> },
+    onOpenCounterpartyInDetail: (String, StatsDrillRange, String) -> Unit = { _, _, _ -> },
+    onOpenAccountInDetail: (Long, String, StatsDrillRange, String) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val vm: StatsViewModel = viewModel(
@@ -215,14 +215,14 @@ fun StatsScreen(
             onOpenCategoryInDetail = { id ->
                 vm.closeDrill()
                 onOpenCategoryInDetail(
-                    id, false, state.yearMonth, state.currencyCode,
+                    id, false, state.drillRange, state.currencyCode,
                     state.drillCategoryName.ifBlank { "分类" }
                 )
             },
             onOpenRootInDetail = { id ->
                 vm.closeDrill()
                 onOpenCategoryInDetail(
-                    id, true, state.yearMonth, state.currencyCode,
+                    id, true, state.drillRange, state.currencyCode,
                     state.drillRootName.ifBlank { "分类" }
                 )
             }
@@ -353,7 +353,7 @@ private fun DonutInsightCard(
     state: StatsUiState,
     vm: StatsViewModel,
     onOpenCategories: () -> Unit,
-    onOpenCategoryInDetail: (Long, Boolean, Int, String, String) -> Unit
+    onOpenCategoryInDetail: (Long, Boolean, StatsDrillRange, String, String) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -397,7 +397,7 @@ private fun DonutInsightCard(
                         // MUST NOT 只开二级构成弹窗、把一级下钻堵在弹窗里。
                         onOpenCategoryInDetail(
                             id, state.sliceLevel == SliceLevel.ROOT,
-                            state.yearMonth, state.currencyCode,
+                            state.drillRange, state.currencyCode,
                             slice?.name ?: "分类"
                         )
                     }
@@ -423,9 +423,9 @@ private fun RankInsightCard(
     vm: StatsViewModel,
     rankDim: RankDim,
     onRankDim: (RankDim) -> Unit,
-    onOpenCategoryInDetail: (Long, Boolean, Int, String, String) -> Unit,
-    onOpenCounterpartyInDetail: (String, Int, String) -> Unit,
-    onOpenAccountInDetail: (Long, String, Int, String) -> Unit
+    onOpenCategoryInDetail: (Long, Boolean, StatsDrillRange, String, String) -> Unit,
+    onOpenCounterpartyInDetail: (String, StatsDrillRange, String) -> Unit,
+    onOpenAccountInDetail: (Long, String, StatsDrillRange, String) -> Unit
 ) {
     // 第 27 批：二级展开态跨重组 / 切 Tab 保留（与分类管理折叠态同口径）。
     var expandedRootId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -483,17 +483,17 @@ private fun RankInsightCard(
                             when (rankDim) {
                                 RankDim.CATEGORY -> row.id?.let {
                                     onOpenCategoryInDetail(
-                                        it, true, state.yearMonth,
+                                        it, true, state.drillRange,
                                         state.currencyCode, row.name
                                     )
                                 }
                                 RankDim.COUNTERPARTY ->
                                     onOpenCounterpartyInDetail(
-                                        row.name, state.yearMonth, state.currencyCode
+                                        row.name, state.drillRange, state.currencyCode
                                     )
                                 RankDim.ACCOUNT -> row.id?.let {
                                     onOpenAccountInDetail(
-                                        it, row.name, state.yearMonth, state.currencyCode
+                                        it, row.name, state.drillRange, state.currencyCode
                                     )
                                 }
                             }
@@ -507,7 +507,7 @@ private fun RankInsightCard(
                                 onClick = {
                                     kid.id?.let {
                                         onOpenCategoryInDetail(
-                                            it, false, state.yearMonth,
+                                            it, false, state.drillRange,
                                             state.currencyCode, kid.name
                                         )
                                     }
