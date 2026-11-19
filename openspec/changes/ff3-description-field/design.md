@@ -20,3 +20,21 @@ v0.2.19 与截图对照时把 FF3 `description` 误映射为「交易对方」�
 - **统计口径**：Top5 对方排行里「虚拟-不记录」仍聚成一坨，是数据源占位习惯，本批不改统计口径；描述只影响展示与筛选/规则。
 - **描述非必填**：记一笔 placeholder-only，不强制；`displayTitle` 单一出口在 `RecordRowCard` 内实现，列表与副行不各自拼串。
 - **规则动作**：`SET_DESCRIPTION` 追加在枚举末尾，旧规则 JSON 按名反序列化不破；`BulkTarget.description` 带默认值，既有构造全部兼容。
+
+## 第 43 批实测回填（v0.2.25）
+
+- 代码 commit：`0d9b4ab3b638c208ba141a138997473c42716c48`（20 新增 / 32 修改 / 12 删除，删除全为两个 change 归档移走）
+- push CI：`44549506587` **success**，17 步全 success / 0 跳过，**首轮 Kotlin 编译与 6 条纯 JVM 单测零错误**
+- release：`44550898979` **success**，28 步 = 23 success / 5 skipped，**「上传到坚果云」completed success**，head_sha 为代码 commit
+- 制品：`offline-ledger-release-v0.2.25` 12403427 B（Actions 制品页 zip 压缩口径）、
+  `offline-ledger-mapping-v0.2.25` 3814849 B、
+  `offline-ledger-metrics-v0.2.25-p-m-nsfalse` 270 B
+- `nsfalse` 只表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
+  坚果云目录以使用者实际看到的短 sha 为准
+- **改表（`version = 5`、无迁移层）→ 必须卸载重装，装之前先导出**
+- 重复 release run `44551456398` 已 cancelled，保留并完成的是 `44550898979`
+- 真机复核仍留 `[ ]`：FF3 重导后 description / notes / 对方三值分离、记一笔描述、
+  列表主标题动态回退、CSV 12 列导出→重建、加密备份/快照恢复零 1811、
+  规则按「描述」圈选与「描述改为」撤销
+- 取舍（见 `design.md`）：Top5 对方排行「虚拟-不记录」仍聚一坨，是数据源占位习惯，
+  不动统计口径；FF3 CSV 导出本身不是备份，完整重建仍以加密备份/快照为准
