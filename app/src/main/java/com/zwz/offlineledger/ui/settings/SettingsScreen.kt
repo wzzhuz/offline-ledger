@@ -41,6 +41,11 @@ fun SettingsScreen(onOpen: (String) -> Unit) {
             title = "数据与备份",
             summary = "加密备份 / CSV 明文导出 / 账单导入 / Firefly III 迁移"
         ) { onOpen("backup") }
+        // 第 38 批：规则提为设置一级入口，紧跟「数据与备份」；复用已有 bulk 路由，零新增 NavHost 路由。
+        SettingGroupCard(
+            title = "规则列表",
+            summary = "保存的规则 / 编辑 / 应用到历史 / 一键撤销"
+        ) { onOpen("bulk") }
         SettingGroupCard(
             title = "偏好",
             summary = "对账阈值 / 配色 / 默认币种 / 默认账户"

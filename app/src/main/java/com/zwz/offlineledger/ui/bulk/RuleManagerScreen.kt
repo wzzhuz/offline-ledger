@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -63,6 +64,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class RuleOption(val id: Long, val label: String)
 
@@ -81,7 +85,9 @@ data class RuleUiState(
     /** 含停用与归档，否则导入的旧分类圈不出来；label 已带「停用 / 归档」标记。 */
     val categories: List<RuleOption> = emptyList(),
     val accounts: List<RuleOption> = emptyList(),
-    val suggestions: List<String> = emptyList()
+    val suggestions: List<String> = emptyList(),
+    /** 第 38 批：最近一次应用到历史的结果，仅内存态，列表页展示「上次应用」。 */
+    val lastApplied: String = ""
 )
 
 class RuleViewModel(
@@ -95,6 +101,9 @@ class RuleViewModel(
     private val _state = MutableStateFlow(RuleUiState())
     val state: StateFlow<RuleUiState> = _state.asStateFlow()
     private var suggestJob: Job? = null
+
+    private fun stamp(): String =
+        SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date())
 
     init {
         reload()
@@ -324,7 +333,8 @@ class RuleViewModel(
                         busy = false,
                         preview = emptyList(),
                         applied = changes,
-                        message = "规则已保存并立即应用 " + changes.size + " 条；可一键撤销。"
+                        message = "规则已保存并立即应用 " + changes.size + " 条；可一键撤销。",
+                        lastApplied = "命中 " + changes.size + " 条 · " + stamp()
                     )
                 } else {
                     _state.value = _state.value.copy(busy = false, message = "规则已保存。")
@@ -460,7 +470,8 @@ class RuleViewModel(
                     busy = false,
                     applied = changes,
                     preview = emptyList(),
-                    message = "已调整 " + changes.size + " 条；可一键撤销。"
+                    message = "已调整 " + changes.size + " 条；可一键撤销。",
+                    lastApplied = "命中 " + changes.size + " 条 · " + stamp()
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(busy = false, error = "写入失败，账本未改动：" + (e.message ?: "unknown"))
@@ -490,12 +501,19 @@ class RuleViewModel(
     }
 }
 
-/** 独立全屏页：动态行较多，Dialog 高度不够，FF3 本身也是整页编辑。 */
+/**
+ * 第 38 批：列表与编辑器拆成两个独立全屏页。
+ * 本壳保留给旧调用点（BulkEditScreen），实际入口已改为 RuleListScreen。
+ */
 @Composable
 fun RuleManagerScreen(onBack: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize()) {
-        RuleManagerContent(onBack = onBack)
-    }
+    val context = LocalContext.current
+    val vm: RuleViewModel = viewModel(
+        factory = ledgerFactory(context) { ep ->
+            RuleViewModel(ep.appDatabase(), ep.ledgerRepository(), ep.recordDao(), ep.categoryDao())
+        }
+    )
+    RuleEditorContent(vm = vm, onBack = onBack)
 }
 
 /** 兼容旧调用点：全屏 Dialog，视觉与独立页一致。 */
@@ -506,86 +524,44 @@ fun RuleManagerDialog(onDismiss: () -> Unit) {
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize()) {
-            RuleManagerContent(onBack = onDismiss)
+            val context = LocalContext.current
+            val vm: RuleViewModel = viewModel(
+                factory = ledgerFactory(context) { ep ->
+                    RuleViewModel(ep.appDatabase(), ep.ledgerRepository(), ep.recordDao(), ep.categoryDao())
+                }
+            )
+            RuleEditorContent(vm = vm, onBack = onDismiss)
         }
     }
 }
 
+/**
+ * 规则编辑器（独立页面）：只负责编辑一条规则，不承载已保存规则列表。
+ * 列表、再次应用与「查看匹配记录」都在 RuleListScreen，靠设置内二级页状态栈切换，
+ * 不新增 NavHost 路由、不新增表、不动 RuleEngine 求值。
+ */
 @Composable
-private fun RuleManagerContent(onBack: () -> Unit) {
-    val context = LocalContext.current
-    val vm: RuleViewModel = viewModel(
-        factory = ledgerFactory(context) { ep ->
-            RuleViewModel(ep.appDatabase(), ep.ledgerRepository(), ep.recordDao(), ep.categoryDao())
-        }
-    )
+fun RuleEditorContent(vm: RuleViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
-    var groupName by remember { mutableStateOf("") }
-    var batchText by remember { mutableStateOf("") }
+    var batchText by rememberSaveable { mutableStateOf("") }
+    val groupName = state.groups.firstOrNull { it.id == state.draft.groupId }?.name ?: "未分组"
 
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("返回", maxLines = 1) }
             Text(
-                "规则编辑器",
+                if (state.editingId == null) "新建规则" else "编辑规则",
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f),
                 maxLines = 1
             )
+            Text("组：" + groupName, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            SectionTitle("规则组")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("当前组：", maxLines = 1)
-                val gLabels = state.groups.map { it.name }
-                val gSel = state.groups.indexOfFirst { it.id == state.selectedGroupId }
-                EnumDropdown("选择组", gLabels, gSel) { idx ->
-                    vm.selectGroup(state.groups[idx].id)
-                }
-            }
-            OutlinedTextField(
-                value = groupName,
-                onValueChange = { groupName = it },
-                label = { Text("新规则组名称") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Button(onClick = { vm.addGroup(groupName); groupName = "" }, modifier = Modifier.fillMaxWidth()) {
-                Text("新建规则组", maxLines = 1)
-            }
-            state.groups.forEach { g ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        g.name + if (g.enabled) "" else "（停用）",
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1
-                    )
-                    TextButton(onClick = { vm.toggleGroup(g) }) { Text(if (g.enabled) "停用" else "启用", maxLines = 1) }
-                    TextButton(onClick = { vm.deleteGroup(g) }) { Text("删除", maxLines = 1) }
-                }
-            }
-
-            SectionTitle("已保存规则")
-            state.rules.filter { it.groupId == state.selectedGroupId }.forEach { r ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        (if (r.enabled) "" else "（停用）") + r.name,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1
-                    )
-                    TextButton(onClick = { vm.editRule(r) }) { Text("编辑", maxLines = 1) }
-                    TextButton(onClick = { vm.previewRule(r) }) { Text("预览", maxLines = 1) }
-                    TextButton(onClick = { vm.duplicateRule(r) }) { Text("复制", maxLines = 1) }
-                    TextButton(onClick = { vm.deleteRule(r) }) { Text("删", maxLines = 1) }
-                }
-            }
-            TextButton(onClick = { vm.newDraft() }) { Text("+ 新建一条规则", maxLines = 1) }
-
-            SectionTitle(if (state.editingId == null) "新建规则" else "编辑规则")
             OutlinedTextField(
                 value = state.draft.name,
                 onValueChange = { vm.updateDraft(state.draft.copy(name = it)) },
@@ -608,7 +584,7 @@ private fun RuleManagerContent(onBack: () -> Unit) {
                 Text("启用", maxLines = 1)
             }
 
-            Text("规则触发于", style = MaterialTheme.typography.titleSmall)
+            SectionTitle("规则触发于")
             state.draft.conditions.forEachIndexed { i, c ->
                 ConditionCard(
                     cond = c,
@@ -638,7 +614,7 @@ private fun RuleManagerContent(onBack: () -> Unit) {
                 }
             ) { Text("+ 添加触发条件", maxLines = 1) }
 
-            Text("规则将执行", style = MaterialTheme.typography.titleSmall)
+            SectionTitle("规则将执行")
             state.draft.actions.forEachIndexed { i, a ->
                 ActionCard(
                     spec = a,
@@ -700,45 +676,22 @@ private fun RuleManagerContent(onBack: () -> Unit) {
             if (state.report.isNotBlank()) {
                 Text(state.report, style = MaterialTheme.typography.labelSmall)
             }
-            val gid = state.selectedGroupId
-            if (gid != null) {
-                TextButton(onClick = { vm.previewGroup(gid) }) { Text("预览整个规则组", maxLines = 1) }
-            }
-
             if (state.message.isNotBlank()) {
                 Text(state.message, style = MaterialTheme.typography.bodySmall)
             }
             if (state.error.isNotBlank()) {
                 Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
-            if (state.preview.isNotEmpty()) {
-                Text(
-                    "前后对比（前 10 条，共 " + state.preview.size + " 条）",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                state.preview.take(10).forEach { c ->
-                    Text(
-                        "#" + c.before.id + " 分类 " + c.before.categoryId + " → " + c.after.categoryId +
-                            " / 对方 " + c.before.counterparty + " → " + c.after.counterparty,
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1
-                    )
-                }
-                Button(onClick = { vm.commit() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-                    Text("确认写入 " + state.preview.size + " 条", maxLines = 1)
-                }
-            }
-            if (state.applied.isNotEmpty()) {
-                Button(onClick = { vm.revert() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-                    Text("一键撤销 " + state.applied.size + " 条", maxLines = 1)
-                }
-            }
+            Text(
+                "保存后回「规则列表」可对历史记录再次应用；本页只改规则定义。",
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.titleSmall,
@@ -748,7 +701,7 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun EnumDropdown(hint: String, labels: List<String>, selected: Int, onPick: (Int) -> Unit) {
+internal fun EnumDropdown(hint: String, labels: List<String>, selected: Int, onPick: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { expanded = true }) {

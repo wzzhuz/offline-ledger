@@ -349,3 +349,28 @@ NOT_EQUALS / APPEND_NOTE、`RecordDao.searchNotes` 限量联想、
 约 24M 是 R8 release APK 原始字节，Actions 制品页约 12M 是 zip 二次压缩尺寸，
 两者同一个文件；不是 debug 变体。`data-safety-and-bulk-rules` 与
 `preset-data-and-counterparty` 仍进行中，未擅自归档。
+
+
+## 第 38 批（v0.2.20）根因与回退顺序
+
+**现象**：保存的规则列表与规则编辑器堆在同一滚动列；保存后没有再次执行入口；
+「预览」既像看详情又像查命中，语义混淆；规则入口埋在「数据与备份」里。
+
+**根因**：v0.2.19 只把 UI 从固定槽位换成动态行，没有把「列表 / 编辑 / 应用」三种
+职责分开；`RuleViewModel` 里其实早有 `previewRule` / `previewGroup` / `commit` / `revert`，
+能力在引擎里，缺的是列表页的执行入口与页面分层。
+
+**做法**：`RuleListScreen` 用 `rememberSaveable` 的 `page` 状态在三个独立
+`@Composable` 全屏页之间切换，共用同一个 `RuleViewModel`（切换不掉草稿）；
+设置页复用现有 `bulk` 路由指向新列表页，零新增 NavHost 路由；
+`RuleUiState.lastApplied` 只是内存态展示，不落表、不进备份 DTO。
+
+**回退顺序**：
+1. 状态栈旋转丢态 → `rememberSaveable` 已保底；仍不行则退回单个 NavHost 路由内 `when(page)`。
+2. 「应用」误写成直接执行 → 一律回到 `previewRule` → `commit`，MUST NOT 静默改写。
+3. 删旧门后已存规则丢失 → 只删 UI 跳板，`rule_definitions` 数据一行不动。
+4. 拆页引发编译红 → 优先保留 `RuleManagerScreen` / `RuleManagerDialog` 兼容壳，
+   不回退动态编辑器本身。
+
+**不动**：`RuleEngine` / `applyBulkTargets` / `changeset` / 两张规则表 / `version = 4` /
+备份 DTO 与恢复拓扑序 / CSV 重建按钮文案 / 两页下拉刷新 / 无障碍刷新按钮 / Manifest / `release.yml`。

@@ -151,8 +151,7 @@ private fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolean
 fun BackupSettingsScreen(
     onBack: () -> Unit,
     onOpenFirefly: () -> Unit = {},
-    onOpenSnapshots: () -> Unit = {},
-    onOpenBulk: () -> Unit = {}
+    onOpenSnapshots: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val vm = settingsVm()
@@ -234,18 +233,11 @@ fun BackupSettingsScreen(
             enabled = !state.busy,
             modifier = Modifier.fillMaxWidth()
         ) { Text("导入 Firefly III 导出（CSV）", maxLines = 1) }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onOpenSnapshots,
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text("自动快照与恢复", maxLines = 1) }
-            Button(
-                onClick = onOpenBulk,
-                enabled = !state.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text("批量规整", maxLines = 1) }
-        }
+        Button(
+            onClick = onOpenSnapshots,
+            enabled = !state.busy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("自动快照与恢复", maxLines = 1) }
         Text(
             text = "CSV 为明文文件，由你自行保管；应用不会上传任何数据。" +
                 "「导入账单」吃支付宝 / 微信 / 银行 / Firefly III 等第三方账单；" +
