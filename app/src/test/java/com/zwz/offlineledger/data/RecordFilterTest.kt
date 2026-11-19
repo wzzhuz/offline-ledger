@@ -8,12 +8,32 @@ import org.junit.Test
 
 class RecordFilterTest {
 
+    /** 第 42 批：不带时间 = 全部记录，不再隐式夹击当前月。 */
     @Test
-    fun `default range covers whole month`() {
+    fun `defaults to all records when time range is empty`() {
         val f = RecordFilter(202611)
+        assertEquals(true, f.allMonths)
+        assertNull(f.effectiveFromDate())
+        assertNull(f.effectiveToDate())
+        assertEquals(0, f.activeCount())
+        assertEquals("时间：全部记录 · 当前定位 2026-11", f.timeSummary())
+    }
+
+    @Test
+    fun `explicit month view still clamps to one month`() {
+        val f = RecordFilter(202611, allMonths = false)
         assertEquals(20261101, f.effectiveFromDate())
         assertEquals(20261130, f.effectiveToDate())
-        assertEquals(0, f.activeCount())
+        assertEquals(false, f.isCrossMonth())
+    }
+
+    @Test
+    fun `time summary reports hit count without a new query`() {
+        val f = RecordFilter(202611)
+        assertEquals(
+            "时间：全部记录 · 当前定位 2026-11 · 共 37 条命中",
+            f.timeSummary(37)
+        )
     }
 
     @Test
@@ -53,7 +73,7 @@ class RecordFilterTest {
         assertNull(f.effectiveToDate())
         assertEquals(0, f.activeCount())
         assertEquals(true, f.isCrossMonth())
-        assertEquals("时间：全部月份 · 当前显示 2026-11", f.timeSummary())
+        assertEquals("时间：全部记录 · 当前定位 2026-11", f.timeSummary())
     }
 
     /** 第 41 批：范围只填一端时另一端不设限，不与月份双重夹击。 */

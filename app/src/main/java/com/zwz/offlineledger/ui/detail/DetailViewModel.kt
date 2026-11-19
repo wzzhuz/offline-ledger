@@ -55,8 +55,8 @@ data class FilterValues(
     val categoryDisplayName: String? = null,
     val counterpartyDisplayName: String? = null,
     val accountDisplayName: String? = null,
-    /** 第 41 批：全部月份视图模式，非筛选条件。 */
-    val allMonths: Boolean = false
+    /** 第 42 批：默认看全部记录；「当前月」快捷段才置 false。 */
+    val allMonths: Boolean = true
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -105,6 +105,14 @@ class DetailViewModel(
     private val _monthCounts = MutableStateFlow<Map<Int, Int>>(emptyMap())
     val monthCounts: StateFlow<Map<Int, Int>> = _monthCounts.asStateFlow()
 
+    /**
+     * 第 42 批：月份条 / Picker 只作「滚到哪个月」的锚点，不参与过滤。
+     * 单独一个 Flow，MUST NOT 写回 _filter，否则 flatMapLatest 会重建 Pager
+     * 把列表弹回顶部，定位就失去意义。
+     */
+    private val _anchorMonth = MutableStateFlow<Int?>(null)
+    val anchorMonth: StateFlow<Int?> = _anchorMonth.asStateFlow()
+
     init {
         viewModelScope.launch { refreshMonthCounts(MonthRange.currentYearMonth() / 100) }
         viewModelScope.launch { _accounts.value = accountDao.all() }
@@ -113,23 +121,28 @@ class DetailViewModel(
         viewModelScope.launch { _filter.collect { f -> reload(f) } }
     }
 
+    /** 筛选变化时只刷新合计，MUST NOT 把概览月份拉回筛选里的初始值。 */
     private suspend fun reload(f: RecordFilter) {
-        val cc = f.currencyCode
-        val expense = if (cc == null) recordDao.totalExpense(f.yearMonth)
-        else recordDao.totalExpenseForCurrency(f.yearMonth, cc)
-        val income = if (cc == null) recordDao.totalIncome(f.yearMonth)
-        else recordDao.totalIncomeForCurrency(f.yearMonth, cc)
-        val daily = recordDao.dailyTotals(f.yearMonth, cc).associate {
+        refreshOverview(_overview.value.yearMonth, f.currencyCode)
+        refreshMonthCounts(_overview.value.yearMonth / 100)
+    }
+
+    private suspend fun refreshOverview(yearMonth: Int, currencyCode: String?) {
+        val cc = currencyCode
+        val expense = if (cc == null) recordDao.totalExpense(yearMonth)
+        else recordDao.totalExpenseForCurrency(yearMonth, cc)
+        val income = if (cc == null) recordDao.totalIncome(yearMonth)
+        else recordDao.totalIncomeForCurrency(yearMonth, cc)
+        val daily = recordDao.dailyTotals(yearMonth, cc).associate {
             it.localDate to (it.expenseCents to it.incomeCents)
         }
         _overview.value = MonthOverview(
-            yearMonth = f.yearMonth,
+            yearMonth = yearMonth,
             expenseCents = expense,
             incomeCents = income,
             dailyTotals = daily,
             currencyCode = cc
         )
-        refreshMonthCounts(f.yearMonth / 100)
     }
 
     private suspend fun refreshMonthCounts(year: Int) {
@@ -145,25 +158,25 @@ class DetailViewModel(
     }
 
     /**
-     * 第 41 批：左右箭头切月 MUST 保留全部筛选条件（含时间范围与全部月份模式），
-     * 旧实现在这里清掉 fromDate/toDate 是「切月丢筛选」的根因。
+     * 第 42 批：左右箭头与 Picker 都只是「滚到哪个月」，不再是过滤。
+     * 不动 _filter → 筛选条件一条不丢、Pager 不重建、列表不回顶。
      */
-    fun switchMonth(deltaMonths: Int) {
-        _filter.value = _filter.value.copy(
-            yearMonth = MonthRange.shift(_filter.value.yearMonth, deltaMonths),
-            revision = _filter.value.revision + 1
-        )
+    fun switchMonth(deltaMonths: Int) =
+        locateMonth(MonthRange.shift(_overview.value.yearMonth, deltaMonths))
+
+    /** YearMonthPicker 一步跳到任意年月，只定位不清条件。 */
+    fun selectMonth(yearMonth: Int) = locateMonth(yearMonth)
+
+    fun locateMonth(yearMonth: Int) {
+        _anchorMonth.value = yearMonth
+        viewModelScope.launch {
+            refreshOverview(yearMonth, _filter.value.currencyCode)
+            refreshMonthCounts(yearMonth / 100)
+        }
     }
 
-    /** YearMonthPicker 一步跳到任意年月：明确「看这一月」，退出跨月模式。 */
-    fun selectMonth(yearMonth: Int) {
-        _filter.value = _filter.value.copy(
-            yearMonth = yearMonth,
-            allMonths = false,
-            fromDate = null,
-            toDate = null,
-            revision = _filter.value.revision + 1
-        )
+    fun consumeAnchor() {
+        _anchorMonth.value = null
     }
 
     fun applyFilter(v: FilterValues) {
@@ -238,7 +251,7 @@ class DetailViewModel(
             minAmountCents = null, maxAmountCents = null, noteQuery = null,
             currencyCode = null, counterpartyQuery = null,
             categoryDisplayName = null, counterpartyDisplayName = null,
-            accountDisplayName = null, allMonths = false,
+            accountDisplayName = null, allMonths = true,
             revision = _filter.value.revision + 1
         )
     }

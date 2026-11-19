@@ -188,7 +188,7 @@ fun FilterSheet(
                     onTo = { dateTarget = 2 },
                     onClear = {
                         fromDate = null; toDate = null
-                        allMonths = false; timePresetKey = "month"
+                        allMonths = true; timePresetKey = "all"
                     }
                 )
                 Row(
@@ -219,9 +219,9 @@ fun FilterSheet(
                 }
                 Text(
                     text = if (allMonths)
-                        "全部月份：跨月查看，顶部月份条只作定位"
+                        "全部记录：跨月一屏到底，顶部月份条只作定位"
                     else
-                        "留空 = 当前月；填起止或选快捷段 = 跨月，不再按月份重复夹击",
+                        "仅当前月；填起止或选快捷段 = 跨月，不再按月份重复夹击",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp)

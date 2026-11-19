@@ -35,17 +35,17 @@ data class RecordFilter(
     val counterpartyDisplayName: String? = null,
     val accountDisplayName: String? = null,
     /**
-     * 第 41 批：true = 时间范围留空时不按月份夹击，列表跨月查看。
+     * 第 42 批：默认 true = 时间范围留空即查看全部记录，不再隐式夹击当前月。
      * 这是「视图模式」而非筛选条件，MUST NOT 计入 activeCount()。
+     * false 仅在主动选「当前月」快捷段 / 明确切按月视图时置位。
      */
-    val allMonths: Boolean = false
+    val allMonths: Boolean = true
 ) {
     /**
-     * 第 41 批：返回 null 交给 SQL 的 `:fromDate IS NULL` 短路，
-     * MUST NOT 再把「当前查看月份」隐式注入成筛选条件。
+     * 第 42 批：返回 null 交给 SQL 的 `:fromDate IS NULL` 短路。
      * - 显式范围任一端填了 → 另一端不设限（跨月，不与月份双重夹击）
-     * - 全空 + allMonths → 全部月份
-     * - 全空 + 按月视图 → 当前查看月份
+     * - 全空（默认 allMonths=true）→ 全部记录，MUST NOT 注入当前月
+     * - 全空 + 主动切 allMonths=false → 仅当前查看月份
      */
     fun effectiveFromDate(): Int? = fromDate
         ?: if (allMonths || toDate != null) null else MonthRange.of(yearMonth).first
@@ -55,12 +55,16 @@ data class RecordFilter(
     /** 是否跨月模式，用于 UI 明示「月份条只作定位」。 */
     fun isCrossMonth(): Boolean = allMonths || fromDate != null || toDate != null
 
-    /** 第 41 批：时间语义单一出口，chip 与月份条共用，不允许各处自己拼。 */
-    fun timeSummary(): String = when {
+    /**
+     * 第 42 批：时间语义单一出口，chip 与月份条共用，不允许各处自己拼。
+     * totalCount 由 UI 传已加载命中数，不另跑聚合查询。
+     */
+    fun timeSummary(totalCount: Int? = null): String = when {
         fromDate != null || toDate != null ->
             "时间：" + (fromDate?.let { MonthRange.dateLabel(it) } ?: "不限") +
                 " ~ " + (toDate?.let { MonthRange.dateLabel(it) } ?: "不限")
-        allMonths -> "时间：全部月份 · 当前显示 " + MonthRange.label(yearMonth)
+        allMonths -> "时间：全部记录 · 当前定位 " + MonthRange.label(yearMonth) +
+            (totalCount?.let { " · 共 " + it + " 条命中" } ?: "")
         else -> "时间：当前月 " + MonthRange.label(yearMonth) + "（切月看其他月）"
     }
 
@@ -73,6 +77,7 @@ data class RecordFilter(
     fun bumped(): RecordFilter = copy(revision = revision + 1)
 
     companion object {
+        /** 第 42 批：首次进入默认看全部记录，不再被当前月夹住。 */
         fun currentMonth(): RecordFilter = RecordFilter(MonthRange.currentYearMonth())
 
         /**
@@ -90,6 +95,7 @@ data class RecordFilter(
         ): RecordFilter = RecordFilter(
             yearMonth = yearMonth,
             revision = revision,
+            allMonths = true,
             rootCategoryId = rootCategoryId,
             categoryId = categoryId,
             currencyCode = currencyCode,
@@ -105,6 +111,7 @@ data class RecordFilter(
         ): RecordFilter = RecordFilter(
             yearMonth = yearMonth,
             revision = revision,
+            allMonths = true,
             counterpartyQuery = counterpartyQuery,
             currencyCode = currencyCode,
             counterpartyDisplayName = counterpartyDisplayName
@@ -119,6 +126,7 @@ data class RecordFilter(
         ): RecordFilter = RecordFilter(
             yearMonth = yearMonth,
             revision = revision,
+            allMonths = true,
             accountId = accountId,
             currencyCode = currencyCode,
             accountDisplayName = accountDisplayName

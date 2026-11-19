@@ -44,7 +44,9 @@ fun YearMonthPickerDialog(
     monthCounts: Map<Int, Int>,
     onYearShown: (Int) -> Unit,
     onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit
+    onConfirm: (Int) -> Unit,
+    /** 第 42 批：明细页传 true，空月灰显不可点；记一笔 / 筛选面板传 false。 */
+    disableEmptyMonths: Boolean = false
 ) {
     var year by rememberSaveable { mutableStateOf(initial / 100) }
     var selected by rememberSaveable { mutableStateOf(initial) }
@@ -102,6 +104,7 @@ fun YearMonthPickerDialog(
                             row.forEach { ym ->
                                 val n = monthCounts[ym] ?: 0
                                 val chosen = ym == selected
+                                val enabled = !disableEmptyMonths || n > 0
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
@@ -112,7 +115,7 @@ fun YearMonthPickerDialog(
                                             else MaterialTheme.colorScheme.surface,
                                             RoundedCornerShape(8.dp)
                                         )
-                                        .clickable {
+                                        .clickable(enabled = enabled) {
                                             selected = ym
                                             onConfirm(ym)
                                         },
@@ -122,6 +125,8 @@ fun YearMonthPickerDialog(
                                         Text(
                                             text = (ym % 100).toString() + "月",
                                             style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                                .copy(alpha = if (enabled) 1f else 0.38f),
                                             textAlign = TextAlign.Center
                                         )
                                         Text(

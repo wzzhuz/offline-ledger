@@ -108,6 +108,19 @@ fun DetailScreen(
         if (refreshTick > 0) vm.bumpRevision()
     }
 
+    /** 第 42 批：月份条 / Picker 只作定位锚点，在已加载项里滚到该月首条。 */
+    val anchorMonth by vm.anchorMonth.collectAsState()
+    LaunchedEffect(anchorMonth) {
+        anchorMonth?.let { ym ->
+            val idx = (0 until pagingItems.itemCount).firstOrNull { i ->
+                pagingItems.peek(i)?.let { it.localDate / 100 == ym } == true
+            }
+            if (idx != null) listState.animateScrollToItem(idx)
+            else snackbarHostState.showSnackbar("该月记录尚未加载，继续下滑后再点一次")
+            vm.consumeAnchor()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -118,7 +131,7 @@ fun DetailScreen(
                     delay(420)
                     isRefreshing = false
                     snackbarHostState.showSnackbar(
-                        "已刷新当前月份 · " + pagingItems.itemCount + " 条记录"
+                        "已刷新 · " + pagingItems.itemCount + " 条记录"
                     )
                 }
             },
@@ -128,7 +141,7 @@ fun DetailScreen(
                 MonthOverviewCard(
                     overview = overview,
                     activeFilterCount = filter.activeCount(),
-                    timeSummary = filter.timeSummary(),
+                    timeSummary = filter.timeSummary(pagingItems.itemCount),
                     onPrev = { vm.switchMonth(-1) },
                     onNext = { vm.switchMonth(1) },
                     onPickMonth = { showMonthPicker = true },
@@ -176,7 +189,13 @@ fun DetailScreen(
                         key = pagingItems.itemKey { it.id }
                     ) { index ->
                         val row = pagingItems[index] ?: return@items
-                        val previous = if (index > 0) pagingItems[index - 1] else null
+                        val previous = if (index > 0) pagingItems.peek(index - 1) else null
+                        val ym = row.localDate / 100
+                        // 第 42 批：跨月连续列表，月分组头只在 UI 层插入，
+                        // 复用已有 monthCounts 角标，MUST NOT 另跑聚合查询。
+                        if (previous == null || previous.localDate / 100 != ym) {
+                            MonthGroupHeader(ym, monthCounts[ym])
+                        }
                         if (previous == null || previous.localDate != row.localDate) {
                             DayHeader(row.localDate, overview.dailyTotals[row.localDate])
                         }
@@ -324,7 +343,8 @@ fun DetailScreen(
             monthCounts = monthCounts,
             onYearShown = { vm.loadMonthCounts(it) },
             onDismiss = { showMonthPicker = false },
-            onConfirm = { vm.selectMonth(it); showMonthPicker = false }
+            onConfirm = { vm.selectMonth(it); showMonthPicker = false },
+            disableEmptyMonths = true
         )
     }
 
@@ -425,6 +445,31 @@ private fun MonthOverviewCard(
             .height(1.dp)
             .background(LedgerColors.Neutral.copy(alpha = 0.12f))
     )
+}
+
+/** 第 42 批：跨月分组头。不 sticky（Paging items 无法直接用 stickyHeader），
+ *  不显示月合计（不新增聚合查询），只显示月份与已有角标命中数。 */
+@Composable
+private fun MonthGroupHeader(yearMonth: Int, count: Int?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = MonthRange.label(yearMonth),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = count?.let { "共 " + it + " 条" } ?: "",
+            style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral
+        )
+    }
 }
 
 @Composable

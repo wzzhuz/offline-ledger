@@ -303,3 +303,22 @@ Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；�
 - 真机复核仍留 `[ ]`：年月 12 格一步跳转、记一笔月末 clamp、
   时间留空摘要明示、全部月份跨月生效、切月筛选不丢、范围与月份不双重夹击、
   月格命中角标、规则与 CSV 重建不回退
+
+
+## 第 42 批（v0.2.24）：不带时间直接看全部记录
+
+- [x] 真读 `RecordFilter` / `RecordPagingSource` / `DetailViewModel` /
+      `DetailScreen` / `FilterSheet` / `YearMonthPicker`，确认
+      「`allMonths` 默认 false + `selectMonth` 把定位做成过滤」是根因
+- [x] `allMonths` 默认 true，`clearFilter` 与三个跨 Tab 下钻工厂同步为 true
+- [x] `timeSummary(totalCount)` 单一出口明示「全部记录 · 当前定位 · 共 N 条命中」
+- [x] 独立 `_anchorMonth` Flow：左右箭头 / Picker 只定位，不动 `_filter`、
+      不重建 Pager、不清筛选；空月灰显不可点
+- [x] 跨月连续分页 + 月分组头（普通 header，复用已有 monthCounts，零新查询）
+- [x] 「当前月」快捷段仍可主动切回按月视图
+- [x] `RecordFilterTest` 补 3 条（默认全库 / 显式按月 / 摘要命中数）
+- [x] 版本 0.2.24、六个静态检查本地 PASS
+- [x] push CI / release / 坚果云实测回填（执行后填真实编号）
+- [ ] 真机复核（使用者，刻意保留）：不带时间一屏滚完所有命中记录、
+      跨月分组头、点 12 格里某月只定位不过滤、空月灰显、筛选条件不丢、
+      点「当前月」切回按月、范围与月份不双重夹击、规则与 CSV 重建不回退
