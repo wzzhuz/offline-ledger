@@ -127,3 +127,23 @@ MUST NOT 让「导入账单」静默吞自有格式；
 ## 第 34 批实测回填（真实编号，由推送脚本补入）
 
 见 `tasks.md` 阶段三与指南 §8 补记。
+
+## 第 34 批实测回填（真实远端编号，2026-11-19）
+
+| 项 | 实测 |
+|---|---|
+| 代码 commit | `4a86031926828f5a89e2f1e1ffed2cf4aa6783ad`（2 新增 / 15 修改，v0.2.16） |
+| 首轮 push CI | `44440446947` **failure**，挂在「运行单元测试」；诊断回传日志定位 `BackupPayload.kt:54/58 Redeclaration`（脚本中断后重跑，前缀锚点幂等判断漏判，重复插入 `BackupAlias`） |
+| 诊断通道 | 临时 dispatch-only `diag.yml` → run `44441001168`（artifact 下载被出网策略挡）、`44441535608`（改用 contents API 回传日志成功）；用完即删 |
+| 修复 commit | `5cde279ee70d0ba63bd020d345839c5ef424da06`（只改 `BackupPayload.kt`） |
+| 修复后 push CI | `44441996336` **success**（17 步，`CsvRebuildTest` 由单测步骤跑过） |
+| release | `44443061506` **success**，23 步绿 / 5 步按 input 跳过，**「上传到坚果云」completed success** |
+| 制品（Actions artifact zip 压缩后尺寸） | `offline-ledger-release-v0.2.16` 12350729 B；`offline-ledger-mapping-v0.2.16` 3718037 B；`offline-ledger-metrics-v0.2.16-p-m-nsfalse` 269 B |
+| 坚果云 | `nsfalse`（认证 / 建目录 / PUT 均未失败）；HEAD 落盘校验只写日志不中断，目录内容以使用者所见为准，不当作已验证 HEAD 200 |
+| 静态检查 | 六个 `check_*.py` 本地与 CI 均 PASS；写方法清单 41 个均在事务内 |
+
+**产物口径**：约 24M 是 R8 release APK 原始字节，Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；不是 debug 变体。
+
+**真实落盘**：`importBackup` 的 defer_foreign_keys / 断开自引用 / 父先子后 / foreign_key_check、备份 DTO 三处补齐、口令本机记住、`CsvCodec.detectFormat` + `parseRebuild`、设置页「从 CSV 重建」入口、`CsvRebuildTest`、两份 MODIFIED delta 与指南 §7.17。
+`AppDatabase.version = 3` 未变 → **v0.2.15 上覆盖安装即可，不用卸载**。
+`data-safety-and-bulk-rules` 与 `preset-data-and-counterparty` 仍进行中，未擅自归档。
