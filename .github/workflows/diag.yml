@@ -2,7 +2,7 @@ name: 临时诊断
 'on':
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   actions: write
 jobs:
   diag:
@@ -23,10 +23,29 @@ jobs:
       - name: 跑单测并留日志
         run: |
           set +e
-          gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/unit.log
+          gradle testDebugUnitTest --stacktrace --no-daemon > /tmp/unit.log 2>&1
+          echo "EXIT=$?" >> /tmp/unit.log
           exit 0
-      - name: 上传日志
-        uses: actions/upload-artifact@v4
-        with:
-          name: p34-unit-log
-          path: /tmp/unit.log
+      - name: 回传日志到仓库
+        run: |
+          python3 - <<'PY'
+          import base64, json, urllib.request, os
+          data = open('/tmp/unit.log','rb').read()
+          payload = {
+            "message": "diag: unit log",
+            "content": base64.b64encode(data).decode(),
+            "branch": "main"
+          }
+          req = urllib.request.Request(
+            "https://api.github.com/repos/" + os.environ['GITHUB_REPOSITORY'] + "/contents/_diag_unit.log",
+            data=json.dumps(payload).encode(),
+            headers={
+              "Authorization": "Bearer " + os.environ['DIAG_TOKEN'],
+              "Accept": "application/vnd.github+json",
+              "Content-Type": "application/json",
+              "User-Agent": "diag"
+            }, method="PUT")
+          print(urllib.request.urlopen(req, timeout=120).status)
+          PY
+        env:
+          DIAG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
