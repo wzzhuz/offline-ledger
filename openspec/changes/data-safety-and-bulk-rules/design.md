@@ -320,3 +320,32 @@ NOT_EQUALS / APPEND_NOTE、`RecordDao.searchNotes` 限量联想、
 `RuleDefinition` 非 Parcelable，ViewModel 跨旋转更稳。
 
 **零改表 → v0.2.18 上覆盖安装即可，不用卸载。**
+
+## 第 37 批交付状态（真实远端编号，2026-11-19）
+
+- [x] push CI 与 release 实测回填、坚果云上传
+- [ ] 真机复核（使用者，刻意保留）
+
+## 第 37 批实测回填（真实远端编号，2026-11-19）
+
+| 项 | 实测 |
+|---|---|
+| 代码 commit | `997e4d195ee718993350a47142026aeb48166477`（主代码，3 新增 / 11 修改 / 0 删除）→ `8b983c2872dd`、`07787056d153`（两次单测断言修正），最终 HEAD `07787056d15329ce704e8a25b1ca1e8cf8397826`（v0.2.19） |
+| push CI | 首轮 `44478463075` failure、并发 `44479256085` cancelled，修复后 `44479652044` **success**，17 步 success，静态检查与单测步骤均 success |
+| release | `44480858062` **success**，23 步 success / 5 步按 input 跳过，**「上传到坚果云」completed success** |
+| 制品（Actions artifact zip 压缩后尺寸） | `offline-ledger-release-v0.2.19` 12399036 B；`offline-ledger-mapping-v0.2.19` 3789871 B；`offline-ledger-metrics-v0.2.19-p-m-nsfalse` 270 B |
+| 坚果云 | `nsfalse`（认证 / 建目录 / PUT 均未失败）；HEAD 落盘校验只写日志不中断，目录内容以使用者所见为准 |
+| 静态检查 | 六个 `check_*.py` 本地与 CI 均 PASS；未新增写方法，`applyBulkTargets` 沿用 |
+
+**真实落盘**：`RuleEditorCatalog`（字段 → 操作符 / 值控件单一来源）、
+`RuleManagerScreen` 独立全屏动态行编辑器（标题 / ALL-ANY / 取反 / 多动作 / 启停）、
+`RecordDao.searchNotes` 限量联想 + 200ms 防抖、分类与账户弹窗含停用归档并显示「一级 / 二级」、
+删独立映射表 UI 改「批量录入」生成 N 条普通规则且给出命中 / 冲突 / 未命中报告、
+「保存并立即应用到历史」复用预览 → 单事务 → 末尾重算 → 撤销。
+
+**如实边界**：规则组嵌套、表达式引擎、标签 / 预算联动、stop processing、导入后自动触发
+均不做（触发器默认关）；「描述」映射到已有「交易对方」、FF3 `notes` 映射到「备注」，
+**零改表** → `AppDatabase.version = 4` 未变，**v0.2.18 上覆盖安装即可，不用卸载**。
+约 24M 是 R8 release APK 原始字节，Actions 制品页约 12M 是 zip 二次压缩尺寸，
+两者同一个文件；不是 debug 变体。`data-safety-and-bulk-rules` 与
+`preset-data-and-counterparty` 仍进行中，未擅自归档。
