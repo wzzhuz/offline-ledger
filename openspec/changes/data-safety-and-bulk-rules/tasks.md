@@ -88,10 +88,25 @@
 - [x] 新增 `CsvRebuildResolverTest`（归档不拒 / 空库逐项报告 / 换名清单 / 同名二级）
 - [x] `check_transaction_annotations.py` 写方法清单登记 `rebuildFromOwnCsv`
 - [x] 六个静态检查本地 PASS
-- [ ] push CI 与 release 实测回填、坚果云上传
+- [x] push CI 与 release 实测回填、坚果云上传
 - [ ] 真机复核（使用者，刻意保留）
 
 ### 本期实现边界（如实说明）
 
 自有 CSV 仍不自包含：不带账户 / 分类 / 模板 / 别名 / 转账，完整重建只能走
 加密备份或自动快照。表结构 `version = 3` 未变 → v0.2.16 上覆盖安装即可。
+
+## 第 35 批实测回填（真实远端编号，2026-11-19）
+
+| 项 | 实测 |
+|---|---|
+| 代码 commit | `e635c9a436ecd9a3ee33f90eedc00be7f1daccb6`（2 新增 / 10 修改，v0.2.17） |
+| push CI | `44447674151` **success**，17 步全绿，新增 `CsvRebuildResolverTest` 由单测步骤跑过 |
+| release | `44448470911` **success**，23 步绿 / 5 步按 input 跳过，**「上传到坚果云」completed success** |
+| 制品（Actions artifact zip 压缩后尺寸） | `offline-ledger-release-v0.2.17` 12353413 B；`offline-ledger-mapping-v0.2.17` 3723958 B；`offline-ledger-metrics-v0.2.17-p-m-nsfalse` 269 B |
+| 坚果云 | `nsfalse`（认证 / 建目录 / PUT 均未失败）；HEAD 落盘校验只写日志不中断，目录内容以使用者所见为准 |
+| 静态检查 | 六个 `check_*.py` 本地与 CI 均 PASS；写方法清单 42 个均在事务内 |
+
+**产物口径**：约 24M 是 R8 release APK 原始字节，Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；不是 debug 变体。
+`AppDatabase.version = 3` 未变 → **v0.2.16 上覆盖安装即可，不用卸载**。
+`data-safety-and-bulk-rules` 与 `preset-data-and-counterparty` 仍进行中，未擅自归档。

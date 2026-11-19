@@ -196,3 +196,18 @@ v0.2.14 又删了预制账户、换了分类清单 → 清库 / 重装后**必�
 `importRecords` 第三方账单严格语义 MUST NOT 放宽；归档 / 停用 MUST NOT
 当成缺失；缺项 MUST NOT 静默丢弃或整批抛异常；CSV MUST NOT 被扩成
 自包含格式；表结构不变 → 覆盖安装即可；MUST NOT 改 `release.yml`。
+
+## 第 35 批实测回填（真实远端编号，2026-11-19）
+
+| 项 | 实测 |
+|---|---|
+| 代码 commit | `e635c9a436ecd9a3ee33f90eedc00be7f1daccb6`（2 新增 / 10 修改，v0.2.17） |
+| push CI | `44447674151` **success**，17 步全绿，新增 `CsvRebuildResolverTest` 由单测步骤跑过 |
+| release | `44448470911` **success**，23 步绿 / 5 步按 input 跳过，**「上传到坚果云」completed success** |
+| 制品（Actions artifact zip 压缩后尺寸） | `offline-ledger-release-v0.2.17` 12353413 B；`offline-ledger-mapping-v0.2.17` 3723958 B；`offline-ledger-metrics-v0.2.17-p-m-nsfalse` 269 B |
+| 坚果云 | `nsfalse`（认证 / 建目录 / PUT 均未失败）；HEAD 落盘校验只写日志不中断，目录内容以使用者所见为准 |
+| 静态检查 | 六个 `check_*.py` 本地与 CI 均 PASS；写方法清单 42 个均在事务内 |
+
+**产物口径**：约 24M 是 R8 release APK 原始字节，Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；不是 debug 变体。
+`AppDatabase.version = 3` 未变 → **v0.2.16 上覆盖安装即可，不用卸载**。
+`data-safety-and-bulk-rules` 与 `preset-data-and-counterparty` 仍进行中，未擅自归档。
