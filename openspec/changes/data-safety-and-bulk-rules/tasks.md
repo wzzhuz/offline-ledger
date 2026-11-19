@@ -237,3 +237,17 @@ Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；�
 - [x] 不动 RuleEngine / applyBulkTargets / changeset / 两张规则表 / version = 4 / 备份与恢复链路
 - [ ] 真机复核（使用者，刻意保留）：粘贴含空格 / 全角分隔 / 空行能生成 N 条且逐行报错、
       分类→对方切换后值清空、分组管理独立页、列表摘要、按钮不霸屏、保存后再次应用与撤销
+
+## 第 40 批（v0.2.22）：草稿预览与删批量录入
+
+- [x] 规则编辑器底部加「查看匹配记录」：用当前未保存草稿走 `previewRule` 只读求值，不要求先保存
+- [x] 草稿预览与列表「应用」共用 `RuleMatchContent`；`matchFrom` 让返回分别回编辑器 / 列表
+- [x] 兼容旧壳 `RuleManagerScreen` / `RuleManagerDialog` 也接上草稿预览，旧路径点按钮不空转
+- [x] 删「批量录入（分类迁移）」整个 UI 块、`generateBatch`、`batchRules` / `batchReport` / `BatchHit`
+- [x] `RuleUiState.report` 字段一并清掉；`previewRule` 支持空名草稿
+- [x] 规格按标题整块 MODIFIED 替换「分类迁移 / 批量录入」Requirement 与 Scenario，追加第 40 批决策史
+- [x] `RuleEditorCatalogTest` 改为目录完整性 + 草稿预览经同一引擎求值与逐字段撤销
+- [x] 不动 RuleEngine / applyBulkTargets / changeset / 两张规则表 / version = 4 / 备份与恢复链路
+- [x] 删入口不丢已存规则：此前批量录入生成的规则仍是普通 `rule_definitions` 行
+- [ ] 真机复核（使用者，刻意保留）：编辑页改完条件直接看命中数、返回仍在编辑器且草稿不丢、
+      列表「应用」返回列表、批量录入入口消失且旧规则仍在、撤销逐字段还原

@@ -79,7 +79,6 @@ data class RuleUiState(
     val rules: List<RuleDefinition> = emptyList(),
     val preview: List<BulkChange> = emptyList(),
     val applied: List<BulkChange> = emptyList(),
-    val report: String = "",
     val draft: RuleDefinition = RuleDefinition(),
     val editingId: Long? = null,
     val selectedGroupId: Long? = null,
@@ -349,82 +348,12 @@ class RuleViewModel(
         }
     }
 
-    /** 批量录入生成的是普通规则，共用同一 RuleEngine 与撤销链路，不另开写入口。 */
-    fun generateBatch(text: String) {
-        viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, error = "", report = "")
-            try {
-                val gid = _state.value.selectedGroupId ?: _state.value.groups.firstOrNull()?.id
-                if (gid == null) {
-                    _state.value = _state.value.copy(busy = false, error = "请先新建一个规则组")
-                    return@launch
-                }
-                val cats = withContext(Dispatchers.IO) { categoryDao.all() }
-                val byId = cats.associateBy { it.id }
-                fun resolve(n: String): Long? {
-                    val q = n.trim()
-                    return cats.firstOrNull { c ->
-                        val parent = c.parentId?.let { byId[it] }
-                        c.name == q || CategoryDisplay.resolve(parent?.name, c.name) == q
-                    }?.id
-                }
-                val start = _state.value.rules.count { it.groupId == gid }
-                val issues = mutableListOf<String>()
-                val rules = RuleEditorCatalog.batchRules(text, gid, start, issues) { resolve(it) }
-                if (rules.isEmpty()) {
-                    _state.value = _state.value.copy(
-                        busy = false,
-                        error = "没有生成规则。" +
-                            (if (issues.isEmpty()) "每行：旧分类名或对方关键词 | 新分类名"
-                             else "\n" + issues.joinToString("\n"))
-                    )
-                    return@launch
-                }
-                val ts = withContext(Dispatchers.IO) { targetsFromDb() }
-                val hits = RuleEditorCatalog.batchReport(ts, rules)
-                val sb = StringBuilder()
-                for (msg in issues) sb.append("⚠ ").append(msg).append('\n')
-                for (h in hits) {
-                    sb.append("第 ").append(h.index + 1).append(" 组 ").append(h.label)
-                        .append("：命中 ").append(h.hits).append(" 条")
-                    if (h.conflicts.isNotEmpty()) {
-                        sb.append("，与第 ")
-                            .append(h.conflicts.joinToString { (it + 1).toString() })
-                            .append(" 组冲突")
-                    }
-                    if (h.hits == 0) sb.append("（未命中）")
-                    sb.append('\n')
-                }
-                withContext(Dispatchers.IO) {
-                    for (r in rules) {
-                        db.ruleDao().insertDefinition(
-                            RuleEntity(
-                                groupId = r.groupId,
-                                sortOrder = r.sortOrder,
-                                definitionJson = json.encodeToString(RuleDefinition.serializer(), r)
-                            )
-                        )
-                    }
-                }
-                reload()
-                _state.value = _state.value.copy(
-                    busy = false,
-                    report = sb.toString(),
-                    message = "已生成 " + rules.size + " 条规则；冲突按组内顺序首次命中优先。"
-                )
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    busy = false,
-                    error = "批量生成失败：" + (e.message ?: "unknown")
-                )
-            }
-        }
-    }
-
     fun previewRule(r: RuleDefinition) {
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = true, error = "")
             try {
+                // 第 40 批：编辑页草稿 id=0、name 可能为空，与已存规则走同一求值出口。
+                val label = r.name.ifBlank { "未命名草稿" }
                 val changes = withContext(Dispatchers.IO) {
                     RuleEngine.applyGroup(targetsFromDb(), listOf(r), true)
                 }
@@ -432,7 +361,7 @@ class RuleViewModel(
                     busy = false,
                     preview = changes,
                     applied = emptyList(),
-                    message = "规则「" + r.name + "」命中 " + changes.size + " 条；确认后才写入。"
+                    message = "规则「" + label + "」命中 " + changes.size + " 条；确认后才写入。"
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(busy = false, error = "预览失败：" + (e.message ?: "unknown"))
@@ -518,7 +447,19 @@ fun RuleManagerScreen(onBack: () -> Unit) {
             RuleViewModel(ep.appDatabase(), ep.ledgerRepository(), ep.recordDao(), ep.categoryDao())
         }
     )
-    RuleEditorContent(vm = vm, onBack = onBack)
+    var showMatch by rememberSaveable { mutableStateOf(false) }
+    if (showMatch) {
+        RuleMatchContent(vm = vm, onBack = { showMatch = false }, fromDraft = true)
+    } else {
+        RuleEditorContent(
+            vm = vm,
+            onBack = onBack,
+            onPreviewDraft = { d ->
+                vm.previewRule(d)
+                showMatch = true
+            }
+        )
+    }
 }
 
 /** 兼容旧调用点：全屏 Dialog，视觉与独立页一致。 */
@@ -535,7 +476,19 @@ fun RuleManagerDialog(onDismiss: () -> Unit) {
                     RuleViewModel(ep.appDatabase(), ep.ledgerRepository(), ep.recordDao(), ep.categoryDao())
                 }
             )
-            RuleEditorContent(vm = vm, onBack = onDismiss)
+            var showMatch by rememberSaveable { mutableStateOf(false) }
+            if (showMatch) {
+                RuleMatchContent(vm = vm, onBack = { showMatch = false }, fromDraft = true)
+            } else {
+                RuleEditorContent(
+                    vm = vm,
+                    onBack = onDismiss,
+                    onPreviewDraft = { d ->
+                        vm.previewRule(d)
+                        showMatch = true
+                    }
+                )
+            }
         }
     }
 }
@@ -544,11 +497,15 @@ fun RuleManagerDialog(onDismiss: () -> Unit) {
  * 规则编辑器（独立页面）：只负责编辑一条规则，不承载已保存规则列表。
  * 列表、再次应用与「查看匹配记录」都在 RuleListScreen，靠设置内二级页状态栈切换，
  * 不新增 NavHost 路由、不新增表、不动 RuleEngine 求值。
+ * 第 40 批：编辑页可直接用当前未保存草稿「查看匹配记录」，不要求先保存。
  */
 @Composable
-fun RuleEditorContent(vm: RuleViewModel, onBack: () -> Unit) {
+fun RuleEditorContent(
+    vm: RuleViewModel,
+    onBack: () -> Unit,
+    onPreviewDraft: (RuleDefinition) -> Unit = {}
+) {
     val state by vm.state.collectAsState()
-    var batchText by rememberSaveable { mutableStateOf("") }
     val groupName = state.groups.firstOrNull { it.id == state.draft.groupId }?.name ?: "未分组"
 
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
@@ -654,6 +611,9 @@ fun RuleEditorContent(vm: RuleViewModel, onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                TextButton(onClick = { onPreviewDraft(state.draft) }, enabled = !state.busy) {
+                    Text("查看匹配记录", maxLines = 1)
+                }
                 TextButton(onClick = { vm.saveDraft(true) }, enabled = !state.busy) {
                     Text("保存并立即应用", maxLines = 1)
                 }
@@ -662,43 +622,6 @@ fun RuleEditorContent(vm: RuleViewModel, onBack: () -> Unit) {
                 }
             }
 
-            SectionTitle("批量录入（分类迁移）")
-            Text(
-                "每行一组：旧分类名或对方关键词 | 新分类名；支持全角｜、→、Tab 与分隔前后空格，空行与 # 注释跳过。" +
-                    "一次生成 N 条普通规则，与单独配置的规则共用同一预览、写入与撤销链路。",
-                style = MaterialTheme.typography.labelSmall
-            )
-            OutlinedTextField(
-                value = batchText,
-                onValueChange = { batchText = it },
-                placeholder = { Text("每行一组映射，如：盒马 | 三餐 / 买菜做饭") },
-                minLines = 3,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = {
-                    batchText = "# 每行一组：旧值 | 新分类\n盒马|三餐 / 买菜做饭\n南京盒马网络科技有限公司|三餐 / 买菜做饭"
-                }) { Text("填入示例", maxLines = 1) }
-                PickerField(
-                    current = "选新分类插入",
-                    options = state.categories,
-                    onPick = { o ->
-                        batchText = (batchText.trimEnd() + "\n旧分类名或对方关键词|" + o.label)
-                    }
-                )
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { vm.generateBatch(batchText) }, enabled = !state.busy) {
-                    Text("生成规则并看命中报告", maxLines = 1)
-                }
-            }
-            if (state.report.isNotBlank()) {
-                Text(state.report, style = MaterialTheme.typography.labelSmall)
-            }
             if (state.message.isNotBlank()) {
                 Text(state.message, style = MaterialTheme.typography.bodySmall)
             }
@@ -706,7 +629,8 @@ fun RuleEditorContent(vm: RuleViewModel, onBack: () -> Unit) {
                 Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             Text(
-                "保存后回「规则列表」可对历史记录再次应用；本页只改规则定义。",
+                "「查看匹配记录」用当前草稿只读预览命中与前后对比，不要求先保存；" +
+                    "保存后回「规则列表」可对历史记录再次应用。",
                 style = MaterialTheme.typography.labelSmall
             )
         }

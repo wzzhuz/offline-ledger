@@ -31,52 +31,44 @@ class RuleEditorCatalogTest {
         assertEquals(8, RuleEditorCatalog.opsFor(RuleField.COUNTERPARTY).size)
     }
 
+    /**
+     * 第 40 批：草稿（id = 0、未入库、name 为空）与已存规则走同一求值出口，
+     * 预览本身只产生新对象、不就地改写原始记录；撤销逐字段还原。
+     */
     @Test
-    fun batchRulesGenerateOrdinaryRulesNotASecondEngine() {
-        val cats = mapOf("旧餐饮" to 3L, "餐饮 / 其他" to 9L)
-        val rules = RuleEditorCatalog.batchRules(
-            "旧餐饮|餐饮 / 其他\n盒马|餐饮 / 其他",
-            groupId = 1L,
-            startOrder = 0
-        ) { cats[it.trim()] }
-        assertEquals(2, rules.size)
-        assertEquals(RuleField.CATEGORY, rules[0].conditions[0].field)
-        assertEquals(3L, rules[0].conditions[0].categoryId!!)
-        assertEquals(RuleField.COUNTERPARTY, rules[1].conditions[0].field)
-        assertEquals("盒马", rules[1].conditions[0].value)
-        for (r in rules) {
-            assertEquals(RuleActionKind.SET_CATEGORY, r.actions[0].kind)
-            assertEquals(9L, r.actions[0].categoryId!!)
-        }
-        assertEquals(0, rules[0].sortOrder)
-        assertEquals(1, rules[1].sortOrder)
-    }
-
-    @Test
-    fun batchReportShowsHitsConflictsAndMisses() {
-        val targets = listOf(t(1, "盒马", 3L), t(2, "盒马", 4L), t(3, "地铁", 5L))
-        val cats = mapOf("旧餐饮" to 3L, "餐饮 / 其他" to 9L)
-        val rules = RuleEditorCatalog.batchRules(
-            "旧餐饮|餐饮 / 其他\n盒马|餐饮 / 其他\n不存在的词|餐饮 / 其他",
-            1L,
-            0
-        ) { cats[it.trim()] }
-        val report = RuleEditorCatalog.batchReport(targets, rules)
-        assertEquals(3, report.size)
-        assertEquals(1, report[0].hits)
-        assertEquals(listOf(1), report[0].conflicts)
-        assertEquals(2, report[1].hits)
-        assertEquals(0, report[2].hits)
-    }
-
-    @Test
-    fun generatedRulesApplyThroughTheSameEngine() {
+    fun draftPreviewUsesSameEngineAndRevertsFieldByField() {
         val targets = listOf(t(1, "盒马", 3L), t(2, "地铁", 5L))
-        val cats = mapOf("旧餐饮" to 3L, "餐饮 / 其他" to 9L)
-        val rules = RuleEditorCatalog.batchRules("旧餐饮|餐饮 / 其他", 1L, 0) { cats[it.trim()] }
-        val changes = RuleEngine.applyGroup(targets, rules, true)
+        val draft = RuleDefinition(
+            id = 0L,
+            name = "",
+            conditions = listOf(
+                RuleCondition(field = RuleField.CATEGORY, op = RuleOp.EQUALS, categoryId = 3L)
+            ),
+            actions = listOf(
+                RuleActionSpec(kind = RuleActionKind.SET_CATEGORY, categoryId = 9L)
+            )
+        )
+        val changes = RuleEngine.applyGroup(targets, listOf(draft), true)
         assertEquals(1, changes.size)
         assertEquals(9L, changes[0].after.categoryId!!)
+        assertEquals(3L, targets[0].categoryId!!)
         assertEquals(listOf(targets[0]), RuleEngine.revert(changes))
+    }
+
+    /** 分类迁移就是一条普通规则，不再有映射表 / 批量录入第二套入口。 */
+    @Test
+    fun categoryMigrationIsJustAnOrdinaryRule() {
+        val draft = RuleDefinition(
+            conditions = listOf(
+                RuleCondition(field = RuleField.CATEGORY, op = RuleOp.EQUALS, categoryId = 3L)
+            ),
+            actions = listOf(
+                RuleActionSpec(kind = RuleActionKind.SET_CATEGORY, categoryId = 9L)
+            )
+        )
+        assertEquals(1, draft.conditions.size)
+        assertEquals(1, draft.actions.size)
+        assertEquals(RuleField.CATEGORY, draft.conditions[0].field)
+        assertEquals(RuleActionKind.SET_CATEGORY, draft.actions[0].kind)
     }
 }

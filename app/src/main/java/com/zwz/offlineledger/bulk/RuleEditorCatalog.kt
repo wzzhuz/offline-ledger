@@ -101,83 +101,10 @@ object RuleEditorCatalog {
         else -> RuleValueKind.TEXT
     }
 
-    data class BatchHit(val index: Int, val label: String, val hits: Int, val conflicts: List<Int>)
-
     /**
-     * 批量录入：每行「旧分类名或对方关键词|新分类名」。
-     * 生成的是普通规则（条件 + SET_CATEGORY 动作），不是第二套执行引擎；
-     * 已存规则照常保留，删掉的只是「独立映射表」这个 UI 入口。
+     * 第 40 批：批量录入 / 映射表的文本解析器已删除。
+     * 分类调整就是一条最普通的规则（条件=分类等于旧类 → 动作=设置分类为新类），
+     * 靠字段下拉与分类弹窗按 id 选值完成；此前由批量录入生成的规则都是普通
+     * rule_definitions 行，删入口不删数据。
      */
-    /**
-     * 第 39 批：分隔符容错（半角 | / 全角 ｜ / → / Tab，分隔前后允许空格），
-     * 空行与 # 注释跳过；不能解析的行不是静默丢弃，而是逐行写进 issues。
-     * 新分类名支持「一级 / 二级」全名（弹窗插入时回填的就是全名）。
-     */
-    fun batchRules(
-        text: String,
-        groupId: Long,
-        startOrder: Int,
-        issues: MutableList<String>? = null,
-        resolveCategory: (String) -> Long?
-    ): List<RuleDefinition> {
-        val sep = Regex("\\s*[|｜]\\s*|\\s*→\\s*|\\t+")
-        val out = ArrayList<RuleDefinition>()
-        var row = 0
-        for (raw in text.lines()) {
-            val line = raw.trim()
-            if (line.isEmpty() || line.startsWith("#")) continue
-            row += 1
-            val parts = line.split(sep, limit = 2).map { it.trim() }
-            if (parts.size < 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
-                issues?.add("第 " + row + " 行：缺分隔符或两侧为空（" + line + "）")
-                continue
-            }
-            val toId = resolveCategory(parts[1])
-            if (toId == null) {
-                issues?.add("第 " + row + " 行：新分类「" + parts[1] + "」不存在，请用「选新分类」插入")
-                continue
-            }
-            val fromId = resolveCategory(parts[0])
-            val cond = if (fromId != null) {
-                RuleCondition(
-                    field = RuleField.CATEGORY,
-                    op = RuleOp.EQUALS,
-                    categoryId = fromId,
-                    value = parts[0]
-                )
-            } else {
-                RuleCondition(
-                    field = RuleField.COUNTERPARTY,
-                    op = RuleOp.CONTAINS,
-                    value = parts[0]
-                )
-            }
-            out.add(
-                RuleDefinition(
-                    groupId = groupId,
-                    name = parts[0] + " → " + parts[1],
-                    sortOrder = startOrder + out.size,
-                    matchMode = "ALL",
-                    conditions = listOf(cond),
-                    actions = listOf(
-                        RuleActionSpec(kind = RuleActionKind.SET_CATEGORY, categoryId = toId)
-                    )
-                )
-            )
-        }
-        return out
-    }
-
-    /** 每组命中数 + 与其他组重叠的冲突下标；hits == 0 即未命中。 */
-    fun batchReport(targets: List<BulkTarget>, rules: List<RuleDefinition>): List<BatchHit> {
-        val hitIds = rules.map { r ->
-            targets.filter { RuleEngine.evaluate(it, r) }.map { it.id }.toSet()
-        }
-        return rules.indices.map { i ->
-            val conflicts = rules.indices.filter { j ->
-                j != i && hitIds[i].intersect(hitIds[j]).isNotEmpty()
-            }
-            BatchHit(i, rules[i].name, hitIds[i].size, conflicts)
-        }
-    }
 }

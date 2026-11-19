@@ -42,17 +42,39 @@ fun RuleListScreen(onBack: () -> Unit) {
         }
     )
     var page by rememberSaveable { mutableStateOf("list") }
+    // 第 40 批：草稿预览从编辑器进「查看匹配记录」，返回要回编辑器而不是列表。
+    var matchFrom by rememberSaveable { mutableStateOf("list") }
     when (page) {
-        "editor" -> RuleEditorContent(vm = vm, onBack = { page = "list" })
-        "match" -> RuleMatchContent(vm = vm, onBack = { page = "list" })
+        "editor" -> RuleEditorContent(
+            vm = vm,
+            onBack = { page = "list" },
+            onPreviewDraft = { d ->
+                vm.previewRule(d)
+                matchFrom = "editor"
+                page = "match"
+            }
+        )
+        "match" -> RuleMatchContent(
+            vm = vm,
+            onBack = { page = matchFrom },
+            fromDraft = matchFrom == "editor"
+        )
         "groups" -> RuleGroupContent(vm = vm, onBack = { page = "list" })
         else -> RuleListContent(
             vm = vm,
             onBack = onBack,
             onNew = { vm.newDraft(); page = "editor" },
             onEdit = { r -> vm.editRule(r); page = "editor" },
-            onApply = { r -> vm.previewRule(r); page = "match" },
-            onApplyGroup = { gid -> vm.previewGroup(gid); page = "match" },
+            onApply = { r ->
+                vm.previewRule(r)
+                matchFrom = "list"
+                page = "match"
+            },
+            onApplyGroup = { gid ->
+                vm.previewGroup(gid)
+                matchFrom = "list"
+                page = "match"
+            },
             onGroups = { page = "groups" }
         )
     }
@@ -231,7 +253,11 @@ private fun RuleGroupContent(vm: RuleViewModel, onBack: () -> Unit) {
 
 /** 「查看匹配记录」：写之前的命中预览与前后对比，不是规则详情。 */
 @Composable
-private fun RuleMatchContent(vm: RuleViewModel, onBack: () -> Unit) {
+fun RuleMatchContent(
+    vm: RuleViewModel,
+    onBack: () -> Unit,
+    fromDraft: Boolean = false
+) {
     val state by vm.state.collectAsState()
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -249,7 +275,11 @@ private fun RuleMatchContent(vm: RuleViewModel, onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                "这里列出满足条件的记录与前后对比，不是规则详情；改规则请回列表点「编辑」。",
+                if (fromDraft)
+                    "当前是未保存的草稿：下面列出满足条件的记录与前后对比，仅供验证条件圈得对不对；" +
+                        "确认写入只改流水、不会保存规则定义。改规则请返回编辑器。"
+                else
+                    "这里列出满足条件的记录与前后对比，不是规则详情；改规则请回列表点「编辑」。",
                 style = MaterialTheme.typography.bodySmall
             )
             if (state.message.isNotBlank()) {

@@ -395,3 +395,29 @@ NOT_EQUALS / APPEND_NOTE、`RecordDao.searchNotes` 限量联想、
 若 placeholder 在 BOM 版本上不可用，退回 label 但去掉文字（保持单行）。
 
 零改表 → v0.2.20 上覆盖安装即可。`version = 4` 未变。
+
+## 第 40 批（v0.2.22）：草稿预览与删批量录入的根因、回退顺序
+
+**根因一**：第 38 / 39 批把「查看匹配记录」只挂在列表「应用」上，编辑器里改完条件
+只能先保存再回列表验证，草稿态没有命中反馈。而 `previewRule(r)` 本来就接受任意
+`RuleDefinition`，草稿（id = 0、未入库）同样能求值 —— 能力在，入口没接。
+
+**根因二**：第 39 批为「粘贴 N 行旧值 → 新分类」做了一整套解析容错，但使用者的
+真实路径是「字段下拉选分类 → 弹窗按 id 选新分类」，N 组就配 N 条规则。解析器是
+为一个不用的辅助功能付出的持续维护成本，且 v0.2.14 换过分类清单后按名匹配天然脆弱。
+
+| 项 | 处理 |
+|---|---|
+| 草稿预览 | 编辑器加 `onPreviewDraft(draft)` → `vm.previewRule(draft)` → `matchFrom = "editor"` → `page = "match"`；`RuleMatchContent` 放开为 public，按 `fromDraft` 显示不同提示 |
+| 返回语义 | `matchFrom` 由 `rememberSaveable` 记住；草稿预览返回编辑器、列表应用返回列表 |
+| 删批量录入 | UI 块 / `generateBatch` / `batchRules` / `batchReport` / `BatchHit` / `state.report` 一并清掉；`RuleEditorCatalogTest` 换成目录完整性与草稿求值测试 |
+| 数据兼容 | 已存规则是普通 `rule_definitions` 行，删 UI 不删数据；`CategoryMigration` 保留为纯 JVM 兼容类型，不参与写入 |
+| 不动 | `RuleEngine` / `applyBulkTargets` / `changeset` / 两张规则表 / `version = 4` / 备份 DTO 与恢复拓扑序 / CSV 重建按钮 / 两页下拉刷新 / `release.yml` |
+
+**回退顺序**：① 若草稿预览与列表预览出现两份求值出口，收敛回 `RuleViewModel.previewRule`
+单一出口；② 若 `RuleMatchContent` 放开为 public 与旧壳 `RuleManagerScreen` / `Dialog`
+冲突，给旧壳内部 `showMatch` 状态，不新增 NavHost 路由；③ 若删 `batchRules` 后
+单测编译失败，测试改为验证目录完整性与同一引擎求值，不保留解析器；
+④ `matchFrom` 旋转丢态由 `rememberSaveable` 保底。
+
+零改表 → v0.2.21 上覆盖安装即可，不用卸载。`version = 4` 未变。
