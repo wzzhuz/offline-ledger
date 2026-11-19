@@ -120,7 +120,7 @@ object RuleEditorCatalog {
         issues: MutableList<String>? = null,
         resolveCategory: (String) -> Long?
     ): List<RuleDefinition> {
-        val sep = Regex("\s*[|｜]\s*|\s*→\s*|\t+")
+        val sep = Regex("\\s*[|｜]\\s*|\\s*→\\s*|\\t+")
         val out = ArrayList<RuleDefinition>()
         var row = 0
         for (raw in text.lines()) {
