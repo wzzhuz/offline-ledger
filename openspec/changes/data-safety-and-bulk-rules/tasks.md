@@ -288,3 +288,18 @@ Actions 制品页约 12M 是 zip 二次压缩尺寸，两者同一个文件；�
       记一笔 1/31 跳 2 月不丢不崩、时间留空时摘要明示、
       选「全部」跨月生效、切月筛选不丢、快捷段范围与月份不双重夹击、
       月格命中角标正确、规则与 CSV 重建不回退
+
+## 第 41 批实测回填（v0.2.23）
+
+- 代码 commit：`9704cb61f59043ba7ccec8da02ad9f7a8faa159d`（15 文件：3 新增 / 12 修改 / 0 删除）
+- push CI：`44518136822` **success**，17 步全 success / 0 跳过，首轮 Kotlin 编译与纯 JVM 单测零错误
+- release：`44519440667` **success**，28 步 = 23 success / 5 skipped，**「上传到坚果云」completed success**，head_sha 为代码 commit
+- 制品：`offline-ledger-release-v0.2.23` 12402874 B（Actions 制品页 zip 压缩口径）、
+  `offline-ledger-mapping-v0.2.23` 3807428 B、
+  `offline-ledger-metrics-v0.2.23-p-m-nsfalse` 271 B
+- `nsfalse` 只表示认证 / 建目录 / PUT 均未失败；HEAD 落盘校验只写日志不中断，
+  坚果云目录以使用者实际看到的短 sha 为准
+- 零改表（`version = 4` 未变）→ **v0.2.22 上覆盖安装即可，不用卸载**
+- 真机复核仍留 `[ ]`：年月 12 格一步跳转、记一笔月末 clamp、
+  时间留空摘要明示、全部月份跨月生效、切月筛选不丢、范围与月份不双重夹击、
+  月格命中角标、规则与 CSV 重建不回退
