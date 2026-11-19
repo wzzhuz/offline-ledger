@@ -24,6 +24,8 @@ data class RecordFilter(
     val currencyCode: String? = null,
     /** 第 11 批：交易对方模糊匹配；null = 不过滤。 */
     val counterpartyQuery: String? = null,
+    /** 第 43 批：描述模糊匹配；null = 不过滤。与规则字段目录共用语义。 */
+    val descriptionQuery: String? = null,
     /**
      * 第 28 批：从统计页下钻带入的三条「只读展示名」，按维度各自独立。
      * 第 27 批用单条 filterDisplayName，被分类行 / 对方框 / 账户行共用，
@@ -71,7 +73,7 @@ data class RecordFilter(
     fun activeCount(): Int = listOf(
         fromDate, toDate, accountId, type, rootCategoryId,
         categoryId, minAmountCents, maxAmountCents, noteQuery, currencyCode,
-        counterpartyQuery
+        counterpartyQuery, descriptionQuery
     ).count { it != null }
 
     fun bumped(): RecordFilter = copy(revision = revision + 1)

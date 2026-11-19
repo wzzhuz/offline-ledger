@@ -18,6 +18,7 @@ object RuleEditorCatalog {
         RuleField.COUNTERPARTY,
         RuleField.CATEGORY,
         RuleField.NOTE,
+        RuleField.DESCRIPTION,
         RuleField.AMOUNT,
         RuleField.ACCOUNT,
         RuleField.DATE,
@@ -29,6 +30,7 @@ object RuleEditorCatalog {
     fun fieldLabel(f: RuleField): String = when (f) {
         RuleField.COUNTERPARTY -> "交易对方"
         RuleField.NOTE -> "备注"
+        RuleField.DESCRIPTION -> "描述"
         RuleField.CATEGORY -> "分类"
         RuleField.AMOUNT -> "金额"
         RuleField.DATE -> "日期"
@@ -84,6 +86,7 @@ object RuleEditorCatalog {
         RuleActionKind.RENAME_COUNTERPARTY,
         RuleActionKind.REPLACE_NOTE,
         RuleActionKind.APPEND_NOTE,
+        RuleActionKind.SET_DESCRIPTION,
         RuleActionKind.SET_EXCLUDED
     )
 
@@ -92,6 +95,7 @@ object RuleEditorCatalog {
         RuleActionKind.RENAME_COUNTERPARTY -> "交易对方改为"
         RuleActionKind.REPLACE_NOTE -> "备注替换"
         RuleActionKind.APPEND_NOTE -> "备注追加"
+        RuleActionKind.SET_DESCRIPTION -> "描述改为"
         RuleActionKind.SET_EXCLUDED -> "切换不计入收支"
     }
 

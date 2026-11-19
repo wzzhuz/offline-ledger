@@ -122,7 +122,8 @@ class RuleViewModel(
                 excludedFromTotals = e.excludeFromStats,
                 accountId = e.fromAccountId ?: e.toAccountId,
                 currencyCode = e.currencyCode,
-                importSource = e.importSource ?: ""
+                importSource = e.importSource ?: "",
+                description = e.description
             )
         }
     }
@@ -277,6 +278,7 @@ class RuleViewModel(
                 when (field) {
                     RuleField.NOTE -> recordDao.searchNotes(q)
                     RuleField.COUNTERPARTY -> recordDao.searchCounterparties(q)
+                    RuleField.DESCRIPTION -> recordDao.searchDescriptions(q)
                     else -> emptyList()
                 }
             }
@@ -896,6 +898,15 @@ private fun ActionCard(
                     placeholder = { Text("追加到备注末尾") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
+                )
+                RuleActionKind.SET_DESCRIPTION -> TextFieldWithSuggestions(
+                    value = spec.text,
+                    label = "新描述（可联想）",
+                    suggestions = state.suggestions,
+                    onValue = {
+                        onChange(spec.copy(text = it))
+                        vm.suggest(it, RuleField.DESCRIPTION)
+                    }
                 )
                 else -> Unit
             }

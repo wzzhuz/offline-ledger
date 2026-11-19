@@ -398,3 +398,9 @@ FF3 `description` = 本项目「交易对方」、`notes` = 「备注」，因�
 
 **不做**：规则组嵌套、表达式引擎、标签 / 预算联动、stop processing、导入后自动触发。
 **`AppDatabase.version = 4` 未变 → v0.2.18 上覆盖安装即可，不用卸载。**
+
+## 第 43 批（v0.2.25）
+
+- 使用者实测：从 Firefly III 导入的数据丢失 `description`（对方被写成「虚拟-不记录」，备注另有信息，结果不知道这笔干嘛）。
+- 按 1-A / 2-A' / 3-A：加独立 `description` 列（`version = 5`），打通 FF3 导入、自有 CSV、加密备份/自动快照、记一笔、明细行主标题、筛选与规则字段；明细主标题动态回退（有描述用描述、空着用交易对方）。
+- 先归档 `data-safety-and-bulk-rules` 与 `preset-data-and-counterparty`，再新建 `ff3-description-field`，决策史不混。

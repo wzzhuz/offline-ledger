@@ -106,6 +106,7 @@ class LedgerRepository @Inject constructor(
             val entity = byId[t.id] ?: continue
             recordDao.update(withResolvedRoot(entity.copy(
                 counterparty = t.counterparty,
+                description = t.description,
                 note = t.note,
                 categoryId = t.categoryId,
                 excludeFromStats = t.excludedFromTotals
@@ -659,7 +660,8 @@ class LedgerRepository @Inject constructor(
             currencyCode = r.currencyCode,
             counterparty = r.counterparty,
             importSource = r.importSource,
-            sourceId = r.sourceId
+            sourceId = r.sourceId,
+            description = r.description
         )
     }
 
@@ -755,6 +757,7 @@ class LedgerRepository @Inject constructor(
                 localDate = ld,
                 yearMonth = ld / 100,
                 note = row.note,
+                description = row.description,
                 excludeFromStats = false,
                 counterparty = CounterpartyNormalizer.normalize(row.counterparty, aliases),
                 importSource = importSource,
@@ -832,6 +835,7 @@ class LedgerRepository @Inject constructor(
                 localDate = ld,
                 yearMonth = ld / 100,
                 note = row.note,
+                description = row.description,
                 excludeFromStats = false,
                 counterparty = CounterpartyNormalizer.normalize(row.counterparty, aliases),
                 importSource = importSource,
@@ -1001,6 +1005,7 @@ class LedgerRepository @Inject constructor(
                 localDate = e.localDate,
                 yearMonth = e.yearMonth,
                 note = e.note,
+                description = e.description,
                 excludeFromStats = false,
                 counterparty = CounterpartyNormalizer.normalize(e.counterparty, aliases),
                 importSource = "FIREFLY_III",

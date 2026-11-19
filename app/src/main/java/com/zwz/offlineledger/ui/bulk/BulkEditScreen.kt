@@ -91,7 +91,8 @@ class BulkEditViewModel(
                             categoryId = e.categoryId,
                             amountCents = e.amountCents,
                             bookedAtEpochMilli = e.timestamp,
-                            excludedFromTotals = e.excludeFromStats
+                            excludedFromTotals = e.excludeFromStats,
+                            description = e.description
                         )
                     }
                     BulkEditEngine.apply(targets, conditions, actions)

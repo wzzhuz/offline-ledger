@@ -51,6 +51,8 @@ data class FilterValues(
     val currencyCode: String? = null,
     /** 第 11 批：交易对方模糊匹配，与 pagedFiltered 参数一一对应。 */
     val counterpartyQuery: String? = null,
+    /** 第 43 批：描述模糊匹配，与 pagedFiltered 参数一一对应。 */
+    val descriptionQuery: String? = null,
     /** 第 28 批：三条只读展示名按维度独立，不进 SQL、不进 activeCount()。 */
     val categoryDisplayName: String? = null,
     val counterpartyDisplayName: String? = null,
@@ -192,6 +194,7 @@ class DetailViewModel(
             noteQuery = v.noteQuery,
             currencyCode = v.currencyCode,
             counterpartyQuery = v.counterpartyQuery,
+            descriptionQuery = v.descriptionQuery,
             categoryDisplayName = v.categoryDisplayName,
             counterpartyDisplayName = v.counterpartyDisplayName,
             accountDisplayName = v.accountDisplayName,
@@ -249,7 +252,7 @@ class DetailViewModel(
             fromDate = null, toDate = null, accountId = null, type = null,
             rootCategoryId = null, categoryId = null,
             minAmountCents = null, maxAmountCents = null, noteQuery = null,
-            currencyCode = null, counterpartyQuery = null,
+            currencyCode = null, counterpartyQuery = null, descriptionQuery = null,
             categoryDisplayName = null, counterpartyDisplayName = null,
             accountDisplayName = null, allMonths = true,
             revision = _filter.value.revision + 1

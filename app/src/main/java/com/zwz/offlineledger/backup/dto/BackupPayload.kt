@@ -39,7 +39,9 @@ data class BackupRecord(
     val counterparty: String = "",
     /** 第 23 批：导入来源标记，带默认值让旧备份仍可解析。 */
     val importSource: String? = null,
-    val sourceId: String? = null
+    val sourceId: String? = null,
+    /** 第 43 批：带默认值，旧备份缺键解析为空串，不破坏兼容。 */
+    val description: String = ""
 )
 
 @Serializable

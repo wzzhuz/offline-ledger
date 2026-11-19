@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class RuleField {
     COUNTERPARTY, NOTE, CATEGORY, AMOUNT, DATE,
-    ACCOUNT, CURRENCY, IMPORT_SOURCE, EXCLUDED
+    ACCOUNT, CURRENCY, IMPORT_SOURCE, EXCLUDED, DESCRIPTION
 }
 
 @Serializable
@@ -36,7 +36,7 @@ data class RuleCondition(
 @Serializable
 enum class RuleActionKind {
     SET_CATEGORY, RENAME_COUNTERPARTY, REPLACE_NOTE, SET_EXCLUDED,
-    APPEND_NOTE
+    APPEND_NOTE, SET_DESCRIPTION
 }
 
 @Serializable

@@ -96,6 +96,7 @@ fun FilterSheet(
         mutableStateOf(initial.maxAmountCents?.let { Cents(it).toYuanString() } ?: "")
     }
     var noteText by remember { mutableStateOf(initial.noteQuery ?: "") }
+    var descText by remember { mutableStateOf(initial.descriptionQuery ?: "") }
     var partyText by remember { mutableStateOf(initial.counterpartyQuery ?: "") }
     var type by remember { mutableStateOf(initial.type) }
     var accountId by remember { mutableStateOf(initial.accountId) }
@@ -291,6 +292,13 @@ fun FilterSheet(
                     modifier = Modifier.fillMaxWidth(),
                     trailingIcon = clearIcon(noteText) { noteText = "" }
                 )
+                CompactField(
+                    value = descText,
+                    onChange = { descText = it },
+                    hint = "描述包含",
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = clearIcon(descText) { descText = "" }
+                )
                 ThinLine()
 
                 Row(
@@ -314,6 +322,7 @@ fun FilterSheet(
                                     noteQuery = noteText.takeIf { it.isNotBlank() },
                                     currencyCode = currencyCode,
                                     counterpartyQuery = partyText.takeIf { it.isNotBlank() },
+                                    descriptionQuery = descText.takeIf { it.isNotBlank() },
                                     categoryDisplayName = displayName,
                                     counterpartyDisplayName =
                                         partyText.takeIf { it.isNotBlank() },

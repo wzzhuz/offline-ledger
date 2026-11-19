@@ -513,19 +513,25 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
     val account = row.fromAccountName ?: row.toAccountName ?: "-"
     val category = row.categoryName ?: "转账"
     val party = row.counterparty.takeIf { it.isNotBlank() }
+    val desc = row.description.takeIf { it.isNotBlank() }
+    // 第 43 批 2-A'：描述有值用描述做主标题，空着回退交易对方。
+    // 超市可写「牛奶鸡蛋」，餐饮只看「肯德基」零额外输入，FF3 占位对方退到副行。
     val primary = when {
         type == RecordType.TRANSFER -> "转账"
+        desc != null -> desc
         party != null -> party
         else -> category
     }
     val partyTag = when {
         type == RecordType.TRANSFER -> null
+        desc != null -> null
         party == null -> null
         type == RecordType.INCOME -> "来源"
         else -> "收款方"
     }
     val secondary = listOfNotNull(
         category.takeIf { primary != category },
+        party.takeIf { desc != null && it != primary },
         row.note.takeIf { it.isNotBlank() && it != primary }
     ).joinToString(" · ")
     val accent = when (type) {

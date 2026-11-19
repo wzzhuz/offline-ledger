@@ -31,6 +31,9 @@ data class TrashEntryEntity(
     /** 与 records.counterparty 同步，删除->恢复不丢收款方。 */
     @ColumnInfo(name = "counterparty", defaultValue = "''")
     val counterparty: String = "",
+    /** 第 43 批：与 records.description 同步，删除->恢复不丢描述。 */
+    @ColumnInfo(name = "description", defaultValue = "''")
+    val description: String = "",
     /** 第 23 批：与 records.importSource 同步。 */
     @ColumnInfo(name = "importSource") val importSource: String? = null,
     @ColumnInfo(name = "sourceId") val sourceId: String? = null,

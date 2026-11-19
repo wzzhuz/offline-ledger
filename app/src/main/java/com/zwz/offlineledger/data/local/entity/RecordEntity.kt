@@ -53,6 +53,12 @@ data class RecordEntity(
     /** 阶段 7：收款方自由文本。不是账户、不产生复式分录、不参与余额联动。 */
     @ColumnInfo(name = "counterparty", defaultValue = "''")
     val counterparty: String = "",
+    /**
+     * 第 43 批：Firefly III 的 description（必填、常写「这笔干嘛的」）。
+     * MUST 独立成列，MUST NOT 拼进 note / 覆盖 counterparty。
+     */
+    @ColumnInfo(name = "description", defaultValue = "''")
+    val description: String = "",
     /** 导入来源标记；手工记账恒为 null，NULL 在 SQLite 唯一索引里互不冲突。 */
     @ColumnInfo(name = "importSource")
     val importSource: String? = null,

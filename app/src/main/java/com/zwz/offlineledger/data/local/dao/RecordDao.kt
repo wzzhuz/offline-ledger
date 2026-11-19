@@ -42,7 +42,9 @@ data class RecordRow(
     val toAccountName: String?,
     val counterparty: String = "",
     val importSource: String = "",
-    val sourceId: String = ""
+    val sourceId: String = "",
+    /** 第 43 批：列表主标题在有描述时用它；缺列时按空串兼容。 */
+    val description: String = ""
 )
 
 /** 账户详情专属流水行。 */
@@ -105,7 +107,9 @@ data class CsvSourceRow(
     val categoryName: String,
     val counterparty: String = "",
     val importSource: String = "",
-    val sourceId: String = ""
+    val sourceId: String = "",
+    /** 第 43 批：列表主标题在有描述时用它；缺列时按空串兼容。 */
+    val description: String = ""
 )
 
 /** 第 23 批：账单导入前的疑似匹配候选（金额 + 账户 + 时间窗）。 */
@@ -189,6 +193,7 @@ interface RecordDao {
                COALESCE(r.counterparty, '') AS counterparty,
                COALESCE(r.importSource, '') AS importSource,
                COALESCE(r.sourceId, '') AS sourceId,
+               COALESCE(r.description, '') AS description,
                c.name AS categoryName, c.colorHex AS categoryColorHex,
                fa.name AS fromAccountName, ta.name AS toAccountName
           FROM records r
@@ -208,6 +213,8 @@ interface RecordDao {
            AND (:currencyCode IS NULL OR r.currencyCode = :currencyCode)
            AND (:counterpartyQuery IS NULL
                 OR COALESCE(r.counterparty, '') LIKE '%' || :counterpartyQuery || '%')
+           AND (:descriptionQuery IS NULL
+                OR COALESCE(r.description, '') LIKE '%' || :descriptionQuery || '%')
          ORDER BY r.localDate DESC, r.id DESC
          LIMIT :limit OFFSET :offset
         """
@@ -216,7 +223,8 @@ interface RecordDao {
         fromDate: Int?, toDate: Int?, accountId: Long?, type: String?,
         rootCategoryId: Long?, categoryId: Long?, minAmount: Long?,
         maxAmount: Long?, noteQuery: String?, currencyCode: String?,
-        counterpartyQuery: String?, limit: Int, offset: Int
+        counterpartyQuery: String?, descriptionQuery: String?,
+        limit: Int, offset: Int
     ): List<RecordRow>
 
     /** 日期头真实值：整月按日聚合，不用已加载分页数据求和。 */
@@ -461,6 +469,7 @@ interface RecordDao {
                COALESCE(r.counterparty, '') AS counterparty,
                COALESCE(r.importSource, '') AS importSource,
                COALESCE(r.sourceId, '') AS sourceId,
+               COALESCE(r.description, '') AS description,
                COALESCE(a.name, '') AS accountName,
                COALESCE(rc.name, '') AS rootName,
                COALESCE(c.name, '') AS categoryName
@@ -536,6 +545,10 @@ interface RecordDao {
     /** 第 37 批：规则编辑器备注联想，纯本地 DISTINCT、限量 10 条，不把全历史灌进内存。 */
     @Query("SELECT DISTINCT note FROM records WHERE note IS NOT NULL AND note <> '' AND note LIKE '%' || :q || '%' ORDER BY note ASC LIMIT 10")
     suspend fun searchNotes(q: String): List<String>
+
+    /** 第 43 批：规则编辑器描述联想，纯本地 DISTINCT、限量 10 条。 */
+    @Query("SELECT DISTINCT description FROM records WHERE description IS NOT NULL AND description <> '' AND description LIKE '%' || :q || '%' ORDER BY description ASC LIMIT 10")
+    suspend fun searchDescriptions(q: String): List<String>
 
     /** 阶段 8：指定日期之后的账户使用频次，用于记账页常用账户置顶。 */
     @Query("SELECT accountId AS id, COUNT(*) AS uses FROM (SELECT fromAccountId AS accountId FROM records WHERE localDate >= :fromDate AND fromAccountId IS NOT NULL UNION ALL SELECT toAccountId AS accountId FROM records WHERE localDate >= :fromDate AND toAccountId IS NOT NULL) GROUP BY accountId ORDER BY uses DESC")

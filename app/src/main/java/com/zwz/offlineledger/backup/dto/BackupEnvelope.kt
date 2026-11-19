@@ -10,7 +10,9 @@ object BackupSchema {
     // 阶段 6a 升 2；阶段 6b 升 3；阶段 6c-1 BackupRecord 增加
     // currencyCode，故 CURRENT 升 4。MIN_SUPPORTED 一路保持 1：
     // v1/v2/v3 备份缺键时靠默认值解析成空列表 / null / HKD。
-    const val CURRENT: Int = 4
+    // 第 43 批：BackupRecord 增加 description（带默认值），CURRENT 升 5；
+    // MIN_SUPPORTED 仍为 1，旧备份缺 description 键按空串解析。
+    const val CURRENT: Int = 5
     const val MIN_SUPPORTED: Int = 1
 }
 

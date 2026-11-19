@@ -17,7 +17,9 @@ data class CsvRow(
     val counterparty: String = "",
     /** 第 23 批：导出必带、导入缺列按空串处理（旧 CSV 兼容）。 */
     val importSource: String = "",
-    val sourceId: String = ""
+    val sourceId: String = "",
+    /** 第 43 批：导出必带、导入缺列按空串处理（旧 CSV 兼容）。 */
+    val description: String = ""
 ) {
     /**
      * 导入去重键 = 账户 + 金额 + 日期 + 备注。

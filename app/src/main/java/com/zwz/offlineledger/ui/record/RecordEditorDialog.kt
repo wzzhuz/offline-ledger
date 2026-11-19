@@ -248,6 +248,19 @@ fun RecordEditorDialog(
                         }
                     }
 
+                    // 第 43 批：描述独立于对方与备注；placeholder-only、无 label 边框。
+                    // 有值时明细列表主标题用它，空着则回退到交易对方。
+                    FormRow("描述") {
+                        OutlinedTextField(
+                            value = state.description,
+                            onValueChange = { vm.setDescription(it) },
+                            placeholder = { Text("买了什么 / 这笔干嘛的（可选）") },
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                        )
+                    }
+
                     // 第 7 批：备注是低频项，默认收进「更多」；编辑已有备注的流水
                     // 在按钮上显示摘要，点开即可改，旧内容绝不会看不见。
                     val noteSummary = if (state.note.length > 18)

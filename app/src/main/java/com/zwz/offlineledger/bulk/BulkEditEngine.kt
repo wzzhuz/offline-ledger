@@ -18,7 +18,9 @@ data class BulkTarget(
      */
     val accountId: Long? = null,
     val currencyCode: String = "CNY",
-    val importSource: String = ""
+    val importSource: String = "",
+    /** 第 43 批：规则条件字段与 SET_DESCRIPTION 动作共用。 */
+    val description: String = ""
 )
 
 data class BulkConditions(

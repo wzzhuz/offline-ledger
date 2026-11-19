@@ -26,6 +26,8 @@ import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 
 /**
+ * 第 43 批：version 升到 5（records / trash 增加 description 独立列）。
+ * 仍不注册 Migration，测试期 MUST 卸载重装、装之前先导出。
  * 第 36 批：version 升到 4（rule_groups / rule_definitions，零外键）。
  * 仍不注册 Migration，测试期 MUST 卸载重装、装之前先导出。
  * 第 30 批：version 升到 3（categories.enabled / accounts.cardLast4 /
@@ -51,7 +53,7 @@ import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
         RuleGroupEntity::class,
         RuleEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

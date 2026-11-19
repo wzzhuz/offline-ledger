@@ -220,6 +220,7 @@ object FireflyCsvCodec {
                 localDate = ld.localDate,
                 yearMonth = ld.yearMonth,
                 note = note,
+                description = r.description,
                 skipReason = skipReason
             )
             if (kind != FireflyKind.SKIPPED) {

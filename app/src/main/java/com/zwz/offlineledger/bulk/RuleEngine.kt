@@ -6,6 +6,7 @@ object RuleEngine {
     private fun valueOf(t: BulkTarget, f: RuleField): String = when (f) {
         RuleField.COUNTERPARTY -> t.counterparty
         RuleField.NOTE -> t.note
+        RuleField.DESCRIPTION -> t.description
         RuleField.CATEGORY -> t.categoryId?.toString() ?: ""
         RuleField.AMOUNT -> t.amountCents.toString()
         RuleField.DATE -> t.bookedAtEpochMilli.toString()
@@ -95,6 +96,7 @@ object RuleEngine {
                 )
                 RuleActionKind.SET_EXCLUDED -> cur.copy(excludedFromTotals = a.excluded)
                 RuleActionKind.APPEND_NOTE -> cur.copy(note = cur.note + a.text)
+                RuleActionKind.SET_DESCRIPTION -> cur.copy(description = a.text)
             }
         }
         return cur

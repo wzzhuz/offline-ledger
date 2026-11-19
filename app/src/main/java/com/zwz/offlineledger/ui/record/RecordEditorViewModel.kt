@@ -33,6 +33,8 @@ data class EditorState(
     val timestamp: Long = System.currentTimeMillis(),
     val note: String = "",
     val counterparty: String = "",
+    /** 第 43 批：描述独立输入，不并入备注。 */
+    val description: String = "",
     val excludeFromStats: Boolean = false,
     val loaded: Boolean = false
 )
@@ -113,6 +115,7 @@ class RecordEditorViewModel(
                         timestamp = r.timestamp,
                         note = r.note,
                         counterparty = r.counterparty,
+                        description = r.description,
                         excludeFromStats = r.excludeFromStats,
                         loaded = true
                     )
@@ -206,6 +209,11 @@ class RecordEditorViewModel(
 
     fun setNote(v: String) {
         _state.value = _state.value.copy(note = v)
+    }
+
+    /** 第 43 批：描述独立于对方与备注，编辑态与列表主标题共用。 */
+    fun setDescription(v: String) {
+        _state.value = _state.value.copy(description = v)
     }
 
     /** 阶段 8：键入一两个字即从全部历史交易对方模糊联想。 */
@@ -318,7 +326,8 @@ class RecordEditorViewModel(
             yearMonth = ld.yearMonth,
             note = s.note,
             excludeFromStats = s.excludeFromStats,
-            counterparty = s.counterparty.trim()
+            counterparty = s.counterparty.trim(),
+            description = s.description.trim()
         )
         return try {
             if (editingId == null) {

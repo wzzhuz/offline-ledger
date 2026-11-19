@@ -53,6 +53,8 @@ data class FireflyEntry(
     val localDate: Int,
     val yearMonth: Int,
     val note: String,
+    /** 第 43 批：FF3 description 独立带出，MUST NOT 并入 note。 */
+    val description: String = "",
     val skipReason: String = ""
 )
 
