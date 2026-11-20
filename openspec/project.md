@@ -447,3 +447,14 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 
 ### 第 47 批实测
 首轮代码 `1f007364f2b4` / CI `44693391892` failure（单测构造顺序写错），修复 `d24c46e2ba8c` / push CI `44694256046` success 17/17 / release `44695050909` success（坚果云 success）/ 制品 `offline-ledger-release-v0.2.29` 12409171 B。并发 run `44695407402` 已 cancel，保留 `44695050909`。零改表 → 覆盖安装。
+
+## 第 48 批（v0.2.30）：明细页单一周期源
+
+- 使用者实测：统计页从 10 月跳转后表头 / 年月切换仍是 11 月；× 掉筛选后表头 11 月、列表 10 月结果。
+- 按 1-A′ / 2-A：`RecordFilter` 新增 `displayYearMonth()` / `displayGranularity()` / `displayPeriodLabel()`，表头、年月选择器、左右箭头、`reload()`、`timeSummary()`、`showMonthOverview()` 全读单一派生；`relocateToMonth()` 下钻态切月换范围保留其余筛选，`cleared()` 清空回默认当前月并递增 revision 触发重查。
+- 未隐藏年月选择：保留下钻态直接翻月能力；统计下钻月 / 年 / 多年三类周期表头同步。
+- 新增 `DetailDisplayPeriodTest` 8 条纯 JVM 单测；spec 新增 Requirement、design 第 48 批、活文档 §7.30 / §8。
+- 零改表（`AppDatabase.version = 5` 未变）→ v0.2.29 上覆盖安装即可，不用卸载。
+- 挂账未动：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中；活文档 §1 事故登记仍待补齐全。
+
+### 第 48 批实测（待回填）

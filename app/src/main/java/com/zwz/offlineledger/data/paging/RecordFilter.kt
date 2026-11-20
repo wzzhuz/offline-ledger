@@ -70,6 +70,29 @@ data class RecordFilter(
     fun effectiveToDate(): Int? = toDate
         ?: if (allMonths || fromDate != null) null else periodBounds().second
 
+    /**
+     * 第 48 批：表头 / 年月选择器 / 左右箭头 / 锚点 / 概览隐藏判断共用的单一周期源。
+     * 显式范围（含统计下钻）以范围首日派生年月，否则用 yearMonth；
+     * MUST NOT 再从 _overview 另存一份月份，那是「列表 10 月、表头 11 月」的根因。
+     */
+    fun displayYearMonth(): Int = fromDate?.let { it / 100 } ?: yearMonth
+
+    /** 整年闭区间只读地识别为年粒度；跨年区间仍按 granularity 交代。 */
+    fun displayGranularity(): DetailGranularity {
+        val f = fromDate
+        val t = toDate
+        return if (f != null && t != null &&
+            f % 10000 == 101 && t % 10000 == 1231 &&
+            f / 10000 == t / 10000
+        ) DetailGranularity.YEAR else granularity
+    }
+
+    /** 第 48 批：顶部标题单一出口。下钻态直接用统计周期只读展示名。 */
+    fun displayPeriodLabel(): String = periodDisplayName ?: when (displayGranularity()) {
+        DetailGranularity.MONTH -> MonthRange.label(displayYearMonth())
+        DetailGranularity.YEAR -> (displayYearMonth() / 100).toString() + " 年"
+    }
+
     /** 第 45 批：顶部标题用的周期文案，月 / 年共用单一出口。 */
     fun periodLabel(anchorYearMonth: Int = yearMonth): String = when (granularity) {
         DetailGranularity.MONTH -> MonthRange.label(anchorYearMonth)
@@ -96,10 +119,11 @@ data class RecordFilter(
      * MUST NOT 显示错月数字，只留 timeSummary() 的范围说明。
      */
     fun showMonthOverview(): Boolean =
-        granularity == DetailGranularity.MONTH &&
+        displayGranularity() == DetailGranularity.MONTH &&
             !allMonths &&
             activeCount() == 0 &&
-            periodDisplayName == null
+            periodDisplayName == null &&
+            displayYearMonth() == yearMonth
 
     /**
      * 第 42 批：时间语义单一出口，chip 与月份条共用，不允许各处自己拼。
@@ -110,13 +134,13 @@ data class RecordFilter(
         fromDate != null || toDate != null ->
             "时间：" + (fromDate?.let { MonthRange.dateLabel(it) } ?: "不限") +
                 " ~ " + (toDate?.let { MonthRange.dateLabel(it) } ?: "不限")
-        allMonths -> "时间：全部记录 · 当前定位 " + MonthRange.label(yearMonth) +
+        allMonths -> "时间：全部记录 · 当前定位 " + MonthRange.label(displayYearMonth()) +
             (totalCount?.let { " · 共 " + it + " 条命中" } ?: "")
-        else -> when (granularity) {
+        else -> when (displayGranularity()) {
             DetailGranularity.MONTH ->
-                "时间：当前月 " + MonthRange.label(yearMonth) + "（切月看其他月）"
+                "时间：当前月 " + MonthRange.label(displayYearMonth()) + "（切月看其他月）"
             DetailGranularity.YEAR ->
-                "时间：" + (yearMonth / 100).toString() + " 年（切年看其他年）"
+                "时间：" + (displayYearMonth() / 100).toString() + " 年（切年看其他年）"
         }
     }
 
@@ -127,6 +151,33 @@ data class RecordFilter(
     ).count { it != null }
 
     fun bumped(): RecordFilter = copy(revision = revision + 1)
+
+    /**
+     * 第 48 批：下钻 / 显式范围态切月 = 把范围换成目标月闭区间，
+     * 清掉「来自统计」标记、保留其余筛选（分类 / 对方 / 账户 / 金额 / 币种），
+     * 来源转成普通「筛选结果」；无范围态（含全部时间）仍只定位、MUST NOT 注入月份过滤。
+     * 两路都递增 revision，Pager 必然重建，表头与列表自然一致。
+     */
+    fun relocateToMonth(target: Int): RecordFilter {
+        val hasRange = fromDate != null || toDate != null || periodDisplayName != null
+        return if (hasRange) {
+            val (first, last) = MonthRange.of(target)
+            copy(
+                yearMonth = target,
+                fromDate = first,
+                toDate = last,
+                periodDisplayName = null,
+                allMonths = false,
+                granularity = DetailGranularity.MONTH,
+                revision = revision + 1
+            )
+        } else {
+            copy(yearMonth = target, revision = revision + 1)
+        }
+    }
+
+    /** 第 48 批：清空筛选 MUST 真正回到默认当前月窄视图，而非留下下钻月份。 */
+    fun cleared(): RecordFilter = currentMonth().copy(revision = revision + 1)
 
     companion object {
         /** 第 45 批：首次进入 / 清空筛选 = 无筛选 → 按当前周期（默认月），不再是全库。 */

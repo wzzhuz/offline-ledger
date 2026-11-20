@@ -125,10 +125,15 @@ class DetailViewModel(
         viewModelScope.launch { _filter.collect { f -> reload(f) } }
     }
 
-    /** 筛选变化时只刷新合计，MUST NOT 把概览月份拉回筛选里的初始值。 */
+    /**
+     * 第 48 批：概览 / 角标统一按 filter 派生的单一周期刷新。
+     * 下钻只替换 _filter 时，_overview.yearMonth 不再停在旧月，
+     * 表头与年月选择器即使读 overview 也不会与列表打架。
+     */
     private suspend fun reload(f: RecordFilter) {
-        refreshOverview(_overview.value.yearMonth, f.currencyCode)
-        refreshMonthCounts(_overview.value.yearMonth / 100)
+        val ym = f.displayYearMonth()
+        refreshOverview(ym, f.currencyCode)
+        refreshMonthCounts(ym / 100)
     }
 
     private suspend fun refreshOverview(yearMonth: Int, currencyCode: String?) {
@@ -161,9 +166,9 @@ class DetailViewModel(
         viewModelScope.launch { refreshMonthCounts(year) }
     }
 
-    /** 第 46 批：左右箭头与 Picker 都是「切到哪个月」，仍不注入月份过滤。 */
+    /** 第 48 批：左右箭头以单一周期源为基准，统计下钻态不会从旧月跳。 */
     fun switchMonth(deltaMonths: Int) =
-        locateMonth(MonthRange.shift(_overview.value.yearMonth, deltaMonths))
+        locateMonth(MonthRange.shift(_filter.value.displayYearMonth(), deltaMonths))
 
     /** YearMonthPicker 一步跳到任意年月，只定位不清条件。 */
     fun selectMonth(yearMonth: Int) = locateMonth(yearMonth)
@@ -185,12 +190,11 @@ class DetailViewModel(
      * overview 先同步更新，避免 _filter.collect 的 reload() 读到旧月份把概览拉回去。
      */
     fun locateMonth(yearMonth: Int) {
+        // 第 48 批：切月语义交给 RecordFilter.relocateToMonth 单一纯函数裁决；
+        // 下钻 / 显式范围态换范围并保留其余筛选，无范围态仍只定位不过滤。
         _anchorMonth.value = yearMonth
         _overview.value = _overview.value.copy(yearMonth = yearMonth)
-        _filter.value = _filter.value.copy(
-            yearMonth = yearMonth,
-            revision = _filter.value.revision + 1
-        )
+        _filter.value = _filter.value.relocateToMonth(yearMonth)
         viewModelScope.launch {
             refreshOverview(yearMonth, _filter.value.currencyCode)
             refreshMonthCounts(yearMonth / 100)
@@ -286,16 +290,10 @@ class DetailViewModel(
         )
     }
 
+    /** 第 48 批：清空筛选 MUST 回默认当前月并触发重查，不能留下下钻的 10 月。 */
     fun clearFilter() {
-        _filter.value = _filter.value.copy(
-            fromDate = null, toDate = null, accountId = null, type = null,
-            rootCategoryId = null, categoryId = null,
-            minAmountCents = null, maxAmountCents = null, noteQuery = null,
-            currencyCode = null, counterpartyQuery = null, descriptionQuery = null,
-            categoryDisplayName = null, counterpartyDisplayName = null,
-            accountDisplayName = null, periodDisplayName = null, allMonths = false,
-            revision = _filter.value.revision + 1
-        )
+        _filter.value = _filter.value.cleared()
+        _anchorMonth.value = null
     }
 
     /** 写操作成功后由外部调用，递增 revision 触发 flatMapLatest 重建 Pager。 */

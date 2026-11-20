@@ -94,3 +94,38 @@
 1. 默认态概览消失 → 摘掉 `showMonthOverview()` 判断，`MonthOverviewCard` 恒传 true。
 2. 隐藏态筛选入口误伤 → 把 `TextButton(onFilter)` 移回独立 Row。
 3. 日头合计误伤 → `DayHeader` 恢复 `totals?.first ?: 0L` 旧写法。
+
+## 第 48 批（v0.2.30）：单一周期源，收口「表头撒谎」
+
+### 根因
+第 47 批只修了「汇总块」绑独立周期源，表头与年月选择器仍读 `_overview.yearMonth`。
+统计下钻 `filterByCategory` / `filterByCounterparty` / `filterByAccount` 直接整体替换 `_filter`，
+`_overview` 没跟着走：列表 10 月、表头 11 月。
+此外 `clearFilter()` 用 `copy(...)` 保留了下钻带进来的 `yearMonth=202610`，
+`allMonths=false` 让 `periodBounds()` 仍按 10 月取范围 → × 掉筛选后列表还是 10 月，
+用户观察为「表头 11 月、列表 10 月」。这是「改一处漏一处」的同一型，不是新的计算错误。
+
+### 决策
+- 「隐藏年月选择 + 清空后额外重查」被否：能消除显示不一致，但下钻后想翻到 9 月要先退出筛选，
+  导航能力被收走，且没解决两套周期源。
+- 单一派生：`displayYearMonth()`（显式范围取首日 / 否则 `yearMonth`）、
+  `displayGranularity()`（整年闭区间识别为 YEAR）、`displayPeriodLabel()`（下钻态复用 `periodDisplayName`）。
+  表头、Picker、左右箭头、`reload()`、`timeSummary()`、`showMonthOverview()` 全读这一组。
+- 切月交给 `relocateToMonth()` 纯函数：下钻 / 显式范围态换范围并保留其余筛选，
+  清掉「来自统计」；无范围态仍只定位不过滤。两路都 `revision+1` 触发 Pager 重建。
+- 清空交给 `cleared()` 纯函数：直接 `currentMonth()` 全新对象，回到默认当前月窄视图。
+- `reload(f)` 用 `f.displayYearMonth()` 刷新 overview 与角标，`_overview.yearMonth` 自然跟随 filter。
+
+### 取舍（如实）
+- 月 / 年粒度 chip 仍绑定 `filter.granularity`（默认视图粒度），不下钻态强制派生：
+  让 `setGranularity()` 在范围态联动会牵动「粒度 vs 范围」交互，范围外溢；
+  下钻态标题由 `periodDisplayName` / `displayPeriodLabel()` 交代，chip 不冒充当前周期。
+- `YearMonthPicker` 的 `disableEmptyMonths` 保持 true：下钻态非空月可点已满足「直接翻月」，
+  空月灰显沿用第 41 批约定，不为这一批放宽。
+- 下钻三入口未单独写 `_anchorMonth`：既有 `consumeAnchor()` 在定位成功后清空，
+  且本批 UI 表头已不依赖 overview，残留锚点不会造成错月标题。
+
+### 回退顺序（第 48 批）
+1. 表头与列表再度错位 → 摘掉 `displayPeriodLabel()`，UI 回 `periodLabel(overview.yearMonth)`。
+2. 下钻态切月丢筛选 → `relocateToMonth()` 退回只改 `yearMonth + revision`。
+3. 清空后仍留下钻月份 → `clearFilter()` 退回旧 `copy(...)` 写法。

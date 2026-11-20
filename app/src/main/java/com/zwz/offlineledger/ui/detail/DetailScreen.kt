@@ -157,7 +157,8 @@ fun DetailScreen(
                     activeFilterCount = filter.activeCount(),
                     timeSummary = filter.timeSummary(pagingItems.itemCount),
                     showOverview = filter.showMonthOverview(),
-                    periodTitle = filter.periodLabel(overview.yearMonth),
+                    // 第 48 批：表头读单一派生周期，不再读 _overview 那份独立月份。
+                    periodTitle = filter.displayPeriodLabel(),
                     granularity = filter.granularity,
                     onGranularity = { vm.setGranularity(it) },
                     onPrev = { vm.switchMonth(-1) },
@@ -336,7 +337,7 @@ fun DetailScreen(
 
     if (showMonthPicker) {
         YearMonthPickerDialog(
-            initial = overview.yearMonth,
+            initial = filter.displayYearMonth(),
             monthCounts = monthCounts,
             onYearShown = { vm.loadMonthCounts(it) },
             onDismiss = { showMonthPicker = false },
