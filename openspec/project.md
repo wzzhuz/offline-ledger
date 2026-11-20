@@ -419,3 +419,7 @@ FF3 `description` = 本项目「交易对方」、`notes` = 「备注」，因�
 - 编辑态账户与交易对方当前值置顶，按 id 精确回填与已删除拦截不回退。
 - 点击记录直接进只读详情页，锁切编辑、删除 / 报销一步到位，不新增 NavHost 路由。
 - 零改表（`version = 5` 不变）→ 覆盖安装；change `detail-scope-and-record-page` 进行中。
+
+### 第 45 批实测
+commit `657ac195d74f` / CI `44661745120` / release `44662596613`（坚果云 success）/
+制品 `offline-ledger-release-v0.2.27` 12,405,979 B。零改表 → 覆盖安装。

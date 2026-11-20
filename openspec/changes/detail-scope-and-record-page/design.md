@@ -30,3 +30,17 @@
 
 ## 不引
 第三方日期库、表达式引擎、真加密锁、NavHost 路由、任何 DAO / 统计口径改动。
+
+## 实测回填（第 45 批）
+
+- 代码 commit：`657ac195d74febf8bb7812bc541017b69cd3077f`
+  （首轮 `149ca6c9024b3d257dd0d838111ff0eba61e1e5c` 的 `promoteIds` 类型不匹配，
+  修复为泛型 `promoteById`；中间 `69dddc7134d0` 为临时诊断 workflow，已清理）
+- push CI：`44661745120` **success** 17/17（首轮 `44660731626` 失败于「运行单元测试」）
+- release：`44662596613` **success**，28 步 = 23 绿 / 5 跳过，「上传到坚果云」success；
+  并发 `44662933616` 已 cancelled（dispatch 回连 502 重试导致，未重复上传）
+- 制品：`offline-ledger-release-v0.2.27` **12,405,979 B**、
+  `offline-ledger-mapping-v0.2.27` **3,826,420 B**、
+  `offline-ledger-metrics-v0.2.27-p-m-nsfalse` **270 B**
+- 零改表（`AppDatabase.version = 5` 未变）→ v0.2.26 上覆盖安装即可
+- 坚果云目录以使用者实际所见为准；上传 step 成功不等于目录可见
