@@ -156,6 +156,7 @@ fun DetailScreen(
                     overview = overview,
                     activeFilterCount = filter.activeCount(),
                     timeSummary = filter.timeSummary(pagingItems.itemCount),
+                    showOverview = filter.showMonthOverview(),
                     periodTitle = filter.periodLabel(overview.yearMonth),
                     granularity = filter.granularity,
                     onGranularity = { vm.setGranularity(it) },
@@ -214,7 +215,13 @@ fun DetailScreen(
                             MonthGroupHeader(ym, monthCounts[ym])
                         }
                         if (previous == null || previous.localDate != row.localDate) {
-                            DayHeader(row.localDate, overview.dailyTotals[row.localDate])
+                            // 第 47 批：跨范围态 overview 只按当前查看月聚合，
+                            // 日头不显示错月 / 0 值合计，只显示日期；不新增聚合查询。
+                            DayHeader(
+                                row.localDate,
+                                if (filter.showMonthOverview()) overview.dailyTotals[row.localDate]
+                                else null
+                            )
                         }
                         RecordRowCard(row = row, onClick = { actionRow = row })
                     }
@@ -369,6 +376,7 @@ private fun MonthOverviewCard(
     overview: MonthOverview,
     activeFilterCount: Int,
     timeSummary: String,
+    showOverview: Boolean,
     periodTitle: String,
     granularity: DetailGranularity,
     onGranularity: (DetailGranularity) -> Unit,
@@ -412,38 +420,62 @@ private fun MonthOverviewCard(
                 Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "下个月")
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("支出 " + formatCents(overview.expenseCents), color = LedgerColors.ExpenseRed)
-            Text("收入 " + formatCents(overview.incomeCents), color = LedgerColors.IncomeGreen)
-        }
-        Text(
-            text = overview.currencyCode?.let { "当前币种：$it · 不跨币种汇总" }
-                ?: "全部币种（可在筛选中按币种查看）",
-            style = MaterialTheme.typography.bodySmall,
-            color = LedgerColors.Neutral
-        )
-        Text(
-            text = timeSummary,
-            style = MaterialTheme.typography.bodySmall,
-            color = LedgerColors.Neutral,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        // 第 47 批：顶部月概览只在「无筛选 · 月粒度 · 单月窄视图」显示。
+        // 统计下钻 / 显式范围 / 全部时间 / 年粒度 / 任意筛选条件下，
+        // overview 与列表不同口径，MUST NOT 显示错月数字。
+        if (showOverview) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("支出 " + formatCents(overview.expenseCents), color = LedgerColors.ExpenseRed)
+                Text("收入 " + formatCents(overview.incomeCents), color = LedgerColors.IncomeGreen)
+            }
             Text(
-                text = "结余 " + formatCents(overview.balanceCents),
-                color = if (overview.balanceCents < 0) LedgerColors.ExpenseRed
-                else LedgerColors.IncomeGreen
+                text = overview.currencyCode?.let { "当前币种：$it · 不跨币种汇总" }
+                    ?: "全部币种（可在筛选中按币种查看）",
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.Neutral
             )
-            TextButton(onClick = onFilter) {
-                Text(if (activeFilterCount > 0) "筛选 ($activeFilterCount)" else "筛选")
+            Text(
+                text = timeSummary,
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.Neutral,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "结余 " + formatCents(overview.balanceCents),
+                    color = if (overview.balanceCents < 0) LedgerColors.ExpenseRed
+                    else LedgerColors.IncomeGreen
+                )
+                TextButton(onClick = onFilter) {
+                    Text(if (activeFilterCount > 0) "筛选 ($activeFilterCount)" else "筛选")
+                }
+            }
+        } else {
+            // 隐藏态：只留一行范围说明（复用 timeSummary 单一出口）+ 筛选入口，
+            // 不新增一整块、不留空白占位、不把统计页数字并列搬来。
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = timeSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LedgerColors.Neutral,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onFilter) {
+                    Text(if (activeFilterCount > 0) "筛选 ($activeFilterCount)" else "筛选")
+                }
             }
         }
     }
@@ -493,13 +525,16 @@ private fun DayHeader(localDate: Int, totals: Pair<Long, Long>?) {
             text = MonthRange.dateLabel(localDate),
             style = MaterialTheme.typography.labelLarge
         )
-        val e = totals?.first ?: 0L
-        val i = totals?.second ?: 0L
-        Text(
-            text = "支出 " + formatCents(e) + " · 收入 " + formatCents(i),
-            style = MaterialTheme.typography.labelSmall,
-            color = LedgerColors.Neutral
-        )
+        // 第 47 批：totals == null 表示跨范围态，只显示日期，
+        // 不把 0 伪装成「本日无收支」，也不新增按范围的日聚合查询。
+        if (totals != null) {
+            Text(
+                text = "支出 " + formatCents(totals.first) +
+                    " · 收入 " + formatCents(totals.second),
+                style = MaterialTheme.typography.labelSmall,
+                color = LedgerColors.Neutral
+            )
+        }
     }
 }
 

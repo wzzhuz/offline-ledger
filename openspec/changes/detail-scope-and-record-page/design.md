@@ -67,3 +67,30 @@
   `offline-ledger-metrics-v0.2.27-p-m-nsfalse` **270 B**
 - 零改表（`AppDatabase.version = 5` 未变）→ v0.2.26 上覆盖安装即可
 - 坚果云目录以使用者实际所见为准；上传 step 成功不等于目录可见
+
+## 第 47 批（v0.2.29）：顶部月概览语义收敛
+
+### 根因
+统计下钻经 `filterByCategory` / `forCategory` 只替换 `_filter`（带 range 的 fromDate/toDate），
+而 `reload()` 仍以 `_overview.value.yearMonth` 聚合出支出 / 收入 / 结余与 dailyTotals。
+于是「列表 10 月、顶部数字 11 月」，且数字既不是目标月也不是筛选口径。
+这是「两个周期源」而非计算错误；v0.2.28 修的是切月同步，没覆盖下钻入口。
+
+### 决策
+- 不按范围重算：结余涉及时点余额 / 期初语义，会新增第二套汇总口径，与统计口径唯一出口冲突。
+- 不把统计页数字搬来并列：两份数字并排更容易被误读为「明细与统计对不上」。
+- 单一出口 `RecordFilter.showMonthOverview()`：仅无筛选 + 月粒度 + 单月窄视图为真；
+  年粒度 / 全部时间 / 显式范围 / 统计下钻 / 任意筛选条件一律隐藏，只留 `timeSummary()` 一行范围说明 + 筛选入口。
+- 日头 `dailyTotals` 同为 overview 产物：跨范围态传 null，`DayHeader` 只显示日期，
+  不把 0 伪装成「本日无收支」，不新增按范围的日聚合查询。
+- 隐藏态不新增整块、不留空白占位；默认态布局一字不改。
+
+### 取舍（如实）
+- 「同步更新」被否：按范围 SUM + 结余语义会拆出第二套口径，需新增聚合查询。
+- 范围说明文案完全复用 `timeSummary()`（已有「（来自统计）」「全部记录 · 共 N 条命中」），未另造前缀。
+- 月份标题仍按 `_overview.yearMonth` 作定位锚点；范围由 timeSummary 明示，标题不冒充数据月份。
+
+### 回退顺序（第 47 批）
+1. 默认态概览消失 → 摘掉 `showMonthOverview()` 判断，`MonthOverviewCard` 恒传 true。
+2. 隐藏态筛选入口误伤 → 把 `TextButton(onFilter)` 移回独立 Row。
+3. 日头合计误伤 → `DayHeader` 恢复 `totals?.first ?: 0L` 旧写法。

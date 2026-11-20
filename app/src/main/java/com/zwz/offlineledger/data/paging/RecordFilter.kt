@@ -89,6 +89,19 @@ data class RecordFilter(
         granularity == DetailGranularity.YEAR
 
     /**
+     * 第 47 批：顶部月概览（支出 / 收入 / 结余）是否可见，单一出口纯函数。
+     * overview 按 _overview.yearMonth 整月聚合，与筛选 / 下钻范围无关；
+     * 只有「无筛选 + 月粒度 + 单月窄视图」时它才和列表同口径。
+     * 年粒度 / 全部时间 / 显式范围 / 统计下钻 / 任意筛选条件下
+     * MUST NOT 显示错月数字，只留 timeSummary() 的范围说明。
+     */
+    fun showMonthOverview(): Boolean =
+        granularity == DetailGranularity.MONTH &&
+            !allMonths &&
+            activeCount() == 0 &&
+            periodDisplayName == null
+
+    /**
      * 第 42 批：时间语义单一出口，chip 与月份条共用，不允许各处自己拼。
      * totalCount 由 UI 传已加载命中数，不另跑聚合查询。
      */

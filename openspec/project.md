@@ -435,3 +435,14 @@ commit `657ac195d74f` / CI `44661745120` / release `44662596613`（坚果云 suc
 
 ### 第 46 批实测
 commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `44687082430` success（坚果云 success）/ 制品 `offline-ledger-release-v0.2.28` 12408292 B。并发 run `44687435727` 已 cancel，保留 `44687082430`。零改表 → 覆盖安装。
+
+## 第 47 批（v0.2.29）：统计下钻后顶部月概览语义收敛
+
+- 使用者实测：明细页停 11 月、统计页看 10 月下钻后列表是 10 月，但顶部支出 / 结余仍是 11 月，也不是筛选后统计。
+- 按 1-A / 2-A：`RecordFilter.showMonthOverview()` 单一出口，仅「无筛选 + 月粒度 + 单月窄视图」显示月概览；年粒度 / 全部时间 / 显式范围 / 统计下钻 / 任意筛选条件一律隐藏数字，只留 `timeSummary()` 范围说明 + 筛选入口。
+- 跨范围态日头不显示错月 / 0 值合计；不新增按范围聚合查询、不动统计口径唯一出口。
+- 新增 `DetailOverviewVisibilityTest` 7 条纯 JVM 单测；spec 新增 Requirement、design 第 47 批、活文档 §7.29 / §8。
+- 零改表（`AppDatabase.version = 5` 未变）→ v0.2.28 上覆盖安装即可，不用卸载。
+- 挂账未动：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中；活文档 §1 事故登记仍待补齐全。
+
+### 第 47 批实测（待回填）
