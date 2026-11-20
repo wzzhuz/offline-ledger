@@ -423,3 +423,14 @@ FF3 `description` = 本项目「交易对方」、`notes` = 「备注」，因�
 ### 第 45 批实测
 commit `657ac195d74f` / CI `44661745120` / release `44662596613`（坚果云 success）/
 制品 `offline-ledger-release-v0.2.27` 12,405,979 B。零改表 → 覆盖安装。
+
+## 第 46 批（v0.2.28）：切月即刷新 / chip 同行 / 系统返回消费
+
+- 使用者实测：切月后提示「该月记录尚未加载，继续下滑后再点一次」且列表不刷新；月 / 年切换独占一行；详情页不支持全面屏左滑返回，直接退出 App。
+- 根因：`locateMonth()` 只写 `_anchorMonth` / `_overview`，漏写 `_filter.yearMonth` → `periodBounds()` 永远按初始月；详情页是 `actionRow` 二级页、没挂 `BackHandler`。
+- 按 1-A / 2-A：切月写回 `yearMonth` + `revision` 触发 Pager 重查，锚点在分页数据到达后定位，删 Snackbar 兜底；月 / 年 `FilterChip` 并入标题 Row；`BackHandler` 消费系统返回，`closeDetail` 单一出口。
+- 新增 `DetailMonthSwitchTest` 5 条纯 JVM 单测（月 / 年切月周期重算、跨月模式不夹击、显式范围优先、筛选条件不丢）；不新增 SQL 出口、不动统计口径。
+- 零改表（`AppDatabase.version = 5` 未变）→ v0.2.27 上覆盖安装即可，不用卸载。
+- 挂账未动：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中；活文档 §1 事故登记仍待补齐全。
+
+### 第 46 批实测（待回填）

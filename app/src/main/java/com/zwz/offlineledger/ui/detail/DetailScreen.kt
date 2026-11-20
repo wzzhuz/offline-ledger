@@ -3,6 +3,7 @@ package com.zwz.offlineledger.ui.detail
 import com.zwz.offlineledger.data.display.CategoryDisplay
 import com.zwz.offlineledger.data.paging.DetailGranularity
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.zwz.offlineledger.core.money.Cents
@@ -109,16 +111,24 @@ fun DetailScreen(
         if (refreshTick > 0) vm.bumpRevision()
     }
 
-    /** 第 42 批：月份条 / Picker 只作定位锚点，在已加载项里滚到该月首条。 */
+    /**
+     * 第 46 批：切月已由 vm.locateMonth 写回 _filter 触发 Pager 重查，
+     * 锚点只在分页首屏 / 后续加载到达后滚到该月首条。
+     * MUST NOT 再要求用户「继续下滑后再点一次」：目标月无记录时列表本身为空即是反馈，
+     * 空月在 YearMonthPicker 里已灰显不可点。
+     */
     val anchorMonth by vm.anchorMonth.collectAsState()
-    LaunchedEffect(anchorMonth) {
+    LaunchedEffect(anchorMonth, pagingItems.itemCount, pagingItems.loadState.refresh) {
         anchorMonth?.let { ym ->
-            val idx = (0 until pagingItems.itemCount).firstOrNull { i ->
-                pagingItems.peek(i)?.let { it.localDate / 100 == ym } == true
+            if (pagingItems.loadState.refresh is LoadState.NotLoading) {
+                val idx = (0 until pagingItems.itemCount).firstOrNull { i ->
+                    pagingItems.peek(i)?.let { it.localDate / 100 == ym } == true
+                }
+                if (idx != null) {
+                    listState.animateScrollToItem(idx)
+                    vm.consumeAnchor()
+                }
             }
-            if (idx != null) listState.animateScrollToItem(idx)
-            else snackbarHostState.showSnackbar("该月记录尚未加载，继续下滑后再点一次")
-            vm.consumeAnchor()
         }
     }
 
@@ -219,16 +229,21 @@ fun DetailScreen(
     }
 
     // 第 45 批：点击记录直接进详情页；删除 / 报销仍复用下方既有二次确认。
-    // 让四列网格保持整齐；编辑 / 报销 / 删除仍各走原有事务路径。
+    // 第 46 批：只读 / 编辑统一返回出口，并消费全面屏左滑返回，
+    // 否则内部二级页没挂 BackHandler，系统 back 会直接收掉 Activity 退出 App。
+    val closeDetail = { actionRow = null }
     actionRow?.let { target ->
         val canSettle = try {
             RecordType.valueOf(target.type) == RecordType.EXPENSE
         } catch (e: IllegalArgumentException) {
             false
         }
+        // 只消费事件，不接管返回动画、不拦 predictive back 预览；
+        // 编辑表单是外部 Dialog，其自身 onDismiss 处理未保存改动，无需在此重复拦截。
+        BackHandler(enabled = true, onBack = closeDetail)
         RecordDetailPage(
             row = target,
-            onClose = { actionRow = null },
+            onClose = closeDetail,
             onEdit = { id -> actionRow = null; onEdit(id) },
             onDelete = { actionRow = null; pendingDelete = target },
             onSettle = if (canSettle) {
@@ -368,6 +383,8 @@ private fun MonthOverviewCard(
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
+        // 第 46 批：月 / 年粒度切换收进标题行，不再独立占一行；
+        // 标题 weight(1f) + 单行省略，chip 紧凑排列，触摸区仍保留 Material 默认值。
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrev) {
                 Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "上个月")
@@ -376,18 +393,10 @@ private fun MonthOverviewCard(
                 text = periodTitle + " ▾",
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).clickable(onClick = onPickMonth)
             )
-            IconButton(onClick = onNext) {
-                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "下个月")
-            }
-        }
-        // 第 45 批：无筛选时的默认周期粒度；有筛选无范围时 chip 仍在但语义由 allMonths 优先。
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
             listOf(
                 DetailGranularity.MONTH to "月",
                 DetailGranularity.YEAR to "年"
@@ -395,9 +404,12 @@ private fun MonthOverviewCard(
                 FilterChip(
                     selected = granularity == g,
                     onClick = { onGranularity(g) },
-                    label = { Text(label) },
-                    modifier = Modifier.padding(horizontal = 4.dp)
+                    label = { Text(label, maxLines = 1) },
+                    modifier = Modifier.padding(horizontal = 2.dp)
                 )
+            }
+            IconButton(onClick = onNext) {
+                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "下个月")
             }
         }
         Row(

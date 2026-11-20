@@ -161,18 +161,36 @@ class DetailViewModel(
         viewModelScope.launch { refreshMonthCounts(year) }
     }
 
-    /**
-     * 第 42 批：左右箭头与 Picker 都只是「滚到哪个月」，不再是过滤。
-     * 不动 _filter → 筛选条件一条不丢、Pager 不重建、列表不回顶。
-     */
+    /** 第 46 批：左右箭头与 Picker 都是「切到哪个月」，仍不注入月份过滤。 */
     fun switchMonth(deltaMonths: Int) =
         locateMonth(MonthRange.shift(_overview.value.yearMonth, deltaMonths))
 
     /** YearMonthPicker 一步跳到任意年月，只定位不清条件。 */
     fun selectMonth(yearMonth: Int) = locateMonth(yearMonth)
 
+    /**
+     * 第 46 批：切月 MUST 默认刷新列表。
+     *
+     * 第 42 批把月份降成锚点后只改 _anchorMonth / _overview，没有写回
+     * _filter.yearMonth：无筛选（allMonths=false）时 periodBounds() 永远按初始月
+     * 算，标题变了列表却不动，还弹出「继续下滑后再点一次」。
+     *
+     * 现在同步写回 yearMonth + revision：
+     * - 无筛选 → flatMapLatest 重建 Pager，periodBounds() 按新月重算，列表与标题同步；
+     * - 有筛选无范围（allMonths=true）→ effective* 仍为 null，全部记录重新加载，
+     *   锚点在分页数据到达后滚到该月首条；
+     * - 显式时间段 / 统计下钻 → 范围不受月份影响，仅重查 + 定位。
+     *
+     * 只改 yearMonth 与 revision，MUST NOT 清空其它筛选条件。
+     * overview 先同步更新，避免 _filter.collect 的 reload() 读到旧月份把概览拉回去。
+     */
     fun locateMonth(yearMonth: Int) {
         _anchorMonth.value = yearMonth
+        _overview.value = _overview.value.copy(yearMonth = yearMonth)
+        _filter.value = _filter.value.copy(
+            yearMonth = yearMonth,
+            revision = _filter.value.revision + 1
+        )
         viewModelScope.launch {
             refreshOverview(yearMonth, _filter.value.currencyCode)
             refreshMonthCounts(yearMonth / 100)
