@@ -2,6 +2,7 @@ package com.zwz.offlineledger.ui.record
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zwz.offlineledger.core.AccountQuickCandidates
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.core.time.LedgerClock
@@ -118,6 +119,13 @@ class RecordEditorViewModel(
                         description = r.description,
                         excludeFromStats = r.excludeFromStats,
                         loaded = true
+                    )
+                    // 第 45 批：编辑态把本记录的账户与交易对方置顶，只改顺序不改选中项。
+                    _accounts.value = AccountQuickCandidates.promoteIds(
+                        sorted, listOfNotNull(r.fromAccountId, r.toAccountId)
+                    )
+                    _counterparties.value = AccountQuickCandidates.promoteText(
+                        _counterparties.value, r.counterparty
                     )
                 }
             }

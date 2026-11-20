@@ -8,6 +8,9 @@ import com.zwz.offlineledger.core.time.MonthRange
  * revision 是刷新信号：写操作成功后 +1，让 flatMapLatest 重建 Pager，
  * 不必持有 PagingSource 引用去手工 invalidate()。
  */
+/** 第 45 批：无筛选时的默认视图粒度。月 = 只看当前月，年 = 只看当前年。 */
+enum class DetailGranularity { MONTH, YEAR }
+
 data class RecordFilter(
     val yearMonth: Int,
     val revision: Int = 0,
@@ -43,7 +46,9 @@ data class RecordFilter(
      */
     /** 第 44 批：统计下钻带进明细的周期只读展示名，不进 SQL、不进 activeCount()。 */
     val periodDisplayName: String? = null,
-    val allMonths: Boolean = true
+    val allMonths: Boolean = true,
+    /** 第 45 批：无筛选时按此粒度收窄；有筛选无范围时 allMonths=true 优先。 */
+    val granularity: DetailGranularity = DetailGranularity.MONTH
 ) {
     /**
      * 第 42 批：返回 null 交给 SQL 的 `:fromDate IS NULL` 短路。
@@ -51,13 +56,37 @@ data class RecordFilter(
      * - 全空（默认 allMonths=true）→ 全部记录，MUST NOT 注入当前月
      * - 全空 + 主动切 allMonths=false → 仅当前查看月份
      */
+    /** 第 45 批：无筛选且 allMonths=false 时按 granularity 取闭区间，单一出口。 */
+    private fun periodBounds(): Pair<Int, Int> = when (granularity) {
+        DetailGranularity.MONTH -> MonthRange.of(yearMonth)
+        DetailGranularity.YEAR -> {
+            val y = yearMonth / 100
+            (y * 10000 + 101) to (y * 10000 + 1231)
+        }
+    }
+
     fun effectiveFromDate(): Int? = fromDate
-        ?: if (allMonths || toDate != null) null else MonthRange.of(yearMonth).first
+        ?: if (allMonths || toDate != null) null else periodBounds().first
     fun effectiveToDate(): Int? = toDate
-        ?: if (allMonths || fromDate != null) null else MonthRange.of(yearMonth).second
+        ?: if (allMonths || fromDate != null) null else periodBounds().second
+
+    /** 第 45 批：顶部标题用的周期文案，月 / 年共用单一出口。 */
+    fun periodLabel(anchorYearMonth: Int = yearMonth): String = when (granularity) {
+        DetailGranularity.MONTH -> MonthRange.label(anchorYearMonth)
+        DetailGranularity.YEAR -> (anchorYearMonth / 100).toString() + " 年"
+    }
+
+    /**
+     * 第 45 批：筛选面板提交时的语义裁决，纯函数可单测。
+     * 有显式范围 → 尊重面板选择；无范围 + 有筛选条件 → 全部时间；
+     * 无范围 + 无筛选条件 → 回到按周期的窄视图。
+     */
+    fun resolveAllMonths(requested: Boolean): Boolean =
+        if (fromDate != null || toDate != null) requested else activeCount() > 0
 
     /** 是否跨月模式，用于 UI 明示「月份条只作定位」。 */
-    fun isCrossMonth(): Boolean = allMonths || fromDate != null || toDate != null
+    fun isCrossMonth(): Boolean = allMonths || fromDate != null || toDate != null ||
+        granularity == DetailGranularity.YEAR
 
     /**
      * 第 42 批：时间语义单一出口，chip 与月份条共用，不允许各处自己拼。
@@ -70,7 +99,12 @@ data class RecordFilter(
                 " ~ " + (toDate?.let { MonthRange.dateLabel(it) } ?: "不限")
         allMonths -> "时间：全部记录 · 当前定位 " + MonthRange.label(yearMonth) +
             (totalCount?.let { " · 共 " + it + " 条命中" } ?: "")
-        else -> "时间：当前月 " + MonthRange.label(yearMonth) + "（切月看其他月）"
+        else -> when (granularity) {
+            DetailGranularity.MONTH ->
+                "时间：当前月 " + MonthRange.label(yearMonth) + "（切月看其他月）"
+            DetailGranularity.YEAR ->
+                "时间：" + (yearMonth / 100).toString() + " 年（切年看其他年）"
+        }
     }
 
     fun activeCount(): Int = listOf(
@@ -82,8 +116,10 @@ data class RecordFilter(
     fun bumped(): RecordFilter = copy(revision = revision + 1)
 
     companion object {
-        /** 第 42 批：首次进入默认看全部记录，不再被当前月夹住。 */
-        fun currentMonth(): RecordFilter = RecordFilter(MonthRange.currentYearMonth())
+        /** 第 45 批：首次进入 / 清空筛选 = 无筛选 → 按当前周期（默认月），不再是全库。 */
+        fun currentMonth(): RecordFilter = RecordFilter(
+            MonthRange.currentYearMonth(), allMonths = false
+        )
 
         /**
          * 第 28 批：三个跨 Tab 下钻入口 MUST 从全新 RecordFilter 起手、

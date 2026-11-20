@@ -32,4 +32,25 @@ object AccountQuickCandidates {
 
     fun currentOrNull(accounts: List<AccountQuickItem>, selectedId: Long?): AccountQuickItem? =
         accounts.firstOrNull { it.id == selectedId }
+
+    /**
+     * 第 45 批：编辑态把本记录引用的账户（转出 / 转入）提到列表最前。
+     * 只改展示顺序，按 id 精确回填与「已删除显式拦截」仍由第 44 批保证。
+     */
+    fun promoteIds(
+        accounts: List<AccountQuickItem>,
+        selectedIds: List<Long>
+    ): List<AccountQuickItem> {
+        if (selectedIds.isEmpty()) return accounts
+        val head = selectedIds.distinct().mapNotNull { id -> accounts.firstOrNull { it.id == id } }
+        val headIds = head.map { it.id }.toSet()
+        return head + accounts.filter { it.id !in headIds }
+    }
+
+    /** 第 45 批：交易对方当前值置顶，联想 / 快捷行不再把「虚拟-不记录」埋在后面。 */
+    fun promoteText(items: List<String>, current: String?): List<String> {
+        val v = current?.trim().orEmpty()
+        if (v.isEmpty()) return items
+        return listOf(v) + items.filter { it != v }
+    }
 }

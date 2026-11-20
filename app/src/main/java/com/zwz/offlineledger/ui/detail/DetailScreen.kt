@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.ui.detail
 
 import com.zwz.offlineledger.data.display.CategoryDisplay
+import com.zwz.offlineledger.data.paging.DetailGranularity
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -121,6 +122,9 @@ fun DetailScreen(
         }
     }
 
+    // 第 45 批：actionRow != null 时整页切到只读详情页，明细列表整体让位，
+    // 不新增 NavHost 路由、不动 4 Tab 骨架。
+    if (actionRow == null) {
     Box(modifier = Modifier.fillMaxSize()) {
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -142,6 +146,9 @@ fun DetailScreen(
                     overview = overview,
                     activeFilterCount = filter.activeCount(),
                     timeSummary = filter.timeSummary(pagingItems.itemCount),
+                    periodTitle = filter.periodLabel(overview.yearMonth),
+                    granularity = filter.granularity,
+                    onGranularity = { vm.setGranularity(it) },
                     onPrev = { vm.switchMonth(-1) },
                     onNext = { vm.switchMonth(1) },
                     onPickMonth = { showMonthPicker = true },
@@ -209,64 +216,32 @@ fun DetailScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
+    }
 
-    // 第 4 批：行内不再塞报销 / 删除按钮，改为点击行弹出动作菜单，
+    // 第 45 批：点击记录直接进详情页；删除 / 报销仍复用下方既有二次确认。
     // 让四列网格保持整齐；编辑 / 报销 / 删除仍各走原有事务路径。
     actionRow?.let { target ->
-        val t = try {
-            RecordType.valueOf(target.type)
+        val canSettle = try {
+            RecordType.valueOf(target.type) == RecordType.EXPENSE
         } catch (e: IllegalArgumentException) {
-            RecordType.TRANSFER
+            false
         }
-        Dialog(onDismissRequest = { actionRow = null }) {
-            Surface(shape = RoundedCornerShape(16.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = target.categoryName ?: "转账",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = formatCents(target.amountCents) + " 元",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = LedgerColors.Neutral
-                    )
-                    if (target.importSource.isNotBlank()) {
-                        Text(
-                            text = "来源：" + target.importSource +
-                                if (target.sourceId.isNotBlank())
-                                    " · " + target.sourceId else "",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = LedgerColors.Neutral
-                        )
+        RecordDetailPage(
+            row = target,
+            onClose = { actionRow = null },
+            onEdit = { id -> actionRow = null; onEdit(id) },
+            onDelete = { actionRow = null; pendingDelete = target },
+            onSettle = if (canSettle) {
+                {
+                    actionRow = null
+                    scope.launch {
+                        settleAmount = Cents(vm.remainingSettlement(target.id)).toYuanString()
+                        settleError = null
+                        settleRow = target
                     }
-                    TextButton(
-                        onClick = { actionRow = null; onEdit(target.id) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("编辑") }
-                    if (t == RecordType.EXPENSE) {
-                        TextButton(
-                            onClick = {
-                                actionRow = null
-                                scope.launch {
-                                    settleAmount = Cents(vm.remainingSettlement(target.id)).toYuanString()
-                                    settleError = null
-                                    settleRow = target
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("报销 / 退款") }
-                    }
-                    TextButton(
-                        onClick = { actionRow = null; pendingDelete = target },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("删除", color = LedgerColors.ExpenseRed) }
-                    TextButton(
-                        onClick = { actionRow = null },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("取消") }
                 }
-            }
-        }
+            } else null
+        )
     }
 
     settleRow?.let { target ->
@@ -379,6 +354,9 @@ private fun MonthOverviewCard(
     overview: MonthOverview,
     activeFilterCount: Int,
     timeSummary: String,
+    periodTitle: String,
+    granularity: DetailGranularity,
+    onGranularity: (DetailGranularity) -> Unit,
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onPickMonth: () -> Unit,
@@ -395,13 +373,31 @@ private fun MonthOverviewCard(
                 Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "上个月")
             }
             Text(
-                text = MonthRange.label(overview.yearMonth) + " ▾",
+                text = periodTitle + " ▾",
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f).clickable(onClick = onPickMonth)
             )
             IconButton(onClick = onNext) {
                 Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "下个月")
+            }
+        }
+        // 第 45 批：无筛选时的默认周期粒度；有筛选无范围时 chip 仍在但语义由 allMonths 优先。
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf(
+                DetailGranularity.MONTH to "月",
+                DetailGranularity.YEAR to "年"
+            ).forEach { (g, label) ->
+                FilterChip(
+                    selected = granularity == g,
+                    onClick = { onGranularity(g) },
+                    label = { Text(label) },
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
             }
         }
         Row(

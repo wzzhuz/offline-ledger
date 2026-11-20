@@ -14,6 +14,7 @@ import com.zwz.offlineledger.data.local.dao.RecordRow
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.paging.RecordFilter
+import com.zwz.offlineledger.data.paging.DetailGranularity
 import com.zwz.offlineledger.data.paging.RecordPagingSource
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
@@ -183,7 +184,7 @@ class DetailViewModel(
     }
 
     fun applyFilter(v: FilterValues) {
-        _filter.value = _filter.value.copy(
+        val next = _filter.value.copy(
             fromDate = v.fromDate,
             toDate = v.toDate,
             accountId = v.accountId,
@@ -202,6 +203,15 @@ class DetailViewModel(
             periodDisplayName = null,
             allMonths = v.allMonths,
             revision = _filter.value.revision + 1
+        )
+        // 第 45 批：面板的 allMonths 只作意图，最终由是否有筛选条件裁决。
+        _filter.value = next.copy(allMonths = next.resolveAllMonths(v.allMonths))
+    }
+
+    /** 第 45 批：顶部「月 / 年」切换；只改粒度，不丢其它筛选条件。 */
+    fun setGranularity(g: DetailGranularity) {
+        _filter.value = _filter.value.copy(
+            granularity = g, revision = _filter.value.revision + 1
         )
     }
 
@@ -265,7 +275,7 @@ class DetailViewModel(
             minAmountCents = null, maxAmountCents = null, noteQuery = null,
             currencyCode = null, counterpartyQuery = null, descriptionQuery = null,
             categoryDisplayName = null, counterpartyDisplayName = null,
-            accountDisplayName = null, periodDisplayName = null, allMonths = true,
+            accountDisplayName = null, periodDisplayName = null, allMonths = false,
             revision = _filter.value.revision + 1
         )
     }

@@ -411,3 +411,11 @@ FF3 `description` = 本项目「交易对方」、`notes` = 「备注」，因�
 - 按 1-A / 2-A / 3-A：新建 `detail-filter-and-transfer-edit`，`StatsDrillRange` 单一出口给三类共 7 个下钻入口带周期；账户快捷候选合并当前选中项、归档可见、已删除拦截。
 - 零改表（`AppDatabase.version = 5` 未变）→ v0.2.25 上覆盖安装即可，不用卸载。
 - `ff3-description-field` 保持进行中，待 description 真机验收后再归档。
+
+
+## 第 45 批（v0.2.27）：默认周期视图 / 编辑态置顶 / 交易详情页
+
+- 无筛选按当前月 / 年（顶部可切），有筛选无时间段看全部时间；统计下钻带周期不回退。
+- 编辑态账户与交易对方当前值置顶，按 id 精确回填与已删除拦截不回退。
+- 点击记录直接进只读详情页，锁切编辑、删除 / 报销一步到位，不新增 NavHost 路由。
+- 零改表（`version = 5` 不变）→ 覆盖安装；change `detail-scope-and-record-page` 进行中。
