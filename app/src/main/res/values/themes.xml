@@ -4,4 +4,11 @@
     <style name="Theme.OfflineLedger" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
     </style>
+    <!-- 第 49 批：磁贴拉起的透明页。底层账单 Activity 仍是 PAUSED，画面留在合成帧里。 -->
+    <style name="Theme.OfflineLedger.Translucent" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

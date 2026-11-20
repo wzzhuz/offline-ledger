@@ -67,6 +67,14 @@ data class ReconcileResult(
  * Room 的 @Transaction 只在 DAO 方法上生成事务代码，
  * 标在 Repository 普通方法上完全不生效，所以这里用 room-ktx 的 withTransaction。
  */
+/** 第 49 批：识屏记账确认页只读展示的落库目标，不进备份 DTO。 */
+data class QuickCaptureDefaults(
+    val accountId: Long,
+    val accountName: String,
+    val categoryId: Long,
+    val categoryName: String
+)
+
 @Singleton
 class LedgerRepository @Inject constructor(
     private val db: AppDatabase,
@@ -81,6 +89,57 @@ class LedgerRepository @Inject constructor(
     private val aliasDao: CounterpartyAliasDao
 ) {
     fun observeNetWorth(): Flow<Long> = accountDao.observeNetWorth()
+
+    /** 第 49 批：确认页只读展示「将记入哪个账户 / 一级分类」。 */
+    suspend fun quickCaptureDefaults(): QuickCaptureDefaults? = db.withTransaction {
+        val a = accountDao.all().firstOrNull { !it.isArchived }
+            ?: return@withTransaction null
+        val c = categoryDao.all().firstOrNull { it.level == 0 && !it.isArchived }
+            ?: return@withTransaction null
+        QuickCaptureDefaults(a.id, a.name, c.id, c.name)
+    }
+
+    /**
+     * 第 49 批：识屏记账唯一写路径。importSource="screen" + 指纹幂等，
+     * 单事务写入 + 末尾一次重算；MUST NOT 静默重复入账、MUST NOT 新开写入口。
+     */
+    suspend fun insertScreenRecord(
+        amountCents: Long,
+        isIncome: Boolean,
+        counterparty: String,
+        description: String,
+        note: String,
+        timestamp: Long,
+        fingerprint: String,
+        accountId: Long,
+        categoryId: Long
+    ): Boolean = db.withTransaction {
+        if (recordDao.countByImportSource("screen", fingerprint) > 0) {
+            return@withTransaction false
+        }
+        val ld = java.time.Instant.ofEpochMilli(timestamp)
+            .atZone(java.time.ZoneId.of("Asia/Shanghai")).toLocalDate()
+        val dateInt = ld.year * 10000 + ld.monthValue * 100 + ld.dayOfMonth
+        val ym = ld.year * 100 + ld.monthValue
+        val entity = RecordEntity(
+            type = if (isIncome) RecordType.INCOME else RecordType.EXPENSE,
+            amountCents = amountCents,
+            categoryId = categoryId,
+            fromAccountId = if (isIncome) null else accountId,
+            toAccountId = if (isIncome) accountId else null,
+            timestamp = timestamp,
+            localDate = dateInt,
+            yearMonth = ym,
+            note = note,
+            counterparty = counterparty,
+            description = description,
+            importSource = "screen",
+            sourceId = fingerprint
+        )
+        recordDao.insert(withResolvedRoot(entity))
+        rebuildAllBalancesInternal()
+        true
+    }
 
     suspend fun insertRecord(record: RecordEntity): Long = db.withTransaction {
         val id = recordDao.insert(withResolvedRoot(record))

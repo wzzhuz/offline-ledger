@@ -53,6 +53,44 @@
         <receiver
             android:name=".backup.snapshot.SnapshotReceiver"
             android:exported="false" />
+        <!-- 第 49 批：识屏记账。不声明任何 uses-permission；
+             a11y / QS 绑定权限是 service 的 android:permission 属性。 -->
+        <service
+            android:name=".quick.ScreenCaptureAccessibilityService"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:label="@string/quick_capture_service_label">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/quick_capture_accessibility" />
+        </service>
+
+        <service
+            android:name=".quick.QuickEntryTileService"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:label="@string/quick_capture_tile_label"
+            android:icon="@android:drawable/ic_menu_add">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <activity
+            android:name=".quick.QuickCaptureActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OfflineLedger.Translucent"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="" />
+
+        <activity
+            android:name=".quick.QuickCaptureSettingsActivity"
+            android:exported="false"
+            android:label="@string/quick_capture_settings_title" />
     </application>
 
 </manifest>

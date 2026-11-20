@@ -17,7 +17,7 @@ plugins {
 // versionCode 由版本名推导（major*10000 + minor*100 + patch），
 // 不再恒为 1 —— 否则系统判不出新旧、装不上覆盖升级。
 // ---------------------------------------------------------------
-val defaultVersionName = "0.2.30"
+val defaultVersionName = "0.2.31"
 
 fun versionCodeFrom(name: String): Int {
     val parts = name.removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
@@ -182,6 +182,11 @@ dependencies {
     // 传递依赖仅 kotlin-stdlib-common 与 compose runtime/animation/foundation，
     // 不含网络客户端；Gradle 依赖只在构建期解析，不产生 App 运行时联网。
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
+
+    // ---- 第 49 批：端侧中文 OCR（bundled，模型随 APK，运行时不联网） ----
+    // ChineseTextRecognizerOptions 在基础包里，两个坐标 MUST 同时声明、版本一致。
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 
     // ---- 单元测试 ----
     testImplementation("junit:junit:4.13.2")

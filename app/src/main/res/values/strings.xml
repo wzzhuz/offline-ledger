@@ -3,4 +3,8 @@
     <string name="app_name">离线账本</string>
     <string name="shortcut_record_short">记一笔</string>
     <string name="shortcut_record_long">直接打开记一笔</string>
+    <string name="quick_capture_service_label">识屏记账（无障碍）</string>
+    <string name="quick_capture_tile_label">识屏记账</string>
+    <string name="quick_capture_settings_title">识屏记账设置</string>
+    <string name="quick_capture_a11y_desc">仅在白名单应用（支付宝 / 微信 / 云闪付 / 手机银行）的账单页面读取屏幕文字或截取单帧用于本地记账；不上传、不保存截图、不读取密码与验证码。可在应用内随时关闭。</string>
 </resources>
