@@ -121,9 +121,9 @@ class RecordEditorViewModel(
                         loaded = true
                     )
                     // 第 45 批：编辑态把本记录的账户与交易对方置顶，只改顺序不改选中项。
-                    _accounts.value = AccountQuickCandidates.promoteIds(
+                    _accounts.value = AccountQuickCandidates.promoteById(
                         sorted, listOfNotNull(r.fromAccountId, r.toAccountId)
-                    )
+                    ) { it.id }
                     _counterparties.value = AccountQuickCandidates.promoteText(
                         _counterparties.value, r.counterparty
                     )

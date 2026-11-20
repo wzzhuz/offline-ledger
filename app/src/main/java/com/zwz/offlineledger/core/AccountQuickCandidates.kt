@@ -37,15 +37,21 @@ object AccountQuickCandidates {
      * 第 45 批：编辑态把本记录引用的账户（转出 / 转入）提到列表最前。
      * 只改展示顺序，按 id 精确回填与「已删除显式拦截」仍由第 44 批保证。
      */
+    fun <T> promoteById(
+        items: List<T>,
+        selectedIds: List<Long>,
+        idOf: (T) -> Long
+    ): List<T> {
+        if (selectedIds.isEmpty()) return items
+        val head = selectedIds.distinct().mapNotNull { id -> items.firstOrNull { idOf(it) == id } }
+        val headIds = head.map(idOf).toSet()
+        return head + items.filter { idOf(it) !in headIds }
+    }
+
     fun promoteIds(
         accounts: List<AccountQuickItem>,
         selectedIds: List<Long>
-    ): List<AccountQuickItem> {
-        if (selectedIds.isEmpty()) return accounts
-        val head = selectedIds.distinct().mapNotNull { id -> accounts.firstOrNull { it.id == id } }
-        val headIds = head.map { it.id }.toSet()
-        return head + accounts.filter { it.id !in headIds }
-    }
+    ): List<AccountQuickItem> = promoteById(accounts, selectedIds) { it.id }
 
     /** 第 45 批：交易对方当前值置顶，联想 / 快捷行不再把「虚拟-不记录」埋在后面。 */
     fun promoteText(items: List<String>, current: String?): List<String> {
