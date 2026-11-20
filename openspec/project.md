@@ -474,3 +474,6 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 - **用户控制**：白名单逐个开关、一键停用、系统无障碍开关随时可关；
   识别结果 MUST 经确认页核对后才落库；关闭后数据链路完全停用。
 - **边界**：这套是高权限能力，自用自装，MUST NOT 把带无障碍服务的 APK 对外分发。
+
+### 第 49 批实测
+分支 `feature/quick-tile-screen-capture`，代码 `d29b2c7af12d`，push CI `44765082653` success，release `44766740258` success（上传到坚果云 success），v0.2.31 制品 32,143,745 B。main 冻结在 v0.2.30，稳定后再合回。
