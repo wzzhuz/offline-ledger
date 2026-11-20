@@ -34,11 +34,11 @@ class DetailOverviewVisibilityTest {
 
     @Test
     fun filterWithoutRangeHidesOverview() {
-        val base = RecordFilter.currentMonth().copy(yearMonth = nov)
-        val f = base.copy(
-            counterpartyQuery = "肯德基",
-            allMonths = base.resolveAllMonths(true)
+        // 先带上筛选条件，再由 resolveAllMonths 裁决：空对象上调用会得到 false。
+        val withFilter = RecordFilter.currentMonth().copy(
+            yearMonth = nov, counterpartyQuery = "肯德基"
         )
+        val f = withFilter.copy(allMonths = withFilter.resolveAllMonths(true))
         assertTrue("有筛选无时间段 MUST 为全部时间", f.allMonths)
         assertFalse(f.showMonthOverview())
         assertTrue(f.timeSummary().contains("全部记录"))
@@ -78,8 +78,8 @@ class DetailOverviewVisibilityTest {
 
     @Test
     fun clearFilterRestoresOverview() {
-        val base = RecordFilter.currentMonth().copy(yearMonth = nov)
-        val filtered = base.copy(accountId = 7L, allMonths = base.resolveAllMonths(true))
+        val withFilter = RecordFilter.currentMonth().copy(yearMonth = nov, accountId = 7L)
+        val filtered = withFilter.copy(allMonths = withFilter.resolveAllMonths(true))
         assertFalse(filtered.showMonthOverview())
         val cleared = filtered.copy(
             accountId = null, allMonths = false, periodDisplayName = null
