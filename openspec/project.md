@@ -457,4 +457,5 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 - 零改表（`AppDatabase.version = 5` 未变）→ v0.2.29 上覆盖安装即可，不用卸载。
 - 挂账未动：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中；活文档 §1 事故登记仍待补齐全。
 
-### 第 48 批实测（待回填）
+### 第 48 批实测
+代码 `2142fe15ad8f` / push CI `44701739996` **success** 17/17 / release `44703074178` **success**（坚果云 success）/ 制品 `offline-ledger-release-v0.2.30` 12410678 B。零改表 → 覆盖安装。
