@@ -477,3 +477,6 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 
 ### 第 49 批实测
 分支 `feature/quick-tile-screen-capture`，代码 `d29b2c7af12d`，push CI `44765082653` success，release `44766740258` success（上传到坚果云 success），v0.2.31 制品 32,143,745 B。main 冻结在 v0.2.30，稳定后再合回。
+
+### 第 50 批实测
+分支 `feature/quick-tile-screen-capture`，首轮 `c3b91b3f8c80` CI 红（单测 fixture 标签提取），修复 `5f41d72a9191` → CI `44915458086` success，release `44916130971` success（上传到坚果云 success），v0.2.32 制品 32,159,121 B。main 冻结在 v0.2.30，稳定后再合回。

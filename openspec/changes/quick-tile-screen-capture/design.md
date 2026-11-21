@@ -95,3 +95,14 @@
 - 截图错误码到可读文案的映射以真机复核为准；当前仅对码 1 做退避重试，
   其余按「错误码 N + 建议手动」呈现，不硬猜含义。
 - 厂商 ROM 对 TileService 绑定 / QS 收起时序的差异，沙盒验不了。
+
+
+### §7.32 实测编号（第 50 批，分支开发）
+
+- 首轮代码 `c3b91b3f8c8058ab2751cda2062b6687c454a072`（1 新增 / 11 修改），push CI `44914954456` **failure**（17 步中「运行单元测试」红）。
+- 根因：`afterLabel` 同命中多标签时取了第一个——「商品说明：牛奶鸡蛋」被「商品」抢先切成「说明：牛奶鸡蛋」，fixture 断言 `牛奶鸡蛋` 失败。修复 commit `5f41d72a91914420b382f96f463973a284a67715` 改为取最长匹配标签，重跑 CI `44915458086` **success** 17/17。
+- release `44916130971` **success**，28 步 = 23 success / 5 skipped，**「上传到坚果云」completed success**；无并发 cancelled run。
+- 制品：`offline-ledger-release-v0.2.32` 32,159,121 B、`offline-ledger-mapping-v0.2.32` 4,390,719 B、`offline-ledger-metrics-v0.2.32-p-m-nsfalse` 269 B。`nsfalse` 表示认证 / 建目录 / PUT 全程走完，未走「跳过」。
+- 按 release.yml 命名规则，坚果云目标为 `/my-apps/offline-ledger-releases/offline-ledger-v0.2.32-release-5f41d72a.apk`。WebDAV 目录与 job logs 在当前凭据下不可读（403），**目录以使用者实际所见为准**。
+- **main 仍冻结在 v0.2.30**（`6f85c8318bda`），未 merge、未 bump main 版本号。
+- 体积 32M 含 ML Kit 中文 bundled 模型，与 v0.2.31 同量级，不是另一个构建变体。
