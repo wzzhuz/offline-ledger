@@ -139,14 +139,15 @@ object ScreenTextParser {
 
     private fun afterLabel(lines: List<String>, labels: List<String>): String? {
         for (line in lines) {
-            for (label in labels) {
-                val i = line.indexOf(label)
-                if (i < 0) continue
-                val rest = line.substring(i + label.length)
-                    .trimStart(':', '：', ' ', '\t', '-', '—')
-                    .trim()
-                if (rest.length >= 2 && rest.length <= 60) return rest
-            }
+            // 第 50 批首轮 CI 修复：同一行可能命中多个标签（「商品」与「商品说明」），
+            // MUST 取最长的那个，否则 rest 会残留「说明：」被当成描述内容。
+            val label = labels.filter { line.contains(it) }
+                .maxByOrNull { it.length } ?: continue
+            val i = line.indexOf(label)
+            val rest = line.substring(i + label.length)
+                .trimStart(':', '：', ' ', '\t', '-', '—')
+                .trim()
+            if (rest.length >= 2 && rest.length <= 60) return rest
         }
         return null
     }
