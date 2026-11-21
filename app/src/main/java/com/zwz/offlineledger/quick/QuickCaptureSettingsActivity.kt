@@ -62,6 +62,11 @@ private fun QuickCaptureSettingsScreen(onBack: () -> Unit) {
     ) {
         Text("识屏记账设置", style = MaterialTheme.typography.titleLarge)
         Text(
+            if (QuickCaptureBridge.isAttached()) "当前：无障碍服务已连接"
+            else "当前：无障碍服务未连接，磁贴仍可一键手动记账",
+            style = MaterialTheme.typography.labelMedium
+        )
+        Text(
             "仅在你点磁贴时读取当前屏幕；白名单之外不解析、不截图。数据只在本机内存里流转。",
             style = MaterialTheme.typography.bodySmall
         )

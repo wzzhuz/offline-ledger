@@ -39,3 +39,21 @@
 - **main 仍冻结在 v0.2.30**（`6f85c8318bda`），未 merge、未 bump main 版本号。
 - 按 release.yml 命名规则，坚果云目标为 `/my-apps/offline-ledger-releases/offline-ledger-v0.2.31-release-d29b2c7a.apk`。WebDAV 目录与 job logs 在当前凭据下不可读（403），**目录以使用者实际所见为准**，不把 step 绿等价于目录可见。
 - 体积从 v0.2.30 的约 12M（artifact 压缩口径）升到 32M，是 ML Kit 中文 bundled 模型与 native 库进入 release 包所致，不是另一个构建变体。
+
+
+## 第 50 批（v0.2.32）已落
+
+- [x] 点击链解耦：磁贴同步起页、失败兜底、移除 noHistory / taskAffinity
+- [x] 权限分层：零权限也能一键手动 + 页内检测 + 引导
+- [x] 节流退避重试一次；安全窗口 / OCR 失败明确降级
+- [x] OCR 回传带坐标文本块；识别详情面板（字段来源 / 原始块 / 改选）
+- [x] 金额候选收紧 + fixture 单测 6 条
+- [x] 改选保留 fingerprint，`importSource="screen"` 幂等不回退
+
+## 第 50 批真机复核（仍 [ ]）
+
+- [ ] 连点 / 权限关掉 / 安全窗口三种情况下磁贴都有可见反应
+- [ ] 未开无障碍能一键手动记账
+- [ ] 展开识别详情能判定是 OCR 错字还是选错块，改选后保存正确
+- [ ] 余额 / 日期不再被选成金额，商户与描述分离
+- [ ] 连点两次只入账一次、撤销逐字段还原

@@ -29,3 +29,38 @@ sealed class CaptureOutcome {
     data class Success(val bill: ParsedBill, val source: String) : CaptureOutcome()
     data class NeedManual(val reason: String) : CaptureOutcome()
 }
+
+
+/**
+ * 第 50 批：OCR / 节点文本块的带坐标候选。MUST 只在内存里流转，
+ * 不落盘、不上传、不记全屏日志；index 用于在确认页里「改选」。
+ */
+data class TextBlockCandidate(
+    val index: Int,
+    val text: String,
+    val left: Int = 0,
+    val top: Int = 0
+)
+
+/** 金额候选：rejected 非空表示被收紧规则排除，仍展示供人工改选。 */
+data class AmountCandidate(
+    val blockIndex: Int,
+    val rawText: String,
+    val amountCents: Long,
+    val rule: String,
+    val rejected: String? = null
+)
+
+/** 字段来源，用来分清「OCR 读错字」还是「选错块」。 */
+data class FieldTrace(
+    val field: String,
+    val blockIndex: Int,
+    val rawText: String,
+    val rule: String
+)
+
+data class ParseTrace(
+    val bill: ParsedBill,
+    val fields: List<FieldTrace>,
+    val amountOptions: List<AmountCandidate>
+)
