@@ -10,13 +10,10 @@
         <exclude domain="database" path="offline_ledger.db" />
         <exclude domain="database" path="offline_ledger.db-wal" />
         <exclude domain="database" path="offline_ledger.db-shm" />
-        <!-- 第 49 批：启动快照的明文账目副本，noBackupFilesDir + 显式排除双保险。 -->
-        <exclude domain="file" path="no_backup/startup_snapshot.json" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="database" path="offline_ledger.db" />
         <exclude domain="database" path="offline_ledger.db-wal" />
         <exclude domain="database" path="offline_ledger.db-shm" />
-        <exclude domain="file" path="no_backup/startup_snapshot.json" />
     </device-transfer>
 </data-extraction-rules>

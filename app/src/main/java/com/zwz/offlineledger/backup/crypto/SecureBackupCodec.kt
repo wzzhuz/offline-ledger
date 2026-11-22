@@ -14,9 +14,9 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * 备份文件加密（纯 JVM，只用 javax.crypto / java.util.zip / java.security）。
  *
- * 与 SQLCipher 的数据库口令**完全无关**：
- * - 数据库口令由 Android Keystore 保管，换设备即失效、用户不可见
- * - 备份口令由用户自设、不落盘、跨设备必须仍可解密
+ * 与本地数据库**完全无关**（第 50 批起本地库为明文 Room）：
+ * - 本地账本由应用沙箱 + 关闭系统自动备份 + 排除数据库保护
+ * - 备份口令由用户自设、不落盘、跨设备必须仍可解密，是导出文件的唯一加密边界
  *
  * 文件布局（MAGIC 之后的字节全部是密文或随机数）：
  *   [0..4]   MAGIC   = "OLBK" + 0x01        5 bytes

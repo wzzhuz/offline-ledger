@@ -588,6 +588,6 @@ jobs:
               *)     echo "☁️ 坚果云：未上传（未勾选或该步骤未产出状态）" ;;
             esac
             echo ""
-            echo "**边界提醒**：R8 包能否真机启动、SQLCipher 打开数据库、"
+            echo "**边界提醒**：R8 包能否真机启动、明文 Room 冷启动与导入重建、"
             echo "BiometricPrompt 弹窗与 SAF 文件选择器，沙盒无法验证，需装到手机实测。"
           } >> "$GITHUB_STEP_SUMMARY"

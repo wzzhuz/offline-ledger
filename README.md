@@ -13,6 +13,12 @@
 > 记账、明细、组合筛选、回收站恢复、净资产与对账沿用阶段 2 / 3 能力。
 > 本仓库遵循 OpenSpec 规范驱动开发，规格是唯一真理源。
 
+> **第 50 批（v0.2.33）变更提示**：本地数据库已按使用者显式授权改为**明文 Room**，
+> 移除 SQLCipher / `SupportOpenHelperFactory` / Keystore 数据库口令；
+> 下文各阶段记录里提到的 SQLCipher、数据库口令、Keystore 均为**历史快照**，不代表当前实现。
+> 当前状态以 `openspec/project.md`、`openspec/specs/privacy-security/spec.md` 为准。
+> 导出 JSON 备份仍为口令加密；装 v0.2.33 前 MUST 先导出 → 卸载 → 安装 → 导入重建。
+
 ---
 
 ## 30 秒架构速览
@@ -21,7 +27,7 @@
 |---|---|
 | 语言 / UI | Kotlin + Jetpack Compose（Material 3） |
 | 架构 | MVVM + Clean Architecture（UI → ViewModel → Repository → Room DAO） |
-| 存储 | Room (SQLite) + **SQLCipher**（阶段 1 已接入） |
+| 存储 | Room (SQLite)，平台默认 SQLiteOpenHelper（明文，第 50 批去 SQLCipher） |
 | 异步 / DI | Coroutines + StateFlow / Hilt |
 | 序列化 | kotlinx.serialization（备份 DTO 与 Entity 分离） |
 | 分页 / 图表 | **Paging 3**（阶段 2 已接入）/ 原生 Canvas 自绘（阶段 4） |
@@ -39,7 +45,7 @@
 |---|---|---|---|---|---|---|---|
 | 8.13 | 8.13.0 | 2.3.21 | 2.3.11 | 2026.06.00 | 2.8.4 | 2.57.1 | 17 |
 
-SQLCipher `4.5.6@aar`、kotlinx-serialization-json `1.9.0`；
+kotlinx-serialization-json `1.9.0`（SQLCipher `4.5.6@aar` 已于第 50 批移除）；
 阶段 2 新增 `material-icons-core`（BOM 管理）、`navigation-compose:2.9.0`、
 `lifecycle-viewmodel-compose:2.9.1`、`paging-common/compose:3.3.6`。
 锁定依据、证据链与应急回退顺序见
@@ -61,8 +67,9 @@ SQLCipher `4.5.6@aar`、kotlinx-serialization-json `1.9.0`；
    统计口径只需 `type IN ('EXPENSE','INCOME') AND excludeFromStats = 0`。
 3. **校准独立成表**，不生成伪支出流水，因此不进明细、不进分类统计、重算时不会被重复扣。
 
-数据库口令由 Android Keystore 的 AES-256/GCM 密钥加密保管，
-`System.loadLibrary("sqlcipher")` 在 Application.onCreate 最早处加载。
+（阶段 1 历史做法）数据库口令曾由 Android Keystore 的 AES-256/GCM 密钥加密保管，
+`System.loadLibrary("sqlcipher")` 曾在 Application.onCreate 最早处加载；
+**第 50 批起已全部移除**，改为平台默认明文 Room 打开。
 
 **阶段 1 的最小 JSON 导出是明文**，仅供开发期防止表结构变动丢数据；
 口令加密、SAF 文件选择器、CSV 属于阶段 5。请勿把导出文件放到公共目录。

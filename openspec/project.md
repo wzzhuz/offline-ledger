@@ -23,8 +23,12 @@
 ### 三条铁律（任何改动不得违反）
 
 1. **数据是你的** —— **账本数据不得默认上传到厂商服务器 / 托管给第三方，
-   数据流向 MUST 由使用者控制**；关闭系统自动备份并排除数据库，本地加密 + 应用锁，
-   数据随时可带走。
+   数据流向 MUST 由使用者控制**；关闭系统自动备份并排除数据库，
+   **应用锁与数据随时可带走由使用者自行决定启用**。
+   **2026-11-22 使用者显式授权**：本地数据库改为明文 Room（去 SQLCipher）。
+   理由：自用 App 装在个人可信手机，威胁模型不含设备丢失 / 取证 / 物理接触；
+   实测加密开库链（so 加载 + Keystore + 密钥派生）导致冷启动 1~2s，去掉后基本无感。
+   红线仍是数据流向，不是本地文件是否加密；**导出 JSON 备份的口令加密 MUST NOT 倒退**。
    **隐私边界（6c-1 与 2026-11-17 两次使用者澄清）**：红线是「**默认把数据传到厂商服务器、
    且用户无法控制**」——这正是弃用钱迹 / 随手记 / 鲨鱼记账的原因；
    **不是**「Manifest 里不能出现 `INTERNET`」或「不能新增 Gradle 依赖」这类形式禁令。
@@ -54,7 +58,7 @@
 | 语言 | Kotlin |
 | UI | Jetpack Compose + Material Design 3（禁止 XML 布局） |
 | 架构 | MVVM + Clean Architecture（UI → ViewModel → Repository → Room DAO） |
-| 本地库 | Room (SQLite) + SQLCipher（自定义 `SupportOpenHelperFactory`） |
+| 本地库 | Room (SQLite)，平台默认 SQLiteOpenHelper（明文，第 50 批去 SQLCipher） |
 | 异步 / DI | Coroutines + StateFlow / Hilt |
 | 序列化 | kotlinx.serialization（备份 DTO 与 Entity 分离） |
 | 分页 / 图表 | Paging 3 / 原生 Canvas 自绘（环形图、折线、分组柱） |
@@ -474,3 +478,18 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 ### 第 49 批实测
 代码 `f9fca48ea153` / push CI `44977573597` **success**（六静态检查 + 单测 + debug APK + release lintVital 全绿）/ release `44978260845` **success**（坚果云 success，已建 tag `v0.2.31`）/ 制品 `offline-ledger-release-v0.2.31` 12,421,988 B、`offline-ledger-mapping-v0.2.31` 3,843,271 B、metrics 269 B。
 **CI 全绿 ≠ 真机通过**：首帧 < 200ms、换源无空帧、写后缓存退场、应用锁边界、R8 快照反序列化、五点打点分段结论全部列为真机待验（活文档 §8 第 49 批继承与新增待验）。
+
+## 第 50 批（v0.2.33）：去 SQLCipher 明文库合入 main，废弃第 49 批缓存方案
+
+- **实验定案**：分支 `experiment/plaintext-db`（从 v0.2.30 基线 `6f85c8318bda` 拉，只去加密、不带缓存、不带第 49 批任何改动，HEAD `227e1d2abf16`），R8 包 `offline-ledger-release-v0.2.31.1` 2,542,416 B。使用者真机实测「效果非常好，基本无感就加载出来了」，且顶部支出 / 结余 / 每日金额也一起立刻出来。
+  → 1~2s 整段落在**加密开库链**（so 加载 + Keystore + SQLCipher 密钥派生），不是 Hilt / JIT / 查询；第 49 批「最可疑但未定案」至此定案。实验包比正式包小约 10 MB，即 SQLCipher 的 .so。
+- **合入方式**：实验分支基线是 v0.2.30，main 已前进 3 个 commit，**不 merge**；在 main HEAD `b450d6f9c633` 上构造新 tree 单次 commit（parent 保持 main HEAD，历史全留）。内容 = v0.2.30 代码底 + 去加密 − 第 49 批全部改动 + 规格修订。
+- **代码**：删 `sqlcipher-android:4.5.6@aar`、`System.loadLibrary`、`SupportOpenHelperFactory`、`DatabaseKeyManager.kt` 与 Keystore 取口令；Room 走平台默认 SQLiteOpenHelper。库名 `offline_ledger.db` 与 `version = 5` **不变**（改库名会让备份排除规则失效）。五点 `StartupTrace` 保留但 `ENABLED = false` 并适配明文链路；导出加密 `SecureBackupCodec`、应用锁、备份排除规则、`FLAG_SECURE` 全部不动。
+- **缓存方案废弃**：删除 `data/startup/` 4 文件 + `StartupSnapshotTest.kt`；`DetailScreen` / `DetailViewModel` / `LedgerApp` / `LedgerRepository` / `AppDatabase` / `RecordPagingSource` / 两个备份规则 / `check_manifest_privacy.py` / proguard 全部回退到第 48 批状态；**整个 `openspec/changes/optimize-cold-start-first-frame/` 目录删除**（方案废弃、delta 从未合并，留着会误导「新会话只读这一份即可还原全貌」）。历史仍可由 git 追溯，第 49 批经验留在活文档 §7.31 作为留痕。
+- **规格修订（正式采纳 A 方案）**：铁律 1 落地描述按使用者确认措辞改写并留显式授权；技术栈表本地库行改明文；`privacy-security/spec.md` 3 条加密 Requirement（「本地数据库加密」「数据库以 SQLCipher 加密打开」「数据库口令由 Android Keystore 保护」）改写为明文边界，L「FLAG_SECURE 与 PIN hash 边界明确」文案同步；保留「隐私边界是数据不离开设备而非文件必须加密」作为依据。**导出 JSON 备份口令加密 MUST NOT 倒退**。
+- **破坏性**：旧 `offline_ledger.db` 是加密的，明文 Room 打不开 → **装前 MUST 先导出加密备份 → 卸载 → 安装 → 导入重建**，覆盖安装会崩。零改表、数据可完整重建。
+- **版本号**：跳过 `0.2.32`（feature/quick-tile-screen-capture 分支已有同名制品 `offline-ledger-release-v0.2.32` 32,159,121 B，按活文档 §1「禁止同名覆盖」顺延），用 `0.2.33`。
+- 挂账未动：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中；本批不新建 change（取舍与威胁模型已在前两轮论证并实测验证）。
+
+### 第 50 批实测
+待回填（代码 commit sha / push CI run id / release run id / 制品名与体积）。

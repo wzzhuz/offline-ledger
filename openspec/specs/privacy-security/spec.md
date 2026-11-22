@@ -87,18 +87,30 @@
 
 ---
 
-### Requirement: 本地数据库加密
+### Requirement: 本地数据库为明文，边界由数据流向界定
 
-账本数据库 SHALL 使用 SQLCipher（Room 经自定义 `SupportOpenHelperFactory` 接入）或同等强度方案加密，密钥 SHALL 由 Android Keystore 派生保管。
+账本数据库 SHALL 以平台默认 SQLiteOpenHelper 打开（明文），
+系统 MUST NOT 再引入 SQLCipher / `SupportOpenHelperFactory` 或任何数据库文件级加密方案。
+保护边界 SHALL 由「不上传第三方、关闭系统自动备份并排除数据库、应用沙箱隔离、应用锁防瞥视」共同构成。
+系统 MUST NOT 以「本地文件为明文」为由要求联网或引入回传类 SDK；
+导出 JSON 备份的口令加密 MUST NOT 因本条倒退。
 
 #### Scenario: 直接读取数据库文件
 
 - **GIVEN** 有人取得应用数据目录下的 db 文件
-- **WHEN** 用 SQLite 工具打开
-- **THEN** 无法读到明文账目
-- **AND** 提示文件已加密或无法解析
+- **WHEN** 用普通 SQLite 工具打开
+- **THEN** 能读到明文账目——这是使用者已明确接受的对价，不算违规
+- **AND** 该风险由应用沙箱 / 关闭自动备份 / 应用锁承担，威胁模型不含设备丢失与物理取证
 
-**理由**：设备丢失、备份残留、恶意应用读取文件是纯本地方案仅剩的风险面，加密是必要兜底。
+#### Scenario: 误引入加密依赖
+
+- **GIVEN** 有人重新加入 `sqlcipher-android` 或数据库口令派生逻辑
+- **WHEN** 构建与静态检查执行
+- **THEN** 该改动 MUST 被拒绝，除非使用者再次显式授权并同步修订本文件
+
+**理由**：2026-11-22 使用者显式授权——自用 App 装在个人可信手机，威胁模型不含设备丢失 / 取证 / 物理接触；
+实测加密开库链（so 加载 + Keystore + 密钥派生）导致冷启动 1~2s，去掉后基本无感。
+隐私红线是「默认把数据传到厂商服务器且用户不可控」，不是本地文件是否加密（见本文件「隐私边界是数据不离开设备而非文件必须加密」）。
 
 ---
 
@@ -213,37 +225,48 @@ MUST NOT 引入网络上传。
 **理由**：文字约定会被忘记，可执行检查不会。
 且备份规则只在 release 的 `lintVital` 才校验，静态检查能在更早一步拦住。
 
-### Requirement: 数据库以 SQLCipher 加密打开
+### Requirement: 数据库以平台默认 SQLiteOpenHelper 打开
 
-系统 SHALL 通过 `SupportOpenHelperFactory` 打开 Room 数据库，
-口令 SHALL 由 `DatabaseKeyManager` 生成，
-且 SHALL 在打开任何数据库之前调用 `System.loadLibrary("sqlcipher")`。
+系统 SHALL 用 Room 默认 `SQLiteOpenHelper` 打开 `offline_ledger.db`，
+MUST NOT 注入自定义 `SupportOpenHelperFactory`、MUST NOT 加载 `sqlcipher` native 库、
+MUST NOT 为打开数据库派生或保管任何口令。
+库名与 `AppDatabase.version` SHALL 保持不变，以免备份排除规则失效。
 
-#### Scenario: 直接读取数据库文件
+#### Scenario: 冷启动开库
 
-- **GIVEN** 有人取得应用数据目录下的 `offline_ledger.db`
-- **WHEN** 用普通 SQLite 工具打开
-- **THEN** 无法读到明文账目
+- **GIVEN** 杀进程后冷启动
+- **WHEN** `DatabaseModule.provideDatabase` 执行
+- **THEN** 只做平台 Room 构建，无 so 加载、无 Keystore IPC、无密钥派生
+- **AND** 明细列表、顶部汇总与每日合计不经额外等待即可显示
 
-**理由**：零网络权限之外，设备丢失与文件残留是纯本地方案仅剩的风险面，
-加密是必要兜底；第一条铁律不能只停在 Manifest 上。
+#### Scenario: 旧加密库残留
+
+- **GIVEN** 设备上残留第 49 批及之前的加密 `offline_ledger.db`
+- **WHEN** 明文 Room 尝试打开
+- **THEN** 必须走「导出加密备份 → 卸载 → 安装 → 导入重建」，MUST NOT 宣称可覆盖安装
+
+**理由**：第 50 批去加密后，第一条铁律靠 Manifest / 备份排除 / 应用沙箱落地，不再靠文件加密；
+`allowBackup=false` 与两个 section 的 `domain="database"` 排除 MUST NOT 因去加密而回退。
 
 ---
 
-### Requirement: 数据库口令由 Android Keystore 保护
+### Requirement: 不再保留数据库口令与 Keystore 数据库密钥
 
-系统 SHALL 用 Android Keystore 的 AES-256/GCM 密钥加密数据库口令，
-密文与 IV MAY 存于 `SharedPreferences`，
-密钥材料 MUST NOT 离开 Keystore，口令 MUST NOT 以明文持久化。
+系统 MUST NOT 再为数据库生成 / 保管口令，
+MUST NOT 存在 `DatabaseKeyManager` 或等价的 Keystore 数据库密钥逻辑。
+Android Keystore MAY 继续用于应用锁 PIN 相关的既有能力，
+但 MUST NOT 与本地数据库打开路径耦合。
+导出备份的口令仍由使用者自设、不落盘，与数据库完全无关。
 
-#### Scenario: 应用重启后仍可打开同一数据库
+#### Scenario: 应用重启后打开同一数据库
 
 - **GIVEN** 应用进程被杀死后重新启动
-- **WHEN** `DatabaseKeyManager.getOrCreatePassphrase` 执行
-- **THEN** 解密得到与首次完全相同的 32 字节口令
-- **AND** 无需用户重新输入
+- **WHEN** Room 打开 `offline_ledger.db`
+- **THEN** 无需任何口令即可打开同一明文库
+- **AND** 账目与重启前完全一致
 
-**理由**：口令一旦每次随机生成，重启后数据库就打不开，等于数据全丢。
+**理由**：口令派生与 Keystore 解密正是冷启动 1~2s 的来源；
+去加密后不再需要数据库口令，`SecureBackupCodec` 的备份口令是独立且唯一保留的加密边界。
 
 ### Requirement: 应用锁在冷启动与后台恢复校验
 
@@ -283,7 +306,7 @@ MUST NOT 引入网络上传。
 系统 SHALL 提供 `FLAG_SECURE` 开关，开启时 SHALL 在 Activity 上设置
 `WindowManager.LayoutParams.FLAG_SECURE`。PIN SHALL 以加盐 SHA-256 存储，
 MUST NOT 明文持久化。UI SHALL 说明该锁防的是「旁边的人瞥一眼 / 丢手机随手翻」，
-MUST NOT 宣称等价强认证——账本本体由 SQLCipher + Keystore 保护。
+MUST NOT 宣称等价强认证——本地账本文件为明文，应用锁只防瞥视，不等价设备级强认证。
 
 #### Scenario: 开启防泄露
 

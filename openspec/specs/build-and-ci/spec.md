@@ -476,9 +476,10 @@ SHALL 通过 `-PminifyRelease=true` 打开 Gradle 侧的
 `app/proguard-rules.pro` SHALL 保留 `kotlinx.serialization` 的
 `$$serializer` / `Companion` / `serializer(...)` 与 `@Serializable` 注解属性，
 SHALL 保留备份 DTO 的字段名、Room 生成实现与 TypeConverter 边界、
-Hilt 生成组件、SQLCipher 的 native 方法与类名、枚举的
+Hilt 生成组件、通用 `native <methods>` 方法名、枚举的
 `values()` / `valueOf(String)`，
 并 SHALL 保留 `SourceFile,LineNumberTable`。
+第 50 批起 MUST NOT 再保留 `net.sqlcipher` / `net.zetetic` 相关 keep 规则。
 
 #### Scenario: 混淆后备份仍可往返
 
@@ -490,13 +491,13 @@ Hilt 生成组件、SQLCipher 的 native 方法与类名、枚举的
 #### Scenario: 混淆后能打开数据库
 
 - **GIVEN** 用 R8 混淆后的包冷启动
-- **WHEN** 首次打开 SQLCipher 数据库
-- **THEN** 不出现 `UnsatisfiedLinkError`
+- **WHEN** 首次打开 Room 数据库（第 50 批起为平台默认明文 SQLite）
+- **THEN** 不出现类初始化失败或 serializer 丢失
 - **AND** 预置分类与账户正常加载
 
-**理由**：多数 AndroidX 库自带 consumer rules，但序列化与 JNI 边界
+**理由**：多数 AndroidX 库自带 consumer rules，但序列化与 native 方法名边界
 必须显式补；R8 出问题的典型表现是「装得上、一启动就崩」，
-CI 编译通过完全看不出来。
+CI 编译通过完全看不出来。去加密后不再有 JNI 库，但仍需保留通用 native 保护。
 
 ---
 

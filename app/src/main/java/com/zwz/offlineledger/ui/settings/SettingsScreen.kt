@@ -58,8 +58,8 @@ fun SettingsScreen(onOpen: (String) -> Unit) {
         SectionTitle("关于")
         Text(
             text = "隐私基线：不声明 INTERNET 权限 · 关闭系统自动备份并排除数据库 · " +
-                "SQLCipher 加密数据库 · 口令由 Android Keystore 保管 · " +
-                "备份口令不落盘，与数据库口令完全独立。",
+                "本地库为明文（第 50 批起，自用可信设备）· " +
+                "导出备份为口令加密，口令不落盘，由使用者自行保管。",
             style = MaterialTheme.typography.bodySmall,
             color = LedgerColors.Neutral
         )

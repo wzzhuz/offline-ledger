@@ -20,7 +20,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,7 +31,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.DataRefreshBus
-import com.zwz.offlineledger.data.startup.StartupPhase
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -95,11 +93,7 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
         DataRefreshBus.events.collect { refreshTick += 1 }
     }
 
-    // 第 49 批：周期补记会写库并可能触发 Pager 二次重建，
-    // 挪到首屏完成原子换源之后的空闲窗口，避免落在启动快照窗口内。
-    val startupPhase by detailVm.startupPhase.collectAsState()
-    LaunchedEffect(startupPhase) {
-        if (startupPhase != StartupPhase.LIVE) return@LaunchedEffect
+    LaunchedEffect(Unit) {
         runCatching {
             val today = LedgerClock.fromEpochMilli(System.currentTimeMillis()).localDate
             val n = LedgerDi.entryPoint(context).ledgerRepository().applyDueRules(today)

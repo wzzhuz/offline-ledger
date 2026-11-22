@@ -132,7 +132,7 @@ fun AppLockScreen(
 
         Text(
             text = "本锁用于防止旁人瞥视或手机丢失后被随手翻看；" +
-                "账本文件本身由 SQLCipher 与 Android Keystore 加密保护。",
+                "本地账本文件为明文，请勿将其等同于设备级强认证。",
             style = MaterialTheme.typography.labelSmall,
             color = LedgerColors.Neutral,
             modifier = Modifier.padding(top = 28.dp)

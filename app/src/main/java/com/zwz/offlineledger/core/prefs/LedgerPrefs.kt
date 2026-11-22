@@ -54,7 +54,7 @@ class LedgerPrefs(context: Context) {
 
     /**
      * 加盐 SHA-256。防的是「明文存 PIN」与彩虹表，
-     * 不是对抗有物理接触的攻击者——账本本体由 SQLCipher + Keystore 保护。
+     * 不是对抗有物理接触的攻击者——应用锁只是防瞥视，不等价设备级强认证。
      */
     fun setPin(pin: String) {
         require(pin.length in 4..12 && pin.all { it.isDigit() }) { "PIN 需为 4–12 位数字" }

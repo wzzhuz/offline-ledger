@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -48,7 +47,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -68,9 +66,6 @@ import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
 import com.zwz.offlineledger.data.local.dao.RecordRow
 import com.zwz.offlineledger.data.model.RecordType
-import com.zwz.offlineledger.data.startup.StartupPhase
-import com.zwz.offlineledger.data.startup.StartupPhaseMachine
-import com.zwz.offlineledger.data.startup.StartupSnapshotCodec
 import com.zwz.offlineledger.ui.components.amountColor
 import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.components.signedAmount
@@ -87,12 +82,9 @@ fun DetailScreen(
     listState: LazyListState,
     onEdit: (Long) -> Unit
 ) {
-    // 无条件 collect：即使首屏渲染的是快照，真实 Paging 也必须在后台同时加载。
     val pagingItems = vm.pagingData.collectAsLazyPagingItems()
     val overview by vm.overview.collectAsState()
     val filter by vm.filter.collectAsState()
-    val startupPhase by vm.startupPhase.collectAsState()
-    val startupRows by vm.startupRows.collectAsState()
     val accounts by vm.accounts.collectAsState()
     val categories by vm.categories.collectAsState()
     /** 第 11 批：筛选面板交易对方联想的全量候选。 */
@@ -117,34 +109,6 @@ fun DetailScreen(
 
     LaunchedEffect(refreshTick) {
         if (refreshTick > 0) vm.bumpRevision()
-    }
-
-    /**
-     * 第 49 批：换源时序交给纯函数裁决。
-     * Paging 3 的 refresh 会先清空现有 items，且刚 collect 时 loadState.refresh
-     * 可能短暂为 NotLoading（还没真正开跑）。因此 MUST 先见过一次 Loading，
-     * 再等本次 refresh 回到 NotLoading 才允许原子换源，否则会把「列表空着」复现。
-     */
-    LaunchedEffect(Unit) {
-        var sawLoading = false
-        snapshotFlow { pagingItems.loadState.refresh }
-            .collect { state ->
-                val isLoading = state is LoadState.Loading
-                sawLoading = StartupPhaseMachine.sawLoading(sawLoading, isLoading)
-                if (StartupPhaseMachine.shouldSwitch(sawLoading, isLoading)) {
-                    val rows = (0 until minOf(
-                        pagingItems.itemCount,
-                        StartupSnapshotCodec.MAX_ROWS
-                    )).mapNotNull { idx -> pagingItems.peek(idx) }
-                    vm.onFirstFrameReady(rows)
-                }
-            }
-    }
-
-    /** 3s 兜底：真实首屏迟迟不来就降级骨架，MUST NOT 无限期挂旧快照。 */
-    LaunchedEffect(Unit) {
-        delay(3000)
-        vm.onStartupTimeout()
     }
 
     /**
@@ -191,10 +155,7 @@ fun DetailScreen(
                 MonthOverviewCard(
                     overview = overview,
                     activeFilterCount = filter.activeCount(),
-                    timeSummary = filter.timeSummary(
-                        if (startupPhase == StartupPhase.LIVE) pagingItems.itemCount
-                        else startupRows.size.takeIf { it > 0 }
-                    ),
+                    timeSummary = filter.timeSummary(pagingItems.itemCount),
                     showOverview = filter.showMonthOverview(),
                     // 第 48 批：表头读单一派生周期，不再读 _overview 那份独立月份。
                     periodTitle = filter.displayPeriodLabel(),
@@ -241,48 +202,29 @@ fun DetailScreen(
                     }
                 }
 
-                // 第 49 批：三个内容源是独立分支，MUST NOT 共用一个 LazyColumn 数据源。
-                when (startupPhase) {
-                    StartupPhase.SNAPSHOT -> StartupSnapshotList(
-                        rows = startupRows,
-                        monthCounts = monthCounts,
-                        overview = overview,
-                        showDailyTotals = filter.showMonthOverview(),
-                        listState = listState,
-                        modifier = Modifier.weight(1f),
-                        onRowClick = { row -> actionRow = row }
-                    )
-                    StartupPhase.SKELETON -> StartupSkeletonList(
-                        listState = listState,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StartupPhase.LIVE -> LazyColumn(
-                        state = listState,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        items(
-                            count = pagingItems.itemCount,
-                            key = pagingItems.itemKey { it.id }
-                        ) { index ->
-                            val row = pagingItems[index] ?: return@items
-                            val previous = if (index > 0) pagingItems.peek(index - 1) else null
-                            val ym = row.localDate / 100
-                            // 第 42 批：跨月连续列表，月分组头只在 UI 层插入，
-                            // 复用已有 monthCounts 角标，MUST NOT 另跑聚合查询。
-                            if (previous == null || previous.localDate / 100 != ym) {
-                                MonthGroupHeader(ym, monthCounts[ym])
-                            }
-                            if (previous == null || previous.localDate != row.localDate) {
-                                // 第 47 批：跨范围态 overview 只按当前查看月聚合，
-                                // 日头不显示错月 / 0 值合计，只显示日期；不新增聚合查询。
-                                DayHeader(
-                                    row.localDate,
-                                    if (filter.showMonthOverview()) overview.dailyTotals[row.localDate]
-                                    else null
-                                )
-                            }
-                            RecordRowCard(row = row, onClick = { actionRow = row })
+                LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
+                    items(
+                        count = pagingItems.itemCount,
+                        key = pagingItems.itemKey { it.id }
+                    ) { index ->
+                        val row = pagingItems[index] ?: return@items
+                        val previous = if (index > 0) pagingItems.peek(index - 1) else null
+                        val ym = row.localDate / 100
+                        // 第 42 批：跨月连续列表，月分组头只在 UI 层插入，
+                        // 复用已有 monthCounts 角标，MUST NOT 另跑聚合查询。
+                        if (previous == null || previous.localDate / 100 != ym) {
+                            MonthGroupHeader(ym, monthCounts[ym])
                         }
+                        if (previous == null || previous.localDate != row.localDate) {
+                            // 第 47 批：跨范围态 overview 只按当前查看月聚合，
+                            // 日头不显示错月 / 0 值合计，只显示日期；不新增聚合查询。
+                            DayHeader(
+                                row.localDate,
+                                if (filter.showMonthOverview()) overview.dailyTotals[row.localDate]
+                                else null
+                            )
+                        }
+                        RecordRowCard(row = row, onClick = { actionRow = row })
                     }
                 }
             }
@@ -544,93 +486,6 @@ private fun MonthOverviewCard(
             .height(1.dp)
             .background(LedgerColors.Neutral.copy(alpha = 0.12f))
     )
-}
-
-/**
- * 第 49 批：冷启动快照态。
- * 独立 `LazyColumn`，与真实 Paging 不共用数据源；复用既有月头 / 日头 / 行卡片，
- * 不新增任何聚合查询。窗口最多 1~2s，换源后本分支立刻销毁。
- */
-@Composable
-private fun StartupSnapshotList(
-    rows: List<RecordRow>,
-    monthCounts: Map<Int, Int>,
-    overview: MonthOverview,
-    showDailyTotals: Boolean,
-    listState: LazyListState,
-    modifier: Modifier = Modifier,
-    onRowClick: (RecordRow) -> Unit
-) {
-    LazyColumn(state = listState, modifier = modifier) {
-        items(count = rows.size, key = { index: Int -> rows[index].id }) { index ->
-            val row = rows[index]
-            val previous = rows.getOrNull(index - 1)
-            val ym = row.localDate / 100
-            if (previous == null || previous.localDate / 100 != ym) {
-                MonthGroupHeader(ym, monthCounts[ym])
-            }
-            if (previous == null || previous.localDate != row.localDate) {
-                DayHeader(
-                    row.localDate,
-                    if (showDailyTotals) overview.dailyTotals[row.localDate] else null
-                )
-            }
-            RecordRowCard(row = row, onClick = { onRowClick(row) })
-        }
-    }
-}
-
-/**
- * 第 49 批：判废 / 读取失败 / refresh 失败 / 超 3s 的兜底。
- * 只给占位，MUST NOT 显示任何账目，也不把「正在加载」伪装成空列表。
- */
-@Composable
-private fun StartupSkeletonList(
-    listState: LazyListState,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(state = listState, modifier = modifier) {
-        items(count = 8) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 60.dp)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            CircleShape
-                        )
-                )
-                Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.55f)
-                            .height(12.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                RoundedCornerShape(4.dp)
-                            )
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.32f)
-                            .height(10.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                RoundedCornerShape(4.dp)
-                            )
-                    )
-                }
-            }
-            ListDivider(Modifier.padding(horizontal = 16.dp))
-        }
-    }
 }
 
 /** 第 42 批：跨月分组头。不 sticky（Paging items 无法直接用 stickyHeader），

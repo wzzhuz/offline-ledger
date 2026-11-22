@@ -3,7 +3,8 @@
 #
 # 本项目用到 Hilt(KSP + 反射) / Room(生成 _Impl) /
 # kotlinx.serialization(@Serializable 的 $serializer 与 Companion) /
-# SQLCipher(System.loadLibrary + JNI) / BiometricPrompt / Compose。
+# BiometricPrompt / Compose。
+# 第 50 批：本地库改为明文 Room，已移除 SQLCipher 及其 JNI 依赖。
 # 多数 AndroidX 库自带 META-INF/proguard consumer rules，AGP 会自动合并；
 # 下面是**防御性补全**，重点是序列化与 JNI 两个边界——
 # 这两处出问题的典型表现是「装得上、一启动就崩」，CI 编译完全看不出来。
@@ -37,13 +38,6 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
-# ---- 第 49 批：启动快照 DTO ----
-# 上面的全局 serializer keep 已覆盖，这里再显式钉死包内 DTO 与字段名：
-# 快照文件跨版本留在磁盘上，字段被 R8 改名会导致旧快照解析失败（表现为判废回退骨架，
-# 不会崩，但「秒开」静默失效，CI 编译完全看不出来）。
--keep class com.zwz.offlineledger.data.startup.** { *; }
--keepclassmembers class com.zwz.offlineledger.data.startup.** { *; }
-
 # ---- 备份 DTO：字段名是备份格式的一部分，绝不能被改名 ----
 # Entity 与 DTO 分离本来就是为了「Entity 加字段不破坏备份格式」，
 # 这里再补一层：DTO 的字段名与成员保持不变。
@@ -73,14 +67,12 @@
 -keep class com.zwz.offlineledger.**_GeneratedInjector { *; }
 -keep class com.zwz.offlineledger.**_Factory { *; }
 
-# ---- SQLCipher / JNI ----
-# native 方法依赖「类名 + 方法名」与 .so 里的符号对应，
-# 混淆类名会直接 UnsatisfiedLinkError（一打开数据库就崩）。
+# ---- 通用 JNI / native 保护 ----
+# 第 50 批已移除 SQLCipher，不再 keep 任何 net.sqlcipher / net.zetetic 包；
+# 保留通用 native 方法名保护即可。
 -keepclasseswithmembernames,includedescriptorclasses class * {
     native <methods>;
 }
--keep class net.sqlcipher.** { *; }
--keep class net.sqlcipher.database.** { *; }
 
 # ---- BiometricPrompt / FragmentActivity ----
 -keep class androidx.biometric.** { *; }

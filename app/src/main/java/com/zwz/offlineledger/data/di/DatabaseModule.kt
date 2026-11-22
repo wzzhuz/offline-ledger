@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import com.zwz.offlineledger.core.StartupTrace
 import com.zwz.offlineledger.data.local.AppDatabase
-import com.zwz.offlineledger.data.local.DatabaseKeyManager
 import com.zwz.offlineledger.data.local.Migrations
 import com.zwz.offlineledger.data.local.SeedCallback
 import com.zwz.offlineledger.data.local.dao.AccountDao
@@ -21,38 +20,36 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import javax.inject.Singleton
 
+/**
+ * 第 50 批：Room 用平台默认 SQLiteOpenHelper（明文库）。
+ * 不再接 SupportOpenHelperFactory、不再取 Keystore 口令、不再派生密钥。
+ *
+ * 库名仍是 `offline_ledger.db`、version 仍是 5：
+ * 备份排除规则写死了这三个文件名，改库名会让账本逃出排除范围。
+ * 因此旧加密库打不开 → 覆盖安装会崩，MUST 先导出加密备份 → 卸载 → 安装 → 导入。
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideOpenHelperFactory(
-        @ApplicationContext context: Context
-    ): SupportOpenHelperFactory {
-        val passphrase = DatabaseKeyManager.getOrCreatePassphrase(context)
-        StartupTrace.mark(2)
-        return SupportOpenHelperFactory(passphrase)
-    }
-
-    @Provides
-    @Singleton
     fun provideDatabase(
-        @ApplicationContext context: Context,
-        factory: SupportOpenHelperFactory
-    ): AppDatabase = Room.databaseBuilder(
-        context,
-        AppDatabase::class.java,
-        AppDatabase.DATABASE_NAME
-    )
-        .openHelperFactory(factory)
-        .addCallback(SeedCallback(context))
-        .addMigrations(*Migrations.ALL)
-        .build()
-        .also { StartupTrace.mark(3) }
+        @ApplicationContext context: Context
+    ): AppDatabase {
+        StartupTrace.mark(2)
+        return Room.databaseBuilder(
+            context,
+            AppDatabase::class.java,
+            AppDatabase.DATABASE_NAME
+        )
+            .addCallback(SeedCallback(context))
+            .addMigrations(*Migrations.ALL)
+            .build()
+            .also { StartupTrace.mark(3) }
+    }
 
     @Provides fun provideAccountDao(db: AppDatabase): AccountDao = db.accountDao()
     @Provides fun provideCategoryDao(db: AppDatabase): CategoryDao = db.categoryDao()
