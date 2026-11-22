@@ -157,9 +157,10 @@ dependencies {
     // ---- 备份序列化（DTO 与 Room Entity 分离）----
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
-    // ---- SQLCipher（阶段 1 接入加密 OpenHelper）----
-    // 官方坐标带 @aar；不引入 Coil/Glide 之类会传递引入网络栈的库。
-    implementation("net.zetetic:sqlcipher-android:4.5.6@aar")
+    // ---- 实验分支 experiment/plaintext-db：已移除 SQLCipher 依赖 ----
+    // 仅用于隔离验证「冷启动 1~2s 是否由加密开库链造成」。
+    // 不引入任何替代依赖；Room 走平台默认 SQLite（明文）。
+    // 注意：不引入 Coil/Glide 之类会传递引入网络栈的库。
 
     // ---- 阶段 2：导航 / 分页 / ViewModel / 图标 ----
     // Compose BOM 2026.06 起不再通过 material3 传递图标 artifact，

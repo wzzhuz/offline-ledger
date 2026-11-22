@@ -2,6 +2,7 @@ package com.zwz.offlineledger.data.paging
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import com.zwz.offlineledger.core.StartupTrace
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.RecordRow
 
@@ -33,6 +34,7 @@ class RecordPagingSource(
                 limit = params.loadSize,
                 offset = offset
             )
+            if (offset == 0) StartupTrace.mark(4)
             PagingSource.LoadResult.Page(
                 data = rows,
                 prevKey = if (offset == 0) null else (offset - params.loadSize).coerceAtLeast(0),
