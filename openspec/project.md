@@ -492,4 +492,6 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 - 挂账未动：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中；本批不新建 change（取舍与威胁模型已在前两轮论证并实测验证）。
 
 ### 第 50 批实测
-待回填（代码 commit sha / push CI run id / release run id / 制品名与体积）。
+代码 `d5cb49cbd77e`（parent `b450d6f9c633`，main HEAD） / push CI `45016703228` **success**（六静态检查 + 单测 + debug APK + release lintVital 全绿）/ release `45016754039` **success**（坚果云 success，已建 tag `v0.2.33`）/ 制品 `offline-ledger-release-v0.2.33` 2,541,509 B、`offline-ledger-mapping-v0.2.33` 3,799,683 B、metrics 270 B。
+实验分支 `experiment/plaintext-db` 保留供对照（HEAD `227e1d2abf16`），**未合并、未删除**。
+**BREAKING 装包顺序 MUST 实测**：导出加密备份 → 卸载 → 安装 v0.2.33 → 导入重建；沙盒无法验证，CI 全绿不得替代（活文档 §1）。
