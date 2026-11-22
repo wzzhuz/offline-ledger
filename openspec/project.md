@@ -459,3 +459,18 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 
 ### 第 48 批实测
 代码 `2142fe15ad8f` / push CI `44701739996` **success** 17/17 / release `44703074178` **success**（坚果云 success）/ 制品 `offline-ledger-release-v0.2.30` 12410678 B。零改表 → 覆盖安装。
+
+## 第 49 批（v0.2.31）：冷启动明细首屏感知优先
+
+- 使用者实测：R8 0.2.30 / 约 2000 条测试数据 / 无应用锁，杀进程冷启动到明细列表出现 1~2s，**界面框架已出、列表空着**；切月份 / 统计页 / 资产页 / 记一笔均几乎无感；5 次杀进程冷启动「基本都是 1~2s」。
+- 根因收敛：切页无感排除「SQL 聚合」与「SQLCipher 页级加解密」；5 次稳定排除「ART 自然攒 profile 下次变快」。嫌疑落在每次启动必付的串行链（so 加载 / Keystore / SQLCipher 开库派生 / Hilt 图 / Room open / 首屏 Paging），**加密项与非加密项未打点前不定案**。
+- 按 1-A / 2-A / 3-A：新建 change `optimize-cold-start-first-frame`（**仍进行中，未归档**）。采用**感知优先、零破坏**：`noBackupFilesDir` 存一次性启动快照（最多 60 行）→ 冷启动先渲染 → 真实 Paging 并行 → `Loading→NotLoading` 后原子换源 → 换源即销毁并覆写；判废 / 失败 / 超 3s 回退骨架。
+- 一致性：不查库校验、不做长期第二数据源；作废挂 `LedgerRepository` 的 Room `InvalidationTracker.Observer`（11 张表，覆盖全部写事务与元数据写），MUST NOT 只挂三个上层刷新出口；快照不进任何导出 / 快照 / CSV / 备份 DTO，不绕应用锁。
+- 配套：五点 `StartupTrace`（release 默认关闭，测完再决定是否追加 Baseline Profile）、`applyDueRules` 挪到首屏换源后、去重 `refreshMonthCounts`、备份规则补 `domain="file"` 排除、检查脚本与 proguard 同步、11 条纯 JVM 单测。
+- **铁律 1 重读结论**：红线是「数据不默认上传厂商服务器且用户不可控」，本地加密不是红线；但本批**保留 SQLCipher / Keystore 不动**，A（去加密）/ B（跳 KDF）本轮不实施。将来若调整须独立 change 改本文件 + 3 条 spec。
+- 零改表（`AppDatabase.version = 5` 未变）→ v0.2.30 上**覆盖安装即可，不用卸载**；不丢数据。
+- 挂账未动：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中；本批新增第 4 个进行中 change。
+
+### 第 49 批实测
+代码 `f9fca48ea153` / push CI `44977573597` **success**（六静态检查 + 单测 + debug APK + release lintVital 全绿）/ release `44978260845` **success**（坚果云 success，已建 tag `v0.2.31`）/ 制品 `offline-ledger-release-v0.2.31` 12,421,988 B、`offline-ledger-mapping-v0.2.31` 3,843,271 B、metrics 269 B。
+**CI 全绿 ≠ 真机通过**：首帧 < 200ms、换源无空帧、写后缓存退场、应用锁边界、R8 快照反序列化、五点打点分段结论全部列为真机待验（活文档 §8 第 49 批继承与新增待验）。

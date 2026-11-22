@@ -52,7 +52,7 @@
 - [x] 6.1 `backup_rules.xml` / `data_extraction_rules.xml` 各补 `domain="file"` 排除（cloud-backup 与 device-transfer 两段都补），MUST NOT 写 `<include>`
 - [x] 6.2 `scripts/check_manifest_privacy.py` 扩展校验 `domain="file"` 排除存在，PASS 文案同步更新；数据库三条 exclude / `allowBackup=false` / `hasFragileUserData` 一条不改
 - [x] 6.3 `app/proguard-rules.pro` 补 `data.startup.**` 显式 keep（DTO 与字段名跨版本留在磁盘上，被 R8 改名会静默判废）
-- [ ] 6.4 **CI**：六个静态检查 + 纯 JVM 单测在 Actions 全绿；CI 全绿不得替代真机观感 / 性能验证（活文档 §1）
+- [x] 6.4 **CI**：push CI `44977573597` success（六静态检查 + 单测 + debug APK + release lintVital 全绿）、release `44978260845` success（坚果云 success）。**CI 全绿不得替代真机观感 / 性能验证**（活文档 §1）
 
 ## 7. 真机验收与文档
 
@@ -62,8 +62,8 @@
 - [ ] 7.4 **真机**：开启应用锁冷启动 → 解锁前无任何账目；跨月 / 改筛选后不展示上月旧账
 - [ ] 7.5 **真机**：R8 release 包冷启动反序列化正常；判废 / 失败 / 超时回退骨架
 - [ ] 7.6 **真机**：回归活文档 §8 第 45–48 批待验项（切月即时刷新、表头单一周期源、统计下钻、清空筛选）
-- [ ] 7.7 更新 `docs/页面优化经验与避坑指南.md`：§7.49 症状→根因→解法→防范、§8 未验清单继承与结项（代码侧已补条目，真机结论待回填）
-- [ ] 7.8 回填本批实测：真实 commit sha + push CI run id + release run id + 制品名与体积；按刚创建的 commit sha 用 Trees/Contents API 逐文件比对 blob sha
+- [x] 7.7 更新 `docs/页面优化经验与避坑指南.md`：§7.31「症状 → 根因 → 解法 → 教训」四段、§8 第 49 批继承与新增待验已补；真机结论待使用者回填
+- [x] 7.8 回填本批实测：`project.md` 第 49 批补录、活文档 §7.31 实测编号、`defaultVersionName = 0.2.31`；真实 commit `f9fca48ea153` / push CI `44977573597` / release `44978260845` / 制品 `offline-ledger-release-v0.2.31` 12,421,988 B；推送脚本按刚创建的 commit sha 逐文件比对 blob sha
 
 ## 8. 收尾
 
