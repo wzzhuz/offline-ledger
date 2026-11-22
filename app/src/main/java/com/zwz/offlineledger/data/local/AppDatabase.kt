@@ -71,5 +71,11 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "offline_ledger.db"
+
+        /**
+         * 启动快照判废用的编译期常量（MUST 与上方 `@Database(version = 5)` 同步修改）。
+         * 刻意不查库：冷启动校验快照若等开库，感知优先就失去意义。
+         */
+        const val DB_VERSION = 5
     }
 }

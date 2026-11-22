@@ -37,6 +37,13 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
+# ---- 第 49 批：启动快照 DTO ----
+# 上面的全局 serializer keep 已覆盖，这里再显式钉死包内 DTO 与字段名：
+# 快照文件跨版本留在磁盘上，字段被 R8 改名会导致旧快照解析失败（表现为判废回退骨架，
+# 不会崩，但「秒开」静默失效，CI 编译完全看不出来）。
+-keep class com.zwz.offlineledger.data.startup.** { *; }
+-keepclassmembers class com.zwz.offlineledger.data.startup.** { *; }
+
 # ---- 备份 DTO：字段名是备份格式的一部分，绝不能被改名 ----
 # Entity 与 DTO 分离本来就是为了「Entity 加字段不破坏备份格式」，
 # 这里再补一层：DTO 的字段名与成员保持不变。

@@ -199,3 +199,23 @@ ColdStart
 
 **实现前必读**：`docs/页面优化经验与避坑指南.md` §1 + §6.1（状态与流程）、§2/§3/§6.2（改 UI 时）、§6.3（交付前检查）；
 踩新坑 MUST 按「症状 → 根因 → 解法 → 防范」补进该活文档（AGENTS.md 硬性要求）。
+
+---
+
+## 实现偏差登记（第 49 批，如实记录，不粉饰）
+
+三处与上文门禁描述不完全一致，均为实现期基于代码事实做的收敛，能力范围不缩水：
+
+| 门禁写法 | 实际落地 | 理由 |
+|---|---|---|
+| 「作废动作挂在 `LedgerRepository` 最底层写事务出口」 | 挂在 `LedgerRepository.init` 注册的 **Room `InvalidationTracker.Observer`**（监听 11 张表），任何写事务提交即 `StartupSnapshotBus.invalidate()` | 逐方法在 `db.withTransaction` 末尾加一行要改 42 处，极易漏（活文档 §7.27「改一处漏一处」已两次踩过）；且 `check_transaction_annotations.py` 逐方法校验 `db.withTransaction` 字面，不能替换成包装函数。InvalidationTracker 是数据库层通知，覆盖面严格大于逐个写方法，含账户 / 分类 / 模板 / 规则等元数据写。仍是「不依赖三个上层出口」的底层出口，spec 意图不变 |
+| 「`allCounterparties()` 全表 DISTINCT 改首帧后低优先级预取」 | **保留在 `DetailViewModel.init`**，只去掉 `refreshMonthCounts` 的重复执行 | `FilterSheet` 的对方联想直接读 `vm.counterparties`，延后会在「冷启动立刻点筛选」时制造空态——这正是阶段 0 对话里自己修正过的「不制造空态」。且 2000 条下 DISTINCT 毫秒级，实测已证伪查询是瓶颈；`YearMonthPicker` 的 `disableEmptyMonths` 依赖 `monthCounts`，更不能延后。`tasks.md` 5.2 相应收敛为「去重 + 不制造空态」 |
+| 「`applyDueRules` 挪到首屏稳定后的空闲窗口」 | 由 `LedgerApp` 监听 `startupPhase == LIVE` 后触发，而不是定时 delay | 用状态而非时间做门控，避免「首屏还没到就补记」或「首屏已到却还在等计时器」两种边界；命中补记会写库并 invalidate，由最终那次 refresh 吸收，不会造成二次重建 |
+
+另：`StartupTrace.ENABLED` 是编译期常量 `false`，release 默认关闭；诊断时改 `true` 重编一次即可读五段耗时，
+不写文件、不进导出。`tasks.md` 1.2–1.4 的真机测量与「是否追加 Baseline Profile」属于使用者侧动作，
+代码侧只提供打点能力，**不预埋结论**。
+
+`StartupSnapshotCodec.isUsable` 的 `unlocked` 参数由架构天然保证：`MainActivity` 只在 `unlocked == true`
+分支渲染 `LedgerApp` → `DetailScreen`，快照态不可能出现在解锁前；纯 JVM 单测仍单独断言
+`unlocked = false` 时判废，防止将来有人把快照渲染挪到锁外。

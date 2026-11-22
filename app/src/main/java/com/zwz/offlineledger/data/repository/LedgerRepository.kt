@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.data.repository
 
 import com.zwz.offlineledger.data.local.CounterpartyNormalizer
+import androidx.room.InvalidationTracker
 import androidx.room.withTransaction
 import com.zwz.offlineledger.backup.dto.BackupFile
 import com.zwz.offlineledger.backup.dto.LedgerSnapshot
@@ -43,6 +44,7 @@ import com.zwz.offlineledger.backup.csv.FireflyImportOutcome
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.time.LedgerClock
+import com.zwz.offlineledger.data.startup.StartupSnapshotBus
 import com.zwz.offlineledger.engine.CategoryTree
 import com.zwz.offlineledger.engine.LedgerEngine
 import com.zwz.offlineledger.engine.Reconciliation
@@ -80,6 +82,28 @@ class LedgerRepository @Inject constructor(
     private val budgetDao: BudgetDao,
     private val aliasDao: CounterpartyAliasDao
 ) {
+    /**
+     * 启动快照作废挂在**数据库层**：任何写事务提交都会由 Room 的
+     * InvalidationTracker 通知，覆盖全部写方法与账户 / 分类等元数据写。
+     *
+     * MUST NOT 只挂 `DataRefreshBus` / `bumpRevision` / `refreshTick` 任一上层出口：
+     * 三者覆盖面互不重叠，只挂一个必漏（尤其在设置二级页导入 / 恢复时）。
+     * 见 openspec/changes/optimize-cold-start-first-frame/design.md「一致性保障」。
+     */
+    init {
+        db.invalidationTracker.addObserver(object : InvalidationTracker.Observer(
+            arrayOf(
+                "records", "trash", "accounts", "categories",
+                "balance_adjustments", "record_templates", "recurring_rules",
+                "budgets", "counterparty_aliases", "rule_groups", "rule_definitions"
+            )
+        ) {
+            override fun onInvalidated(tables: Set<String>) {
+                StartupSnapshotBus.invalidate()
+            }
+        })
+    }
+
     fun observeNetWorth(): Flow<Long> = accountDao.observeNetWorth()
 
     suspend fun insertRecord(record: RecordEntity): Long = db.withTransaction {

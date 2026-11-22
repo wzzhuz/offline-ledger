@@ -2,6 +2,7 @@ package com.zwz.offlineledger.data.di
 
 import android.content.Context
 import androidx.room.Room
+import com.zwz.offlineledger.core.StartupTrace
 import com.zwz.offlineledger.data.local.AppDatabase
 import com.zwz.offlineledger.data.local.DatabaseKeyManager
 import com.zwz.offlineledger.data.local.Migrations
@@ -31,9 +32,11 @@ object DatabaseModule {
     @Singleton
     fun provideOpenHelperFactory(
         @ApplicationContext context: Context
-    ): SupportOpenHelperFactory = SupportOpenHelperFactory(
-        DatabaseKeyManager.getOrCreatePassphrase(context)
-    )
+    ): SupportOpenHelperFactory {
+        val passphrase = DatabaseKeyManager.getOrCreatePassphrase(context)
+        StartupTrace.mark(2)
+        return SupportOpenHelperFactory(passphrase)
+    }
 
     @Provides
     @Singleton
@@ -49,6 +52,7 @@ object DatabaseModule {
         .addCallback(SeedCallback(context))
         .addMigrations(*Migrations.ALL)
         .build()
+        .also { StartupTrace.mark(3) }
 
     @Provides fun provideAccountDao(db: AppDatabase): AccountDao = db.accountDao()
     @Provides fun provideCategoryDao(db: AppDatabase): CategoryDao = db.categoryDao()

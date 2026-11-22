@@ -4,4 +4,7 @@
     <exclude domain="database" path="offline_ledger.db" />
     <exclude domain="database" path="offline_ledger.db-wal" />
     <exclude domain="database" path="offline_ledger.db-shm" />
+    <!-- 第 49 批：启动快照落在 noBackupFilesDir，天然不备份；这里再显式排除一层。
+         只写 exclude（黑名单模式），MUST NOT 写 <include>，否则 lintVital 判 fatal。 -->
+    <exclude domain="file" path="no_backup/startup_snapshot.json" />
 </full-backup-content>

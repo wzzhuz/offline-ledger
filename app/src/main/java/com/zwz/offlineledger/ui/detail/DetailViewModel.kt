@@ -6,7 +6,9 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import com.zwz.offlineledger.core.StartupTrace
 import com.zwz.offlineledger.core.time.MonthRange
+import com.zwz.offlineledger.data.local.AppDatabase
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
@@ -18,9 +20,18 @@ import com.zwz.offlineledger.data.paging.DetailGranularity
 import com.zwz.offlineledger.data.paging.RecordPagingSource
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
+import com.zwz.offlineledger.data.startup.SnapshotRow
+import com.zwz.offlineledger.data.startup.StartupPhase
+import com.zwz.offlineledger.data.startup.StartupSnapshot
+import com.zwz.offlineledger.data.startup.StartupSnapshotBus
+import com.zwz.offlineledger.data.startup.StartupSnapshotCodec
+import com.zwz.offlineledger.data.startup.StartupSnapshotStore
 import com.zwz.offlineledger.ui.stats.StatsDrillRange
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -117,13 +128,118 @@ class DetailViewModel(
     private val _anchorMonth = MutableStateFlow<Int?>(null)
     val anchorMonth: StateFlow<Int?> = _anchorMonth.asStateFlow()
 
+    /**
+     * 第 49 批：冷启动首屏的三态内容源。
+     * `SNAPSHOT` / `SKELETON` / `LIVE` 是独立内容分支，MUST NOT 共用一个
+     * LazyColumn 数据源（Paging 3 refresh 会先清空 items，早切会闪空列表）。
+     */
+    private val _startupPhase = MutableStateFlow(StartupPhase.SKELETON)
+    val startupPhase: StateFlow<StartupPhase> = _startupPhase.asStateFlow()
+
+    private val _startupRows = MutableStateFlow<List<RecordRow>>(emptyList())
+    val startupRows: StateFlow<List<RecordRow>> = _startupRows.asStateFlow()
+
     init {
-        viewModelScope.launch { refreshMonthCounts(MonthRange.currentYearMonth() / 100) }
+        // 冷启动读一次性快照：不查库、不等开库；磁盘 IO 放 IO 线程。
+        // LedgerApp 只在「已解锁」分支渲染 DetailScreen，因此 unlocked 天然为 true。
+        viewModelScope.launch {
+            val f = _filter.value
+            val snapshot = withContext(Dispatchers.IO) { StartupSnapshotStore.read() }
+            val use = snapshot != null && StartupSnapshotCodec.isUsable(
+                snapshot = snapshot,
+                currentYearMonth = MonthRange.currentYearMonth(),
+                expectedDbVersion = AppDatabase.DB_VERSION,
+                unlocked = true,
+                filterIsDefault = f.isDefaultForStartup(),
+                isDefaultGranularity = f.displayGranularity() == DetailGranularity.MONTH
+            )
+            if (use && snapshot != null) {
+                _startupRows.value = snapshot.rows.map { it.toRecordRow() }
+                _startupPhase.value = StartupPhase.SNAPSHOT
+            } else {
+                _startupPhase.value = StartupPhase.SKELETON
+            }
+        }
+        // 任一写事务提交即作废：由 LedgerRepository 的 InvalidationTracker 触发，
+        // 覆盖导入 / 恢复 / 批量规整等不在明细页发生的写。
+        viewModelScope.launch {
+            StartupSnapshotBus.invalidations.collect {
+                _startupRows.value = emptyList()
+                if (_startupPhase.value != StartupPhase.LIVE) {
+                    _startupPhase.value = StartupPhase.SKELETON
+                }
+            }
+        }
+        // 第 49 批：monthCounts 只在 reload() 跑一次，init 不再重复。
         viewModelScope.launch { _accounts.value = accountDao.all() }
         viewModelScope.launch { _categories.value = categoryDao.all() }
+        // 全表 DISTINCT 保留在启动初期：FilterSheet 的对方联想依赖它，
+        // 延后会在「冷启动立刻点筛选」时制造空态；2000 条下毫秒级，实测非瓶颈。
         viewModelScope.launch { _counterparties.value = recordDao.allCounterparties() }
         viewModelScope.launch { _filter.collect { f -> reload(f) } }
     }
+
+    /** 默认窄视图：无筛选、无下钻标记、非全部时间。快照只服务这个视图。 */
+    private fun RecordFilter.isDefaultForStartup(): Boolean =
+        activeCount() == 0 && periodDisplayName == null && !allMonths
+
+    /**
+     * 真实首屏 `Loading → NotLoading` 后由 UI 调用，一次冷启动只切一次。
+     * rows 是真实分页前 60 行（可能为空）；只在默认月视图下覆写快照供下次冷启动。
+     */
+    fun onFirstFrameReady(rows: List<RecordRow>) {
+        if (_startupPhase.value == StartupPhase.LIVE) return
+        _startupPhase.value = StartupPhase.LIVE
+        _startupRows.value = emptyList()
+        val f = _filter.value
+        viewModelScope.launch(Dispatchers.IO) {
+            if (f.isDefaultForStartup() &&
+                f.displayGranularity() == DetailGranularity.MONTH &&
+                rows.isNotEmpty()
+            ) {
+                StartupSnapshotStore.write(
+                    StartupSnapshot(
+                        schemaVersion = StartupSnapshotCodec.SCHEMA_VERSION,
+                        dbVersion = AppDatabase.DB_VERSION,
+                        yearMonth = MonthRange.currentYearMonth(),
+                        granularity = "MONTH",
+                        savedAtEpochMilli = System.currentTimeMillis(),
+                        rows = StartupSnapshotCodec.trim(rows.map { it.toSnapshotRow() })
+                    )
+                )
+            } else {
+                StartupSnapshotStore.delete()
+            }
+        }
+        StartupTrace.logIfEnabled()
+    }
+
+    /** 3s 兜底：MUST NOT 无限期把旧快照冒充最新数据。 */
+    fun onStartupTimeout() {
+        if (_startupPhase.value == StartupPhase.LIVE) return
+        _startupRows.value = emptyList()
+        _startupPhase.value = StartupPhase.SKELETON
+    }
+
+    private fun SnapshotRow.toRecordRow(): RecordRow = RecordRow(
+        id = this.id, type = this.type, amountCents = this.amountCents,
+        categoryId = null, rootCategoryId = null,
+        fromAccountId = null, toAccountId = null,
+        timestamp = this.timestamp, localDate = this.localDate, yearMonth = this.yearMonth,
+        note = this.note, excludeFromStats = this.excludeFromStats,
+        categoryName = this.categoryName, categoryColorHex = this.categoryColorHex,
+        fromAccountName = this.fromAccountName, toAccountName = this.toAccountName,
+        counterparty = this.counterparty, description = this.description
+    )
+
+    private fun RecordRow.toSnapshotRow(): SnapshotRow = SnapshotRow(
+        id = this.id, type = this.type, amountCents = this.amountCents,
+        timestamp = this.timestamp, localDate = this.localDate, yearMonth = this.yearMonth,
+        note = this.note, excludeFromStats = this.excludeFromStats,
+        categoryName = this.categoryName, categoryColorHex = this.categoryColorHex,
+        fromAccountName = this.fromAccountName, toAccountName = this.toAccountName,
+        counterparty = this.counterparty, description = this.description
+    )
 
     /**
      * 第 48 批：概览 / 角标统一按 filter 派生的单一周期刷新。

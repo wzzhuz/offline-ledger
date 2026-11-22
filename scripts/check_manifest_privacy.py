@@ -80,6 +80,9 @@ def main() -> int:
                             '再 exclude 未被 include 的路径会被 lintVital 判为 fatal')
         if 'domain="database"' not in s:
             problems.append(label + ' 未排除 domain="database"')
+        # 第 49 批：启动快照是明文账目副本，必须显式排除 file domain。
+        if 'domain="file"' not in s:
+            problems.append(label + ' 未排除 domain="file"（启动快照文件）')
         if label == 'data_extraction_rules.xml':
             for section in ('<cloud-backup>', '<device-transfer>'):
                 if section not in s:
@@ -103,7 +106,7 @@ def main() -> int:
     for n in notes:
         print('  [已授权] ' + n)
     print('check_manifest_privacy: PASS（无未授权的网络权限 / 关闭自动备份 / '
-          '排除数据库 / 无默认回传 SDK；边界=数据流向由使用者控制）')
+          '排除数据库与启动快照文件 / 无默认回传 SDK；边界=数据流向由使用者控制）')
     return 0
 
 
