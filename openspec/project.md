@@ -548,5 +548,24 @@ release `45125186214` **success**（R8 编译 / 整理产物 / 上传 Release AP
 - **不建 change**：纯 CI 运维，不改变系统行为、不涉及 spec，按流程只记运维批次。
 - **验证方式**：本批 push 自身会触发 build CI，直接观察「清理历史 Debug 制品」与「上传 Debug APK」两步是否都 success，比静态检查更有说服力。
 
-### 第 53 批实测
-待回填（commit sha / push CI run id / 两步结论 / 清理后配额）。
+### 第 53 批实测（含根因更正）
+
+**重要更正**：本批起初判断「debug 制品堆积导致配额满」，清理后上传仍失败，深挖发现**配额是账号级、不是仓库级**。远端实测（2026-11-23）：
+
+| 仓库 | artifacts | 占用 |
+|---|---|---|
+| `wzzhuz/dayscounter` | 132 个（71 debug + 61 release） | **1289.2 MB** |
+| `wzzhuz/offline-ledger` | 127 个 | 277.2 MB |
+| `wzzhuz/rice-cooker-schedule-android` | 32 个 | 90.7 MB |
+| `lifelog` / `rice-cooker-schedule` | 6 个 | 8.4 MB |
+| **账号合计** | **297 个** | **1.63 GB** |
+
+GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个仓库占 1.29 GB，本仓库从 2.21 GB 清到 277 MB 仍不足以腾出上传空间。验证链：删 80 个 debug（释放 1917 MB）→ push CI `45127506505` 清理步骤 success、上传仍 failure → 删最后 1 个同名 debug（debug 数归 0）→ rerun attempt 2 仍 failure → 全新 workflow_dispatch run `45129359205` 仍 failure。**排除同名 artifact 冲突、排除本仓库配额、排除 rerun 特有因素**。
+
+因此「让上传真正成功」需要**账号侧**处理（清理 `dayscounter` 等其它仓库制品，或升级套餐），超出「清理 offline-ledger debug 产物」的授权范围，本批**不擅自删其它仓库**，交回使用者拍板。
+
+仓库内可交付的兜底：`build.yml` 上传步骤加 `id: upload_debug_apk` + `continue-on-error: true`，并新增「Debug 制品上传失败告警」写 Summary。Debug APK 只是编译校验产物、不是交付物（正式包以 Release 附件 + 坚果云为准），上传失败 MUST NOT 把整条 CI 染红，也不静默。这与 release.yml 三个上传步骤的既有做法一致。
+
+代码 `6c0816d998b7`（parent `747b50c2ae`）：清理 80 个 + 补无条件清理调用 + 解除 release 死锁；本批兜底改动待第二次 commit。清理后本仓库 **127 个 / 277.2 MB、debug 0 个**。
+
+**待回填**：兜底 commit sha / 验证 run id / 该 run 是否 success。

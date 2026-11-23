@@ -126,6 +126,11 @@ jobs:
       # v4 的 overwrite 默认 false，同名 artifact 已存在会直接失败，
       # 而界面只显示「上传失败」，看不出原因；配额由上方清理步骤保证。
       - name: 上传 Debug APK
+        id: upload_debug_apk
+        # 第 53 批：Actions 存储配额是**账号级**，本仓库清干净也可能被其它仓库占满。
+        # Debug APK 只是编译校验产物、不是交付物（正式包走 Release 附件与坚果云），
+        # 故上传失败 MUST NOT 把整条 CI 染红；失败由下一步在 Summary 显式告警，不静默。
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: offline-ledger-debug-apk
@@ -133,6 +138,16 @@ jobs:
           overwrite: true
           retention-days: 7
           if-no-files-found: error
+
+      - name: Debug 制品上传失败告警
+        if: steps.upload_debug_apk.outcome == 'failure'
+        run: |
+          echo "### ⚠️ Debug APK 未上传到 Actions 制品" >> "$GITHUB_STEP_SUMMARY"
+          echo "Debug APK 仅作编译校验，不是交付物；正式包以 GitHub Release 附件与坚果云为准。" \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "常见原因：账号级 Actions 存储配额被其它仓库占满（与 Packages 共用），" \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "本仓库的清理步骤已执行，配额需账号侧处理。" >> "$GITHUB_STEP_SUMMARY"
 
       - name: 输出摘要
         run: |
