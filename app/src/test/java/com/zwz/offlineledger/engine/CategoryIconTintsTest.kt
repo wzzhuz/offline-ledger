@@ -32,6 +32,11 @@ class CategoryIconTintsTest {
         assertEquals(CategoryIconTints.IncomeGreen, CategoryIconTints.tintOf("wallet")!!)
         assertEquals(CategoryIconTints.FoodOrange, CategoryIconTints.tintOf("bowl-chopsticks")!!)
         assertEquals(CategoryIconTints.FoodOrange, CategoryIconTints.tintOf("bubble-tea")!!)
-        assertEquals(CategoryIconTints.TransportBlue, CategoryIconTints.tintOf("motorbike")!!)
+        // 「外卖」用的是 motorbike，但业务归属是**餐饮**，按一级领域分组必须跟
+        // 餐饮同色；MUST NOT 按图标字面含义（摩托车）判成交通色。
+        assertEquals(CategoryIconTints.FoodOrange, CategoryIconTints.tintOf("motorbike")!!)
+        // 真正的交通项才是 TransportBlue。
+        assertEquals(CategoryIconTints.TransportBlue, CategoryIconTints.tintOf("bus")!!)
+        assertEquals(CategoryIconTints.TransportBlue, CategoryIconTints.tintOf("bike")!!)
     }
 }

@@ -293,14 +293,31 @@ v0.2.35 覆盖安装的用户库已存在，106 行 `iconName` 仍是空串；�
 收入统一绿）、`CategoryIconKeysTest`（106 个预置 id 全覆盖且都有配色、
 自定义 id 返 null）、`SeedCatalogOptionalIconTest`（旧清单无图标字段仍可解析）。
 
-**一次 CI 失败与修复（如实登记）**：首个图标批 commit 的「运行单元测试」步骤失败，
-根因不是 Kotlin 编译也不是 AAPT，而是 `app/src/test/resources/default_categories.json`
-是 assets 清单的**测试 classpath 副本**，本批只改了 assets、没同步副本；
-`CategoryIconTintsTest` 从 classpath 读到旧副本（106 行全无 `iconKey`），
-`assertNotNull` 全挂。修复 = 副本同步 + 90 个 VectorDrawable 补
-`android:fillColor="#00000000"`（Tabler `fill="none"` 语义，防止 path 被默认填充成黑块）。
-**沉淀：改 assets 清单 MUST 同时核 `src/test/resources` 是否有镜像副本**，
-单测读的是 classpath，不是 assets 路径。
+**三轮 CI 失败与最终定位（如实登记，不包装成一致）**：图标批 `72cc63e5`、
+修复批 `0e8b6640`、二分批 `a386e584` 均卡在第 7 步「运行单元测试」。
+运行环境的网络策略把 Actions 日志与 artifact 下载全部 403（`policy_default_denied`），
+网页日志也被安全审核拦截；经使用者授权临时改 `build.yml`，让失败时把
+`/tmp/unit.log` 关键行回写到 commit comment，才拿到原文：
+`CategoryIconTintsTest > domain colors are grouped FAILED /
+java.lang.AssertionError at CategoryIconTintsTest.kt:35 /
+310 tests completed, 1 failed`。
+
+**真实根因是我写错了断言，不是产品代码**：`motorbike` 是「餐饮 / 外卖」
+的图标，按「一级领域分组、同组同色」应为 `FoodOrange`；我在测试里按图标
+字面含义（摩托车）断言成 `TransportBlue`。**309 个测试全过**，包括
+`CategoryIconKeysTest` 的 106 个预置 id 全覆盖、`SeedCatalog` 系列、
+以及全部既有测试 —— 图标资源、清单、覆盖安装兜底均无误。
+
+第一次失败另有 `app/src/test/resources/default_categories.json` 未同步
+（它是 assets 清单的 classpath 镜像，单测读的是它），已修；但后续两轮
+持续失败的都是上面这条断言，当时误判成「副本问题未清」是错的。
+90 个 VectorDrawable 补 `android:fillColor="#00000000"` 是**防御性修正**
+（Tabler `fill="none"` 语义，防止 path 被默认填充成黑块），不是失败原因。
+诊断用的 `build.yml` 改动与 `scripts/diag_upload.py` 已在拿到原文后撤销删除。
+
+**沉淀**：①改 assets 清单 MUST 同时核 `src/test/resources` 镜像副本；
+②断言 MUST 按业务归属写，MUST NOT 按图标/变量名猜语义；
+③CI 日志不可读时先建立可读通道，MUST NOT 靠猜连续推三轮。
 
 **零改表复核**：`AppDatabase.version` 仍 5、`Migrations.ALL` 仍空、
 `colorHex` 一字未动（仍参与 `ChartData` 扇区取色与 `RecordDao` 三处投影）、
