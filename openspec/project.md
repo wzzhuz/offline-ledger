@@ -622,3 +622,14 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **零改表**：`AppDatabase.version = 5` 不变、`Migrations.ALL` 仍空 → **v0.2.35 直接覆盖安装生效**，不需要导出 / 卸载 / 导入。版本号 `0.2.36`（已核实未被 tag / release / artifact 占用）。
 - **依赖**：无新增第三方库；`rememberReorderableLazyGridState` 已在 `sh.calvin.reorderable:reorderable:3.1.0` README 查证存在。等宽网格用稳定 `Row + weight(1f)`，MUST NOT 用 `LazyVerticalGrid` 嵌套或 `FlowRow`（T12）。
 - **CI 全绿不替代真机**：活文档 §8 第 55 批新增 16 项真机待验（网格观感、长名省略、⋮ 菜单七项、排序手感与放弃零写库、连续添加、图标缺项兜底、记一笔零回归、横屏，以及 90 个 Tabler 图标在 40dp 圆底的辨识度、11 种领域色是否杂乱、浅底对比度、排序页灰阶、收入统一绿语义冲突、覆盖安装按 id 显示图标），§8 既有项整体继承。
+
+## 第 56 批（v0.2.37）：排序页两态互斥 + 共享只读分类选择器
+
+- **起因**：v0.2.36 真机体验「不符合预期」，使用者要求「排序页面直接参考一羽记账」「添加子类页面可以作为记一笔里面还有筛选里面分类选择页面的样式，只是把添加的输入框和按钮去除」；随后追问替代库与「拖一级时二级折叠、两级互不干涉、横排一个变横排 5 个」。
+- **第 3 轮技术澄清（已推 `6b87ad0`）**：核查 `sh.calvin.reorderable:3.1.0` README，确认 `LazyVerticalGrid` 与 `rememberReorderableLazyGridState` 原生支持，收回上一轮「库只支持一维、二维 MUST 自写 `pointerInput`」的错误外推；一羽为闭源 App，实现查不到，只按截图与使用者观察推断为两态互斥。四件套按此改完并经使用者确认。
+- **排序页**：`CategorySortScreen.kt` 完整重写为两态互斥。一级态单个 5 列 `LazyVerticalGrid` 可拖、二级区折叠不渲染、无 span / header；点一级进二级态，外层一级区改非惰性 `Column + Row(weight)` 静态冻结，白卡插在选中行之后，卡内第二套 `LazyVerticalGrid(Fixed(5))` 拖二级。两套 grid state 各管各段 `draftOrder`，`onMove` 由 ViewModel 同步 `_state.update`；上移 / 下移改为 `semantics.customActions` 的 TalkBack 兜底。
+- **共享只读选择器**：新增 `ui/components/CategorySelectSheet.kt` 的 `CategorySelectDialog`（顶部搜索 + 左一级分组导航 + 右 5 列彩色图标格），无名称输入、无「继续添加」/ 保存按钮、无写库路径；记一笔 `AllCategoriesDialog` 与筛选 `PickRow("分类")` 接入同一组件，`CategoryPickerScreen` 零改动。停用项可选带角标、归档项不进、搜索跨组平铺、二级 label 经 `CategoryDisplay`，点选即刻关闭。
+- **口径再放宽一次**：彩色 Tabler 图标扩到两个全量选择器；记一笔快捷栏 / 明细列表行 / 账户详情 / 统计页仍中性圆 + 首字，`colorHex` 一字不动。筛选层级区分由 `r:` / `c:` 字符串前缀改为 `CategorySelectChoice.level` 显式字段，spec / design / tasks 三处表述已同步回写，不留矛盾文本。
+- **零改表 / 零回归**：`AppDatabase.version = 5`、`default_categories.json`、`colorHex`、三处 DAO 投影、备份整表替换一律未动；零新增 Gradle 依赖；`defaultVersionName` → `0.2.37`，v0.2.36 可直接覆盖安装。
+- **CI 全绿不替代真机**：活文档 §8 第 56 批新增 13 项真机待验（两态折叠与互不干涉、拖拽手感与让位、draft 不丢、无闪烁、白卡限高与滚动边界、360dp 窄屏、两处选择器同组件、彩色与中性圆并存观感、停用项兜底与回填、原分类选择页零回归、覆盖安装 / 全新安装、记一笔零回归），§8 既有项整体继承。归档仍需使用者明确说「可以归档」。
+

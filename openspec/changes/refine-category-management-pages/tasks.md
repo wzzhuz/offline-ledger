@@ -119,48 +119,49 @@
 - [x] 4.5.5 `app/build.gradle.kts` 版本号递增
 
 ### 4.6 排序页按一羽图 3 做 1:1（第 2 轮 + 第 3 轮技术澄清）
-- [ ] 4.6.1 **两态互斥**：一级态只渲染 5 列 `LazyVerticalGrid` 可拖网格、
+- [x] 4.6.1 **两态互斥**：一级态只渲染 5 列 `LazyVerticalGrid` 可拖网格、
        二级区折叠不渲染；点一级进入二级态，同一时刻只有一个可拖容器
-- [ ] 4.6.2 一级态沿用 `rememberReorderableLazyGridState` + `ReorderableItem` 稳定 key；
+- [x] 4.6.2 一级态沿用 `rememberReorderableLazyGridState` + `ReorderableItem` 稳定 key；
        容器内无 span / header，`from.index` 直接对应 `draftOrder` 下标
-- [ ] 4.6.3 二级态：外层一级区改**非惰性** `Column + Row(weight(1f))` 手工 5 列
+- [x] 4.6.3 二级态：外层一级区改**非惰性** `Column + Row(weight(1f))` 手工 5 列
        （15 个一级 = 3 行，静态不可拖、选中项蓝底）；
        圆角白卡**插在选中一级所在行之后**、其余一级行之前，保留 1:1 视觉
-- [ ] 4.6.4 白卡内二级改**第二套** `LazyVerticalGrid(Fixed(5))` +
+- [x] 4.6.4 白卡内二级改**第二套** `LazyVerticalGrid(Fixed(5))` +
        `rememberReorderableLazyGridState`（库原生，MUST NOT 自写 `pointerInput`）；
        单父级最多 11 项 = 3 行，白卡限高、外层 Column 不滚动
-- [ ] 4.6.5 两套 grid state 各管各段 `draftOrder`、互不干涉；
+- [x] 4.6.5 两套 grid state 各管各段 `draftOrder`、互不干涉；
        `onMove` MUST 在返回前同步更新列表（README FAQ，否则拖动项闪烁）；
        若容器内插入任何非拖 item，索引 MUST 按 README 减偏移
-- [ ] 4.6.6 保留上移 / 下移按钮作 TalkBack 兜底；`rebuildOrder` 三元组保存语义零改动；
+- [x] 4.6.6 上移 / 下移改为每格 `semantics.customActions` 的 TalkBack 兜底（只列可行方向）；`rebuildOrder` 三元组保存语义零改动；
        「保存 / 放弃」行为与第 1 轮一致
-- [ ] 4.6.7 灰阶降噪保留（一羽图 3 自身降饱和）；彩色只在列表页与选择器；
+- [x] 4.6.7 灰阶降噪保留（一羽图 3 自身降饱和）；彩色只在列表页与选择器；
        两态切换 MUST NOT 丢失任一层的 `draftOrder`
 
 ### 4.7 共享只读分类选择组件 `CategorySelectSheet`（第 2 轮）
-- [ ] 4.7.1 抽只读组件：顶部搜索 + 左侧一级分组导航 + 右侧 5 列等宽彩色图标格；
+- [x] 4.7.1 抽只读组件：顶部搜索 + 左侧一级分组导航 + 右侧 5 列等宽彩色图标格；
        **无名称输入框、无「继续添加」/ 保存按钮、无写库路径**
-- [ ] 4.7.2 记一笔 `AllCategoriesDialog` 替换为该组件；选中立即回填
+- [x] 4.7.2 记一笔 `AllCategoriesDialog` 替换为该组件；选中立即回填
        `categoryId` / `rootCategoryId` 并关闭；快捷栏当前选中项兜底不变
-- [ ] 4.7.3 `FilterSheet` 的 `PickRow("分类")` 单选弹层替换为**同一组件**；
-       回填 `rootId` / `categoryId` / `displayName`，保留「全部分类」与 `r:` / `c:` 前缀
-- [ ] 4.7.4 继承既有约束：停用项全可见可搜带角标、归档项不进、按收支类型过滤、
+- [x] 4.7.3 `FilterSheet` 的 `PickRow("分类")` 单选弹层替换为**同一组件**；
+       回填 `rootId` / `categoryId` / `displayName`，保留「全部分类」与一级 / 二级层级区分
+       （实现改为 `CategorySelectChoice.level` 显式字段，不再拼 `r:` / `c:` 字符串前缀）
+- [x] 4.7.4 继承既有约束：停用项全可见可搜带角标、归档项不进、按收支类型过滤、
        搜索跨组平铺、二级 label 经 `CategoryDisplay` 拼「一级 / 二级」、点选无二次确认
-- [ ] 4.7.5 `CategoryPickerScreen` **零改动**：添加子类 / 父级预填 / 继续添加 /
+- [x] 4.7.5 `CategoryPickerScreen` **零改动**：添加子类 / 父级预填 / 继续添加 /
        重名校验全部保留（使用者第 3 问「保留」）
-- [ ] 4.7.6 彩色图标只进选择器；记一笔快捷栏 / 明细列表行 / 账户详情 / 统计页
+- [x] 4.7.6 彩色图标只进选择器；记一笔快捷栏 / 明细列表行 / 账户详情 / 统计页
        仍中性圆 + 首字，`colorHex` 零改动
 
 ### 4.8 规格与文档（第 2 轮 + 第 3 轮核查）
-- [ ] 4.8.1 `category-stats` MODIFIED「分类图标不做字符串映射」正文放宽 + Scenario 改名
+- [x] 4.8.1 `category-stats` MODIFIED「分类图标不做字符串映射」正文放宽 + Scenario 改名
        「彩色图标只进分类选择组件」
-- [ ] 4.8.2 `category-stats` ADDED「独立分类排序页与临时顺序」就地改写为
+- [x] 4.8.2 `category-stats` ADDED「独立分类排序页与临时顺序」就地改写为
        1:1 两态互斥布局 + 两套 grid state，并新增「拖一级时二级折叠」
        与「两级拖拽互不干涉」两个 Scenario
-- [ ] 4.8.3 `category-stats` 新增 ADDED「记一笔与筛选复用分类网格选择组件」（≥3 Scenario）
-- [ ] 4.8.4 `reporting-ui` 新增 MODIFIED「分类全量选择器采用分组 chips 且不用下拉框」，
+- [x] 4.8.3 `category-stats` 新增 ADDED「记一笔与筛选复用分类网格选择组件」（≥3 Scenario）
+- [x] 4.8.4 `reporting-ui` 新增 MODIFIED「分类全量选择器采用分组 chips 且不用下拉框」，
        标题沿用基线原名作整块替换锚点，正文改分组导航 + 等宽网格、保留全部 Scenario
-- [ ] 4.8.5 `proposal.md` / `design.md` / 活文档 §2.6 §7.3 §8 同步；
+- [x] 4.8.5 `proposal.md` / `design.md` / 活文档 §2.6 §7.3 §8 同步；
        版本号递增（下一版本，v0.2.36 已发布不回改）
 
 ## 5. 校验与交付
@@ -225,3 +226,19 @@
        更名为「…采用分组导航与等宽网格」（标题原名仅作替换锚点）
 - [ ] 7.2 change 文件夹移到 `openspec/changes/archive/<日期>-refine-category-management-pages/`
 - [ ] 7.3 校验 specs 已反映新行为，无规格腐烂
+
+### 4.9 第 56 批编码落地
+
+- [x] 4.9.1 `CategorySortScreen.kt` 完整重写为两态互斥：一级态单个 `LazyVerticalGrid(Fixed(5))`、
+       二级区折叠不渲染；二级态外层非惰性 `Column + Row(weight)` 静态一级区冻结、
+       白卡插在选中行之后、卡内第二套 `LazyVerticalGrid(Fixed(5))` 拖二级
+- [x] 4.9.2 两套 `rememberReorderableLazyGridState` 各管各段 `draftOrder`；
+       `onMove` 由 ViewModel 同步 `_state.update`，无 `GridItemSpan`、无自实现手势
+- [x] 4.9.3 上移 / 下移改为每格 `semantics.customActions` 的 TalkBack 兜底
+       （只列出可能的移动方向），不额外堆按钮
+- [x] 4.9.4 新增 `ui/components/CategorySelectSheet.kt`：只读 `CategorySelectDialog`
+       （搜索 + 左分组导航 + 右 5 列彩色图标格），无输入框 / 无「继续添加」/ 无写库路径
+- [x] 4.9.5 记一笔 `AllCategoriesDialog` 与筛选 `PickRow("分类")` 接入同一组件；
+       `CategoryPickerScreen` 零改动，`colorHex` 零改动
+- [x] 4.9.6 `defaultVersionName` → `0.2.37`；活文档 §2.6 / §7.3 / §7.38 / §8
+       与 `openspec/project.md` 同步

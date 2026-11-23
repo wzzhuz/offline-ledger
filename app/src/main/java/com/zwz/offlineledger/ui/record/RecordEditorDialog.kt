@@ -56,7 +56,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.AccountQuickCandidates
 import com.zwz.offlineledger.core.AccountQuickItem
-import com.zwz.offlineledger.core.CategoryPickerHit
 import com.zwz.offlineledger.core.CategoryQuickCandidates
 import com.zwz.offlineledger.core.CategoryQuickItem
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
@@ -68,6 +67,7 @@ import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.components.CategoryIcon
+import com.zwz.offlineledger.ui.components.CategorySelectDialog
 import com.zwz.offlineledger.ui.components.WrapRow
 import com.zwz.offlineledger.ui.components.YearMonthPickerDialog
 import com.zwz.offlineledger.ui.theme.LedgerColors
@@ -474,9 +474,11 @@ private fun CategoryStrip(
 }
 
 /**
- * 第 52 批：「分类 ›」全量选择器。分组 chips + 搜索，不用下拉框、不用竖排长列表；
- * 组标题可点 = 按一级直记，点任一项即选中并关闭，MUST NOT 二次确认。
- * 未归档的停用一级 / 二级全部可见可搜，带「停用」角标；归档项仍不进选择器。
+ * 第 56 批：「分类 ›」全量选择器改用**共享只读** CategorySelectDialog。
+ *
+ * 与筛选「分类」复用同一份版式（顶部搜索 + 左侧一级分组导航 + 右侧 5 列
+ * 彩色图标格），无名称输入框、无「继续添加」/ 保存按钮、无写库路径。
+ * 选中后立即回填并关闭；快捷栏中性圆 + 首字口径不变。
  */
 @Composable
 private fun AllCategoriesDialog(
@@ -486,123 +488,18 @@ private fun AllCategoriesDialog(
     onSelect: (Long, Long) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val items = remember(categories) {
-        categories.map {
-            CategoryQuickItem(
-                it.id, it.name, it.type.name, it.parentId, it.level,
-                it.enabled, it.isArchived, it.sortOrder, it.colorHex
-            )
-        }
-    }
-    var query by remember { mutableStateOf("") }
-    val groups = CategoryQuickCandidates.pickerGroups(items, type.name)
-    val hits: List<CategoryPickerHit> =
-        CategoryQuickCandidates.searchHits(items, type.name, query)
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "全部分类",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Filled.Close, contentDescription = "关闭")
-                    }
-                }
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = {
-                        Text("搜索一级或二级分类名", style = MaterialTheme.typography.bodyMedium)
-                    },
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
-                )
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 460.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    if (query.isBlank()) {
-                        groups.forEach { g ->
-                            TextButton(
-                                onClick = { onSelect(g.root.id, g.root.id); onDismiss() },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    CategoryQuickCandidates.labelOf(g.root),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                            WrapRow(
-                                spacing = 6.dp,
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
-                            ) {
-                                g.children.forEach { c ->
-                                    FilterChip(
-                                        selected = selectedId == c.id,
-                                        onClick = { onSelect(c.id, g.root.id); onDismiss() },
-                                        label = {
-                                            Text(
-                                                CategoryQuickCandidates.labelOf(c),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                maxLines = 1
-                                            )
-                                        },
-                                        leadingIcon = {},
-                                        modifier = Modifier.padding(bottom = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        hits.forEach { h ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 40.dp)
-                                    .background(
-                                        if (h.id == selectedId)
-                                            MaterialTheme.colorScheme.secondaryContainer
-                                        else Color.Transparent
-                                    )
-                                    .clickable { onSelect(h.id, h.rootId); onDismiss() }
-                                    .padding(horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    h.label,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                        if (hits.isEmpty()) {
-                            Text(
-                                "没有匹配的分类",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = LedgerColors.Neutral,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+    CategorySelectDialog(
+        categories = categories,
+        type = type,
+        selectedId = selectedId,
+        allowAll = false,
+        title = "全部分类",
+        onSelect = { choice ->
+            val id = choice.categoryId
+            if (id != null) onSelect(id, choice.rootId ?: id)
+        },
+        onDismiss = onDismiss
+    )
 }
 
 /**

@@ -188,7 +188,7 @@
    - **GIVEN** 4 条 MODIFIED 与 5 条 ADDED 写完
      **WHEN** 跑归档校验与 CI
      **THEN** 无重复 Requirement 标题、每条 ≥1 Scenario、含 RFC2119、
-     MODIFIED 按标题整块替换；零改表（version 5）、v0.2.36 可直接覆盖安装；
+     MODIFIED 按标题整块替换；零改表（version 5）、v0.2.36 → v0.2.37 可直接覆盖安装；
      CI 全绿**且**真机待验清单落盘（CI 不替代观感）
 
 5. **被否决的方案**

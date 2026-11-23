@@ -48,6 +48,7 @@ import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.time.MonthRange
 import com.zwz.offlineledger.core.time.YearMonthMath
 import com.zwz.offlineledger.ui.components.YearMonthPickerDialog
+import com.zwz.offlineledger.ui.components.CategorySelectDialog
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.paging.RecordFilter
@@ -140,19 +141,6 @@ fun FilterSheet(
         accounts.filter { !it.isArchived }
             .map { it.currencyCode }.distinct().sorted()
             .map { it to it }
-    // 第 27 批：一级 + 二级平铺在同一份全量单选列表里，带搜索；
-    // value 用 r:/c: 前缀区分层级，选中时同时还原 rootId 与 parentId。
-    val categoryOptions = listOf<Pair<String, String?>>("全部分类" to null) +
-        categories.filter { it.level == 0 && !it.isArchived }
-            .flatMap { root ->
-                listOf(categoryOptionLabel(root) to ("r:" + root.id)) +
-                    categories.filter { it.parentId == root.id && !it.isArchived }
-                        .map { c ->
-                            CategoryDisplay.resolve(root.name, categoryOptionLabel(c)) to
-                                ("c:" + c.id)
-                        }
-            }
-
     Dialog(onDismissRequest = onDismiss) {
         Surface(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
             Column(
@@ -387,89 +375,94 @@ fun FilterSheet(
         }
     }
 
-    // 全量单选弹层：高度固定，不随账户 / 分类数量增长，长名称完整可见。
-    picker?.let { kind ->
-        val spec = when (kind) {
-            "account" -> PickerData("账户", accountOptions, accountId?.toString()) { v ->
-                accountId = v?.toLongOrNull()
-            }
-            "root" -> PickerData("一级分类", rootOptions, rootId?.toString()) { v ->
-                rootId = v?.toLongOrNull()
-                categoryId = null
-            }
-            "child" -> PickerData("二级分类", childOptions, categoryId?.toString()) { v ->
-                categoryId = v?.toLongOrNull()
-            }
-            "category" -> PickerData(
-                "分类",
-                categoryOptions,
-                when {
-                    categoryId != null -> "c:" + categoryId
-                    rootId != null -> "r:" + rootId
-                    else -> null
-                }
-            ) { v ->
-                if (v == null) {
-                    rootId = null; categoryId = null; displayName = null
-                } else if (v.startsWith("r:")) {
-                    rootId = v.removePrefix("r:").toLongOrNull()
+    // 第 56 批：分类改用共享只读 CategorySelectDialog（与记一笔「分类 ›」同一份组件）；
+    // 其余条件沿用固定高度单选弹层，面板高度不随选项数增长。
+    if (picker == "category") {
+        CategorySelectDialog(
+            categories = categories,
+            type = null,
+            selectedId = categoryId ?: rootId,
+            allowAll = true,
+            title = "分类",
+            onSelect = { choice ->
+                val cid = choice.categoryId
+                if (cid == null) {
+                    rootId = null
                     categoryId = null
-                    displayName = categoryOptions.firstOrNull { it.second == v }?.first
+                    displayName = null
+                } else if (choice.level == 0) {
+                    rootId = cid
+                    categoryId = null
+                    displayName = choice.label
                 } else {
-                    val cid = v.removePrefix("c:").toLongOrNull()
                     categoryId = cid
-                    rootId = cid?.let { id ->
-                        categories.firstOrNull { it.id == id }?.parentId
-                    }
-                    displayName = categoryOptions.firstOrNull { it.second == v }?.first
+                    rootId = choice.rootId
+                    displayName = choice.label
+                }
+            },
+            onDismiss = { picker = null }
+        )
+    } else {
+        picker?.let { kind ->
+            val spec = when (kind) {
+                "account" -> PickerData("账户", accountOptions, accountId?.toString()) { v ->
+                    accountId = v?.toLongOrNull()
+                }
+                "root" -> PickerData("一级分类", rootOptions, rootId?.toString()) { v ->
+                    rootId = v?.toLongOrNull()
+                    categoryId = null
+                }
+                "child" -> PickerData("二级分类", childOptions, categoryId?.toString()) { v ->
+                    categoryId = v?.toLongOrNull()
+                }
+                else -> PickerData("币种", currencyOptions, currencyCode) { v ->
+                    currencyCode = v
                 }
             }
-            else -> PickerData("币种", currencyOptions, currencyCode) { v ->
-                currencyCode = v
-            }
-        }
-        var search by remember(kind) { mutableStateOf("") }
-        val shown = spec.options.filter { it.first.contains(search, ignoreCase = true) }
-        Dialog(onDismissRequest = { picker = null }) {
-            Surface(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(spec.title, style = MaterialTheme.typography.titleMedium)
-                    CompactField(
-                        value = search,
-                        onChange = { search = it },
-                        hint = "搜索名称",
-                        modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = clearIcon(search) { search = "" }
-                    )
-                    LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
-                        items(shown) { (name, value) ->
-                            val chosen = value == spec.selected
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 40.dp)
-                                    .background(
-                                        if (chosen) MaterialTheme.colorScheme.secondaryContainer
-                                        else Color.Transparent
+            var search by remember(kind) { mutableStateOf("") }
+            val shown = spec.options.filter { it.first.contains(search, ignoreCase = true) }
+            Dialog(onDismissRequest = { picker = null }) {
+                Surface(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(spec.title, style = MaterialTheme.typography.titleMedium)
+                        CompactField(
+                            value = search,
+                            onChange = { search = it },
+                            hint = "搜索名称",
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = clearIcon(search) { search = "" }
+                        )
+                        LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                            items(shown) { (name, value) ->
+                                val chosen = value == spec.selected
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 40.dp)
+                                        .background(
+                                            if (chosen) MaterialTheme.colorScheme.secondaryContainer
+                                            else Color.Transparent
+                                        )
+                                        .clickable { spec.onSelect(value); picker = null }
+                                        .padding(horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                    .clickable { spec.onSelect(value); picker = null }
-                                    .padding(horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                }
                             }
                         }
+                        TextButton(onClick = { picker = null }) { Text("取消") }
                     }
-                    TextButton(onClick = { picker = null }) { Text("取消") }
                 }
             }
         }
     }
+
 }
 
 /** 第 52 批：停用项在全量选择器里可见可搜，带角标；启用项保持裸名不变。 */

@@ -400,7 +400,8 @@ MUST NOT 让不同父级下的同名项混淆。
 点任一项 SHALL **立即选中并关闭弹层**，MUST NOT 加二次确认；
 记一笔侧 SHALL 回填 `categoryId` / `rootCategoryId` 并保持快捷栏当前选中项兜底，
 筛选侧 SHALL 回填 `rootId` / `categoryId` 与只读展示名，
-并保留既有「全部分类」清空项与 `r:` / `c:` 前缀的层级区分。
+并保留既有「全部分类」清空项与一级 / 二级层级区分（共享组件 SHALL 用显式 `level` 字段分派，
+MUST NOT 再拼 `r:` / `c:` 字符串前缀）。
 固定高度的弹层 MUST NOT 撑高筛选面板本体，面板行网格仍 SHALL 遵守
 「筛选面板统一网格与紧凑输入框」。
 

@@ -419,7 +419,7 @@ MUST NOT 当作一羽实现。只能按截图与使用者观察推断为**两态
 - 记一笔：`FormRow("分类")` → `showAllCategories` → `CategorySelectSheet`，
   选中后立即回填 `categoryId` / `rootCategoryId` 并关闭；快捷栏当前选中项兜底不变。
 - 筛选：`PickRow("分类")` → 同一组件，回填 `rootId` / `categoryId` 与 `displayName`，
-  保留「全部分类」清空项与 `r:` / `c:` 前缀的层级区分。
+  保留「全部分类」清空项与一级 / 二级层级区分（实现见第 56 批落地记录）。
 
 **必须继承的既有约束**（不重写、不丢能力）：
 - 基线「停用分类在全量选择器中仍可选」：数据源 MUST NOT `filter { it.enabled }`；
@@ -477,6 +477,22 @@ MUST NOT 当作一羽实现。只能按截图与使用者观察推断为**两态
    **已降级**：上一版登记的「自实现手势 pointer pass 竞争」「`GridItemSpan`
    索引错位」「回退到上移/下移按钮」三项，因改用库原生 API 且无 span item
    而不再成立，MUST NOT 继续写进真机清单。
+
+
+## 第 56 批编码落地记录（2026-11-23）
+
+改完代码后按实现回写文档，不把偏差包装成一致：
+
+| 项 | 文档原表述 | 实际实现 | 原因 |
+|---|---|---|---|
+| 筛选层级区分 | 保留 `r:` / `c:` 前缀 | `CategorySelectChoice` 带 `level: Int` 显式字段，筛选侧按 `level` 直接分派 `rootId` / `categoryId` | 共享组件被记一笔与筛选复用，`r:` / `c:` 是旧单选列表的内部编码；显式字段更不易拼错，语义等价、零回归 |
+| 上移 / 下移兜底 | 保留上移 / 下移按钮 | 每格 `Modifier.semantics { customActions }`，只列出可行方向，由 `moveDraftRootByIndex` / `moveDraftChildByIndex` 执行 | TalkBack 场景下按钮会挤满 5 列小格；库 README 的 Accessibility 段推荐 customActions |
+| 二级态一级区 | 非惰性 `Column + Row(weight)` | 一致；白卡按 `roots.chunked(5)` 找到选中行后插入，卡内二级网格 `heightIn(max = 180.dp)` 自身滚动 | 外层 Column 不滚动，符合 spec；窄屏是否需内滚列入 §8 待验 |
+| 一级态高度 | 第 55 批 `heightIn(max = 240.dp)` | 改 `Modifier.weight(1f)` 占满剩余空间 | 两态互斥后一级态没有白卡，15 个一级 3 行不再需要限高 |
+
+**零回归核对**：`CategoryPickerScreen.kt` 未改；记一笔快捷栏、明细列表行、账户详情、
+统计页仍用 `CategoryIcon`（中性圆 + 首字）；`colorHex` 与三处 DAO 投影未动；
+`AppDatabase.version = 5` 未动；`default_categories.json` 未动；零新增 Gradle 依赖。
 
 ## 验证
 
