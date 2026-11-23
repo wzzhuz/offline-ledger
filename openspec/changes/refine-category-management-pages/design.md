@@ -199,6 +199,41 @@ MUST NOT 引入 `material-icons-extended`（`build.gradle.kts` L168–170 已刻
 | 改 `SeedCatalog` 解析后纯 JVM 单测挂 | 新增字段全部可选（缺失按默认），旧 JSON / 旧备份仍可解析；补 `SeedCatalogTest` |
 | spec 出现两条相反要求 | 3 条按标题整块 MODIFIED，不追加 ADDED 覆盖旧文本；归档前查重复标题（活文档 §5） |
 
+## 方案 A 实施记录（2026-11-23）
+
+使用者确认四件套后选**方案 A**：三页布局与交互全部落地，图标资源与许可证后置。
+
+**API 查证（不凭记忆写）**：`sh.calvin.reorderable` v3.1.0 的 README 经 GitHub
+Contents API 读取，确认 `rememberReorderableLazyGridState(lazyGridState) { from, to }`
+存在，并附 `LazyVerticalGrid` 完整示例；`ReorderableItem(state, key)`、
+`Modifier.draggableHandle()` / `longPressDraggableHandle()` 均在
+`ReorderableCollectionItemScope` 内可用。因此排序页一级**可以合法横排 5 列拖拽**，
+无需退回竖排。`from.index` / `to.index` 直接映射到 `draftOrder` 的下标。
+
+**实际落地与文档的偏差（如实登记，不包装成一致）**：
+
+| 项 | design 原方案 | 实际实现 | 原因 |
+|---|---|---|---|
+| 排序页容器 | 一级横排 + 选中二级白卡「插在」一级网格中间 | 一级网格与二级列表是 `Column` 的**兄弟**：网格限高 240dp、二级 `weight(1f)` | 一个惰性容器里混 `GridItemSpan` 与嵌套 `LazyColumn` 会造成同方向嵌套滚动 + 高度不确定。兄弟容器零风险，组织方式（横排一级 + 白卡二级）一致 |
+| 一级拖动手柄 | 挂在整个格子上 | 挂在格子内 32dp 的「≡」小手柄上，名称另可点选中 | README 明确 clickable 容器与 draggableHandle 共存需额外处理；分离手柄与点击零冲突 |
+| `default_categories.json` | 补 `iconKey` / `iconTintHex` | **本批零改 JSON** | 方案 A 图标资源未定，补空字段无收益且徒增 106 行改动风险；`SeedCatalog` 已先支持可选字段解析，资源确认后一次补齐即可 |
+| `CategoryManagerDialog.kt` | 块级精确替换（§3 T6） | **完整重写** | 本批改动同时覆盖 TopBar / 列表 / 一级行 / 编辑视图，块级替换 10+ 处更易漏。改前已读远端 `main` 全文并 grep 全部调用点，改后跑括号平衡、重复 import 与六个静态检查。§3 T6 针对的是「脚本持有旧快照整文件回写把刚加的按钮盖掉」，不是禁止完整重写单文件 |
+| 排序页 VM 实例 | 与列表页共享 | 各路由独立 `settingsVm()` 实例 | `settingsVm()` 用默认 `viewModel()` 作用域，跨 NavBackStackEntry 不共享。列表页加 `LaunchedEffect(Unit) { loadCategories() }`，从排序页 / 选择页返回时重新查库，保证新 `sortOrder` 立即可见 |
+
+**新增文件**：`engine/CategoryManagementRules.kt`（纯 JVM：网格分行 / 三元组重建 / 重名）、
+`ui/components/CategoryIconCatalog.kt`（图标唯一出口 + 5 列等宽网格）、
+`ui/settings/CategorySortScreen.kt`、`ui/settings/CategoryPickerScreen.kt`、
+`engine/CategoryManagementRulesTest.kt`、`data/SeedCatalogOptionalIconTest.kt`。
+
+**方案 A 未结项（MUST NOT 记为已完成）**：图标集来源 / 许可证 / 传递依赖审计、
+清单补字段、第一批图标覆盖率、`design.md`「依赖与许可」表第二行填写。
+`CategoryIconCatalog` 当前为空目录，`CategoryGlyph` 三页全回退中性圆 + 首字；
+补齐资源时只改这一处，三个页面零改动。
+
+**零改表复核**：`AppDatabase.version` 仍 5、`Migrations.ALL` 仍空、
+`colorHex` 一字未动（仍参与 `ChartData` 扇区取色与 `RecordDao` 三处投影）、
+`assets/default_categories.json` 一字未动、六个静态检查本地全 PASS。
+
 ## 验证
 
 - [ ] 六个静态检查本地与 CI 全 PASS（`check_kotlin_strings` / `check_docs_consistency` /

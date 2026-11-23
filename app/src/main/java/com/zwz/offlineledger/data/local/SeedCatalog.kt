@@ -10,7 +10,10 @@ object SeedCatalog {
     data class Row(
         val id: Long, val name: String, val type: String,
         val parentId: Long?, val level: Int,
-        val enabled: Boolean, val sortOrder: Int
+        val enabled: Boolean, val sortOrder: Int,
+        /** 第 55 批：可选图标字段；缺字段时为空串，旧清单零改动仍可解析。 */
+        val iconName: String = "",
+        val iconTintHex: String = ""
     )
 
     private val OBJECT = Regex("\\{([^{}]*)\\}")
@@ -30,7 +33,9 @@ object SeedCatalog {
             parentId = parent,
             level = fields["level"]?.toIntOrNull() ?: 0,
             enabled = fields["enabled"] != "false",
-            sortOrder = fields["sortOrder"]?.toIntOrNull() ?: 0
+            sortOrder = fields["sortOrder"]?.toIntOrNull() ?: 0,
+            iconName = (fields["iconKey"] ?: "\"\"").removeSurrounding("\""),
+            iconTintHex = (fields["iconTintHex"] ?: "\"\"").removeSurrounding("\"")
         )
     }.toList()
 
@@ -38,7 +43,8 @@ object SeedCatalog {
     fun insertStatements(json: String): List<String> = parse(json).map { r ->
         val parent = r.parentId?.toString() ?: "NULL"
         val name = r.name.replace("'", "''")
+        val icon = r.iconName.replace("'", "''")
         "INSERT INTO categories (id, name, type, parentId, level, iconName, colorHex, sortOrder, isArchived, enabled) " +
-            "VALUES (${r.id}, '$name', '${r.type}', $parent, ${r.level}, '', '#888888', ${r.sortOrder}, 0, ${if (r.enabled) 1 else 0})"
+            "VALUES (${r.id}, '$name', '${r.type}', $parent, ${r.level}, '$icon', '#888888', ${r.sortOrder}, 0, ${if (r.enabled) 1 else 0})"
     }
 }

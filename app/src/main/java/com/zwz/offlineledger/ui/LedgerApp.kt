@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.DataRefreshBus
+import com.zwz.offlineledger.data.model.RecordType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -42,6 +43,8 @@ import com.zwz.offlineledger.ui.detail.DetailViewModel
 import com.zwz.offlineledger.ui.record.RecordEditorDialog
 import com.zwz.offlineledger.ui.settings.BackupSettingsScreen
 import com.zwz.offlineledger.ui.settings.CategoryManagerScreen
+import com.zwz.offlineledger.ui.settings.CategoryPickerScreen
+import com.zwz.offlineledger.ui.settings.CategorySortScreen
 import com.zwz.offlineledger.ui.settings.FireflyImportScreen
 import com.zwz.offlineledger.ui.settings.LedgerSettingsScreen
 import com.zwz.offlineledger.ui.settings.PreferenceSettingsScreen
@@ -205,7 +208,34 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                     onOpen = { route -> navController.navigate(route) }
                 )
             }
-            composable("categories") { CategoryManagerScreen(onBack = { goBack() }) }
+            composable("categories") {
+                CategoryManagerScreen(
+                    onBack = { goBack() },
+                    onOpenSort = { t -> navController.navigate("category-sort/" + t.name) },
+                    onOpenPicker = { pid, t, m ->
+                        navController.navigate(
+                            "category-picker/${pid ?: -1L}/${t.name}/$m"
+                        )
+                    }
+                )
+            }
+            composable("category-sort/{type}") { entry ->
+                val t = runCatching {
+                    RecordType.valueOf(entry.arguments?.getString("type") ?: "EXPENSE")
+                }.getOrDefault(RecordType.EXPENSE)
+                CategorySortScreen(type = t, onBack = { goBack() })
+            }
+            composable("category-picker/{parentId}/{type}/{mode}") { entry ->
+                val pid = entry.arguments?.getString("parentId")
+                    ?.toLongOrNull()?.takeIf { it > 0L }
+                val t = runCatching {
+                    RecordType.valueOf(entry.arguments?.getString("type") ?: "EXPENSE")
+                }.getOrDefault(RecordType.EXPENSE)
+                val m = entry.arguments?.getString("mode") ?: "add"
+                CategoryPickerScreen(
+                    parentId = pid, type = t, mode = m, onBack = { goBack() }
+                )
+            }
             composable("trash") {
                 TrashScreen(onBack = { goBack() }, onChanged = { })
             }

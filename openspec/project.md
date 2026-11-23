@@ -607,3 +607,16 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 **一处如实登记**：`offline-ledger` 的 run `45147962536` 虽 completed success，但该 run 的 **artifacts 为 0**，且「Debug 制品上传失败告警」步骤 `conclusion=success`（执行了，而非 skipped）→ `upload_debug_apk.outcome` 仍为 failure，`continue-on-error` 染绿。**本仓库的 Debug APK 仍未真正上传成功**，与其它仓库表现不一致，原因未定（日志在 fine-grained token 下 403 不可读，疑似与同仓两个清理步骤并发 / 同名 artifact 状态有关）。CI 不报红 + 明确告警的兜底仍有效，正式包 v0.2.35 的 Release 附件与坚果云不受影响。此差异列为后续观察项，不包装成「全部修好」。
 
 **账号级占用（验证后）**：清理完毕瞬时 23 个 / 85.1 MB；随后各仓 push CI 重新产出，回升到约 30 个 / 114.3 MB，仍在统一口径的稳态内（每个类别 ≤1 / ≤3）。
+
+## 第 55 批（v0.2.36）：分类管理三页借鉴一羽布局与交互
+
+- **起因**：使用者真机对照「我们的分类管理效果差一羽一大截」，并纠正本会话把「BeeCount 网格卡片留白大」外推成「等宽图标网格不能用」。撤回外推，按一羽组织方式重排三页；change `refine-category-management-pages`，四件套已推 `6e188f2` / 勾选回写 `0b1d00d`。
+- **使用者显式放行的两条文档约束**（留痕，防止后续会话再拿旧口径拦）：
+  1. **彩色图标**：原「中性单色圆 + 首字 / 彩色图标目录一律不进清单」收窄为**仅限分类管理三页**（列表 / 排序 / 分类选择）；记一笔、明细、账户详情、统计页口径不变。
+  2. **二级布局**：原「MUST 用 `WrapRow` 自适应 chips、MUST NOT 等宽列」改为列表页 5 列等宽图标网格、排序页二级临时一维列表。
+- **方案 A（使用者本轮选定）**：图标资源与许可证待确认 / 提供，本批 `CategoryIconCatalog` 为空目录、三页全回退中性圆 + 首字；`default_categories.json` 的 `iconKey` / `iconTintHex` 补字段随资源一起后置，`SeedCatalog` 已先支持可选字段解析。MUST NOT 伪造 106 个矢量、MUST NOT 复制一羽视觉资产。
+- **落地**：列表页蓝底 TopBar + 收支 Tab + 二级 5 列等宽网格 + 末格「添加子类」+ 停用小角标 + 底部胶囊「已归档 / 停用项管理」+ 大 `+` FAB；新增独立「分类排序」页（横排 5 列长按拖 / 二级点按拖 / 保存与放弃 / `draftOrder` 与 `sortOrder` 分离）；新增「分类选择」页（借一羽添加子类页版式：父级预填 + 分组导航 + 等宽网格 + 搜索 + 继续添加 + 重名校验），同版式用于停用项批量启用。
+- **零回归**：不改记一笔 / 明细 / 统计页分类标识；不改 `colorHex`（仍参与 `ChartData` 扇区取色与 3 处 DAO 投影）；不改两级模型、ID 规则、启用/停用语义、备份整表替换、统计口径；上移 / 下移保留作 TalkBack 兜底；一级列表仍竖排 `LazyColumn`（横排只在排序页）。
+- **零改表**：`AppDatabase.version = 5` 不变、`Migrations.ALL` 仍空 → **v0.2.35 直接覆盖安装生效**，不需要导出 / 卸载 / 导入。版本号 `0.2.36`（已核实未被 tag / release / artifact 占用）。
+- **依赖**：无新增第三方库；`rememberReorderableLazyGridState` 已在 `sh.calvin.reorderable:reorderable:3.1.0` README 查证存在。等宽网格用稳定 `Row + weight(1f)`，MUST NOT 用 `LazyVerticalGrid` 嵌套或 `FlowRow`（T12）。
+- **CI 全绿不替代真机**：活文档 §8 第 55 批新增 14 项真机待验（网格观感、长名省略、⋮ 菜单七项、排序手感与放弃零写库、连续添加、图标缺项兜底、记一笔零回归、横屏等），§8 既有项整体继承。

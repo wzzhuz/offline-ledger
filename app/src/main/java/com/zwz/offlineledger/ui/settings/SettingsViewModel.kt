@@ -30,6 +30,7 @@ import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
+import com.zwz.offlineledger.engine.CategoryManagementRules
 import com.zwz.offlineledger.engine.InsightData
 import com.zwz.offlineledger.engine.Reconciliation
 import com.zwz.offlineledger.ui.theme.LedgerColors
@@ -82,7 +83,13 @@ data class SettingsState(
     /** 第 13 批：分类笔数（一级含二级）与分类详情下钻。 */
     val categoryCounts: Map<Long, Int> = emptyMap(),
     val categoryDetailName: String = "",
-    val categoryDetail: List<DrillRow> = emptyList()
+    val categoryDetail: List<DrillRow> = emptyList(),
+    /** 第 55 批：排序页临时顺序，只活在内存，MUST NOT 逐次写库。 */
+    val sortDraftRootIds: List<Long> = emptyList(),
+    val sortDraftChildIds: Map<Long, List<Long>> = emptyMap(),
+    val sortDirty: Boolean = false,
+    /** 第 55 批：分类选择页的同父级重名提示。 */
+    val pickerError: String = ""
 )
 
 class SettingsViewModel(
@@ -820,6 +827,135 @@ class SettingsViewModel(
             persistWithGroup(valid + tail, key)
             loadCategories()
         }
+    }
+
+    // ---------------------------------------------------------------
+    // 第 55 批：分类排序页的临时顺序（draft）与分类选择页的重名校验。
+    // draft 与已落库 sortOrder 完全分离，拖动只改内存；
+    // 点「保存」才一次性按 (type, level, parentId) 三元组写回。
+    // ---------------------------------------------------------------
+    fun beginSort(type: RecordType) {
+        val active = _state.value.categories.filter { !it.isArchived }
+        val roots = active.filter { it.level == 0 && it.type == type }
+            .sortedBy { it.sortOrder }
+            .map { it.id }
+        val kids = roots.associateWith { rid ->
+            active.filter { it.level == 1 && it.parentId == rid }
+                .sortedBy { it.sortOrder }
+                .map { it.id }
+        }
+        _state.update { st -> st.copy(
+            sortDraftRootIds = roots,
+            sortDraftChildIds = kids,
+            sortDirty = false
+        ) }
+    }
+
+    fun moveDraftRootByIndex(from: Int, to: Int) {
+        _state.update { st ->
+            val list = st.sortDraftRootIds.toMutableList()
+            if (from in list.indices && to in list.indices) {
+                list.add(to, list.removeAt(from))
+                st.copy(sortDraftRootIds = list, sortDirty = true)
+            } else {
+                st
+            }
+        }
+    }
+
+    fun moveDraftChildByIndex(parentId: Long, from: Int, to: Int) {
+        _state.update { st ->
+            val list = st.sortDraftChildIds[parentId].orEmpty().toMutableList()
+            if (from in list.indices && to in list.indices) {
+                list.add(to, list.removeAt(from))
+                st.copy(
+                    sortDraftChildIds = st.sortDraftChildIds + (parentId to list),
+                    sortDirty = true
+                )
+            } else {
+                st
+            }
+        }
+    }
+
+    fun discardSort() {
+        _state.update { st -> st.copy(
+            sortDraftRootIds = emptyList(),
+            sortDraftChildIds = emptyMap(),
+            sortDirty = false
+        ) }
+    }
+
+    /** 保存：一次写库后同步刷新 state，再回调返回，避免列表页读到旧顺序。 */
+    fun saveSort(type: RecordType, onDone: () -> Unit) {
+        viewModelScope.launch {
+            val snapshot = _state.value
+            val ordered = CategoryManagementRules.rebuildOrder(
+                all = snapshot.categories.map { c ->
+                    CategoryManagementRules.Item(
+                        id = c.id,
+                        type = c.type.name,
+                        level = c.level,
+                        parentId = c.parentId,
+                        sortOrder = c.sortOrder,
+                        archived = c.isArchived
+                    )
+                },
+                type = type.name,
+                draftRoots = snapshot.sortDraftRootIds,
+                draftChildren = snapshot.sortDraftChildIds
+            )
+            repository.reorderCategories(ordered)
+            val fresh = withContext(Dispatchers.IO) { categoryDao.all() }
+            val direct = withContext(Dispatchers.IO) {
+                recordDao.insightCategoryCounts().associate { it.categoryId to it.cnt }
+            }
+            val counts = InsightData.rollupCounts(
+                direct, fresh.associate { it.id to it.parentId }
+            )
+            _state.update { st -> st.copy(
+                categories = fresh,
+                categoryCounts = counts,
+                sortDraftRootIds = emptyList(),
+                sortDraftChildIds = emptyMap(),
+                sortDirty = false,
+                message = "分类顺序已保存"
+            ) }
+            onDone()
+        }
+    }
+
+    fun validatePickerName(name: String, type: RecordType, parentId: Long?): String? {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return "请填名称"
+        val level = if (parentId == null) 0 else 1
+        val siblings = _state.value.categories
+            .filter {
+                !it.isArchived && it.type == type &&
+                    it.level == level && it.parentId == parentId
+            }
+            .map { it.name }
+        return if (CategoryManagementRules.isDuplicate(siblings, trimmed)) {
+            "同一级下已有同名分类"
+        } else null
+    }
+
+    fun clearPickerError() {
+        _state.update { st ->
+            if (st.pickerError.isEmpty()) st else st.copy(pickerError = "")
+        }
+    }
+
+    /** 同步返回是否成功，UI 据此清空名称但保留父级 / 类型 / 焦点（继续添加）。 */
+    fun submitPicker(name: String, type: RecordType, parentId: Long?): Boolean {
+        val err = validatePickerName(name, type, parentId)
+        if (err != null) {
+            _state.update { st -> st.copy(pickerError = err) }
+            return false
+        }
+        _state.update { st -> st.copy(pickerError = "") }
+        createCategory(name.trim(), type, parentId)
+        return true
     }
 
     /** 供 UI 显示默认阈值，避免有人把偏好写成非法值后界面一片空白。 */

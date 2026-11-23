@@ -45,18 +45,23 @@ SHALL 记录在 change 的 `design.md`「依赖与许可」节，MUST NOT 引入
 分类管理 SHALL 提供一级与二级排序，**排序作用域 SHALL 为
 `(type, level, parentId)` 三元组**：一级只在同收支类型的一级之间排序，
 二级只在所属一级内部排序，MUST NOT 把全部未归档分类当成一个全局数组交换相邻项。
-**第 20 批整块修订（替换第 15-17 批自研拖拽表述）**：分类一级、资产页账户、
-模板管理 SHALL 共用 `sh.calvin.reorderable:reorderable:3.1.0`（Apache-2.0、
-Maven Central、纯 UI 库、无运行时网络行为）与
-`ui/components/ReorderListSupport.kt` 的 `rememberKeyedReorder` 适配层：
-MUST 用 `ReorderableItem` + 稳定 `key`，MUST 用 `longPressDraggableHandle` 长按手柄，
-库 SHALL 负责拖动中 `animateItem()` 让位补间、pointer pass 顺序、长按窗口、
-拖到边缘按距离变速自动滚动，MUST NOT 再自写 `pointerInput` / `scrollable` /
-「拖拽期间禁用父滚动」/ 实测行高阈值；资产页容器 SHALL 为 `LazyColumn`
-（库的边缘滚动仅支持 Lazy 容器），MUST NOT 用 `Column + verticalScroll`。
-拖动中 `onMove` SHALL 只改内存顺序，松手 `onDragStopped` SHALL 一次性写入
-显式 `sortOrder`，重开页面顺序 SHALL 保持；MUST NOT 使用跨应用
-`dragAndDropSource/Target` 协议。资产页账户的展示仍按 `AccountType` 分组，
+**第 55 批整块修订（替换第 20 批表述）**：资产页账户、模板管理与分类管理
+SHALL 继续共用 `sh.calvin.reorderable:reorderable:3.1.0`（Apache-2.0、
+Maven Central、纯 UI 库、无运行时网络行为）；资产页账户与模板管理 SHALL 沿用
+`ui/components/ReorderListSupport.kt` 的 `rememberKeyedReorder` 适配层与
+`rememberReorderableLazyListState`。**分类列表页 SHALL NOT 再提供就地拖拽**，
+一级顺序调整统一交给独立「分类排序」页；排序页一级横排 5 列 SHALL 用
+`rememberReorderableLazyGridState`（v3.1.0 README 已查证存在），
+选中一级的二级 SHALL 用 `rememberReorderableLazyListState` 的一维列表。
+两处 MUST 用 `ReorderableItem` + 稳定 `key`（与父容器 `item(key = ...)` 一致），
+一级 MUST 用 `longPressDraggableHandle`、二级 MUST 用 `draggableHandle`。
+库 SHALL 负责拖动中让位补间、pointer pass 顺序、长按窗口与边缘滚动，
+MUST NOT 再自写 `pointerInput` / `scrollable` / 实测行高阈值，
+MUST NOT 使用跨应用 `dragAndDropSource/Target` 协议。
+拖动中 `onMove` SHALL 只改 `draftOrder` 内存顺序，**松手 MUST NOT 写库**；
+点「保存」才一次性写入显式 `sortOrder`，重开页面顺序 SHALL 保持。
+资产页容器 SHALL 为 `LazyColumn`（库的边缘滚动仅支持 Lazy 容器），
+MUST NOT 用 `Column + verticalScroll`；资产页账户的展示仍按 `AccountType` 分组，
 落库顺序 SHALL 由 `commitAccountOrderAll` 全量写回，MUST NOT 丢项。
 
 **本批整块修订（替换第 14–16 批 `WrapRow` 自适应 chips 表述）**：
@@ -111,11 +116,12 @@ MUST NOT 再横排 `≡` / `›` / `⋮` 三个控件。
 - **WHEN** 点「餐饮·早餐」下移
 - **THEN** 只与「餐饮」下的二级换位，「零食」下的二级顺序不变
 
-#### Scenario: 拖动中实时让位
-- **GIVEN** 一级「餐饮 / 零食 / 水果 / 交通」
+#### Scenario: 拖动中实时让位且不落库
+- **GIVEN** 排序页一级「餐饮 / 零食 / 水果 / 交通」
 - **WHEN** 长按「餐饮」手柄向下拖过「零食」
-- **THEN** 拖动过程中「零食」立即让位、列表显示为「零食 / 餐饮 / 水果 / 交通」
-- **AND** 松手后重进页面顺序不变（一次性落库，非松手才跳变）
+- **THEN** 拖动过程中「零食」立即让位、显示为「零食 / 餐饮 / 水果 / 交通」
+- **AND** 松手后仅 `draftOrder` 变化，库内 `sortOrder` 不变
+- **AND** 点「保存」后重进页面顺序保持
 
 #### Scenario: 11 个二级排成等宽网格
 - **GIVEN** 「居住」下有 11 个二级，含 7 字长名与若干停用项
@@ -194,9 +200,11 @@ MUST NOT 在排序页保留彩色（浏览页才上色）。
 MUST NOT 静默写库，MUST NOT 让库内顺序发生任何变化。
 状态写入 SHALL 用 `_state.update { }` 原子更新，
 MUST NOT 用 `_state.value = _state.value.copy(...)` 散写（活文档 §7.11）。
-保存 SHALL 复用既有 `commitRootOrder` / `commitChildOrder` / `moveCategory` 语义，
-全量写回 MUST NOT 丢项；一级横排时拖动手柄 SHALL 挂在每个格子上，
-`ReorderableItem` 的 key SHALL 与父 `items(key = ...)` 完全一致。
+保存 SHALL 由纯 JVM `CategoryManagementRules.rebuildOrder` 按三元组一次性重建
+全量 id 顺序并写回，MUST NOT 丢项、MUST NOT 混入另一收支类型或另一父级；
+既有 `commitRootOrder` / `commitChildOrder` / `moveCategory` SHALL 保留供列表页
+上移 / 下移无障碍兜底使用。一级拖动手柄 SHALL 挂在格子内的小手柄上，
+`ReorderableItem` 的 key SHALL 与父容器 `item(key = ...)` 完全一致。
 
 #### Scenario: 试排可放弃
 - **GIVEN** 在排序页拖动了一级与二级、尚未点保存
