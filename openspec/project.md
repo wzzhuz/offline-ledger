@@ -572,3 +572,38 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 但**上传并未真正成功**：该 run 的 artifacts 数为 **0**，账号内 `offline-ledger-debug-apk` 仍为 0 个、本仓库仍 127 个 / 277.2 MB。step 13 的 `conclusion: success` 是 `continue-on-error: true` 的染绿效果，真实 `outcome` 仍是 `failure` —— 旁证是 `if: steps.upload_debug_apk.outcome == 'failure'` 的告警步骤**确实执行了**（若 outcome 为 success 该步应 skipped）。这正是 §7.33 记过的 `continue-on-error` 坑，本批是**有意使用且配了 Summary 告警**，不静默、不假装产物存在。
 **账号级根因未消除**：`dayscounter` 仍是 132 个 / 1289.2 MB，未动。要真正恢复上传需账号侧处理，超出本批授权范围，交回使用者拍板。
 **结论**：用户诉求「避免下次还报错」已达成（CI 不红 + 明确告警）；「Debug APK 真的传到 Actions 制品」未达成，且它不是交付物（正式包以 v0.2.35 Release 附件与坚果云为准）。两者 MUST NOT 混为一谈。
+
+## 第 54 批（运维）：账号级统一制品清理（debug 1 / release 3）
+
+- **授权**：使用者 2026-11-23 明确授权「清理其他仓库，同步更新所有仓库的清理机制，debug 产物只保留最近一个，release 只保留最近 3 个」。
+- **根因闭环**：第 53 批只清了 `offline-ledger` 本仓库，但 Actions 存储配额是**账号级**、与 Packages 共用。拉全 14 个仓库才发现 `wzzhuz/dayscounter` 一个仓库占 132 个 / 1289.2 MB（71 debug + 61 release，且它的 build.yml **从来没有任何清理步骤**），账号合计 297 个 / 1665.6 MB，所以本仓库清到 277 MB 上传仍失败。
+- **立即清理（全账号 14 仓）**：按目标稳态删除 **274 个 / 1580.4 MB**，0 失败。
+
+  | 仓库 | 清理前 | 清理后 | 构成 |
+  |---|---|---|---|
+  | `dayscounter` | 132 / 1289.2 MB | **4 / 35.1 MB** | debug 1 + release 3 |
+  | `offline-ledger` | 127 / 277.2 MB | **6 / 20.3 MB** | release 3 + other 3 |
+  | `rice-cooker-schedule-android` | 32 / 90.7 MB | **7 / 21.2 MB** | debug 1 + release 3 + other 3 |
+  | `lifelog` | 4 / 7.6 MB | 4 / 7.6 MB | 已在稳态 |
+  | `rice-cooker-schedule` | 2 / 0.8 MB | 2 / 0.8 MB | 已在稳态 |
+  | **账号合计** | **297 / 1665.6 MB** | **23 / 85.1 MB** | |
+
+- **统一机制（8 个自有仓库各一次 commit）**：`dayscounter` / `lifelog` / `my-app-workflow` / `offline-ledger` / `rice-cooker-schedule` / `rice-cooker-schedule-android` / `secrets-sync` / `wzzhuz.github.io`。
+  - 新增 `.github/scripts/cleanup-artifacts.sh`：**自动分类模式**（无参数 = debug 留 1 / release 留 3 / 其它留 3），并保留旧 `--pattern/--keep` 显式模式，兼容既有调用。`category_of` 用大小写不敏感的 `case` glob：`*debug*` / `*release*`|`*-preview-*`|`*v*.apk` / 其它。按 `created_at` 倒序遍历 + 分类计数，等价于「各类别只留最近 N 个」。
+  - 新增 `.github/workflows/artifact-cleanup.yml`：`push`（每次 CI 前后收敛）+ `schedule` 每天 + `workflow_dispatch`；显式 `permissions: actions: write`；`concurrency` 防堆积；`if: always()` 精神由「无条件 job」保证。
+  - 已有内联清理统一口径：`offline-ledger/release.yml` 的 release / mapping `--keep 5` → **3**；`lifelog/release.yml` 的 `lifelog-v*` `--keep 5` → **3**；`lifelog/build.yml` 清理步骤的 `if: outcome == 'success'` → **`always()` + `continue-on-error: true`**（它原本和第 53 批踩的是同一个死锁）。
+  - 版本号、签名、坚果云、应用源码一律未动，**本批不出新包**。
+- **6 个 fork 不改代码**（`BeeCount` / `docker_image_pusher` / `HideCamera` / `interview_internal_reference` / `keepass2android` / `legado`）：它们 **0 个 artifacts**，workflow 属上游代码，`legado` 还有 `autoupdatefork.yml` 会自动同步覆盖，写入只会制造冲突。它们的 artifacts 仍纳入本次全账号清理范畴（当前为 0）。若使用者要求连 fork 一起加机制，需单独授权。
+- **关键教训**：查配额 MUST 先确认作用域是账号级；`if: outcome == 'success'` 是死锁开关；`continue-on-error` 会把 `conclusion` 染绿但 `outcome` 仍为 failure，判断产物是否真在只能查 artifacts 列表。
+
+### 第 54 批实测
+
+**8 个自有仓库 commit**：`dayscounter c10449a7` / `lifelog 9634c914` / `my-app-workflow 54505feb` / `offline-ledger 51bd6341` / `rice-cooker-schedule 48250f41` / `rice-cooker-schedule-android fcf14c6c` / `secrets-sync 48215452` / `wzzhuz.github.io 975a4670`，逐 blob 校验通过、零删除。
+
+**清理机制全部实测生效**：8 个仓库的 `artifact-cleanup.yml` 均由 push 触发并 **completed success**，一次验证了 YAML 语法、`gh`/`jq` 可用性、`actions: write` 权限、自动分类逻辑四处。
+
+**上传真的恢复了（其它仓库）**：`dayscounter-debug`（09:35）、`生活手记-debug-apk`（09:34）、`rice-cooker-debug-apk`（09:35）均为清理后新建，证明账号级配额腾出后 `upload-artifact` 不再被服务端拒绝。这是第 53 批「清了 1.9 GB 仍失败」的反证闭环。
+
+**一处如实登记**：`offline-ledger` 的 run `45147962536` 虽 completed success，但该 run 的 **artifacts 为 0**，且「Debug 制品上传失败告警」步骤 `conclusion=success`（执行了，而非 skipped）→ `upload_debug_apk.outcome` 仍为 failure，`continue-on-error` 染绿。**本仓库的 Debug APK 仍未真正上传成功**，与其它仓库表现不一致，原因未定（日志在 fine-grained token 下 403 不可读，疑似与同仓两个清理步骤并发 / 同名 artifact 状态有关）。CI 不报红 + 明确告警的兜底仍有效，正式包 v0.2.35 的 Release 附件与坚果云不受影响。此差异列为后续观察项，不包装成「全部修好」。
+
+**账号级占用（验证后）**：清理完毕瞬时 23 个 / 85.1 MB；随后各仓 push CI 重新产出，回升到约 30 个 / 114.3 MB，仍在统一口径的稳态内（每个类别 ≤1 / ≤3）。
