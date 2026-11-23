@@ -568,4 +568,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 
 代码 `6c0816d998b7`（parent `747b50c2ae`）：清理 80 个 + 补无条件清理调用 + 解除 release 死锁；本批兜底改动待第二次 commit。清理后本仓库 **127 个 / 277.2 MB、debug 0 个**。
 
-**待回填**：兜底 commit sha / 验证 run id / 该 run 是否 success。
+**兜底实测（如实区分 conclusion 与 outcome）**：兜底 commit `f3bd56bbec18`（parent `6c0816d998b7`）→ push CI `45130602117` **completed success**，六静态检查 / 单测 / debug APK / lintVital / 校验值 / 清理 / 上传 / 告警 / 摘要全部 success，**整条 CI 不再报红**。
+但**上传并未真正成功**：该 run 的 artifacts 数为 **0**，账号内 `offline-ledger-debug-apk` 仍为 0 个、本仓库仍 127 个 / 277.2 MB。step 13 的 `conclusion: success` 是 `continue-on-error: true` 的染绿效果，真实 `outcome` 仍是 `failure` —— 旁证是 `if: steps.upload_debug_apk.outcome == 'failure'` 的告警步骤**确实执行了**（若 outcome 为 success 该步应 skipped）。这正是 §7.33 记过的 `continue-on-error` 坑，本批是**有意使用且配了 Summary 告警**，不静默、不假装产物存在。
+**账号级根因未消除**：`dayscounter` 仍是 132 个 / 1289.2 MB，未动。要真正恢复上传需账号侧处理，超出本批授权范围，交回使用者拍板。
+**结论**：用户诉求「避免下次还报错」已达成（CI 不红 + 明确告警）；「Debug APK 真的传到 Actions 制品」未达成，且它不是交付物（正式包以 v0.2.35 Release 附件与坚果云为准）。两者 MUST NOT 混为一谈。
