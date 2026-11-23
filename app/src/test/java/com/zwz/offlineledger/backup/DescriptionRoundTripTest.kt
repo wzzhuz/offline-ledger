@@ -44,7 +44,7 @@ class DescriptionRoundTripTest {
     fun csvExportThenImportKeepsDescription() {
         val row = CsvRow(
             date = "2026-11-19", type = "EXPENSE", amountYuan = "12.00",
-            accountName = "招商银行", categoryRoot = "三餐", category = "外卖",
+            accountName = "招商银行", categoryRoot = "餐饮", category = "外卖",
             note = "另有信息", currencyCode = "CNY", counterparty = "盒马",
             importSource = "FIREFLY_III", sourceId = "j1", description = "牛奶鸡蛋"
         )
@@ -58,7 +58,7 @@ class DescriptionRoundTripTest {
     @Test
     fun oldCsvWithoutDescriptionDefaultsToEmpty() {
         val legacy = "date,type,amount,account,categoryRoot,category,note,currencyCode,counterparty,importSource,sourceId\r\n" +
-                "2026-11-19,EXPENSE,12.00,招商银行,三餐,外卖,另有信息,CNY,盒马,,\r\n"
+                "2026-11-19,EXPENSE,12.00,招商银行,餐饮,外卖,另有信息,CNY,盒马,,\r\n"
         val parsed = CsvCodec.parseImport(legacy.toByteArray())
         assertTrue(parsed.errors.toString(), parsed.ok)
         assertEquals("", parsed.rows[0].description)

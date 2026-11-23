@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.zwz.offlineledger.data.display.CategoryDisplay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -160,7 +161,7 @@ fun CategoryManagerScreen(onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { deletingId = null },
             title = { Text("删除分类") },
-            text = { Text("无流水的分类会直接删除；已有流水的分类自动转为归档，历史流水归属不变。") },
+            text = { Text("已有流水或预制分类会转为归档，可在下方「已归档」区恢复，历史流水归属不变；仅手工新建且无流水的分类会直接删除。预制分类删除后不会自动补回，恢复标准清单需全新安装且不导入旧备份。") },
             confirmButton = {
                 TextButton(onClick = { vm.deleteCategory(id); deletingId = null }) {
                     Text("确定", color = LedgerColors.ExpenseRed)
@@ -343,7 +344,9 @@ private fun CategoryList(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                     ) {
                         Text(
-                            text = c.name,
+                            text = CategoryDisplay.resolve(
+                                categories.firstOrNull { it.id == c.parentId }?.name, c.name
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = LedgerColors.Neutral,
                             modifier = Modifier.weight(1f)

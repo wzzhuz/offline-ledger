@@ -163,13 +163,14 @@
 ### Requirement: 预置两级中文分类
 
 系统 SHALL 在全新库创建时预置至少 7 个一级支出分类、3 个一级收入分类
-及若干二级分类，并 SHALL 预置资产账户与一个带额度的信用负债账户。
+及若干二级分类；第 30 批起**首启为零账户**，账户由资产页快捷模板创建，
+MUST NOT 再预置资产账户或信用负债账户。
 
 #### Scenario: 首次启动
 
 - **GIVEN** 全新安装后首次创建数据库
 - **WHEN** `SeedCallback.onCreate` 执行
-- **THEN** `categories` 与 `accounts` 表中存在预置数据
+- **THEN** `categories` 表中存在预置数据，`accounts` 表为空
 - **AND** 所有二级分类的 `type` 与父级一致
 
 **理由**：首次打开就能记账，是「记账不能变慢」的一部分；避免用户先做一轮配置才上手。
@@ -613,22 +614,92 @@ MODIFIED 块**，避免归档时出现重复 Requirement；按标题整块替换
 随包 `assets/default_categories.json` SHALL 是分类清单的唯一可替换来源；更换清单 MUST NOT 需要改 Kotlin 代码。`categories.enabled` SHALL 控制录入侧可见性，停用 MUST NOT 删除行、MUST NOT 改写已有流水，且统计、排行、历史、CSV 导出与加密备份 MUST 仍读全量。
 
 #### Scenario: 停用后记一笔不可选但统计仍计入
-- **WHEN** 使用者停用一级「养车」
-- **THEN** 记一笔、筛选面板、预算、模板的分类选项不再出现「养车」及其二级
+- **WHEN** 使用者停用一级「宠物」
+- **THEN** 记一笔、筛选面板、预算、模板的分类选项不再出现「宠物」及其二级
 - **AND** 统计占比卡、排行、历史流水与该分类的既有金额保持不变
 
 #### Scenario: 重新启用
-- **WHEN** 使用分类管理再次启用「养车」
+- **WHEN** 使用分类管理再次启用「宠物」
 - **THEN** 该一级与其二级重新出现在录入侧，历史流水归属不变
 
 ### Requirement: 按 A 方案区分租房与代缴父母水电
-「居住」一级 SHALL 只包含租房 / 自住产生的成本（房租、水费、电费、燃气、物业、宽带）。代父母缴纳的水电 SHALL 归到「人情 / 赡养·代缴水电」，MUST NOT 与租房费用混在同一一级下。
+「居住」一级 SHALL 只包含租房 / 自住产生的成本（房租、水费、电费、燃气、物业、宽带）。代父母缴纳的水电 SHALL 归到「人情社交 / 赡养·代缴水电」，MUST NOT 与租房费用混在同一一级下。
 
 #### Scenario: 水电两种动机分开
 - **WHEN** 使用者记一笔老家父母的水电费
-- **THEN** 可选「人情 / 赡养·代缴水电」
+- **THEN** 可选「人情社交 / 赡养·代缴水电」
 - **AND** 「居住 / 水费」「居住 / 电费」仍只用于自己住处
 
 #### Scenario: 同名二级不再混淆
 - **WHEN** 图表或筛选 chip 显示二级分类名
 - **THEN** MUST 经 `CategoryDisplay.resolve` 带父级名，且每个一级下 MUST NOT 再设名为「其他」的二级
+
+## 第 51 批：预制分类 v2 / ID 规则 / 删除策略
+
+### Requirement: 预置分类 ID 分配规则且 ID 无语义
+
+随包 `assets/default_categories.json` 的 `id` SHALL 按下列规则分配：
+
+- 支出一级 `1..10`，收入一级 `30..34`；`11..29` / `35..99` 为一级预留段；
+- 二级 `id = parentId × 1000 + 序号(1..999)`，即 `1001..99999`；
+- 系统 MUST NOT 从 ID 数值解析父子关系或收支类型，树关系 SHALL 唯一由 `parentId` 表达，
+  统计 SHALL 走 `records.rootCategoryId` 冗余列；
+- 一级与二级 ID 段 MUST NOT 重叠（二级最小 id MUST 大于一级最大 id），
+  全部 id MUST 全局唯一；
+- 手工新建 / CSV 导入新建的分类 SHALL 由 `@PrimaryKey(autoGenerate = true)`
+  从 `sqlite_sequence` 历史最大值 +1 分配，MUST NOT 显式指定 id；
+- 预制清单与 `SeedData` fallback、测试资源副本 SHALL 逐行一致（`SeedCatalogTest` 断言）；
+- `SeedData.isPresetCategoryId(id)` SHALL 由清单 id 集合生成，供删除策略使用，
+  MUST NOT 靠解析数值段位判断。
+
+#### Scenario: 加一级与二级不撞号
+
+- **GIVEN** 未来新增一个一级分类与某父下新增多个二级分类
+- **WHEN** 按规则取预留段与父段内空位
+- **THEN** 新 id 与现有 id 不重复、父子段不重叠
+- **AND** 无需改表结构、无需 Migration、无需重刷历史 `rootCategoryId`
+
+**理由**：旧方案是隐式约定（一级 1..15 收支混编、二级 父×100+序号），每父最多 99 个二级，
+父 1 加到第 101 个会撞上父 2 的第 1 个。第 51 批把规则显式化，ID 彻底无语义，
+换来对查询效率零影响（主键 B-tree 比较、HashMap 查找、GROUP BY 均与 ID 数值无关）。
+
+### Requirement: AUTOINCREMENT 空洞不回填且删除策略可恢复
+
+系统 MUST NOT 回填 AUTOINCREMENT 因物理删除留下的 rowid 空洞；回填会让旧备份、
+残留引用或归档行里的旧 id 被新分类顶上，造成静默关联错乱。
+分类删除 SHALL 由 `CategoryDeletionPolicy.shouldArchive(linkedRecordCount, isPreset)` 判定：
+有流水或属于预制清单的分类 MUST NOT 物理删，SHALL 统一转 `isArchived = 1`；
+仅「手工新建且无流水」才可物理删。分类管理删除确认弹窗 SHALL 明确提示
+「预制分类删除后不会自动补回，恢复标准清单需全新安装且不导入旧备份」。
+
+#### Scenario: 误删预制分类
+
+- **GIVEN** 使用者误点删除一个无流水的预制二级分类
+- **WHEN** `deleteCategory` 执行
+- **THEN** 该行转归档、id 与父子关系保留
+- **AND** 「已归档」区显示「一级 / 二级」全名，点「恢复」即可回到录入侧
+
+#### Scenario: 外部导入产生大量不合理分类
+
+- **GIVEN** 从 CSV / Firefly III 导入的分类大多已挂流水
+- **WHEN** 使用者批量删除整理
+- **THEN** 这些行按既有规则转归档而非物理删，几乎不产生 ID 空洞
+- **AND** 归档列表的累积为已知且可接受的限制，MUST NOT 为「整理干净」改写历史归属
+
+**理由**：`SeedCallback.onCreate` 只在全新库跑一次，`Migrations.ALL` 为空，
+没有「恢复默认分类」入口；`restoreCategory` 对已物理删的行影响 0 行且不报错。
+AUTOINCREMENT「永不重用」正是「备份里 categoryId 引用不破」的保证。
+
+### Requirement: 分类导入必须整表替换
+
+任何分类导入路径（含 `importBackup`）SHALL 先清空 `categories` 再按父先子后整表插回，
+MUST NOT 按 id 增量合并、MUST NOT 按名称重映射、MUST NOT 只恢复流水而丢弃分类表。
+备份文件是「分类表 + 表内引用」自洽闭环，整表搬运与具体 id 数值无关。
+
+#### Scenario: 旧备份导入新版
+
+- **GIVEN** 使用者持有第 50 批及更早版本的加密备份
+- **WHEN** 在 v0.2.34 全新安装后导入该备份
+- **THEN** 关联不错乱（备份内 id 自洽）
+- **AND** 但旧分类表整体覆盖新清单，新版预制分类**不会生效**
+- **AND** 装包说明 MUST 写明「恢复标准清单 = 全新安装且不导入旧备份」

@@ -5,6 +5,7 @@ import androidx.room.withTransaction
 import com.zwz.offlineledger.backup.dto.BackupFile
 import com.zwz.offlineledger.backup.dto.LedgerSnapshot
 import com.zwz.offlineledger.data.local.AppDatabase
+import com.zwz.offlineledger.data.local.SeedData
 import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.BudgetDao
@@ -30,6 +31,7 @@ import com.zwz.offlineledger.data.model.AccountType
 import com.zwz.offlineledger.data.model.BudgetScope
 import com.zwz.offlineledger.data.model.LedgerAdjustment
 import com.zwz.offlineledger.data.model.RecordType
+import com.zwz.offlineledger.engine.CategoryDeletionPolicy
 import com.zwz.offlineledger.data.model.LedgerCategory
 import com.zwz.offlineledger.backup.csv.CsvImportOutcome
 import com.zwz.offlineledger.backup.csv.CsvRebuildOutcome
@@ -417,9 +419,19 @@ class LedgerRepository @Inject constructor(
         categoryDao.archive(id)
     }
 
-    /** 第三批：删除分类。有流水只归档（保护历史归属），无流水才物理删。 */
+    /**
+     * 第 51 批：删除分类。
+     * 有流水 MUST NOT 物理删（历史 rootCategoryId 会悬空）；
+     * 预制分类即使无流水也 MUST NOT 物理删——onCreate 只种一次、无「恢复默认」入口，
+     * 删掉后 restoreCategory 影响 0 行，等于不可逆。两类统一转归档。
+     * AUTOINCREMENT 留下的 ID 空洞 MUST NOT 回填（见 CategoryDeletionPolicy）。
+     */
     suspend fun deleteCategory(id: Long) = db.withTransaction {
-        if (categoryDao.linkedRecordCount(id) > 0) {
+        val archive = CategoryDeletionPolicy.shouldArchive(
+            linkedRecordCount = categoryDao.linkedRecordCount(id),
+            isPreset = SeedData.isPresetCategoryId(id)
+        )
+        if (archive) {
             categoryDao.archive(id)
         } else {
             categoryDao.deleteById(id)

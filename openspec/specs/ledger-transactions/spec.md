@@ -975,7 +975,7 @@ MUST NOT 拼接进备注，且 MUST 在导入结果中明示未迁移。
 - **THEN** 三者输出完全相同；一级下钻与手工选一级时均只显示一级名
 
 ### Requirement: 预置数据来源与数据库版本
-预置分类 SHALL 来自随包 JSON 而非 Kotlin 常量；`AppDatabase.version` SHALL 为 3。测试阶段 MUST 卸载重装后再导入重建，MUST NOT 声称覆盖安装可用。
+预置分类 SHALL 来自随包 JSON 而非 Kotlin 常量；`AppDatabase.version` SHALL 为 5（第 51 批核实，旧文写 3 为文档债）。`SeedCallback.onCreate` 只对**全新库**生效，更换预制清单 MUST 全新安装，MUST NOT 声称覆盖安装或导入旧备份后能生效。
 
 ### Requirement: 快捷账户模板替代预制账户行
 首次启动 SHALL 为零账户；资产页新增账户对话框 SHALL 提供只读快捷模板，按资产组与信用负债组展示，点选后自动填名称与类型，并可填卡号后四位。花呗 / 白条 / 美团月付 / 抖音月付 MUST 归信用负债组，MUST NOT 与支付宝余额、微信零钱并列。

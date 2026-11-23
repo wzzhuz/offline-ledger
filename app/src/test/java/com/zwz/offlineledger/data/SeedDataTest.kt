@@ -28,6 +28,18 @@ class SeedDataTest {
     }
 
     @Test
+    fun `id layout has no collision and no semantic parsing`() {
+        val rows = SeedData.categories
+        assertEquals(rows.size, rows.map { it.id }.toSet().size)
+        val roots = rows.filter { it.level == 0 }
+        val leaves = rows.filter { it.level == 1 }
+        assertTrue("二级最小 ID 必须大于一级最大 ID",
+            leaves.minOf { it.id } > roots.maxOf { it.id })
+        leaves.forEach { assertEquals("二级必须落在父×1000 段", it.parentId, it.id / 1000) }
+        assertTrue(roots.all { it.id in 1L..99L })
+    }
+
+    @Test
     fun `insert statements are generated for every seed row`() {
         val statements = SeedData.allInsertStatements()
         assertEquals(SeedData.categories.size + SeedData.accounts.size, statements.size)

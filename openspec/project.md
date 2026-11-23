@@ -495,3 +495,18 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 代码 `d5cb49cbd77e`（parent `b450d6f9c633`，main HEAD） / push CI `45016703228` **success**（六静态检查 + 单测 + debug APK + release lintVital 全绿）/ release `45016754039` **success**（坚果云 success，已建 tag `v0.2.33`）/ 制品 `offline-ledger-release-v0.2.33` 2,541,509 B、`offline-ledger-mapping-v0.2.33` 3,799,683 B、metrics 270 B。
 实验分支 `experiment/plaintext-db` 保留供对照（HEAD `227e1d2abf16`），**未合并、未删除**。
 **BREAKING 装包顺序 MUST 实测**：导出加密备份 → 卸载 → 安装 v0.2.33 → 导入重建；沙盒无法验证，CI 全绿不得替代（活文档 §1）。
+
+## 第 51 批（v0.2.34）：预制分类 v2 重构（宽一级 / 细二级 / ID 显式规则）
+
+- **起因**：使用者认为预制分类不合理——一级过细且维度混杂（三餐按内容、养车按对象、人情按用途），「三餐」更接近二级。取主流「一级看结构（6~9 个、少而稳）、二级看原因」原则 ；钱迹官方统计里「三餐」恰是一级，但本轮按其二级思路 + 主流宽一级原则，不照抄。
+- **清单 v2**（`default_categories.json` version 4，106 行 = 一级 15 + 二级 91；启用 47 / 停用扩展 59）：支出一级 `餐饮 / 交通 / 养车 / 居住 / 购物 / 医疗 / 学习娱乐 / 宠物 / 人情社交 / 其他`，默认启用 7 个（含**养车**，使用者要求独立看成本）；收入一级 `工资 / 奖金 / 兼职 / 理财收益 / 其他收入`。「三餐」概念降为 `餐饮 / 正餐`，与外卖 / 聚餐 / 买菜做饭并列，不再往下挂层级。扩展二级（零食、水果、话费、美妆、长途交通等）`enabled=false`，在分类管理按需启用；停用一级下二级同步停用。
+- **ID 规则显式化**：一级支出 1..10、收入 30..34，预留 11..29 / 35..99；二级 = `parentId × 1000 + 序号(1..999)`（1001..34004）。ID 无语义、树关系只看 `parentId`，统计走 `rootCategoryId`。旧隐式规则「父×100」每父最多 99 个二级、父 1 第 101 个会撞父 2 第 1 个，已修。手工新建 / 导入新建走 AUTOINCREMENT 从 `max+1`，不按段位。
+- **两个确认题的结论**：① ID 数值对查询效率零影响（主键 B-tree / HashMap / GROUP BY 均与数值无关），抬高 AUTOINCREMENT 起点无实质开销；② 备份自带完整分类表且 `importBackup` 整表替换，**ID 怎么编都不用重写备份代码**；「ID 不动」只适用于「已有数据的库上原地改清单」，使用者已定全新安装、测试数据舍弃，该约束消失。
+- **ID 空洞与误删**（使用者追问后核实）：外部导入分类大多挂流水 → `deleteCategory` 只归档、几乎不产生空洞；AUTOINCREMENT「永不重用」正是引用不破的保证，**明确不回填并写进 spec**。误删预制分类确实不可逆（onCreate 只种一次、无恢复默认入口、restoreCategory 对已删行影响 0 行、弹窗无警告）→ 采用 B 方案：新增纯 JVM `CategoryDeletionPolicy.shouldArchive`，预制一律转归档；弹窗补警告；归档区显示改经 `CategoryDisplay.resolve` 带父级前缀。预制 id 集合取 `SeedData.presetIds`（由一致性单测保证与随包 JSON 同步），零 Context、零 DI、零表结构变更。
+- **文档债顺手修**：`ledger-transactions` 的 `version SHALL 为 3` → 5；`category-stats` 的「预置资产账户」→ 零账户、停用 Scenario 示例养车 → 宠物、A 方案「人情」→「人情社交」；CSV 往返测试 `三餐,外卖` → `餐饮,外卖`。
+- **登记未修**：归档列表平铺累积、重复导入会造同名重复项（导入查重排除了归档行），列为后续独立议题，本轮不动。
+- **装包**：`SeedCallback.onCreate` 只对全新库生效 → **全新安装、测试数据重造、不导 v0.2.33 及更早备份**（导入旧备份会把旧分类表整表覆盖回来，新清单不生效）。零改表、`version=5` 不变、`Migrations.ALL` 仍为空。
+- **挂账未动**：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中。本批按「改变系统行为 + 改 spec」新建 change `restructure-preset-categories`。
+
+### 第 51 批实测
+待回填（代码 commit sha / push CI run id / release run id / 制品名与体积）。

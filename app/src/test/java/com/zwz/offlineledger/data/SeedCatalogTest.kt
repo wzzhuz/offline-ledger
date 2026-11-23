@@ -33,16 +33,17 @@ class SeedCatalogTest {
         val rows = SeedCatalog.parse(json())
         val roots = rows.filter { it.level == 0 }.associateBy { it.id }
         val housing = rows.filter { it.parentId == roots.values.first { it.name == "居住" }.id }
-        val relations = rows.filter { it.parentId == roots.values.first { it.name == "人情" }.id }
+        val relations = rows.filter { it.parentId == roots.values.first { it.name == "人情社交" }.id }
         assertTrue(housing.none { it.name.contains("代缴") })
         assertTrue(relations.any { it.name.contains("代缴水电") })
     }
 
     @Test
-    fun `default disabled roots cover car pet leisure and relations`() {
-        val disabled = SeedCatalog.parse(json())
-            .filter { it.level == 0 && !it.enabled }.map { it.name }.toSet()
-        assertTrue(disabled.containsAll(setOf("养车", "宠物", "教育娱乐", "人情")))
+    fun `default disabled roots cover leisure pet and relations`() {
+        val roots = SeedCatalog.parse(json()).filter { it.level == 0 }
+        val disabled = roots.filter { !it.enabled }.map { it.name }.toSet()
+        assertEquals(setOf("学习娱乐", "宠物", "人情社交"), disabled)
+        assertTrue(roots.first { it.name == "养车" }.enabled)
     }
 
     @Test
