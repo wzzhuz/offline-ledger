@@ -126,18 +126,20 @@ LazyColumn（竖排，竖排，15 个一级不横排）
   `SeedCatalog.Row` 与 `insertStatements` 同步解析并写入 `iconName`；
   `SeedData` fallback 同构补齐，保持「换清单只改 JSON、不改 Kotlin」的既有约定。
 - **MUST NOT 改写 `colorHex`**：该字段参与 `ChartData` 扇区取色与
-  `RecordDao` 的三处 `categoryColorHex` 投影。图标配色由目录的
-  `iconTintHex` 单独提供，两套管径分离，统计口径零影响。
+  `RecordDao` 的三处 `categoryColorHex` 投影。图标配色由**纯 JVM
+  `engine/CategoryIconTints.kt` 的编译期常量表**按一级领域分组提供
+  （同组同色、11 种低饱和色），与 `colorHex` 两套管径分离，统计口径零影响。
 - **适用范围**：只有列表 / 排序 / 选择三页读目录；
   `CategoryIcon(...)`（中性圆 + 首字）在记一笔、明细、账户详情、
   统计页的调用点**一字不动**。
 - **资源来源与许可证**：MUST NOT 复制一羽记账的图标资源（第三方视觉资产
-  需授权）。推荐采用自有手绘或可商用矢量集（如 MIT / Apache-2.0 / CC0 的
-  Tabler / Lucide 类集合），只取所需图标、以本地资源随包，
-  **许可证、来源链接与传递依赖审计 MUST 写进本文件「依赖与许可」节**。
-  第一批先覆盖一级 15 + 高频二级，缺项一律回退中性圆 + 首字。
-  > **开放项**：具体图标集与资源文件由使用者确认 / 提供；
-  > 确认前 tasks 中该项保持 `[ ]`，MUST NOT 由 AI 凭空生成 106 个矢量。
+  需授权）。**已确认采用 Tabler Icons outline v3.34.0（MIT）**，
+  只取 90 个 SVG 转成 `res/drawable` 本地资源，
+  许可证、来源链接与传递依赖审计见本文件「依赖与许可」节与 `assets/NOTICE`。
+  > **已确认（2026-11-23）**：使用者选定 Tabler。实际覆盖**全部 106 个
+  > 预置分类**（90 个唯一 iconKey），非仅高频项；详见「图标资源落地记录」。
+  > `SeedCatalog` 保留 `iconTintHex` 可选解析口子供将来按分类级自定义，
+  > 本批不写库、不参与运行时取色；清单最终只补 `iconKey` 一个字段。
 
 ### 5. 状态与落库
 
@@ -153,10 +155,19 @@ LazyColumn（竖排，竖排，15 个一级不横排）
 | 项 | 坐标 / 来源 | 许可证 | 传递依赖 | 运行时网络 |
 |---|---|---|---|---|
 | 拖拽（既有） | `sh.calvin.reorderable:reorderable:3.1.0` | Apache-2.0 | kotlin-stdlib-common、compose runtime/animation/foundation | 无 |
-| 图标资源（新增，待确认） | 自有手绘或可商用矢量集，**待使用者确认后填写** | **待填写** | 无（本地资源） | 无 |
+| 图标资源（第 55 批落地） | **Tabler Icons outline v3.34.0**（pin 版本，非 `@latest`）<br>`https://github.com/tabler/tabler-icons`<br>`https://tablericons.com/` | **MIT**<br>`Copyright (c) 2018-2026 Tabler` | **无**（只取 90 个 SVG 转成 `res/drawable/ic_cat_*.xml` 随包，零新增依赖、零 AAR、零 Maven 坐标） | 无 |
+
+**版权声明落盘**：MIT 全文 + 版权行 + 来源 + pin 版本写在 `app/src/main/assets/NOTICE`，
+随 APK 分发，满足 MIT「保留版权与许可声明」的唯一义务 。选 Tabler 而非
+Lucide（ISC，部分图标源自 Feather 带 MIT 声明，NOTICE 要列两套）是因为许可单一、
+6,257 个图标覆盖中文记账特有概念更全；统一 24×24 网格 / 2px 居中描边 /
+`stroke="currentColor"` / 无固定色，正好把上色权留给我们，不会回到记一笔页
+「6~7 种高饱和色乱跳」的老坑 。
 
 MUST NOT 引入 `material-icons-extended`（`build.gradle.kts` L168–170 已刻意排除，
-体积数 MB）；MUST NOT 引入图片加载库（无远程图片需求）。
+官方自述 excessive size、同类项目实测全量 AAR 编进 11,400 个类占 43%）；
+MUST NOT 引入第三方 Tabler Compose AAR（Maven Central 有 MIT 封装，但会把全量
+图标类编进 dex，绕回体积老路）；MUST NOT 引入图片加载库（无远程图片需求）。
 
 ## 考虑过的其他方案
 
@@ -216,7 +227,7 @@ Contents API 读取，确认 `rememberReorderableLazyGridState(lazyGridState) { 
 |---|---|---|---|
 | 排序页容器 | 一级横排 + 选中二级白卡「插在」一级网格中间 | 一级网格与二级列表是 `Column` 的**兄弟**：网格限高 240dp、二级 `weight(1f)` | 一个惰性容器里混 `GridItemSpan` 与嵌套 `LazyColumn` 会造成同方向嵌套滚动 + 高度不确定。兄弟容器零风险，组织方式（横排一级 + 白卡二级）一致 |
 | 一级拖动手柄 | 挂在整个格子上 | 挂在格子内 32dp 的「≡」小手柄上，名称另可点选中 | README 明确 clickable 容器与 draggableHandle 共存需额外处理；分离手柄与点击零冲突 |
-| `default_categories.json` | 补 `iconKey` / `iconTintHex` | **本批零改 JSON** | 方案 A 图标资源未定，补空字段无收益且徒增 106 行改动风险；`SeedCatalog` 已先支持可选字段解析，资源确认后一次补齐即可 |
+| `default_categories.json` | 补 `iconKey` / `iconTintHex` | 首批方案 A 阶段零改；图标落地后**只补 `iconKey` 一个字段**，106 行数据语义零改动 | 配色权威来源改为 `CategoryIconTints` 编译期常量表（同组同色、11 色），清单不需要逐行存色值；`SeedCatalog` 仍保留 `iconTintHex` 可选解析口子供将来扩展 |
 | `CategoryManagerDialog.kt` | 块级精确替换（§3 T6） | **完整重写** | 本批改动同时覆盖 TopBar / 列表 / 一级行 / 编辑视图，块级替换 10+ 处更易漏。改前已读远端 `main` 全文并 grep 全部调用点，改后跑括号平衡、重复 import 与六个静态检查。§3 T6 针对的是「脚本持有旧快照整文件回写把刚加的按钮盖掉」，不是禁止完整重写单文件 |
 | 排序页 VM 实例 | 与列表页共享 | 各路由独立 `settingsVm()` 实例 | `settingsVm()` 用默认 `viewModel()` 作用域，跨 NavBackStackEntry 不共享。列表页加 `LaunchedEffect(Unit) { loadCategories() }`，从排序页 / 选择页返回时重新查库，保证新 `sortOrder` 立即可见 |
 
@@ -225,14 +236,67 @@ Contents API 读取，确认 `rememberReorderableLazyGridState(lazyGridState) { 
 `ui/settings/CategorySortScreen.kt`、`ui/settings/CategoryPickerScreen.kt`、
 `engine/CategoryManagementRulesTest.kt`、`data/SeedCatalogOptionalIconTest.kt`。
 
-**方案 A 未结项（MUST NOT 记为已完成）**：图标集来源 / 许可证 / 传递依赖审计、
-清单补字段、第一批图标覆盖率、`design.md`「依赖与许可」表第二行填写。
-`CategoryIconCatalog` 当前为空目录，`CategoryGlyph` 三页全回退中性圆 + 首字；
-补齐资源时只改这一处，三个页面零改动。
+**方案 A 收口**：布局与交互先落地、图标资源后置的做法已按使用者 2026-11-23
+「按 Tabler 来」完成收口；下面单独记录图标批，未结项仅剩真机观感验收。
+首批的「图标资源来源 / 许可证 / 清单补字段」三项现已全部有落盘产物，
+MUST NOT 再写成待确认。
+
+## 图标资源落地记录（Tabler / 方案 A 收尾）
+
+**选型**：Tabler Icons outline **v3.34.0**（pin 到具体 tag，非 `@latest`），
+MIT 单一许可、6,257 个 24×24 / 2px 描边 / `stroke="currentColor"` 线性图标。
+经 GitHub `zipball` API 拉下该 tag 整包（34.8 MB / 4,963 个 outline SVG），
+只取所需 **90 个唯一 iconKey**，覆盖清单 **全部 106 个预置分类**。
+未选 Lucide 是因为 ISC + Feather 衍生 MIT 双声明会让 NOTICE 变两套；
+未引 Maven Central 上的第三方 Tabler Compose AAR 是为了不把全量图标类编进 dex。
+
+**转换（零新增依赖）**：Tabler SVG 根上统一 `fill="none"` / `stroke-width="2"` /
+`stroke-linecap="round"` / `stroke-linejoin="round"`，图标体**只有 `<path d="..."/>`**
+（生成脚本断言无 `circle/rect/g/use` 等元素）。用脚本把每个 `d` 原样写进
+`res/drawable/ic_cat_*.xml` 的 `android:pathData`，配
+`strokeColor="#FF000000"` / `strokeWidth="2"` / round cap+join，
+由 Compose `Icon(painterResource(...), tint = ...)` 在运行时染色。
+比 SVG→`ImageVector` PathData DSL 更稳： arc / 相对命令交给 Android 框架解析，
+不需要自己写 SVG path 解释器；90 个 XML 全部通过 `ElementTree` 解析自检。
+生成脚本是一次性产物、不进仓库，产物（XML + Kotlin 表）落盘可复核。
+
+**目录与配色（编译期显式常量，非运行时反射）**：
+
+| 文件 | 职责 |
+|---|---|
+| `ui/components/CategoryIconCatalog.kt` | `when (iconKey) -> R.drawable.ic_cat_*`，90 个分支；`else -> null`。`CategoryGlyph` 组合「浅色圆底 + 单色线性图标」，缺项回退 `CategoryIcon` 中性圆 + 首字 |
+| `engine/CategoryIconTints.kt` | 纯 JVM，90 个 iconKey → 领域色（ARGB Int）。**11 种低饱和色、按一级领域分组、同组同色**；收入统一 `IncomeGreen`；排序页 `GRAYSCALE` 降饱和 |
+| `engine/CategoryIconKeys.kt` | 纯 JVM，106 个预置 id → iconKey |
+
+配色克制是刻意的：Tabler 本身单色，上色权完全在我们手里；「同组同色」
+拿到一羽式彩色网格的观感，同时避开活文档 §2.6 记一笔页「6~7 种高饱和色
+一眼不清晰」的翻车路径。`colorHex` 一字未动，两套管径分离。
+
+**覆盖安装兜底（本批最容易漏的一点）**：`SeedCatalog.insertStatements`
+只在 `SeedCallback.onCreate` **全新安装**时把 `iconKey` 写进 `categories.iconName`。
+v0.2.35 覆盖安装的用户库已存在，106 行 `iconName` 仍是空串；零改表前提下
+不能靠迁移回填。因此 `CategoryGlyph` 在 `iconName` 为空时按
+`CategoryIconKeys.keyOfPreset(categoryId)` 回查，**覆盖安装也能立刻看到图标**，
+且零写库、零 Entity 变更、零备份 DTO 变更。手工新建分类 id 从 `max+1` 起、
+永不回填空洞，查不到即回退中性圆。4 个 `CategoryGlyph` 调用点全部传 `categoryId`。
+
+**清单与 fallback**：`default_categories.json` 106 行各补一行 `iconKey`
+（保留原 2 空格缩进的最小 diff），`id/name/type/parentId/level/enabled/sortOrder`
+**逐字段零改动**；`SeedData` fallback 的 `CategorySeed` 本就有 `iconName` 字段、
+`c()` 仍给空串，仅用于纯 JVM 结构校验，首次安装实际读 assets JSON，
+`SeedCatalogTest` 的 6 项一致性断言不受新增字段影响。
+
+**版权声明**：`app/src/main/assets/NOTICE` = 来源 + pin 版本 + `Copyright (c)
+2018-2026 Tabler` + MIT 全文，随 APK 分发，满足 MIT 唯一义务。
+
+**单测**：`CategoryIconTintsTest`（清单每个 iconKey 都有配色、未知 key 返 null、
+收入统一绿）、`CategoryIconKeysTest`（106 个预置 id 全覆盖且都有配色、
+自定义 id 返 null）、`SeedCatalogOptionalIconTest`（旧清单无图标字段仍可解析）。
 
 **零改表复核**：`AppDatabase.version` 仍 5、`Migrations.ALL` 仍空、
 `colorHex` 一字未动（仍参与 `ChartData` 扇区取色与 `RecordDao` 三处投影）、
-`assets/default_categories.json` 一字未动、六个静态检查本地全 PASS。
+`app/build.gradle.kts` 依赖表一字未动、六个静态检查本地全 PASS。
+清单只新增可选字段、不改任何数据语义 → **v0.2.35 直接覆盖安装生效**。
 
 ## 验证
 

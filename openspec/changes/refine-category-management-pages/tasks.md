@@ -32,26 +32,41 @@
 
 ## 4. 实现（按 3.3 校验通过后开始）
 
-> 使用者 2026-11-23 选定**方案 A**：三页布局与交互全部落地，
-> 图标资源与许可证后置；`CategoryIconCatalog` 为空目录，三页全回退中性圆 + 首字。
+> 使用者 2026-11-23 选定**方案 A**（布局先行、图标后置），随后确认「按 Tabler 来」
+> **完成收口**：Tabler Icons outline v3.34.0 / MIT，90 个本地 drawable 覆盖全部 106 个
+> 预置分类；目录缺项才回退中性圆 + 首字。未结项仅剩真机观感验收与出包。
 
 ### 4.1 图标数据与目录
-- [ ] 4.1.1 `assets/default_categories.json` 每行补 `iconKey` / `iconTintHex`
-      —— **方案 A 后置，未做**：图标资源未定，补空字段无收益且徒增 106 行改动风险；
-      本批清单**一字未动**（零改数据），资源确认后一次补齐
+- [x] 4.1.1 `assets/default_categories.json` 106 行各补一行 `iconKey`
+      （最小 diff，保留原 2 空格缩进）；`id/name/type/parentId/level/enabled/sortOrder`
+      逐字段零改动。配色由编译期常量表给，清单**不补** `iconTintHex`（如实登记偏差）
 - [x] 4.1.2 `SeedCatalog.Row` / `parse` / `insertStatements` 同步解析并写 `iconName`；
       新字段可选，旧 JSON 缺字段仍可解析，`colorHex` 仍固定 `#888888`
 - [x] 4.1.3 `SeedData` fallback 同构核对
       —— 复核后 `CategorySeed` 本就有 `iconName` / `colorHex` 且 INSERT 已写入，
       `c()` 给空串；无需改代码，已在 `design.md` 如实登记
-- [x] 4.1.4 新增 `ui/components/CategoryIconCatalog.kt`：
-      编译期显式常量出口（方案 A 空目录）+ `CategoryGlyph` 全回退 + `CategoryIconGrid`
-      5 列等宽网格（`Row + weight(1f)`、固定格高、均匀 gutter、长名 ellipsis、停用小角标）
-- [ ] 4.1.5 **图标资源来源与许可证待使用者确认 / 提供**（开放项）
-      —— 确认前不伪造 106 个矢量、不复制一羽视觉资产；
-      确认后回填 `design.md`「依赖与许可」表
-- [x] 4.1.6 新增 `CategoryManagementRulesTest` / `SeedCatalogOptionalIconTest`
+- [x] 4.1.4 `ui/components/CategoryIconCatalog.kt`：
+      首批方案 A 为空目录 + 全回退，Tabler 落地后改为 90 分支编译期常量表 +
+      「浅色圆底 + 单色线性图标」`CategoryGlyph`；`CategoryIconGrid` 5 列等宽网格
+      （`Row + weight(1f)`、固定格高、均匀 gutter、长名 ellipsis、停用小角标）不变
+- [x] 4.1.5 图标资源与许可证（已确认）
+      —— Tabler Icons outline **v3.34.0**（pin tag，非 `@latest`）/ MIT /
+      `Copyright (c) 2018-2026 Tabler`；`design.md`「依赖与许可」表与
+      `assets/NOTICE`（MIT 全文）均已回填
+- [x] 4.1.6 单测：`CategoryManagementRulesTest` / `SeedCatalogOptionalIconTest`
       —— 网格分行与补空位、重名忽略大小写、三元组重建与不丢项、纯函数性、旧清单兼容
+- [x] 4.1.7 从 Tabler zipball 取 90 个 outline SVG，脚本转成
+      `res/drawable/ic_cat_*.xml`（90 个 VectorDrawable，XML 解析自检全通过）；
+      零新增 Gradle 依赖、零 AAR、零运行时网络
+- [x] 4.1.8 `CategoryIconCatalog` 编译期常量表（90 个 `when` 分支）+ `CategoryGlyph`
+      「浅色圆底 + 单色线性图标」；缺项回退中性圆 + 首字
+- [x] 4.1.9 `engine/CategoryIconTints.kt`（11 种低饱和领域色、同组同色、
+      排序页灰阶）与 `engine/CategoryIconKeys.kt`（106 个预置 id → iconKey）
+- [x] 4.1.10 **覆盖安装兜底**：`iconName` 为空时按 id 回查预置表，
+      v0.2.35 覆盖安装也能立刻显示图标；零写库 / 零 Entity 变更 / 零改表。
+      4 个 `CategoryGlyph` 调用点全部补 `categoryId`
+- [x] 4.1.11 新增 `CategoryIconTintsTest` / `CategoryIconKeysTest`
+      —— 106 个 iconKey 全有配色、106 个预置 id 全覆盖、未知 key / 自定义 id 返 null
 
 ### 4.2 列表页
 - [x] 4.2.1 蓝底 TopBar：返回 / 标题 / 右上「排序」+ ⋮；支出 / 收入 Tab 坐进标题栏下部
@@ -125,11 +140,16 @@
 - [ ] 6.6 放弃后顺序零变化；保存后一级只在支出一级间换位、二级只在父级内换位，
       重进页面顺序保持
 - [ ] 6.7 连续添加不清父级 / 类型、重名提示、键盘与搜索共存
-- [ ] 6.8 图标缺项回退中性圆 + 首字，无崩溃、无整页空白（方案 A 当前全部走此路径）
+- [ ] 6.8 图标缺项回退中性圆 + 首字，无崩溃、无整页空白（手工新建分类走此路径）
 - [ ] 6.9 记一笔 / 明细 / 统计页分类标识仍是中性圆 + 首字（本批零回归）
 - [ ] 6.10 横屏与旋转屏幕后展开态、draft 状态、网格列数
 - [ ] 6.11 排序页一级网格限高 240dp 在 15 个一级下是否需要内滚
 - [ ] 6.12 §8 既有全部未验项整体继承
+- [ ] 6.13 **图标观感**：90 个 Tabler 图标在 40dp 圆底里的辨识度、
+      11 种领域色是否仍显杂乱、浅色圆底与文字对比度、
+      排序页灰阶降噪是否可辨、收入统一绿是否与「支出红/收入绿」语义冲突
+- [ ] 6.14 **覆盖安装**：从 v0.2.35 覆盖安装后（库内 iconName 为空串）
+      三页是否都能按 id 显示图标；全新安装是否同样正常
 
 ## 7. 归档（使用者明确说「可以归档」才做）
 

@@ -614,9 +614,11 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **使用者显式放行的两条文档约束**（留痕，防止后续会话再拿旧口径拦）：
   1. **彩色图标**：原「中性单色圆 + 首字 / 彩色图标目录一律不进清单」收窄为**仅限分类管理三页**（列表 / 排序 / 分类选择）；记一笔、明细、账户详情、统计页口径不变。
   2. **二级布局**：原「MUST 用 `WrapRow` 自适应 chips、MUST NOT 等宽列」改为列表页 5 列等宽图标网格、排序页二级临时一维列表。
-- **方案 A（使用者本轮选定）**：图标资源与许可证待确认 / 提供，本批 `CategoryIconCatalog` 为空目录、三页全回退中性圆 + 首字；`default_categories.json` 的 `iconKey` / `iconTintHex` 补字段随资源一起后置，`SeedCatalog` 已先支持可选字段解析。MUST NOT 伪造 106 个矢量、MUST NOT 复制一羽视觉资产。
+- **方案 A 已收口（使用者确认「按 Tabler 来」）**：图标采用 **Tabler Icons outline v3.34.0**（pin tag / MIT / `Copyright (c) 2018-2026 Tabler`），从 zipball 只取 90 个 SVG 转成 `res/drawable/ic_cat_*.xml`，覆盖**全部 106 个预置分类**；编译期 `when` 常量表 + `else` 回退中性圆 + 首字。零新增 Gradle 依赖、零 AAR、零运行时网络；MIT 全文与版权声明放 `assets/NOTICE` 随 APK 分发。MUST NOT 复制一羽视觉资产、MUST NOT 引 `material-icons-extended`。
+- **图标配色**：纯 JVM `CategoryIconTints` 编译期常量表，**11 种低饱和领域色、按一级分组同组同色**，排序页降为中性灰；`colorHex` 一字未动、仍只管统计扇区。`default_categories.json` 只补 `iconKey` 一个可选字段，106 行数据语义逐字段零改动。
+- **覆盖安装兜底（零改表承诺的落地）**：`SeedCatalog` 只在全新安装 `onCreate` 写 `iconName`，老库 106 行仍为空串；`CategoryGlyph` 在 `iconName` 为空时按 `CategoryIconKeys.keyOfPreset(id)` 纯内存回查，v0.2.35 覆盖安装也能立刻显示图标，零写库 / 零 Entity 变更 / 零备份 DTO 变更。
 - **落地**：列表页蓝底 TopBar + 收支 Tab + 二级 5 列等宽网格 + 末格「添加子类」+ 停用小角标 + 底部胶囊「已归档 / 停用项管理」+ 大 `+` FAB；新增独立「分类排序」页（横排 5 列长按拖 / 二级点按拖 / 保存与放弃 / `draftOrder` 与 `sortOrder` 分离）；新增「分类选择」页（借一羽添加子类页版式：父级预填 + 分组导航 + 等宽网格 + 搜索 + 继续添加 + 重名校验），同版式用于停用项批量启用。
 - **零回归**：不改记一笔 / 明细 / 统计页分类标识；不改 `colorHex`（仍参与 `ChartData` 扇区取色与 3 处 DAO 投影）；不改两级模型、ID 规则、启用/停用语义、备份整表替换、统计口径；上移 / 下移保留作 TalkBack 兜底；一级列表仍竖排 `LazyColumn`（横排只在排序页）。
 - **零改表**：`AppDatabase.version = 5` 不变、`Migrations.ALL` 仍空 → **v0.2.35 直接覆盖安装生效**，不需要导出 / 卸载 / 导入。版本号 `0.2.36`（已核实未被 tag / release / artifact 占用）。
 - **依赖**：无新增第三方库；`rememberReorderableLazyGridState` 已在 `sh.calvin.reorderable:reorderable:3.1.0` README 查证存在。等宽网格用稳定 `Row + weight(1f)`，MUST NOT 用 `LazyVerticalGrid` 嵌套或 `FlowRow`（T12）。
-- **CI 全绿不替代真机**：活文档 §8 第 55 批新增 14 项真机待验（网格观感、长名省略、⋮ 菜单七项、排序手感与放弃零写库、连续添加、图标缺项兜底、记一笔零回归、横屏等），§8 既有项整体继承。
+- **CI 全绿不替代真机**：活文档 §8 第 55 批新增 16 项真机待验（网格观感、长名省略、⋮ 菜单七项、排序手感与放弃零写库、连续添加、图标缺项兜底、记一笔零回归、横屏，以及 90 个 Tabler 图标在 40dp 圆底的辨识度、11 种领域色是否杂乱、浅底对比度、排序页灰阶、收入统一绿语义冲突、覆盖安装按 id 显示图标），§8 既有项整体继承。

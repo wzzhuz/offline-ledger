@@ -195,7 +195,8 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                     iconName = root.iconName,
                                     colorHex = root.colorHex,
                                     grayscale = true,
-                                    size = 36
+                                    size = 36,
+                                    categoryId = root.id
                                 )
                                 Text(
                                     text = root.name,
@@ -264,7 +265,8 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                             iconName = child.iconName,
                                             colorHex = child.colorHex,
                                             grayscale = true,
-                                            size = 32
+                                            size = 32,
+                                            categoryId = child.id
                                         )
                                         Spacer(Modifier.width(8.dp))
                                         Text(

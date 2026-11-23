@@ -13,11 +13,15 @@
 （T14：任一图标名不存在会让整份映射表编译失败）。
 目录中缺项的分类 SHALL 回退 `CategoryIcon` 中性圆 + 首字，
 MUST NOT 崩溃、MUST NOT 出现整页空白、MUST NOT 因单个资源缺失导致编译失败。
-`iconName` 字段 SHALL 原样保留并作为目录键使用；图标配色 SHALL 由目录的
-`iconTintHex` 提供，MUST NOT 改写参与环形图扇区取色与 DAO 投影的 `colorHex`。
-图标资源 MUST NOT 复制第三方 App 的视觉资产；来源、许可证与传递依赖审计
-SHALL 记录在 change 的 `design.md`「依赖与许可」节，MUST NOT 引入
-含网络行为的图标加载库。
+`iconName` 字段 SHALL 原样保留并作为目录键使用；`iconName` 为空时
+SHALL 按预置分类 id 回查编译期表，使覆盖安装也能显示图标。
+图标配色 SHALL 由纯 JVM `CategoryIconTints` 编译期常量表按一级领域分组提供，
+MUST NOT 改写参与环形图扇区取色与 DAO 投影的 `colorHex`，
+MUST NOT 逐图标随机高饱和。
+图标资源 SHALL 为 Tabler Icons outline v3.34.0（MIT，pin 版本），
+MUST NOT 复制第三方 App 的视觉资产；来源、许可证、版权声明与传递依赖审计
+SHALL 记录在 change 的 `design.md`「依赖与许可」节与 `assets/NOTICE`，
+MUST NOT 新增任何 Gradle 依赖、MUST NOT 引入含网络行为的图标加载库。
 
 #### Scenario: 新增分类名不含已知图标名
 
@@ -261,33 +265,58 @@ MUST NOT 用固定 `height`、MUST NOT 用浮动 `label`。
 ### Requirement: 分类管理彩色图标目录与缺项兜底
 
 系统 SHALL 提供 `CategoryIconCatalog` 作为分类管理三页图标的**唯一出口**，
-以编译期显式常量登记随包本地图标资源，MUST NOT 用字符串反射 / 运行时查表。
-`assets/default_categories.json` 每行 SHALL 可携带 `iconKey` / `iconTintHex`，
-`SeedCatalog` 与 `SeedData` fallback SHALL 同构解析；
+以**编译期显式常量表**（`when (iconKey) -> R.drawable.*`）登记随包本地
+VectorDrawable，MUST NOT 用字符串反射 / 运行时查表映射到 `ImageVector`。
+图标资源 SHALL 为 **Tabler Icons outline v3.34.0**（pin 到具体 tag，非 `@latest`，
+MIT，`Copyright (c) 2018-2026 Tabler`），只取所需 SVG 转成本地 drawable；
+来源、pin 版本、许可证与传递依赖审计 SHALL 落在 change 的 `design.md`，
+MIT 全文与版权声明 SHALL 落在 `assets/NOTICE` 随 APK 分发。
+MUST NOT 复制第三方记账 App 的图标资源，
+MUST NOT 引入 `material-icons-extended`、第三方图标 AAR 或任何含网络行为的
+图片加载库，MUST NOT 新增任何 Gradle 依赖。
+
+`assets/default_categories.json` 每行 SHALL 携带可选 `iconKey`，
+`SeedCatalog` SHALL 解析并写入 `categories.iconName`；
 新字段 SHALL 可选，缺字段的旧 JSON / 旧备份 MUST 仍可解析。
 补字段 MUST NOT 改动 `id / name / type / parentId / level / enabled / sortOrder`
 中任何一个值，MUST NOT 改写 `colorHex`。
+图标配色 SHALL 由纯 JVM `CategoryIconTints` 编译期常量表按**一级领域分组、
+同组同色、低饱和**提供，MUST NOT 逐图标随机高饱和；
+排序页 SHALL 降饱和为中性灰；MUST NOT 让配色参与统计口径。
 
-图标资源 SHALL 为自有手绘或可商用矢量集，
-来源、许可证与传递依赖审计 SHALL 落在 change 的 `design.md`；
-MUST NOT 复制第三方记账 App 的图标资源，
-MUST NOT 引入 `material-icons-extended` 或任何含网络行为的图片加载库。
-MUST NOT 在图标资源未确认 / 未提供的情况下伪造 106 个矢量资源；
-未覆盖项 SHALL 回退中性圆 + 中文首字并显式列为真机待验。
+**覆盖安装兜底**：`iconName` 为空时系统 SHALL 按预置分类 id 回查
+`CategoryIconKeys.keyOfPreset(id)`，使**库已存在的覆盖安装也能立刻显示图标**，
+MUST NOT 为此写库、改 Entity、改备份 DTO 或升数据库版本。
+用户手工新建分类的 id 不在预置表内，SHALL 回退中性圆 + 中文首字。
+目录或缺项表查不到的分类 SHALL 回退中性圆 + 首字，页面 MUST NOT 有空白格、
+MUST NOT 崩溃、MUST NOT 因单个资源缺失导致编译失败。
 统计页环形图扇区取色与 `RecordDao` 的 `categoryColorHex` 投影 SHALL 保持零变化。
 
 #### Scenario: 清单补字段不改数据语义
-- **GIVEN** 清单 v4 的 106 行补上了图标字段
+- **GIVEN** 清单 v4 的 106 行补上了 `iconKey`
 - **WHEN** 全新安装并核对分类表
 - **THEN** 所有 id / 名称 / 层级 / 启用态 / sortOrder 与补字段前完全一致
 - **AND** `colorHex` 仍为原值，统计扇区颜色不变
 
+#### Scenario: 覆盖安装也有图标
+- **GIVEN** 用户从 v0.2.35 覆盖安装，库内 106 行 `iconName` 仍是空串
+- **WHEN** 打开分类管理列表页
+- **THEN** 预置分类按 id 回查目录正常显示彩色图标
+- **AND** 数据库版本号不变、无任何写库操作、备份 DTO 不变
+
 #### Scenario: 图标资源缺项
-- **GIVEN** 目录只覆盖了一级 15 与部分二级
+- **GIVEN** 用户手工新建了一个分类，或某 iconKey 不在编译期目录里
 - **WHEN** 打开三页网格
-- **THEN** 未覆盖分类显示中性圆 + 首字，页面无空白格、无崩溃
-- **AND** 该缺项被登记为真机待验，MUST NOT 被写成「图标已对齐」
+- **THEN** 该格显示中性圆 + 首字，页面无空白格、无崩溃
+- **AND** 记一笔 / 明细 / 统计页的分类标识仍是中性圆 + 首字
+
+#### Scenario: 许可声明随包
+- **GIVEN** 构建出的 APK
+- **WHEN** 查看 `assets/NOTICE` 与 change 的 `design.md`
+- **THEN** 含 Tabler 的来源、pin 版本、MIT 全文与版权行
+- **AND** Gradle 依赖表无任何新增条目
 
 **理由**：`iconName` / `colorHex` 字段自阶段 1 就预留且全为空，
 放行彩色图标必须补一份图标数据；把配色与 `colorHex` 分离，
 是为了不让管理页的观感改动污染已锁死的统计口径。
+覆盖安装兜底是为了不把「零改表可覆盖安装」写成一句空话。

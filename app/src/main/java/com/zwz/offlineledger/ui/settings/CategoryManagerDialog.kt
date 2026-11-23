@@ -73,7 +73,8 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
  * - 底部胶囊「已归档 / 停用项管理」+ 蓝色大 + FAB；
  * - 就地拖拽移出列表页，统一交给独立「分类排序」页（保存 / 放弃）。
  *
- * 方案 A：图标资源未定，CategoryGlyph 全回退中性圆 + 首字。
+ * 图标：Tabler Icons outline v3.34.0（MIT），按预置 id / iconName 查编译期目录，
+ * 目录缺项才回退中性圆 + 首字；记一笔 / 明细 / 统计页零回归。
  * 骨架一字未回退：顶部固定入口 + LazyColumn + 编辑独立视图 + ListDivider 单一来源。
  */
 private data class CategoryEditorState(
@@ -408,6 +409,7 @@ private fun CategoryList(
             item(key = "root-" + root.id) {
                 Column {
                     CategoryRootRow(
+                        id = root.id,
                         name = root.name,
                         iconName = root.iconName,
                         colorHex = root.colorHex,
@@ -502,6 +504,7 @@ private fun CategoryList(
 /* ------------------------------------------------------------------ */
 @Composable
 private fun CategoryRootRow(
+    id: Long,
     name: String,
     iconName: String,
     colorHex: String,
@@ -541,7 +544,8 @@ private fun CategoryRootRow(
                     iconName = iconName,
                     colorHex = colorHex,
                     grayscale = false,
-                    size = 36
+                    size = 36,
+                    categoryId = id
                 )
                 Spacer(Modifier.width(8.dp))
                 Column {
