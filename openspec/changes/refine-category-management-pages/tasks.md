@@ -175,8 +175,12 @@
 - [x] 5.3 按最终 commit sha 查 tree，逐文件比对 blob sha，`远端校验: PASS`
 - [ ] 5.4 归档校验：无重复 Requirement 标题、每条 ≥1 Scenario、含 RFC2119、MODIFIED 整块替换
 - [ ] 5.5 给出真实 commit sha + run id；制品名带短 sha、不同名覆盖；`mapping.txt` 随对应 APK
+       —— v0.2.37 已出 Release 附件与 tag（见下），**Actions 制品列表仍为 0**：
+       「制品上传失败告警」步骤实际执行，可反证三个 continue-on-error 上传步骤
+       outcome=failure 被染绿（§7.33/§7.35）。**mapping.txt 未随制品留存**，
+       本项保持 `[ ]`，如实登记不写成已通过；以 Release assets + asset.digest 为准
        —— v0.2.36 已出 Release 附件与 tag，**但 Actions 制品列表未查到 v0.2.36 条目**
-       （v0.2.34/35 同样不在，历史清理口径遗留，非本批引入）；以 Release 附件为准
+       （v0.2.34/35 同样不在，历史清理口径遗留，非本批引入）
 - [x] 5.6 无 `diag/` 残留、无 token 明文、Manifest 仍无 `INTERNET`
        （诊断脚本已删、comment 已删、`build.yml` 按远端原版 byte-for-byte 恢复）
 - [x] 5.7 **明确写出仍未验证的真机项**，不用「CI 全绿」替代观感 / 性能 / 弹窗验证（§1）

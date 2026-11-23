@@ -633,3 +633,15 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **零改表 / 零回归**：`AppDatabase.version = 5`、`default_categories.json`、`colorHex`、三处 DAO 投影、备份整表替换一律未动；零新增 Gradle 依赖；`defaultVersionName` → `0.2.37`，v0.2.36 可直接覆盖安装。
 - **CI 全绿不替代真机**：活文档 §8 第 56 批新增 13 项真机待验（两态折叠与互不干涉、拖拽手感与让位、draft 不丢、无闪烁、白卡限高与滚动边界、360dp 窄屏、两处选择器同组件、彩色与中性圆并存观感、停用项兜底与回填、原分类选择页零回归、覆盖安装 / 全新安装、记一笔零回归），§8 既有项整体继承。归档仍需使用者明确说「可以归档」。
 
+### 第 56 批实测（v0.2.37 出包）
+
+- 代码 `2410a91c2c0d`（parent `6b87ad0bbc76`），11 文件逐 blob 校验 PASS；push CI `45211406554` 全绿。
+- 出包 CI `45289759199` completed success；tag `v0.2.37` → `2410a91c`；Release 附件
+  `offline-ledger-v0.2.37-release-2410a91c.apk`（3,137,307 B，
+  SHA256 `a99320ac93c1bded6bc7109a6b392987191bacb678c10a58a6f7ac65a292db77`），
+  API `state=uploaded` + `digest` 与 notes 一致。debug.keystore 签名，v0.2.36 可直接覆盖安装。
+- **一处如实登记**：本批 Actions artifacts 仍为 0（三个上传步骤 outcome=failure 被
+  `continue-on-error` 染绿，「制品上传失败告警」步骤实际执行可反证），`mapping.txt`
+  未随制品留存；Release 附件与 tag 不受影响，按 §7.33/§7.35 只认 Release assets。
+  坚果云落盘因 job logs 403 无法确认，不写成已上传。归档仍需使用者明确说「可以归档」。
+
