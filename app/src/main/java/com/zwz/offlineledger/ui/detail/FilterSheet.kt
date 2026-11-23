@@ -127,13 +127,15 @@ fun FilterSheet(
     )
     val accountOptions = listOf<Pair<String, String?>>("全部账户" to null) +
         accounts.filter { !it.isArchived }.map { it.name to it.id.toString() }
+    // 第 52 批：停用语义收窄为「默认快捷栏不展示、全量选择器仍可选」。
+    // 筛选面板本身就是带搜索的全量选择器，去掉 enabled 过滤即可对齐，不新增入口；
+    // 归档项仍不进选择器（归档 = 不再新选），停用项加角标便于分辨。
     val rootOptions = listOf<Pair<String, String?>>("全部一级" to null) +
-        categories.filter { it.level == 0 && !it.isArchived && it.enabled }
-            .map { it.name to it.id.toString() }
+        categories.filter { it.level == 0 && !it.isArchived }
+            .map { categoryOptionLabel(it) to it.id.toString() }
     val childOptions = listOf<Pair<String, String?>>("全部二级" to null) +
-        categories.filter {
-            it.level == 1 && it.parentId == rootId && !it.isArchived && it.enabled
-        }.map { it.name to it.id.toString() }
+        categories.filter { it.level == 1 && it.parentId == rootId && !it.isArchived }
+            .map { categoryOptionLabel(it) to it.id.toString() }
     val currencyOptions = listOf<Pair<String, String?>>("全部币种" to null) +
         accounts.filter { !it.isArchived }
             .map { it.currencyCode }.distinct().sorted()
@@ -141,11 +143,14 @@ fun FilterSheet(
     // 第 27 批：一级 + 二级平铺在同一份全量单选列表里，带搜索；
     // value 用 r:/c: 前缀区分层级，选中时同时还原 rootId 与 parentId。
     val categoryOptions = listOf<Pair<String, String?>>("全部分类" to null) +
-        categories.filter { it.level == 0 && !it.isArchived && it.enabled }
+        categories.filter { it.level == 0 && !it.isArchived }
             .flatMap { root ->
-                listOf(root.name to ("r:" + root.id)) +
-                    categories.filter { it.parentId == root.id && !it.isArchived && it.enabled }
-                        .map { c -> CategoryDisplay.resolve(root.name, c.name) to ("c:" + c.id) }
+                listOf(categoryOptionLabel(root) to ("r:" + root.id)) +
+                    categories.filter { it.parentId == root.id && !it.isArchived }
+                        .map { c ->
+                            CategoryDisplay.resolve(root.name, categoryOptionLabel(c)) to
+                                ("c:" + c.id)
+                        }
             }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -466,6 +471,10 @@ fun FilterSheet(
         }
     }
 }
+
+/** 第 52 批：停用项在全量选择器里可见可搜，带角标；启用项保持裸名不变。 */
+private fun categoryOptionLabel(c: CategoryEntity): String =
+    if (c.enabled) c.name else c.name + "（停用）"
 
 private data class PickerData(
     val title: String,

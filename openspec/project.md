@@ -513,3 +513,17 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 release `45109513641` **success**（坚果云 success，已建 tag `v0.2.34`）/ GitHub Release 附件 `offline-ledger-v0.2.34-release-ca4c80f0.apk` 3,039,702 B；Actions artifacts 因同类上传失败未生成（该步骤 `continue-on-error`，不影响打 tag、Release 附件与坚果云）。
 **装包**：全新安装、测试数据重造、**不导 v0.2.33 及更早备份**（导入旧备份会把旧分类表整表覆盖回来，新清单不生效）。沙盒无真机，分类候选 / 停用项启用 / 归档恢复 / 弹窗观感 MUST 真机验（§8），CI 全绿不得替代（§1）。
 **后续运维**：给 `cleanup-artifacts.sh` 补 `offline-ledger-debug-apk` 的清理 pattern 或手工清理历史产物，否则 push CI 会持续红在 artifact 上传步骤；本批不擅自删仓库产物、不改 workflow。
+
+## 第 52 批（v0.2.35）：停用语义收窄 + 分类全量选择器 + 一级直记
+
+- **起因**：第 51 批把 59 个扩展项设为 `enabled=false`，但旧语义「停用 = 录入侧不可见」让 `RecordEditorViewModel.load()` 在数据源就 `filter { it.enabled }`，连「选择更多」都选不到。使用者要求：默认快捷栏只展示启用项，停用项可像「选择更多账户」那样点「分类」进入更多，**不要用下拉框**，尽可能方便选择；并指出「就按xx记」是多余确认、点一级本就该按一级记、选错二级再点一级应回到一级。
+- **停用语义收窄（改 spec）**：从「录入侧不可见」改为「默认快捷栏不展示，全量选择器 / 筛选面板仍可选」。数据源改回全量 `categoryDao.all()`，过滤下沉到 UI；统计 / 排行 / 历史 / CSV / 加密备份读全量不变。筛选面板按使用者确认**同步修改**：三处分类选项去掉 `enabled` 过滤，停用项加「（停用）」角标，归档项仍不进选择器；因筛选面板第 27 批已有带搜索的全量弹层，不再新增「更多」按钮或 chip。
+- **纯 JVM 出口** `core/CategoryQuickCandidates.kt`（7 个单测）：`visibleRoots / visibleChildren` 只列启用且未归档项，但**当前选中项所属一级与该二级 MUST 追加**——否则编辑引用停用分类的历史流水时一排候选没一个亮（`save()` 查全量校验其实保存不会失败，只是视觉误导）。`pickerGroups` 含停用一级 / 二级、不含归档；`searchHits` 跨组平铺，二级 label 带「一级 / 二级」全名。
+- **「分类 ›」全量选择器（B 方案）**：`FormRow("分类", onRowClick=…)` 整行可点、label 带 `›`，与「账户 ›」同构，不新增 chip、不占首屏。弹层用 `Dialog + Surface`（不引入 ModalBottomSheet、不新增依赖，免依赖审计）：搜索框 + 按一级分组的 `WrapRow` chips + 460dp 上限滚动。组标题可点 = 按一级直记，chip 可点 = 选二级，**点任一项立即选中并关闭，无二次确认**。搜索跨组平铺；停用项带角标、归档项不出现。否决：Spinner / ExposedDropdown / DropdownMenu（使用者明确不要下拉框）、仿账户竖排 TextButton 长列表（106 行要长滚）、快捷栏尾部「更多」chip（挤占首屏，重蹈活文档 §7 模板翻车）。
+- **一级直记**：新增 `selectRoot(rootId)`——点一级即 `categoryId = 一级`、首次展开二级 / 再点同一级收起；删「就按「xx」记」TextButton 与死代码 `setExpandedRoot` / `onKeepRoot`；一级选中态由文字换色升级为 `secondaryContainer` 底色。核查确认**保存逻辑本来就是对的**（点一级已把 categoryId 置为一级，`CategoryTree.resolveRootId` 对 level 0 返回自身），本批改的是误导文案与视觉，不是记账口径。默认一级与 `setType()` 重置补 `enabled && !isArchived`，避免落到停用扩展项。
+- **铁律 3**：默认路径仍是「打开 → 点一级 → 金额 → 保存」≤3 次交互，且少一个确认按钮；选停用项是低频路径，弹层点选即关闭，不给默认路径加步。计算器键盘、账户 / 模板 / 对方 / 描述 / 备注交互一律不动。
+- **非破坏性**：零改分类表数据、零改表结构、`version=5` 不变、`Migrations.ALL` 仍空 → **v0.2.34 直接覆盖安装生效**，不需要导出 / 卸载 / 导入。版本号 `0.2.35`（已核实未占用）。
+- **挂账未动**：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中；第 51 批的 ID 规则、删除策略、分类清单 v2 全部不动。本批按「改变系统行为 + 改 spec 语义」新建 change `record-category-picker-and-root-select`。
+
+### 第 52 批实测
+待回填（代码 commit sha / push CI run id / release run id / 制品名与体积）。

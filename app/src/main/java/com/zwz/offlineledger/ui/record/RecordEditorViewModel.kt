@@ -72,7 +72,9 @@ class RecordEditorViewModel(
     fun load(recordId: Long?) {
         viewModelScope.launch {
             val a = accountDao.all()
-            val c = categoryDao.all().filter { it.enabled }
+            // 第 52 批：数据源改为全量，停用项不再「查不到」。过滤下沉到 UI 快捷栏，
+            // 全量选择器仍可选停用项；统计 / 历史 / 导出一直读全量，不受影响。
+            val c = categoryDao.all()
             _accounts.value = a
             _categories.value = c
             _counterparties.value = runCatching { recordDao.distinctCounterparties() }.getOrDefault(emptyList())
@@ -96,8 +98,12 @@ class RecordEditorViewModel(
                     type = RecordType.EXPENSE,
                     fromAccountId = defaultAcc,
                     toAccountId = defaultAcc,
+                    // 默认一级 MUST 取启用且未归档的，避免新记一笔落到停用扩展项上。
                     categoryId = lastCategoryId
-                        ?: c.firstOrNull { it.level == 0 && it.type == RecordType.EXPENSE }?.id,
+                        ?: c.firstOrNull {
+                            it.level == 0 && it.type == RecordType.EXPENSE &&
+                                it.enabled && !it.isArchived
+                        }?.id,
                     timestamp = System.currentTimeMillis(),
                     loaded = true
                 )
@@ -158,7 +164,7 @@ class RecordEditorViewModel(
         val s = _state.value
         val defaultAcc = lastAccountId ?: s.fromAccountId ?: s.toAccountId
         val visible = _categories.value.filter {
-            !it.isArchived && it.level == 0 && it.type == t
+            !it.isArchived && it.enabled && it.level == 0 && it.type == t
         }.map { it.id }
         val current = s.categoryId?.let { id ->
             val c = _categories.value.firstOrNull { it.id == id }
@@ -185,14 +191,24 @@ class RecordEditorViewModel(
         _state.value = _state.value.copy(amountExpr = next)
     }
 
-    /** 点一级：既直接可选中（低摩擦），又展开二级 chips（可选细分）。 */
+    /**
+     * 第 52 批：点一级 = 直接按一级记（覆盖之前可能选错的二级）。
+     * 第一次点展开二级 chips 供可选细分；**再点同一级则收起二级栏**，
+     * 替代原二次确认按钮，且不再需要任何额外点击。
+     */
+    fun selectRoot(rootId: Long) {
+        val s = _state.value
+        lastCategoryId = rootId
+        _state.value = s.copy(
+            categoryId = rootId,
+            expandedRootId = if (s.expandedRootId == rootId) null else rootId
+        )
+    }
+
+    /** 点二级 / 全量选择器命中：categoryId 指向二级，rootCategoryId 由保存时统一解析。 */
     fun selectCategory(id: Long, rootId: Long) {
         lastCategoryId = id
         _state.value = _state.value.copy(categoryId = id, expandedRootId = rootId)
-    }
-
-    fun setExpandedRoot(id: Long?) {
-        _state.value = _state.value.copy(expandedRootId = id)
     }
 
     fun setFromAccount(id: Long) {

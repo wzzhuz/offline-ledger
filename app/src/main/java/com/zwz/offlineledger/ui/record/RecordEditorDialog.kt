@@ -2,6 +2,7 @@ package com.zwz.offlineledger.ui.record
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +46,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -53,6 +56,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.AccountQuickCandidates
 import com.zwz.offlineledger.core.AccountQuickItem
+import com.zwz.offlineledger.core.CategoryPickerHit
+import com.zwz.offlineledger.core.CategoryQuickCandidates
+import com.zwz.offlineledger.core.CategoryQuickItem
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
@@ -62,6 +68,7 @@ import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.components.CategoryIcon
+import com.zwz.offlineledger.ui.components.WrapRow
 import com.zwz.offlineledger.ui.components.YearMonthPickerDialog
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import kotlinx.coroutines.launch
@@ -99,6 +106,7 @@ fun RecordEditorDialog(
     val suggestions by vm.counterpartySuggestions.collectAsState()
     var errorText by remember { mutableStateOf<String?>(null) }
     var showMore by remember { mutableStateOf(false) }
+    var showAllCategories by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -157,14 +165,14 @@ fun RecordEditorDialog(
                     FormDivider()
 
                     if (state.type != RecordType.TRANSFER) {
-                        FormRow("分类") {
+                        FormRow("分类", onRowClick = { showAllCategories = true }) {
                             CategoryStrip(
                                 categories = categories,
                                 type = state.type,
                                 selectedId = state.categoryId,
                                 expandedRootId = state.expandedRootId,
-                                onSelect = { id, root -> vm.selectCategory(id, root) },
-                                onKeepRoot = { vm.setExpandedRoot(null) }
+                                onSelectRoot = { vm.selectRoot(it) },
+                                onSelectChild = { id, root -> vm.selectCategory(id, root) }
                             )
                         }
                     }
@@ -358,6 +366,15 @@ fun RecordEditorDialog(
             zonedTime.hour, zonedTime.minute, true
         ).show()
     }
+    if (showAllCategories) {
+        AllCategoriesDialog(
+            categories = categories,
+            type = state.type,
+            selectedId = state.categoryId,
+            onSelect = { id, root -> vm.selectCategory(id, root) },
+            onDismiss = { showAllCategories = false }
+        )
+    }
 }
 
 /** 第 5 批：三个凸起 Button 换成平铺 TabRow，少一层视觉重量。 */
@@ -379,17 +396,29 @@ private fun TypeTabs(current: RecordType, onSelect: (RecordType) -> Unit) {
     }
 }
 
-/** 一级横向单行；点一级即可直接记，二级 chips 只是可选细分。 */
+/**
+ * 第 52 批：默认快捷栏只列启用一级；点一级即按一级记并展开二级 chips，
+ * 再点同一级收起。停用项不进快捷栏，由「分类 ›」全量选择器提供。
+ * 当前选中项所属一级 / 二级 MUST 追加，编辑历史流水时不出现「一排没一个亮」。
+ */
 @Composable
 private fun CategoryStrip(
     categories: List<CategoryEntity>,
     type: RecordType,
     selectedId: Long?,
     expandedRootId: Long?,
-    onSelect: (Long, Long) -> Unit,
-    onKeepRoot: () -> Unit
+    onSelectRoot: (Long) -> Unit,
+    onSelectChild: (Long, Long) -> Unit
 ) {
-    val roots = categories.filter { it.level == 0 && it.type == type && !it.isArchived }
+    val items = remember(categories) {
+        categories.map {
+            CategoryQuickItem(
+                it.id, it.name, it.type.name, it.parentId, it.level,
+                it.enabled, it.isArchived, it.sortOrder, it.colorHex
+            )
+        }
+    }
+    val roots = CategoryQuickCandidates.visibleRoots(items, type.name, selectedId)
     Row(
         modifier = Modifier.fillMaxWidth()
             .horizontalScroll(rememberScrollState())
@@ -400,7 +429,13 @@ private fun CategoryStrip(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .padding(horizontal = 6.dp, vertical = 2.dp)
-                    .clickable { onSelect(root.id, root.id) }
+                    .background(
+                        if (chosen) MaterialTheme.colorScheme.secondaryContainer
+                        else Color.Transparent,
+                        RoundedCornerShape(8.dp)
+                    )
+                    .clickable { onSelectRoot(root.id) }
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
             ) {
                 CategoryIcon(root.name, root.colorHex, size = if (chosen) 40 else 34)
                 Text(
@@ -414,23 +449,157 @@ private fun CategoryStrip(
 
     val expanded = categories.firstOrNull { it.id == expandedRootId }
     if (expanded != null) {
-        val children = categories.filter { it.level == 1 && it.parentId == expanded.id }
-        Row(
-            modifier = Modifier.fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
+        val children = CategoryQuickCandidates.visibleChildren(items, expanded.id, selectedId)
+        WrapRow(
+            spacing = 6.dp,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
         ) {
             children.forEach { child ->
-                TextButton(onClick = { onSelect(child.id, expanded.id) }) {
-                    Text(
-                        text = child.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (selectedId == child.id) LedgerColors.IncomeGreen
-                        else LedgerColors.Neutral
-                    )
-                }
+                FilterChip(
+                    selected = selectedId == child.id,
+                    onClick = { onSelectChild(child.id, expanded.id) },
+                    label = {
+                        Text(
+                            CategoryQuickCandidates.labelOf(child),
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1
+                        )
+                    },
+                    leadingIcon = {},
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
             }
-            TextButton(onClick = onKeepRoot) {
-                Text("就按「${expanded.name}」记", style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+/**
+ * 第 52 批：「分类 ›」全量选择器。分组 chips + 搜索，不用下拉框、不用竖排长列表；
+ * 组标题可点 = 按一级直记，点任一项即选中并关闭，MUST NOT 二次确认。
+ * 未归档的停用一级 / 二级全部可见可搜，带「停用」角标；归档项仍不进选择器。
+ */
+@Composable
+private fun AllCategoriesDialog(
+    categories: List<CategoryEntity>,
+    type: RecordType,
+    selectedId: Long?,
+    onSelect: (Long, Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val items = remember(categories) {
+        categories.map {
+            CategoryQuickItem(
+                it.id, it.name, it.type.name, it.parentId, it.level,
+                it.enabled, it.isArchived, it.sortOrder, it.colorHex
+            )
+        }
+    }
+    var query by remember { mutableStateOf("") }
+    val groups = CategoryQuickCandidates.pickerGroups(items, type.name)
+    val hits: List<CategoryPickerHit> =
+        CategoryQuickCandidates.searchHits(items, type.name, query)
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "全部分类",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Filled.Close, contentDescription = "关闭")
+                    }
+                }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = {
+                        Text("搜索一级或二级分类名", style = MaterialTheme.typography.bodyMedium)
+                    },
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 460.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (query.isBlank()) {
+                        groups.forEach { g ->
+                            TextButton(
+                                onClick = { onSelect(g.root.id, g.root.id); onDismiss() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    CategoryQuickCandidates.labelOf(g.root),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            WrapRow(
+                                spacing = 6.dp,
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                            ) {
+                                g.children.forEach { c ->
+                                    FilterChip(
+                                        selected = selectedId == c.id,
+                                        onClick = { onSelect(c.id, g.root.id); onDismiss() },
+                                        label = {
+                                            Text(
+                                                CategoryQuickCandidates.labelOf(c),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                maxLines = 1
+                                            )
+                                        },
+                                        leadingIcon = {},
+                                        modifier = Modifier.padding(bottom = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        hits.forEach { h ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 40.dp)
+                                    .background(
+                                        if (h.id == selectedId)
+                                            MaterialTheme.colorScheme.secondaryContainer
+                                        else Color.Transparent
+                                    )
+                                    .clickable { onSelect(h.id, h.rootId); onDismiss() }
+                                    .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    h.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        if (hits.isEmpty()) {
+                            Text(
+                                "没有匹配的分类",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = LedgerColors.Neutral,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }

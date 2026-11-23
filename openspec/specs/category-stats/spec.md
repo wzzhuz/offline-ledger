@@ -611,11 +611,15 @@ MUST 带 `LIMIT`、MUST NOT 全量加载，且 MUST 保留时间、金额、分�
 MODIFIED 块**，避免归档时出现重复 Requirement；按标题整块替换，不留矛盾文本。
 
 ### Requirement: 预置分类清单可替换且支持启用开关
-随包 `assets/default_categories.json` SHALL 是分类清单的唯一可替换来源；更换清单 MUST NOT 需要改 Kotlin 代码。`categories.enabled` SHALL 控制录入侧可见性，停用 MUST NOT 删除行、MUST NOT 改写已有流水，且统计、排行、历史、CSV 导出与加密备份 MUST 仍读全量。
+随包 `assets/default_categories.json` SHALL 是分类清单的唯一可替换来源；更换清单 MUST NOT 需要改 Kotlin 代码。
+第 52 批起 `categories.enabled` SHALL 只控制**记一笔默认快捷栏**的可见性：停用 MUST NOT 删除行、
+MUST NOT 改写已有流水、**MUST NOT 从「分类 ›」全量选择器或筛选面板隐藏**（仅加「停用」角标）。
+统计、排行、历史、CSV 导出与加密备份 MUST 仍读全量。
 
-#### Scenario: 停用后记一笔不可选但统计仍计入
+#### Scenario: 停用后不进默认快捷栏但统计仍计入
 - **WHEN** 使用者停用一级「宠物」
-- **THEN** 记一笔、筛选面板、预算、模板的分类选项不再出现「宠物」及其二级
+- **THEN** 记一笔默认快捷栏不再出现「宠物」及其二级
+- **AND** 点「分类 ›」全量选择器或筛选面板仍可搜到并选中「宠物」及其二级（带「停用」角标）
 - **AND** 统计占比卡、排行、历史流水与该分类的既有金额保持不变
 
 #### Scenario: 重新启用
@@ -703,3 +707,31 @@ MUST NOT 按 id 增量合并、MUST NOT 按名称重映射、MUST NOT 只恢复�
 - **THEN** 关联不错乱（备份内 id 自洽）
 - **AND** 但旧分类表整体覆盖新清单，新版预制分类**不会生效**
 - **AND** 装包说明 MUST 写明「恢复标准清单 = 全新安装且不导入旧备份」
+
+## 第 52 批：停用语义收窄
+
+### Requirement: 停用分类在全量选择器中仍可选
+
+编辑一条引用了停用分类的历史流水时，`RecordEditorViewModel` SHALL 提供**全量**分类数据源，
+MUST NOT 在查询层 `filter { it.enabled }` 把停用项从数据源里删掉。
+记一笔默认快捷栏 SHALL 由纯 JVM 出口 `CategoryQuickCandidates.visibleRoots / visibleChildren`
+只列启用且未归档项，但**当前选中项所属一级与该二级 MUST 追加**，避免「一排候选没一个亮」。
+筛选面板的三处分类选项 SHALL 同样去掉 `enabled` 过滤，仅以「（停用）」角标区分。
+
+#### Scenario: 编辑停用分类的历史流水
+
+- **GIVEN** 一条流水引用了停用的「居住 / 话费」
+- **WHEN** 打开编辑流水
+- **THEN** 快捷栏出现「居住」一级且「话费」chip 为选中态
+- **AND** 保存成功，历史 `categoryId` / `rootCategoryId` 不被改写
+
+#### Scenario: 全量选择器不含归档项
+
+- **GIVEN** 库里存在已归档分类
+- **WHEN** 打开「分类 ›」全量选择器
+- **THEN** 归档项不出现（归档 = 不再新选）
+- **AND** 归档项仍可经快捷栏「当前选中项」兜底显示，统计口径不变
+
+**理由**：第 51 批把 59 个扩展项设为 `enabled=false`，原语义「录入侧不可见」让它们在
+`load()` 的数据源里就不存在，「更多分类」也就无从可选。语义收窄后，停用回归「默认不占快捷栏、
+按需可选」的本意，且统计 / 历史 / 导出读全量的既有铁律不变。
