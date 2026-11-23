@@ -306,13 +306,20 @@ jobs:
           overwrite: true
           if-no-files-found: warn
 
-      - name: 只保留最近 5 个 Release 制品
-        if: steps.upload_release_apk.outcome == 'success'
+      # 第 53 批：清理 MUST 无条件执行。原 if: outcome == 'success' 在配额打满时
+      # 会被跳过，形成「越满越不清理」死锁；continue-on-error 避免清理自身失败染红整条 CI。
+      # mapping 是第二大占用（约 40 个 × 3.5MB），只清 debug 的话 90 天保留期内仍会复发，
+      # 故一并收敛到最近 5 个。
+      - name: 清理历史制品（Release / mapping 各保留 5 个）
+        if: always()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bash .github/scripts/cleanup-artifacts.sh \
             --pattern 'offline-ledger-release-v*' --keep 5
+          bash .github/scripts/cleanup-artifacts.sh \
+            --pattern 'offline-ledger-mapping-v*' --keep 5
 
       - name: 制品上传失败告警
         if: steps.upload_release_apk.outcome == 'failure'

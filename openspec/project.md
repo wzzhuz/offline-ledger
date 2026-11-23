@@ -531,3 +531,22 @@ release `45125186214` **success**（R8 编译 / 整理产物 / 上传 Release AP
 **装包**：本批零改分类表数据、零改表结构、`version=5` 不变 → **v0.2.34 直接覆盖安装生效**，MUST NOT 再要求导出 / 卸载 / 导入（那是第 50/51 批的破坏性顺序）。
 **CI 全绿不替代真机**：默认快捷栏 7 个启用一级、「分类 ›」分组 chips 与搜索、停用项角标、460dp 弹层高度、一级选中底色、再点一级收起、编辑停用分类历史流水、筛选面板停用项可选，十项列在 tasks §7 待验（§1）。
 **后续运维**：`offline-ledger-debug-apk` 产物清理 pattern 仍缺失，push CI 会持续红在 artifact 上传；本批不擅自删仓库产物、不改 workflow，留待单独一轮处理。
+
+## 第 53 批（运维）：清理 Actions 制品配额并解除清理死锁
+
+- **起因**：第 51/52 批 push CI 连续两次「六静态检查 / 单测 / debug APK / lintVital 全绿，仅上传 Debug APK 失败」。使用者要求清理 debug 产物，避免下次再报错。
+- **远端核查（2026-11-23）**：共 **208 个 artifacts / 2,208.6 MB**；其中 `offline-ledger-debug-apk` **81 个 / 1,931.4 MB（87%）**，第二大是 `offline-ledger-mapping-v*` 约 40 个 / 约 140 MB，其余为各版本 release / metrics。`overwrite: true` 在配额耗尽时同样被服务端拒绝，所以同名 debug 包一路累积到 81 个。
+- **根因不是代码，是清理死锁**：`.github/scripts/cleanup-artifacts.sh` 本身是通用 `--pattern` 实现，**不需要改脚本**；缺的是调用方。
+  - `build.yml` 的「上传 Debug APK」**从来没有任何清理步骤**，`retention-days: 7` 也没兜住（累积期每天多个 push）；
+  - `release.yml` 虽有清理，但只清 `offline-ledger-release-v*`，且挂 `if: steps.upload_release_apk.outcome == 'success'` —— 配额满时上传失败 → 清理被跳过 → 越满越不清理。前两批文档写「给 cleanup-artifacts.sh 补 debug pattern」措辞不准，本批更正为「补调用方」。
+  - 脚本注释早已写明「配额打满时 upload-artifact 会被服务端直接拒绝，表现为上传步骤 1 秒失败而前面编译全绿，错误信息不提配额」，与现象完全吻合。
+- **立即清理**：按 `--keep 1` 语义保留最新 1 个（`14752329305`，2026-11-22T11:37:21Z，14.7 MB），**删除其余 80 个，释放 1,917.3 MB**，80/80 成功、0 失败。清理后总量 **128 个 / 334.2 MB**、debug 仅 1 个。
+- **防复发（改 workflow，不改脚本）**：
+  - `build.yml` 在上传**之前**新增 `- name: 清理历史 Debug 制品`，`if: always()` + `continue-on-error: true`，调 `--pattern 'offline-ledger-debug-apk' --keep 1`。「无条件 + 排在上传之前」是关键：配额满时上传失败不影响清理，且上传前已释放空间，本次就能成功；稳态恒定 1 个。
+  - `release.yml` 清理步骤的 `if:` 从 `outcome == 'success'` 改为 `always()` + `continue-on-error: true`，并把 `offline-ledger-mapping-v*` 一并纳入 `--keep 5`。只清 debug 不够：mapping `retention-days: 90`，保留期内仍会堆到数百 MB 再次打满。
+- **不改**：App 源码、分类逻辑、spec、`defaultVersionName`（仍 0.2.35）、`.github/scripts/cleanup-artifacts.sh`、签名与坚果云链路。**本批不出新包**，因为 App 代码零改动。
+- **不建 change**：纯 CI 运维，不改变系统行为、不涉及 spec，按流程只记运维批次。
+- **验证方式**：本批 push 自身会触发 build CI，直接观察「清理历史 Debug 制品」与「上传 Debug APK」两步是否都 success，比静态检查更有说服力。
+
+### 第 53 批实测
+待回填（commit sha / push CI run id / 两步结论 / 清理后配额）。

@@ -110,8 +110,21 @@ jobs:
           echo "sha256=$(sha256sum app-debug.apk | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           echo "size=$(du -h app-debug.apk | cut -f1)" >> $GITHUB_OUTPUT
 
+      # 第 53 批：配额清理 MUST 无条件执行，且 MUST 排在上传之前。
+      # 配额打满时 upload-artifact 被服务端直接拒绝（1 秒失败、报错不提配额），
+      # 若把清理挂在上传成功之后，就永远等不到清理 → 死锁（第 51/52 批已踩两次）。
+      # 每次 push 先把历史 debug 包收敛到 1 个，再上传；稳态恒定 1 个。
+      - name: 清理历史 Debug 制品
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .github/scripts/cleanup-artifacts.sh \
+            --pattern 'offline-ledger-debug-apk' --keep 1
+
       # v4 的 overwrite 默认 false，同名 artifact 已存在会直接失败，
-      # 而界面只显示「上传失败」，看不出原因。
+      # 而界面只显示「上传失败」，看不出原因；配额由上方清理步骤保证。
       - name: 上传 Debug APK
         uses: actions/upload-artifact@v4
         with:
