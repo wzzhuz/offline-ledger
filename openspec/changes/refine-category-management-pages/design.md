@@ -64,7 +64,12 @@ LazyColumn（竖排，竖排，15 个一级不横排）
   「已归档（N）」「停用项管理」，不碰 `default_categories.json` 的
   ID 规则与备份整表替换语义。
 
-### 2. 独立排序页：临时顺序与 `sortOrder` 分离
+### 2. 独立排序页：临时顺序与 `sortOrder` 分离（第 1 轮方案，**布局已被文末「第 2 轮重做（含第 3 轮修订）」取代**）
+
+> ⚠️ **本节是第 1 轮历史记录，布局部分（白卡兄弟容器 / 二级一维列表 /
+> 二维拖拽被误判为不可行）已不再适用。** 现行方案见文末
+> 「第 2 轮重做：排序页 1:1 与共享只读分类选择组件」的 2-A（第 3 轮修订）。
+> 本节保留的原因是 `draftOrder` / 三元组落库 / 保存-放弃语义仍然有效。
 
 ```
 蓝底 TopBar:  ←  分类排序                          保存
@@ -85,16 +90,17 @@ LazyColumn（竖排，竖排，15 个一级不横排）
   返回 / 放弃 MUST NOT 写库，有未保存改动时 SHALL 明示「放弃修改」。
 - **一级横排**：排序页用 `LazyVerticalGrid` 或 `Row` 分行都行，
   但拖拽仍 MUST 用 `reorderable` 的 `longPressDraggableHandle`；
-  库只支持一维 `LazyColumn`，故一级横排时**拖动手柄挂在每个格子上**，
+  ~~库只支持一维 `LazyColumn`~~（**第 3 轮注：此判断错误，3.1.0 原生支持 Grid，见 2-A**），故一级横排时**拖动手柄挂在每个格子上**，
   落库仍按三元组重建全量 id 顺序（沿用 `commitRootOrder` 已有语义）。
 - **二级点按拖**：排序页内把选中一级的二级**临时排成一维列表**，
   用 `draggableHandle`（非长按）挂在项首小拖柄上，避开「点按 = 编辑」冲突；
-  列表页网格保持不动。MUST NOT 在二维网格上硬做点按拖。
+  列表页网格保持不动。~~MUST NOT 在二维网格上硬做点按拖~~
+   （**第 3 轮注：此条作废**，`rememberReorderableLazyGridState` 原生支持二维网格）。
 - **灰阶降饱和**：排序页图标统一去饱和（一羽图 3 自己就是灰的），
   彩色只在浏览页，减少拖动时的视觉噪声。
 - **上移 / 下移**在列表页弹层保留，MUST NOT 作为主入口。
 
-### 3. 分类选择页：只借版式，不改语义
+### 3. 分类选择页：只借版式，不改语义（本页功能第 2 轮**完整保留**；只读变体见文末「第 2 轮重做」）
 
 一羽「添加二级分类」页的版式为「顶部上下文（一级分类：餐饮）+
 名称输入 + 颜色圆点 + 继续添加 + 搜索 + 左侧图标分组导航 / 右侧图标网格」。
@@ -177,7 +183,7 @@ MUST NOT 引入第三方 Tabler Compose AAR（Maven Central 有 MIT 封装，但
 | 继续用 `WrapRow`，只给 chip 加彩色圆点 | 改动最小、零改 spec | 使用者已明确否掉：留白碎在行尾、长短不一，正是「效果差一大截」的根因 |
 | `LazyVerticalGrid` 做二级网格 | API 现成、自动分行 | 嵌在 `LazyColumn.item {}` 里是同方向嵌套滚动，高度不确定；且一级行展开/收起时网格高度难算。改用 `Row + weight` 稳定 Layout，行数显式计算 |
 | `FlowRow` + `@OptIn(ExperimentalLayoutApi)` | 自适应换行最自然 | 活文档 T12 / §7.6：BOM 2026.06 注解状态不确定，为「更优雅」引入实验性 API 不值当 |
-| 二维网格上直接做点按拖 | 与一羽图 3 视觉一致 | `reorderable` 是一维列表模型（§7.7），二维索引 → 位置换算会重新踩 4 轮 pointer pass 坑。排序页内临时改一维，列表页保持网格 |
+| 二维网格上直接做点按拖 | 与一羽图 3 视觉一致 | ~~`reorderable` 是一维列表模型，二维索引会踩 4 轮 pointer pass 坑~~ **第 3 轮注：此判断已作废**，3.1.0 README 明列 `LazyVerticalGrid` 支持，本仓库一级已在使用；现行方案见 2-A |
 | 图标名 → `ImageVector` 运行时查表 | 清单改起来直观 | T14：任一图标名不存在即整份映射表编译失败。改编译期显式常量 + `else` 兜底 |
 | 直接改 `colorHex` 给图标上色 | 复用已有字段 | `colorHex` 参与环形图扇区取色与 3 处 DAO 投影，会污染统计口径；图标配色另开 `iconTintHex` |
 | 复制一羽的图标资源 | 观感 100% 对齐 | 第三方视觉资产需授权，个人自用也不该静默搬运；改用可商用集并记录许可证 |
@@ -225,7 +231,7 @@ Contents API 读取，确认 `rememberReorderableLazyGridState(lazyGridState) { 
 
 | 项 | design 原方案 | 实际实现 | 原因 |
 |---|---|---|---|
-| 排序页容器 | 一级横排 + 选中二级白卡「插在」一级网格中间 | 一级网格与二级列表是 `Column` 的**兄弟**：网格限高 240dp、二级 `weight(1f)` | 一个惰性容器里混 `GridItemSpan` 与嵌套 `LazyColumn` 会造成同方向嵌套滚动 + 高度不确定。兄弟容器零风险，组织方式（横排一级 + 白卡二级）一致 |
+| 排序页容器 | 一级横排 + 选中二级白卡「插在」一级网格中间 | 一级网格与二级列表是 `Column` 的**兄弟**：网格限高 240dp、二级 `weight(1f)` | 一个惰性容器里混 `GridItemSpan` 与嵌套 `LazyColumn` 会造成同方向嵌套滚动 + 高度不确定。**第 3 轮注：此「兄弟容器」偏差由 2-A 的两态互斥方案消除，白卡改插在选中行之后** |
 | 一级拖动手柄 | 挂在整个格子上 | 挂在格子内 32dp 的「≡」小手柄上，名称另可点选中 | README 明确 clickable 容器与 draggableHandle 共存需额外处理；分离手柄与点击零冲突 |
 | `default_categories.json` | 补 `iconKey` / `iconTintHex` | 首批方案 A 阶段零改；图标落地后**只补 `iconKey` 一个字段**，106 行数据语义零改动 | 配色权威来源改为 `CategoryIconTints` 编译期常量表（同组同色、11 色），清单不需要逐行存色值；`SeedCatalog` 仍保留 `iconTintHex` 可选解析口子供将来扩展 |
 | `CategoryManagerDialog.kt` | 块级精确替换（§3 T6） | **完整重写** | 本批改动同时覆盖 TopBar / 列表 / 一级行 / 编辑视图，块级替换 10+ 处更易漏。改前已读远端 `main` 全文并 grep 全部调用点，改后跑括号平衡、重复 import 与六个静态检查。§3 T6 针对的是「脚本持有旧快照整文件回写把刚加的按钮盖掉」，不是禁止完整重写单文件 |
@@ -324,6 +330,154 @@ java.lang.AssertionError at CategoryIconTintsTest.kt:35 /
 `app/build.gradle.kts` 依赖表一字未动、六个静态检查本地全 PASS。
 清单只新增可选字段、不改任何数据语义 → **v0.2.35 直接覆盖安装生效**。
 
+## 第 2 轮重做：排序页 1:1 与共享只读分类选择组件（2026-11-23）
+
+> 触发：v0.2.36 装机体验后使用者反馈「不符合预期」，两条原话：
+> 「排序页面直接参考一羽记账吧」「添加子类页面可以作为记一笔里面还有筛选里面
+> 分类选择页面的样式，只是把添加的输入框和按钮去除，应该比原来的分类选择好」。
+> 本节覆盖 §2 的排序页布局描述；§3 分类选择页功能**完整保留**。
+
+### 2-A. 排序页按一羽图 3 做 1:1（第 3 轮修订：两态互斥 + 库原生网格拖）
+
+#### 先收回一处错误判断
+
+上一版写「`reorderable` 是一维列表模型，二维网格必须自实现
+`Modifier.pointerInput`，会重踩 4 轮 pointer pass 坑」——**这是错的**，
+与早先「等宽网格必然留白大」属于同类外推。核查 `Calvin-LL/Reorderable`
+v3.1.0 README 原文：
+
+- 首段明列支持 `LazyColumn` / `LazyRow` / **`LazyVerticalGrid`** /
+  `LazyHorizontalGrid` / StaggeredGrid / `Column` / `Row`；
+- API 表把 `rememberReorderableLazyGridState` 与 `ReorderableItem` 列为
+  Grid 的一等入口，README 有完整 `LazyVerticalGrid` 示例（L548–656）；
+- Features 含「items of different sizes」「some items can be made
+  non-reorderable」「section headers and footers」「拖到边缘自动滚动」
+  「`animateItem` 让位动画」；
+- 本仓库 `CategorySortScreen.kt` 一级**本来就在用**
+  `rememberReorderableLazyGridState`，L156 即 `GridCells.Fixed(5)`。
+
+**一羽怎么实现的查不到**：它是闭源商业 App（Android / iOS / HarmonyOS Next
++ WebDAV 备份），官网只有产品介绍，无源码、技术博客与开源仓库。
+搜索命中的「微信小程序 movable-view 拖拽排序」是关键词撞上的无关文章，
+MUST NOT 当作一羽实现。只能按截图与使用者观察推断为**两态互斥**。
+
+#### 版式：两态互斥，拖一级时二级折叠
+
+| 状态 | 渲染 | 可拖容器 |
+|---|---|---|
+| **A 一级排序**（默认） | 只有一级 5 列横排图标格；**二级区完全折叠 / 不渲染** | 单个 `LazyVerticalGrid(Fixed(5))` + 第一套 `rememberReorderableLazyGridState` |
+| **B 二级排序**（点某个一级） | 一级区改非惰性 5 列 Row（静态、选中蓝底），圆角白卡**插在选中一级所在行之后**、其余一级行之前；白卡内二级 5 列等宽图标格 | 白卡内第二套 `LazyVerticalGrid(Fixed(5))` + `rememberReorderableLazyGridState`；一级区冻结 |
+
+这同时满足使用者三个观察点：拖一级时二级折叠、两级互不干涉、
+二级「由横排一个变成横排 5 个」。`GridCells.Fixed(5)` 原生支持跨行跨列换位。
+灰阶降噪保留（一羽图 3 自身降饱和），彩色只在分类列表页与全量选择器；
+底部仍是「长按拖动一级，点按拖动二级」+「保存 / 放弃」。
+
+#### 实现路径（避开已知坑）
+
+| 层 | 做法 | 规避的坑 |
+|---|---|---|
+| 一级态 | 单个 `LazyVerticalGrid(Fixed(5))` + `longPressDraggableHandle`；容器内**无 span / header**，`from.index` 直接对应 `draftOrder` 下标；`ReorderableItem` key 与 `item(key=…)` 一致 | 无 `GridItemSpan` → 不再有索引错位；沿用第 1 轮已跑通的 key 规则 |
+| 二级态外层 | **非惰性** `Column + Row(weight(1f))` 手工 5 列展示 15 个一级（3 行），静态、不挂拖柄；白卡按选中行位置插在对应 Row 之后 | 非惰性容器不参与滚动，白卡「插在中间」的 1:1 视觉成立且无同方向嵌套滚动 |
+| 二级态白卡内 | 第二套 `LazyVerticalGrid(Fixed(5))` + `rememberReorderableLazyGridState`，`draggableHandle` 点按拖；单父级最多 11 项 = 3 行，白卡限高、自身滚动 | 外层非惰性 → **不是**惰性套惰性；库原生让位 / 边缘滚动 / 补间全部复用 |
+| 互不干涉 | 两套独立 `LazyGridState` + 两套 reorder state，各自 `onMove` 只改自己那段 `draftOrder`；同一时刻只渲染一个可拖容器 | 库状态按容器实例隔离，一个容器拖动不会触发另一个的 `onMove` |
+| 兜底 | 每格保留上移 / 下移按钮供 TalkBack；`commitRootOrder` / `commitChildOrder` / `moveCategory` 不动 | 无障碍与列表页既有能力零回归 |
+
+#### 库 README 的两条硬约束（MUST 遵守）
+
+1. `onMove` MUST **在返回前**同步更新列表，否则拖动项闪烁（FAQ L1760–1776）；
+   MUST NOT 把更新包进 `launch` 异步做。
+2. 容器内若插入任何非拖 item（提示行 / 白卡等），`from.index` / `to.index`
+   是整个容器的索引，MUST 按 README「Section Headers and Footers」示例减偏移。
+   本方案两态都不含 span/header，故一级态无需换算；实现时若加了提示行，
+   二级态 MUST 相应减偏移。
+
+#### 手势风险：已降级
+
+删掉上一版「自实现 `detectDragGesturesAfterLongPress` / 4 轮 pointer pass 坑 /
+`GridItemSpan` 索引错位 / 回退到上移下移按钮」四项——改用库原生 API 后
+它们都不成立。剩下的真机待验见 2-E，MUST NOT 用 CI 全绿替代。
+
+**落库语义不变**：`draftOrder` 与已落库 `sortOrder` 完全分离；拖动零写库；
+「保存」由 `CategoryManagementRules.rebuildOrder` 按 `(type, level, parentId)`
+三元组一次性重建全量 id 顺序写回；「放弃」零写库并用 `_state.update { }` 原子更新。
+
+### 2-B. 共享只读分类选择组件 `CategorySelectSheet`
+
+**现状**（已读代码确认）：记一笔是 `CategoryStrip` 快捷 chips + `AllCategoriesDialog`
+（L482，按一级分组的 `WrapRow` chips + 搜索）；筛选 `FilterSheet` 是
+`PickRow("分类")` → 竖排单选弹层（`rootOptions` / `childOptions` 扁平列表）。
+两处都不是一羽那套版式。
+
+**做法**：抽取一份**只读** `CategorySelectSheet`，与「分类选择」页同版式
+（顶部搜索 + 左侧一级分组导航 + 右侧 5 列等宽彩色图标格），
+但 **MUST NOT** 含名称输入框、**MUST NOT** 含「继续添加」/ 保存按钮、
+**MUST NOT** 暴露任何写库路径。原 `CategoryPickerScreen` 一行不改，
+添加子类 / 父级预填 / 连续添加 / 重名校验全部保留（使用者第 3 问「保留」）。
+
+**两处接入**：
+- 记一笔：`FormRow("分类")` → `showAllCategories` → `CategorySelectSheet`，
+  选中后立即回填 `categoryId` / `rootCategoryId` 并关闭；快捷栏当前选中项兜底不变。
+- 筛选：`PickRow("分类")` → 同一组件，回填 `rootId` / `categoryId` 与 `displayName`，
+  保留「全部分类」清空项与 `r:` / `c:` 前缀的层级区分。
+
+**必须继承的既有约束**（不重写、不丢能力）：
+- 基线「停用分类在全量选择器中仍可选」：数据源 MUST NOT `filter { it.enabled }`；
+  停用项全部可见可搜并带「停用」角标，**归档项不进选择器**。
+- 按收支类型过滤（`CategoryQuickCandidates` 既有口径）；搜索跨组平铺；
+  二级 label 经 `CategoryDisplay` 拼成「一级 / 二级」，避免同名混淆。
+- 点任一项**立即选中并关闭**，MUST NOT 加二次确认（基线「按一级直记」）。
+- 筛选面板本体仍遵守「统一网格与紧凑输入框」：该 Requirement 约束的是
+  **面板行网格不随选项数增高**；弹层内部版式由新增 Requirement 约束，
+  固定高度全屏/弹层 MUST NOT 撑高面板。
+
+**图标口径**（使用者第 2 问选 A）：两个选择器 SHALL 用
+`CategoryIconCatalog` 彩色 Tabler 图标，缺项回退中性圆 + 首字；
+**记一笔快捷栏、明细列表行、账户详情、统计页仍是中性圆 + 首字**，
+`colorHex` 一字不动（仍供 `ChartData` 扇区取色与 3 处 DAO 投影）。
+第 1 轮 delta 里「彩色图标不越界到记一笔」Scenario 因此改写为
+「彩色图标只进分类选择组件」，并新增 `reporting-ui` 一条 MODIFIED。
+
+### 2-C. 考虑过的其他方案（第 2 轮 + 第 3 轮改判）
+
+| 方案 | 结论 |
+|---|---|
+| 排序页保留兄弟容器、只调观感与提示（B） | 否，使用者明确选 A |
+| 二级态白卡内用第二个 `LazyVerticalGrid` | **是（第 3 轮改判）**：外层一级区为非惰性 `Column + Row`，不存在惰性套惰性；且 MUST 与一级态互斥，同一时刻只有一个可拖容器 |
+| 两处选择器各写一份网格 | 否，抽共享组件，避免第二份实现漂移 |
+| 把 `CategoryPickerScreen` 改成只读再复用 | 否，会丢添加子类 / 连续添加（使用者要「保留」） |
+| 彩色图标铺进记一笔快捷栏与明细列表行 | 否，超出「新选择器」授权范围，且回到「记一笔图标效果差」的老坑 |
+| 改 `colorHex` 给图标上色 | 否，污染统计扇区取色 |
+| 用 `FlowRow` / `LazyVerticalGrid` 嵌 `LazyColumn.item{}` | 否，T12 / §7.3 已证 |
+
+### 2-D. 规格变更清单
+
+- `category-stats` MODIFIED「分类图标不做字符串映射」：正文放宽到
+  「分类管理三页 + 两个全量选择器」，Scenario 改名为「彩色图标只进分类选择组件」。
+- `category-stats` ADDED「独立分类排序页与临时顺序」：就地改写为 1:1 **两态互斥**布局 +
+  两套 `rememberReorderableLazyGridState`，并新增「拖一级时二级折叠」与
+  「两级拖拽互不干涉」两个 Scenario。
+- `category-stats` **新增 ADDED**「记一笔与筛选复用分类网格选择组件」。
+- `reporting-ui` **新增 MODIFIED**「分类全量选择器采用分组 chips 且不用下拉框」
+  （标题沿用基线原名作整块替换锚点，正文改为分组导航 + 等宽网格；
+  归档合并后建议由维护者把标题更名为「…采用分组导航与等宽网格」）。
+- 合计 **4 条 MODIFIED + 5 条 ADDED = 9 个 Requirement**。
+
+### 2-E. 风险与真机待验（CI 全绿不替代）
+
+1. 两态切换时两层 `draftOrder` 是否都不丢、一级态长按全程二级区是否确实不渲染。
+2. `onMove` 是否按要求**在返回前**同步更新列表（否则库 FAQ 记载会闪烁）。
+3. 二级态白卡限高与外层非惰性 `Column` 的滚动边界是否冲突、
+   二级网格边缘自动滚动在嵌套布局下是否仍生效。
+4. 360dp 窄屏下 3 行一级 + 白卡是否需要内滚、15 个一级是否仍一屏可达。
+5. 选择器彩色图标与记一笔快捷栏中性圆**同屏并存**的观感是否割裂。
+6. 记一笔从网格选停用项后快捷栏兜底、筛选回填后再次打开是否保留值。
+7. 覆盖安装（v0.2.36 → 新版）与全新安装两条路径；记一笔 / 明细 / 统计零回归。
+   以上续写进 `tasks.md` 第 6 节与活文档 §8，未验项 MUST NOT 写成已通过。
+   **已降级**：上一版登记的「自实现手势 pointer pass 竞争」「`GridItemSpan`
+   索引错位」「回退到上移/下移按钮」三项，因改用库原生 API 且无 span item
+   而不再成立，MUST NOT 继续写进真机清单。
+
 ## 验证
 
 - [ ] 六个静态检查本地与 CI 全 PASS（`check_kotlin_strings` / `check_docs_consistency` /
@@ -336,7 +490,7 @@ java.lang.AssertionError at CategoryIconTintsTest.kt:35 /
 - [ ] **真机待验（CI 全绿不替代，活文档 §1）**：
   5 列网格在 360dp / 6.73 寸观感与 gutter 均匀度、长名省略、停用角标可辨、
   蓝底 TopBar 与底部 FAB 不遮挡列表末行、⋮ 菜单七项操作全可达、
-  排序页长按一级 / 点按二级手感与让位补间、放弃后顺序零变化、
+  排序页两态切换、一级长按 / 二级 5 列网格拖动手感与让位补间、放弃后顺序零变化、
   保存后三元组作用域正确、重进页面顺序保持、连续添加不清父级、
   重名校验提示、图标缺项兜底显示、记一笔 / 明细 / 统计页分类标识仍为中性圆、
   横屏与旋转屏幕后展开态与 draft 状态

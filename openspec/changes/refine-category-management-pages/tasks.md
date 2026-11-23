@@ -86,7 +86,9 @@
       返回 / 放弃有未保存改动时弹「放弃修改」确认
 - [x] 4.3.4 ViewModel 新增 `sortDraftRootIds` / `sortDraftChildIds` / `sortDirty` 原子状态
       （全部 `_state.update { }`），与已落库 `sortOrder` 完全分离
-- [x] 4.3.5 排序页内二级临时排成一维列表，`draggableHandle` 挂项首小拖柄；
+- [x] 4.3.5 排序页内二级临时排成一维列表，`draggableHandle` 挂项首小拖柄
+（第 1 轮实现；**第 2 轮 4.6 撤回此项布局**，第 3 轮改 5 列网格 +
+       第二套 `rememberReorderableLazyGridState`，不自实现手势）；
       一级 `longPressDraggableHandle` 挂格子内小手柄；
       `ReorderableItem` key 与父容器 `item(key = ...)` 一致；
       `rememberReorderableLazyGridState` 已在 v3.1.0 README 查证存在
@@ -116,19 +118,67 @@
       按标题整块替换，不新增第二份 MODIFIED
 - [x] 4.5.5 `app/build.gradle.kts` 版本号递增
 
+### 4.6 排序页按一羽图 3 做 1:1（第 2 轮 + 第 3 轮技术澄清）
+- [ ] 4.6.1 **两态互斥**：一级态只渲染 5 列 `LazyVerticalGrid` 可拖网格、
+       二级区折叠不渲染；点一级进入二级态，同一时刻只有一个可拖容器
+- [ ] 4.6.2 一级态沿用 `rememberReorderableLazyGridState` + `ReorderableItem` 稳定 key；
+       容器内无 span / header，`from.index` 直接对应 `draftOrder` 下标
+- [ ] 4.6.3 二级态：外层一级区改**非惰性** `Column + Row(weight(1f))` 手工 5 列
+       （15 个一级 = 3 行，静态不可拖、选中项蓝底）；
+       圆角白卡**插在选中一级所在行之后**、其余一级行之前，保留 1:1 视觉
+- [ ] 4.6.4 白卡内二级改**第二套** `LazyVerticalGrid(Fixed(5))` +
+       `rememberReorderableLazyGridState`（库原生，MUST NOT 自写 `pointerInput`）；
+       单父级最多 11 项 = 3 行，白卡限高、外层 Column 不滚动
+- [ ] 4.6.5 两套 grid state 各管各段 `draftOrder`、互不干涉；
+       `onMove` MUST 在返回前同步更新列表（README FAQ，否则拖动项闪烁）；
+       若容器内插入任何非拖 item，索引 MUST 按 README 减偏移
+- [ ] 4.6.6 保留上移 / 下移按钮作 TalkBack 兜底；`rebuildOrder` 三元组保存语义零改动；
+       「保存 / 放弃」行为与第 1 轮一致
+- [ ] 4.6.7 灰阶降噪保留（一羽图 3 自身降饱和）；彩色只在列表页与选择器；
+       两态切换 MUST NOT 丢失任一层的 `draftOrder`
+
+### 4.7 共享只读分类选择组件 `CategorySelectSheet`（第 2 轮）
+- [ ] 4.7.1 抽只读组件：顶部搜索 + 左侧一级分组导航 + 右侧 5 列等宽彩色图标格；
+       **无名称输入框、无「继续添加」/ 保存按钮、无写库路径**
+- [ ] 4.7.2 记一笔 `AllCategoriesDialog` 替换为该组件；选中立即回填
+       `categoryId` / `rootCategoryId` 并关闭；快捷栏当前选中项兜底不变
+- [ ] 4.7.3 `FilterSheet` 的 `PickRow("分类")` 单选弹层替换为**同一组件**；
+       回填 `rootId` / `categoryId` / `displayName`，保留「全部分类」与 `r:` / `c:` 前缀
+- [ ] 4.7.4 继承既有约束：停用项全可见可搜带角标、归档项不进、按收支类型过滤、
+       搜索跨组平铺、二级 label 经 `CategoryDisplay` 拼「一级 / 二级」、点选无二次确认
+- [ ] 4.7.5 `CategoryPickerScreen` **零改动**：添加子类 / 父级预填 / 继续添加 /
+       重名校验全部保留（使用者第 3 问「保留」）
+- [ ] 4.7.6 彩色图标只进选择器；记一笔快捷栏 / 明细列表行 / 账户详情 / 统计页
+       仍中性圆 + 首字，`colorHex` 零改动
+
+### 4.8 规格与文档（第 2 轮 + 第 3 轮核查）
+- [ ] 4.8.1 `category-stats` MODIFIED「分类图标不做字符串映射」正文放宽 + Scenario 改名
+       「彩色图标只进分类选择组件」
+- [ ] 4.8.2 `category-stats` ADDED「独立分类排序页与临时顺序」就地改写为
+       1:1 两态互斥布局 + 两套 grid state，并新增「拖一级时二级折叠」
+       与「两级拖拽互不干涉」两个 Scenario
+- [ ] 4.8.3 `category-stats` 新增 ADDED「记一笔与筛选复用分类网格选择组件」（≥3 Scenario）
+- [ ] 4.8.4 `reporting-ui` 新增 MODIFIED「分类全量选择器采用分组 chips 且不用下拉框」，
+       标题沿用基线原名作整块替换锚点，正文改分组导航 + 等宽网格、保留全部 Scenario
+- [ ] 4.8.5 `proposal.md` / `design.md` / 活文档 §2.6 §7.3 §8 同步；
+       版本号递增（下一版本，v0.2.36 已发布不回改）
+
 ## 5. 校验与交付
 
-- [ ] 5.1 六个静态检查本地 + CI 全 PASS
+- [x] 5.1 六个静态检查本地 + CI 全 PASS
       —— 本地已全 PASS（`check_docs_consistency` / `check_kotlin_strings` /
       `check_manifest_privacy` / `check_stat_rules` / `check_transaction_annotations` /
       `check_workflow_syntax`）；**CI 待推送后查 Actions，不以本地代替**
 - [x] 5.2 `check_kotlin_strings.py` PASS；另跑去注释/字符串括号平衡、重复 import、
       `setValue` / `getValue` 导入自查，10 个文件全 OK
-- [ ] 5.3 按最终 commit sha 查 tree，逐文件比对 blob sha，`远端校验: PASS`
+- [x] 5.3 按最终 commit sha 查 tree，逐文件比对 blob sha，`远端校验: PASS`
 - [ ] 5.4 归档校验：无重复 Requirement 标题、每条 ≥1 Scenario、含 RFC2119、MODIFIED 整块替换
 - [ ] 5.5 给出真实 commit sha + run id；制品名带短 sha、不同名覆盖；`mapping.txt` 随对应 APK
-- [ ] 5.6 无 `diag/` 残留、无 token 明文、Manifest 仍无 `INTERNET`
-- [ ] 5.7 **明确写出仍未验证的真机项**，不用「CI 全绿」替代观感 / 性能 / 弹窗验证（§1）
+       —— v0.2.36 已出 Release 附件与 tag，**但 Actions 制品列表未查到 v0.2.36 条目**
+       （v0.2.34/35 同样不在，历史清理口径遗留，非本批引入）；以 Release 附件为准
+- [x] 5.6 无 `diag/` 残留、无 token 明文、Manifest 仍无 `INTERNET`
+       （诊断脚本已删、comment 已删、`build.yml` 按远端原版 byte-for-byte 恢复）
+- [x] 5.7 **明确写出仍未验证的真机项**，不用「CI 全绿」替代观感 / 性能 / 弹窗验证（§1）
 
 ## 6. 真机待验（使用者，刻意保留 `[ ]`）
 
@@ -141,7 +191,8 @@
       重进页面顺序保持
 - [ ] 6.7 连续添加不清父级 / 类型、重名提示、键盘与搜索共存
 - [ ] 6.8 图标缺项回退中性圆 + 首字，无崩溃、无整页空白（手工新建分类走此路径）
-- [ ] 6.9 记一笔 / 明细 / 统计页分类标识仍是中性圆 + 首字（本批零回归）
+- [ ] 6.9 记一笔快捷栏 / 明细列表行 / 账户详情 / 统计页分类标识仍是中性圆 + 首字
+       （第 2 轮口径：彩色只进四个页面/组件，零回归）
 - [ ] 6.10 横屏与旋转屏幕后展开态、draft 状态、网格列数
 - [ ] 6.11 排序页一级网格限高 240dp 在 15 个一级下是否需要内滚
 - [ ] 6.12 §8 既有全部未验项整体继承
@@ -151,8 +202,26 @@
 - [ ] 6.14 **覆盖安装**：从 v0.2.35 覆盖安装后（库内 iconName 为空串）
       三页是否都能按 id 显示图标；全新安装是否同样正常
 
+- [ ] 6.15 **拖一级时二级折叠**：一级态长按拖动全程二级区不渲染，
+       无 span item、无索引偏移、让位与边缘滚动是否实时
+- [ ] 6.16 点一级进入二级态后，白卡确实「插在网格中间」而非上下兄弟容器；
+       一级区冻结不可拖，白卡内二级 5 列网格独立拖，两套 state 互不干涉
+- [ ] 6.17 两态来回切换时两层 `draftOrder` 都不丢；15 个一级 + 白卡
+       在 360dp / 6.73 寸是否需内滚、选中行视觉是否连贯
+- [ ] 6.18 库 `onMove` 同步更新后无拖动项闪烁；白卡限高与外层非惰性 Column
+       的滚动边界无冲突、二级网格边缘自动滚动仍生效
+- [ ] 6.19 记一笔「分类 ›」与筛选「分类」是否确为同一组件、无输入框 / 无保存按钮
+- [ ] 6.20 选择器彩色图标与记一笔快捷栏中性圆同屏并存是否割裂；
+       快捷栏 / 明细列表行 / 账户详情 / 统计页零回归
+- [ ] 6.21 从网格选停用项后记一笔快捷栏兜底、筛选回填后再次打开值是否保留、
+       归档项不出现、搜索跨组平铺无同名混淆
+- [ ] 6.22 原分类选择页添加子类 / 继续添加 / 重名校验零回归
+- [ ] 6.23 v0.2.36 → 新版覆盖安装、全新安装两条路径；§8 既有清单整体继承
+
 ## 7. 归档（使用者明确说「可以归档」才做）
 
-- [ ] 7.1 把 3 条 MODIFIED 按标题整块替换回 `openspec/specs/`，4 条 ADDED 合并
+- [ ] 7.1 把 **4 条 MODIFIED** 按标题整块替换回 `openspec/specs/`，**5 条 ADDED** 合并；
+       并把 `reporting-ui`「分类全量选择器采用分组 chips 且不用下拉框」标题
+       更名为「…采用分组导航与等宽网格」（标题原名仅作替换锚点）
 - [ ] 7.2 change 文件夹移到 `openspec/changes/archive/<日期>-refine-category-management-pages/`
 - [ ] 7.3 校验 specs 已反映新行为，无规格腐烂

@@ -39,8 +39,10 @@ MUST NOT 把「（停用）」拼进名称，MUST NOT 让短名行的剩余留�
 MUST NOT 用 `LazyVerticalGrid` 嵌进 `LazyColumn.item {}` 造成同方向嵌套滚动，
 MUST NOT 用 `@OptIn(ExperimentalLayoutApi)` 的 `FlowRow`（T12），
 MUST NOT 用 `Card` 底色 / 阴影表达格子边界。
-分类排序页内选中一级的二级 SHALL 临时排成一维列表以适配 `reorderable`
-的一维模型并支持点按拖；列表页仍 SHALL 为等宽图标网格。
+分类排序页 SHALL 为两态互斥：一级态二级区折叠不渲染、
+二级态白卡内为 5 列等宽图标网格，两级 SHALL 各用一套
+`rememberReorderableLazyGridState`（库原生支持 Grid）、互不干涉；
+列表页仍 SHALL 为等宽图标网格。
 上移 / 下移 SHALL 在列表页二级操作弹层保留为无障碍兜底
 （TalkBack 无法执行拖动手势），MUST NOT 作为主入口。
 分类管理新增的排序页与分类选择页 SHALL 仍为全屏独立页（Navigation 路由），
@@ -84,3 +86,59 @@ MUST NOT 做成内容受限的小弹窗，MUST NOT 新增第 5 个底部 Tab；
 留白来自 `WrapRow` 按文本收缩 + 行尾余量 + 停用后缀拼进名称，
 不是固定列数网格本身。本批按标题整块替换，
 MUST NOT 只追加 ADDED 而让两条相反要求并存（活文档 §5）。
+
+---
+
+### Requirement: 分类全量选择器采用分组 chips 且不用下拉框
+
+> 标题沿用基线原名以命中整块替换；**本 Requirement 的现行语义以本节正文为准**，
+> 归档合并后 SHALL 由维护者更名为「分类全量选择器采用分组导航与等宽网格」。
+
+`FormRow("分类", onRowClick = …)` SHALL 与「账户 ›」同构，整行可点开全量选择器，
+label 自动带 `›`。全量选择器 SHALL 复用只读共享组件 `CategorySelectSheet`，
+采用**顶部搜索 + 左侧一级分组导航 + 右侧 5 列等宽彩色图标网格**，
+MUST NOT 使用 Spinner / ExposedDropdown / DropdownMenu，
+MUST NOT 退化为按一级分组的 `WrapRow` chips 或需要长距离滚动的竖排 TextButton 列表。
+组标题本身 SHALL 可点 = 按一级直记；组内格子 SHALL 可点 = 选该二级。
+点任一项 SHALL **立即选中并关闭弹层**，MUST NOT 加二次确认。
+
+未归档的停用一级 / 二级 SHALL 全部可见可搜并带「停用」角标；归档项 SHALL 不进选择器。
+搜索命中 SHALL 跨组平铺，二级 label MUST 经 `CategoryDisplay` 风格拼成「一级 / 二级」。
+选择器 SHALL 显示彩色 `CategoryIconCatalog` 图标，
+但记一笔快捷栏、明细列表行、账户详情与统计页 SHALL 仍是中性圆 + 首字。
+明细筛选面板 `PickRow("分类")` SHALL 复用同一组件，
+固定高度弹层 MUST NOT 撑高筛选面板本体。
+
+#### Scenario: 从更多分类里选停用项
+
+- **GIVEN** 新记一笔，默认快捷栏只有 7 个启用一级
+- **WHEN** 点「分类 ›」→ 搜索「话费」→ 点「居住 / 话费（停用）」网格格
+- **THEN** 弹层关闭，`categoryId = 4007`、`rootCategoryId = 4`
+- **AND** 快捷栏临时显示「居住」一级与选中的「话费」chip，保存成功
+
+#### Scenario: 按一级直记
+
+- **GIVEN** 全量选择器展开「学习娱乐（停用）」分组
+- **WHEN** 点组标题
+- **THEN** 立即按该一级选中并关闭弹层，MUST NOT 弹出「就按xx记」或确认框
+
+#### Scenario: 首屏不被选择器挤占
+
+- **GIVEN** 中小屏手机打开记一笔
+- **WHEN** 不滚动、不点「分类 ›」
+- **THEN** 金额、分类快捷栏、账户、日期、对方、描述、保存按钮仍一屏可见
+- **AND** 页面上没有「更多分类」chip、没有常驻的名称输入框
+
+#### Scenario: 两处选择器复用同一组件
+
+- **GIVEN** 记一笔与明细筛选面板
+- **WHEN** 分别打开分类全量选择器
+- **THEN** 两处均为同一分组导航 + 5 列等宽彩色图标网格版式
+- **AND** 均无名称输入框、无「继续添加」/ 保存按钮、无写库路径
+
+**理由**：第 52 批定下的「分组 chips + 搜索」是为了兼顾 106 行分类的可达性与
+「记账不能变慢」铁律 3；使用者 2026-11-23 装机体验 v0.2.36 后明确指出
+一羽「添加二级分类」页的左导航 + 等宽网格版式「应该比原来的分类选择好」，
+并对新选择器图标明确放行彩色 Tabler（A）。本批保留「整行 › 入口 + 立即选中 +
+停用项可达 + 首屏不被挤占」这些已验证结论，只替换弹层内部版式；
+按标题整块 MODIFIED，MUST NOT 追加 ADDED 让两条相反要求并存（活文档 §5）。
