@@ -526,4 +526,8 @@ release `45109513641` **success**（坚果云 success，已建 tag `v0.2.34`）/
 - **挂账未动**：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中；第 51 批的 ID 规则、删除策略、分类清单 v2 全部不动。本批按「改变系统行为 + 改 spec 语义」新建 change `record-category-picker-and-root-select`。
 
 ### 第 52 批实测
-待回填（代码 commit sha / push CI run id / release run id / 制品名与体积）。
+代码 `014f9da96bad`（parent `0639814b9613`，main HEAD）→ push CI `45125148563` **六静态检查 / 单测 / debug APK 编译 / release lintVital / 校验值全部 success，仅「上传 Debug APK」失败**（与第 51 批同因：库内累积 200+ 个 Actions artifacts，配额耗尽；`overwrite: true` + `retention-days: 7` 仍无法上传，与本批代码无关）。
+release `45125186214` **success**（R8 编译 / 整理产物 / 上传 Release APK / 建 tag `v0.2.35` / 坚果云全部 success）→ GitHub Release 附件 `offline-ledger-v0.2.35-release-014f9da9.apk` **3,039,702 B**；Actions artifacts 因同类配额问题为 0（该步骤 `continue-on-error`），**包以 Release 附件与坚果云为准**。
+**装包**：本批零改分类表数据、零改表结构、`version=5` 不变 → **v0.2.34 直接覆盖安装生效**，MUST NOT 再要求导出 / 卸载 / 导入（那是第 50/51 批的破坏性顺序）。
+**CI 全绿不替代真机**：默认快捷栏 7 个启用一级、「分类 ›」分组 chips 与搜索、停用项角标、460dp 弹层高度、一级选中底色、再点一级收起、编辑停用分类历史流水、筛选面板停用项可选，十项列在 tasks §7 待验（§1）。
+**后续运维**：`offline-ledger-debug-apk` 产物清理 pattern 仍缺失，push CI 会持续红在 artifact 上传；本批不擅自删仓库产物、不改 workflow，留待单独一轮处理。

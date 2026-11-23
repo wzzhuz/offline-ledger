@@ -40,8 +40,8 @@
 
 - [x] 6.1 本地六静态检查 + Kotlin 括号 + 死代码残留检查
 - [x] 6.2 推送（单次 commit，parent 保持远端 main HEAD）并按新 sha 逐文件校验
-- [x] 6.3 push CI 六静态检查 / 单测 / debug / lintVital
-- [x] 6.4 出 R8 正式包 v0.2.35（打 tag + 坚果云）
+- [x] 6.3 push CI 六静态检查 / 单测 / debug / lintVital 全绿（仅 artifact 上传因配额失败，见回填）
+- [x] 6.4 出 R8 正式包 v0.2.35（打 tag + 坚果云 + Release 附件）
 - [x] 6.5 回填实测编号
 
 ## 7. 真机验收（沙盒不能验，CI 全绿不得替代）
@@ -59,4 +59,4 @@
 
 ## 实测回填
 
-待回填（代码 commit sha / push CI run id / release run id / 制品名与体积）。
+代码 `014f9da96bad` / push CI `45125148563`（代码门禁全绿，artifact 上传因配额失败）/ release `45125186214` success（tag `v0.2.35`，坚果云 + Release 附件 success）/ 附件 `offline-ledger-v0.2.35-release-014f9da9.apk` 3,039,702 B。详见 `openspec/project.md` 第 52 批实测。
