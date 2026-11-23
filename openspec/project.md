@@ -509,4 +509,7 @@ commit `8a10edf368b6` / push CI `44686081288` success 17/17 / release `446870824
 - **挂账未动**：`ff3-description-field`、`detail-filter-and-transfer-edit`、`detail-scope-and-record-page` 三个 change 仍进行中。本批按「改变系统行为 + 改 spec」新建 change `restructure-preset-categories`。
 
 ### 第 51 批实测
-待回填（代码 commit sha / push CI run id / release run id / 制品名与体积）。
+代码 `ca4c80f0db29`（parent `85c7e0ce84a9`，main HEAD）→ push CI `45109206812` **六静态检查 / 单测 / debug APK 编译 / release lintVital 全部 success，仅「上传 Debug APK」失败**（attempt 1 与 rerun attempt 2 均如此）。该失败与本批改动无关：库内累积 209 个 Actions artifacts（单页约 1.26 GB），疑似存储配额耗尽，`build.yml` 该步骤已设 `overwrite: true`、`retention-days: 7`，仍上传失败。
+release `45109513641` **success**（坚果云 success，已建 tag `v0.2.34`）/ GitHub Release 附件 `offline-ledger-v0.2.34-release-ca4c80f0.apk` 3,039,702 B；Actions artifacts 因同类上传失败未生成（该步骤 `continue-on-error`，不影响打 tag、Release 附件与坚果云）。
+**装包**：全新安装、测试数据重造、**不导 v0.2.33 及更早备份**（导入旧备份会把旧分类表整表覆盖回来，新清单不生效）。沙盒无真机，分类候选 / 停用项启用 / 归档恢复 / 弹窗观感 MUST 真机验（§8），CI 全绿不得替代（§1）。
+**后续运维**：给 `cleanup-artifacts.sh` 补 `offline-ledger-debug-apk` 的清理 pattern 或手工清理历史产物，否则 push CI 会持续红在 artifact 上传步骤；本批不擅自删仓库产物、不改 workflow。

@@ -1,6 +1,6 @@
 # Tasks：预制分类 v2（第 51 批）
 
-> 状态：全部完成（CI 与制品编号见末尾回填）
+> 状态：代码与文档全部完成；真机验收（§5）待使用者实测。CI 与制品编号见末尾回填。
 
 ## 1. 清单与 ID 规则
 
@@ -32,8 +32,8 @@
 - [x] 4.2 `defaultVersionName` → `0.2.34`
 - [x] 4.3 本地六个静态检查 + Kotlin 括号 + JSON 一致性 + ID 规则自检
 - [x] 4.4 推送（单次 commit，parent 保持远端 main HEAD）并按新 commit sha 逐文件校验
-- [x] 4.5 push CI 六静态检查 / 单测 / debug APK / release lintVital
-- [x] 4.6 出 R8 正式包 v0.2.34（打 tag + 坚果云），取制品名与体积
+- [x] 4.5 push CI 六静态检查 / 单测 / debug APK / release lintVital 全绿（仅 artifact 上传失败，见回填）
+- [x] 4.6 出 R8 正式包 v0.2.34（打 tag + 坚果云 + GitHub Release 附件），取制品名与体积
 - [x] 4.7 回填实测编号到 project.md 与活文档，第二个 commit
 
 ## 5. 真机验收（沙盒不能验，CI 全绿不得替代）
@@ -49,4 +49,4 @@
 
 ## 实测回填
 
-待回填（代码 commit sha / push CI run id / release run id / 制品名与体积）。
+代码 `ca4c80f0db29` / push CI `45109206812`（代码门禁全绿，artifact 上传因配额失败）/ release `45109513641` success（tag `v0.2.34`，坚果云 success）/ GitHub Release 附件 `offline-ledger-v0.2.34-release-ca4c80f0.apk` 3,039,702 B。详见 `openspec/project.md` 第 51 批实测。
