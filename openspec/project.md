@@ -675,3 +675,16 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **边界**：7 字长名（赡养·代缴水电）在 57dp 下仍单行省略，MUST NOT 换行撑高格子；跨组搜索同名二级归属缺失仍沿用 Q3A 口径。
 - **CI 全绿不替代真机**：活文档 §8 第 58 批新增 6.29 待验，既有项整体继承。归档仍需使用者明确说「可以归档」。
 
+### 第 58 批实测（v0.2.39 出包）
+
+- 代码 + 四件套 `bd2e3d7cc71c`（parent `dbc7b256bfe9`），9 文件逐 blob 校验 PASS；push CI `45315914873` 全绿。
+- 出包 CI `45316364221` completed success；tag `v0.2.39` → `bd2e3d7c`；Release 附件
+  `offline-ledger-v0.2.39-release-bd2e3d7c.apk`（3,137,307 B，
+  SHA256 `faf49588ddfeaa0416e253722c1d2e28015c93859671c77455f2da5f7ad9abc7`），
+  API `state=uploaded` + `digest` 与 notes 一致。debug.keystore 签名，v0.2.38 可直接覆盖安装。
+- Actions artifacts 3 个（release / mapping / metrics），全步骤无染绿，`mapping.txt` 随制品留存。
+- **操作偏差**：dispatch 因工具层 502 被重放两次，第二个 run `45316726495` 排队 pending 时主动 cancel（202 →
+  `completed cancelled`），未产生第二次 tag 重建或 Release 覆盖；资产 digest 单一。
+  教训：204 空响应的触发请求超时后 MUST 先查 runs 列表再决定是否补发，MUST NOT 直接重发。
+- 归档仍需使用者明确说「可以归档」。
+

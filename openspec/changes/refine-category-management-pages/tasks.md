@@ -175,11 +175,16 @@
 - [x] 5.3 按最终 commit sha 查 tree，逐文件比对 blob sha，`远端校验: PASS`
 - [ ] 5.4 归档校验：无重复 Requirement 标题、每条 ≥1 Scenario、含 RFC2119、MODIFIED 整块替换
 - [ ] 5.5 给出真实 commit sha + run id；制品名带短 sha、不同名覆盖；`mapping.txt` 随对应 APK
-       —— v0.2.38 已出 Release 附件与 tag，制品名带短 sha `ae8f1b3a`；
-       **本批 Actions artifacts 为 3 个**（release / mapping / metrics），
+       —— v0.2.39 已出 Release 附件与 tag，制品名带短 sha `bd2e3d7c`；
+       **Actions artifacts 为 3 个**（release / mapping / metrics），
        全步骤 `outcome` 无 failure、无 `continue-on-error` 染绿，`mapping.txt` 确实随制品留存，
-       以 Release assets + `asset.digest` 为准。5.4 归档校验未做，本项仍保持 `[ ]`，
+       以 Release assets + `asset.digest` 为准。
+       **一处操作偏差**：dispatch 因工具层 502 被重放两次，第二个 run `45316726495`
+       排队 pending 时主动 cancel（最终 `completed cancelled`），未产生第二次发布；
+       详见活文档 §7.40。5.4 归档校验未做，本项仍保持 `[ ]`，
        归档需使用者明确说「可以归档」
+       —— v0.2.38 曾出 Release 附件与 tag（短 sha `ae8f1b3a`），
+       Actions artifacts 同为 3 个、mapping 随制品留存
        —— v0.2.37 曾出 Release 附件与 tag 但 **Actions 制品列表为 0**：
        「制品上传失败告警」步骤实际执行，可反证三个 continue-on-error 上传步骤
        outcome=failure 被染绿（§7.33/§7.35），`mapping.txt` 未随制品留存
