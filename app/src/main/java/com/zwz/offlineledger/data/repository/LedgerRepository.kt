@@ -936,7 +936,8 @@ class LedgerRepository @Inject constructor(
                 // 同名两卡靠 choice.targetCardLast4 精确落位。
                 val hit = existingAccounts.firstOrNull {
                     it.name == targetName &&
-                        (choice.targetCardLast4 == null || it.cardLast4 == choice.targetCardLast4)
+                        (choice?.targetCardLast4 == null ||
+                            it.cardLast4 == choice?.targetCardLast4)
                 } ?: throw IllegalArgumentException("账户映射目标不存在：" + targetName)
                 accountIds[name] = hit.id
                 val opening = openingBySource[name]
