@@ -42,7 +42,10 @@ MUST NOT 用 `Card` 底色 / 阴影表达格子边界。
 分类排序页 SHALL 为两态互斥：一级态二级区折叠不渲染、
 二级态白卡内为 5 列等宽图标网格，两级 SHALL 各用一套
 `rememberReorderableLazyGridState`（库原生支持 Grid）、互不干涉；
-列表页仍 SHALL 为等宽图标网格。
+列表页仍 SHALL 为等宽图标网格。排序页一级 / 二级 SHALL **整格直接拖动**，
+MUST NOT 再画三道横线小手柄；二级态长按任意一级格 SHALL 自动收起二级区，
+MUST NOT 设「收起，排一级」按钮；末行不足 5 列 SHALL 补 `weight(1f)` 空占位保持列对齐；
+二级区 SHALL 以明显不同的浅色底标注，MUST NOT 再用小字重复拖动提示。
 上移 / 下移 SHALL 在列表页二级操作弹层保留为无障碍兜底
 （TalkBack 无法执行拖动手势），MUST NOT 作为主入口。
 分类管理新增的排序页与分类选择页 SHALL 仍为全屏独立页（Navigation 路由），
@@ -103,7 +106,9 @@ MUST NOT 退化为按一级分组的 `WrapRow` chips 或需要长距离滚动的
 点任一项 SHALL **立即选中并关闭弹层**，MUST NOT 加二次确认。
 
 未归档的停用一级 / 二级 SHALL 全部可见可搜并带「停用」角标；归档项 SHALL 不进选择器。
-搜索命中 SHALL 跨组平铺，二级 label MUST 经 `CategoryDisplay` 风格拼成「一级 / 二级」。
+搜索命中 SHALL 跨组平铺。网格与搜索结果的二级**显示名 SHALL 用裸名**（左侧已选一级，
+MUST NOT 拼成「餐饮 / …」被单行省略）；选中后回填的筛选 `displayName`
+MUST 仍经 `CategoryDisplay` 拼成「一级 / 二级」，MUST NOT 改第 29 批共用口径。
 选择器 SHALL 显示彩色 `CategoryIconCatalog` 图标，
 但记一笔快捷栏、明细列表行、账户详情与统计页 SHALL 仍是中性圆 + 首字。
 明细筛选面板 `PickRow("分类")` SHALL 复用同一组件，
@@ -112,7 +117,7 @@ MUST NOT 退化为按一级分组的 `WrapRow` chips 或需要长距离滚动的
 #### Scenario: 从更多分类里选停用项
 
 - **GIVEN** 新记一笔，默认快捷栏只有 7 个启用一级
-- **WHEN** 点「分类 ›」→ 搜索「话费」→ 点「居住 / 话费（停用）」网格格
+- **WHEN** 点「分类 ›」→ 搜索「话费」→ 点裸名「话费」（带停用小角标）网格格
 - **THEN** 弹层关闭，`categoryId = 4007`、`rootCategoryId = 4`
 - **AND** 快捷栏临时显示「居住」一级与选中的「话费」chip，保存成功
 

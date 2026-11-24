@@ -393,11 +393,11 @@ fun FilterSheet(
                 } else if (choice.level == 0) {
                     rootId = cid
                     categoryId = null
-                    displayName = choice.label
+                    displayName = choice.displayLabel
                 } else {
                     categoryId = cid
                     rootId = choice.rootId
-                    displayName = choice.label
+                    displayName = choice.displayLabel
                 }
             },
             onDismiss = { picker = null }

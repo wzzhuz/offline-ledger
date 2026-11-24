@@ -67,7 +67,8 @@ MUST NOT 自写 `Modifier.pointerInput` 手势。
 点开一级后一级区冻结、白卡内二级 5 列网格独立拖；
 同一时刻 MUST 只有一个可拖容器，两套 state 的 `onMove` MUST 各管各段 `draftOrder`。
 两处 MUST 用 `ReorderableItem` + 稳定 `key`（与父容器 `item(key = ...)` 一致），
-一级 MUST 用 `longPressDraggableHandle`、二级 MUST 用 `draggableHandle`。
+一级 MUST 用 `longPressDraggableHandle`、二级 MUST 用 `draggableHandle`，
+且两者 SHALL 挂在**整个格子**根 Modifier 上，MUST NOT 再画三道横线小手柄。
 库 SHALL 负责拖动中让位补间、pointer pass 顺序、长按窗口与边缘滚动，
 MUST NOT 再自写 `pointerInput` / `scrollable` / 实测行高阈值，
 MUST NOT 使用跨应用 `dragAndDropSource/Target` 协议。
@@ -207,12 +208,15 @@ MUST NOT 因此改动 `assets/default_categories.json` 的 ID 规则或备份整
 （选中一级所在行之后、其余一级行之前），白卡内为 5 列等宽图标格，
 且 SHALL 以灰阶单色显示，MUST NOT 在排序页保留彩色
 （彩色只在分类列表页与全量选择器）。白卡 MUST NOT 退化为上下兄弟容器。
-页面 SHALL 明示「长按拖动一级，点按拖动二级」并提供「保存」与「放弃」。
+页面 SHALL 提供「保存」与「放弃」，MUST NOT 再常驻拖动说明文字或三道横线手柄；
+可拖性由整格手势与底色分区表达（使用者第 4 轮 Q2A）。
 
 排序页 SHALL 为**两态互斥**，这是使用者观察到的「一羽拖一级时二级折叠」：
 一级态 SHALL 只渲染 5 列一级 `LazyVerticalGrid`，二级区 SHALL 折叠 / 不渲染，
 容器内 MUST NOT 有 span item 或 section header；
-点某个一级 SHALL 进入二级态，一级区 SHALL 改为**非惰性** 5 列 Row 静态展示并冻结不可拖，
+点某个一级 SHALL 进入二级态，一级区 SHALL 改为**非惰性** 5 列 Row 静态展示并冻结不可拖；
+**长按任意一级格 SHALL 立即自动收起二级区回到一级态**，
+MUST NOT 要求点「收起，排一级」按钮（使用者第 4 轮 Q1A）。
 圆角白卡 SHALL 插在选中一级所在行之后、其余一级行之前，
 白卡内二级 SHALL 为第二套 `LazyVerticalGrid(GridCells.Fixed(5))` 可独立拖。
 
@@ -240,14 +244,28 @@ MUST NOT 用 `_state.value = _state.value.copy(...)` 散写（活文档 §7.11�
 保存 SHALL 由纯 JVM `CategoryManagementRules.rebuildOrder` 按三元组一次性重建
 全量 id 顺序并写回，MUST NOT 丢项、MUST NOT 混入另一收支类型或另一父级；
 既有 `commitRootOrder` / `commitChildOrder` / `moveCategory` SHALL 保留供列表页
-上移 / 下移无障碍兜底使用。一级拖动手柄 SHALL 挂在格子内的小手柄上，
+上移 / 下移无障碍兜底使用。一级与二级拖动手柄 SHALL 挂在**整个格子**上，
+短按展开与长按拖动 SHALL 共享 `MutableInteractionSource` 共存
+（v3.1.0 README「Use with Card」段明确支持的写法），
 `ReorderableItem` 的 key SHALL 与父容器 `item(key = ...)` 完全一致。
 
 排序页白卡 SHALL 只出现在二级态，且外层一级区 MUST 为非惰性
 `Column + Row(weight(1f))`，MUST NOT 用 `GridItemSpan` 常驻一级网格、
 MUST NOT 用第二个惰性网格嵌进另一个惰性网格（同方向嵌套滚动 + 高度不确定）。
 二级网格 SHALL 限高并自身滚动，外层 Column MUST NOT 再滚动。
-上移 / 下移 SHALL 保留作 TalkBack 兜底。
+上移 / 下移 SHALL 以每格 `semantics.customActions` 保留作 TalkBack 兜底
+（5 列小格 MUST NOT 再堆按钮），只列可行方向、复用 `moveDraft*ByIndex`。
+
+**第 4 轮交互优化（使用者 Q1A / Q2A / Q3A）**：二级态外层 5 列 Row 的最后一行
+不足 5 个时 SHALL 以 `weight(1f)` 空占位补齐，MUST NOT 让剩余格子被拉宽导致列不对齐。
+白卡内二级网格为 `GridCells.Fixed(5)`，最后一排留白但格宽恒定，MUST NOT 改自适应列。
+白卡 SHALL 用与一级区明显不同的浅色底（浅蓝灰）标注二级区域、二级格仍为白底圆角；
+MUST NOT 再用「点按小手柄拖动排序」之类小字重复提示，
+MUST NOT 在页面顶部或底部常驻拖动说明文字，只保留分组标题与「保存 / 放弃」。
+二级态静态一级格为触发「长按自动收起」MAY 用
+`Modifier.pointerInput { detectTapGestures(onLongPress = …) }`——
+这仅是一个状态切换触发器，不涉及坐标换算、让位补间或索引，
+MUST NOT 与「MUST NOT 自写排序拖动手势」混为一谈。
 
 **已降级的风险**：上一版登记的「自实现手势 pointer pass 竞争」
 「`GridItemSpan` 与一级拖动索引错位」「回退到上移 / 下移按钮」三项，
@@ -268,7 +286,7 @@ MUST NOT 继续列进真机待验清单；CI 全绿仍 MUST NOT 替代真机观�
 #### Scenario: 拖一级时二级折叠
 
 - **GIVEN** 分类排序页处于一级态
-- **WHEN** 长按某个一级手柄开始拖动、跨行换位
+- **WHEN** 长按某个一级**格子**开始拖动、跨行换位
 - **THEN** 全程二级区不渲染，容器内无 span item、无索引偏移
 - **AND** 让位动画与边缘滚动由 `reorderable` 提供，只改一级段 `draftOrder`
 
@@ -279,6 +297,28 @@ MUST NOT 继续列进真机待验清单；CI 全绿仍 MUST NOT 替代真机观�
 - **THEN** 一级区冻结不可拖，一级 `draftOrder` 零变化
 - **AND** 只有该父级下二级段 `draftOrder` 改变，另一父级与收入分类不受影响
 - **AND** 两态来回切换后两层 `draftOrder` 均不丢失
+
+#### Scenario: 长按一级自动收起二级
+
+- **GIVEN** 处于二级态、白卡已展开「餐饮」的二级
+- **WHEN** 长按任意一级格（含非选中一级）
+- **THEN** 二级区立即收起并回到一级态，MUST NOT 出现「收起，排一级」按钮
+- **AND** 两层 `draftOrder` 均不丢失；再长按一次即可开始一级拖动
+
+#### Scenario: 末行不足 5 列仍对齐
+
+- **GIVEN** 一级数为 13 个（末行 3 个）、二级数为 11 个
+- **WHEN** 展开某级进入二级态
+- **THEN** 一级区末行 3 格仍各占 1/5 宽、右侧 2 格为空占位，与其他行列线对齐
+- **AND** 白卡内二级最后一排格子宽度与前排一致，不被拉宽
+
+#### Scenario: 无手柄与无重复提示
+
+- **GIVEN** 一级态与二级态
+- **WHEN** 查看页面
+- **THEN** 页面上 MUST NOT 出现三道横线「≡」手柄、MUST NOT 出现「长按拖动一级，点按拖动二级」
+  或「点按小手柄拖动排序」等说明文字
+- **AND** 二级区靠浅色底 + 白格区分，一级格与二级格整格均可直接拖动
 
 **理由**：现网是「列表里就地拖 + 松手即落库」，既易误触也无法反悔；
 一羽的独立页 + 保存/放弃是更稳的组织方式。临时顺序与落库值分离同时
@@ -394,8 +434,12 @@ MUST NOT 各写一份网格实现。
 组件 SHALL 按收支类型过滤分类；数据源 MUST NOT 用 `filter { it.enabled }`
 把停用项删掉，未归档的停用一级 / 二级 SHALL 全部可见可搜并带「停用」角标，
 归档项 SHALL 不进选择器（沿用基线「停用分类在全量选择器中仍可选」）。
-搜索命中 SHALL 跨组平铺，二级 label MUST 经 `CategoryDisplay` 拼成「一级 / 二级」，
-MUST NOT 让不同父级下的同名项混淆。
+搜索命中 SHALL 跨组平铺。**网格 tile 与搜索结果的显示名 SHALL 一律用裸名**，
+MUST NOT 拼父级前缀——左侧分组导航已表明父级，拼成「餐饮 / …」会把 5 列格单行省略成
+只见一级名（使用者第 4 轮第 5 条 / Q3A）。选中后**回填筛选侧的 `displayName`
+MUST 仍经 `CategoryDisplay` 拼成「一级 / 二级」**，MUST NOT 改动第 29 批由
+统计占比图例、扇区下钻、筛选面板、明细筛选 chip 四处共用的显示名契约。
+跨组搜索时不同父级下的同名二级 MAY 显示不出归属，这是 Q3A 明确接受的代价。
 
 点任一项 SHALL **立即选中并关闭弹层**，MUST NOT 加二次确认；
 记一笔侧 SHALL 回填 `categoryId` / `rootCategoryId` 并保持快捷栏当前选中项兜底，
@@ -407,6 +451,14 @@ MUST NOT 再拼 `r:` / `c:` 字符串前缀）。
 
 「分类选择」页（添加子类 / 父级预填 / 继续添加 / 同父级重名校验）
 SHALL 保持原功能不变，MUST NOT 因抽取共享组件而丢失写路径。
+
+#### Scenario: 二级裸名显示但回填仍带父级
+
+- **GIVEN** 筛选面板打开分类选择器，左侧选中「餐饮」分组
+- **WHEN** 查看右侧网格、点「外卖」格
+- **THEN** 网格格显示裸名「外卖」，MUST NOT 显示「餐饮 / 外卖」或被单行省略成「餐饮 / …」
+- **AND** 筛选 chip 的 `displayName` 仍为「餐饮 / 外卖」，与统计 / 明细口径一致
+- **AND** 搜索结果里的二级同样显示裸名
 
 #### Scenario: 记一笔从网格选停用项
 

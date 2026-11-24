@@ -2,6 +2,8 @@ package com.zwz.offlineledger.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -51,23 +53,28 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
 
 /**
- * 第 56 批：独立「分类排序」页，按一羽图 3 做**两态互斥**。
+ * 第 57 批：独立「分类排序」页，两态互斥 + 整格直接拖动。
  *
  * - 一级态：只渲染 5 列一级 `LazyVerticalGrid`，二级区折叠 / 不渲染；
- *   容器内无 span / header，`from.index` 直接对应 `draftOrder` 下标。
+ *   整个一级格挂 `longPressDraggableHandle`，短按展开与长按拖动共享
+ *   `MutableInteractionSource`（v3.1.0 README「Use with Card」段写法）。
  * - 二级态：外层一级区改非惰性 `Column + Row(weight)` 静态展示并冻结；
- *   圆角白卡插在选中一级所在行之后，卡内用**第二套**
- *   `rememberReorderableLazyGridState` 拖 5 列等宽二级图标格。
+ *   **长按任意一级格即自动收起二级区**（删掉专门的收起按钮）；
+ *   圆角白卡插在选中一级所在行之后，卡内第二套
+ *   `LazyVerticalGrid(Fixed(5))` 整格挂 `draggableHandle` 拖二级。
  *
- * 两套 grid state 各管各段 `draftOrder`，同一时刻只有一个可拖容器，互不干涉。
- * `onMove` 在返回前由 ViewModel 同步 `_state.update`（库 FAQ：异步会闪烁）；
- * 保存 / 放弃语义与第 55 批一致：`draftOrder` 与已落库 `sortOrder` 完全分离。
+ * 第 4 轮优化：无三道横线「≡」手柄、无拖动说明文字，可拖性由整格手势 +
+ * 浅蓝灰白卡底色表达；二级态末行不足 5 列补 `weight(1f)` 空占位保证列对齐。
+ *
+ * `pointerInput { detectTapGestures(onLongPress) }` 只用于二级态静态一级格触发
+ * 「收起」状态切换，不涉及排序坐标换算 / 让位 / 索引，MUST NOT 与自实现
+ * 拖动手势混为一谈。`draftOrder` 与已落库 `sortOrder` 完全分离，语义不变。
  */
 @Composable
 fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
     val vm = settingsVm()
     val state by vm.state.collectAsState()
-    // null = 一级态；非 null = 二级态（即使用者观察到的「拖一级时二级折叠」）。
+    // null = 一级态；非 null = 二级态（拖一级时二级折叠）。
     var expandedRootId by remember { mutableStateOf<Long?>(null) }
     var confirmDiscard by remember { mutableStateOf(false) }
 
@@ -154,14 +161,10 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             if (expandedRootId == null) {
+                // 只留分组标题：MUST NOT 再常驻「长按手柄拖动」之类说明文字。
                 Text(
-                    text = "一级分类 · 长按手柄拖动排序",
+                    text = "一级分类",
                     style = MaterialTheme.typography.bodySmall,
-                    color = LedgerColors.Neutral
-                )
-                Text(
-                    text = "点一级名称可展开该组二级排序；一级拖动时二级折叠。",
-                    style = MaterialTheme.typography.labelSmall,
                     color = LedgerColors.Neutral
                 )
                 Spacer(Modifier.height(4.dp))
@@ -177,8 +180,13 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                         val key = "sort-root-" + root.id
                         item(key = key) {
                             ReorderableItem(reorderRoots, key = key) { _ ->
-                                val dragHandle = with(this) {
-                                    Modifier.longPressDraggableHandle()
+                                // 短按展开与长按整格拖动共享同一个 InteractionSource：
+                                // v3.1.0 README「Use with Card」段明确支持的共存写法。
+                                val interactionSource = remember { MutableInteractionSource() }
+                                val dragModifier = with(this) {
+                                    Modifier.longPressDraggableHandle(
+                                        interactionSource = interactionSource
+                                    )
                                 }
                                 Column(
                                     modifier = Modifier
@@ -187,6 +195,11 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                             Color(0xFFF2F3F7),
                                             RoundedCornerShape(12.dp)
                                         )
+                                        .clickable(
+                                            interactionSource = interactionSource,
+                                            onClick = { expandedRootId = root.id }
+                                        )
+                                        .then(dragModifier)
                                         .semantics {
                                             customActions = buildList {
                                                 if (idx > 0) {
@@ -210,16 +223,6 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                         .padding(vertical = 6.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Box(
-                                        modifier = dragHandle.size(32.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "≡",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = LedgerColors.Neutral
-                                        )
-                                    }
                                     CategoryGlyph(
                                         name = root.name,
                                         iconName = root.iconName,
@@ -233,10 +236,7 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                         style = MaterialTheme.typography.bodySmall,
                                         color = LedgerColors.Neutral,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.clickable {
-                                            expandedRootId = root.id
-                                        }
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -245,20 +245,9 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                 }
             } else {
                 // 二级态：一级区冻结为静态网格，白卡插在选中行之后。
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "「" + (selectedRoot?.name ?: "—") + "」的二级 · 点按手柄拖动",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = LedgerColors.Neutral,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = { expandedRootId = null }) {
-                        Text("收起，排一级")
-                    }
-                }
                 Text(
-                    text = "一级区已冻结；点其他一级可切换分组，两态顺序互不影响。",
-                    style = MaterialTheme.typography.labelSmall,
+                    text = "「" + (selectedRoot?.name ?: "—") + "」的二级分类",
+                    style = MaterialTheme.typography.bodySmall,
                     color = LedgerColors.Neutral
                 )
                 Spacer(Modifier.height(4.dp))
@@ -277,9 +266,20 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                     StaticRootCell(
                                         root = root,
                                         chosen = root.id == activeRootId,
-                                        onClick = { expandedRootId = root.id }
+                                        onTap = {
+                                            // 再点已选中一级格也收起，省掉专门按钮。
+                                            expandedRootId =
+                                                if (root.id == activeRootId) null else root.id
+                                        },
+                                        onLongPress = { expandedRootId = null }
                                     )
                                 }
+                            }
+                            // 末行不足 5 列补空占位：MUST NOT 让剩余格子被 weight 拉宽。
+                            repeat(5 - row.size) {
+                                Spacer(
+                                    Modifier.weight(1f).padding(horizontal = 2.dp)
+                                )
                             }
                         }
                         val parentId = activeRootId
@@ -289,14 +289,11 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color(0xFFF7F8FC), RoundedCornerShape(16.dp))
+                                    // 与一级区明显不同的浅蓝灰：靠底色标注二级区，
+                                    // MUST NOT 再用小字重复「点按手柄拖动排序」。
+                                    .background(Color(0xFFEAF0FF), RoundedCornerShape(16.dp))
                                     .padding(8.dp)
                             ) {
-                                Text(
-                                    text = "二级分类 · 点按小手柄拖动排序",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = LedgerColors.Neutral
-                                )
                                 if (children.isEmpty()) {
                                     Text(
                                         "该一级暂无二级分类",
@@ -318,7 +315,7 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                             val key = "sort-child-" + child.id
                                             item(key = key) {
                                                 ReorderableItem(reorderChildren, key = key) { _ ->
-                                                    val dragHandle = with(this) {
+                                                    val dragModifier = with(this) {
                                                         Modifier.draggableHandle()
                                                     }
                                                     Column(
@@ -328,6 +325,7 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                                                 Color.White,
                                                                 RoundedCornerShape(8.dp)
                                                             )
+                                                            .then(dragModifier)
                                                             .semantics {
                                                                 customActions = buildList {
                                                                     if (idx > 0) {
@@ -348,19 +346,9 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                                                     }
                                                                 }
                                                             }
-                                                            .padding(vertical = 4.dp),
+                                                            .padding(vertical = 6.dp),
                                                         horizontalAlignment = Alignment.CenterHorizontally
                                                     ) {
-                                                        Box(
-                                                            modifier = dragHandle.size(26.dp),
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Text(
-                                                                text = "≡",
-                                                                style = MaterialTheme.typography.bodyMedium,
-                                                                color = LedgerColors.Neutral
-                                                            )
-                                                        }
                                                         CategoryGlyph(
                                                             name = child.name,
                                                             iconName = child.iconName,
@@ -389,14 +377,9 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = "长按拖动一级，点按拖动二级",
-                style = MaterialTheme.typography.labelSmall,
-                color = LedgerColors.Neutral,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
+            // 底部只留操作按钮：MUST NOT 再常驻拖动说明文字。
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(onClick = { save() }, modifier = Modifier.weight(1f)) { Text("保存") }
@@ -424,12 +407,16 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
     }
 }
 
-/** 二级态的静态一级格：不挂拖柄、不可拖，点击只切换当前分组。 */
+/**
+ * 二级态的静态一级格：不挂拖柄、不可拖。
+ * 短按切换 / 收起分组，长按立即收起二级区回到一级态（Q1A）。
+ */
 @Composable
 private fun StaticRootCell(
     root: CategoryEntity,
     chosen: Boolean,
-    onClick: () -> Unit
+    onTap: () -> Unit,
+    onLongPress: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -438,7 +425,12 @@ private fun StaticRootCell(
                 if (chosen) CategoryHeaderBlue else Color(0xFFF2F3F7),
                 RoundedCornerShape(12.dp)
             )
-            .clickable(onClick = onClick)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onTap() },
+                    onLongPress = { onLongPress() }
+                )
+            }
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

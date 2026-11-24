@@ -43,15 +43,19 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /**
  * 第 56 批：记一笔「分类 ›」与明细筛选「分类」共用的**只读**分类选择弹层。
+ * 第 57 批（Q3A）：网格与搜索结果的二级**显示名一律用裸名**——左侧分组导航
+ * 已表明父级，拼成「餐饮 / 外卖」会把 5 列格单行省略成「餐饮 / …」。
+ * 但选中后回填筛选侧的 `displayName` MUST 仍经 `CategoryDisplay` 拼父级，
+ * 第 29 批由统计占比图例、扇区下钻、筛选面板、明细筛选 chip 四处共用的
+ * 显示名契约一字不动。
  *
  * 版式借一羽「添加二级分类」页：顶部搜索 + 左侧一级分组导航 + 右侧 5 列
- * 等宽彩色图标格。与 CategoryPickerScreen 的区别是：
- * MUST NOT 有名称输入框、MUST NOT 有「继续添加」/ 保存按钮、
+ * 等宽彩色图标格。MUST NOT 含名称输入框、MUST NOT 含「继续添加」/ 保存按钮、
  * MUST NOT 暴露任何写库路径 —— 点任一项立即回填并关闭。
  *
  * 既有口径零回归：数据源不按 enabled 过滤（停用项可选、靠小角标表达）、
  * 归档项不进选择器、按收支类型过滤（type 为 null 时不过滤，供筛选沿用）、
- * 搜索跨组平铺、二级显示名经 CategoryDisplay 拼成「一级 / 二级」。
+ * 搜索跨组平铺、点选无二次确认。
  *
  * 彩色 Tabler 图标只进本组件；记一笔快捷栏、明细列表行、账户详情、统计页
  * 仍用中性圆 + 中文首字，colorHex 一字不动。
@@ -59,7 +63,10 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 data class CategorySelectChoice(
     val categoryId: Long?,
     val rootId: Long?,
-    val label: String,
+    /** 网格 tile 与搜索结果的显示名：裸名，MUST NOT 拼父级前缀。 */
+    val tileName: String,
+    /** 回填筛选 chip 的只读展示名：仍为「一级 / 二级」。 */
+    val displayLabel: String,
     val level: Int
 )
 
@@ -88,24 +95,24 @@ fun CategorySelectDialog(
             .sortedBy { it.sortOrder }
     }
 
-    // 搜索命中：一级名或其下二级名；二级 label 一律带父级，避免同名混淆。
-    val hits: List<Pair<CategoryEntity, String>> = if (query.isBlank()) {
+    // 搜索命中：一级名或其下二级名；结果只保留 entity，
+    // 显示名（裸名）与回填名（拼父级）在 tileOf / choose 里统一算，不再带 label 字符串。
+    val hits: List<CategoryEntity> = if (query.isBlank()) {
         emptyList()
     } else {
         val q = query.trim()
         roots.flatMap { r ->
             val rootMatch = r.name.contains(q, ignoreCase = true)
-            val list = mutableListOf<Pair<CategoryEntity, String>>()
-            if (rootMatch) list += r to r.name
-            childrenOf(r.id).forEach { c ->
-                if (rootMatch || c.name.contains(q, ignoreCase = true)) {
-                    list += c to CategoryDisplay.resolve(r.name, c.name)
+            buildList {
+                if (rootMatch) add(r)
+                childrenOf(r.id).forEach { c ->
+                    if (rootMatch || c.name.contains(q, ignoreCase = true)) add(c)
                 }
             }
-            list
         }
     }
 
+    // 当前值仍是筛选 chip 口径：拼父级，MUST NOT 跟着改成裸名。
     val currentLabel = if (selectedId == null) {
         "全部分类"
     } else {
@@ -118,28 +125,33 @@ fun CategorySelectDialog(
         }
     }
 
-    fun choose(c: CategoryEntity, label: String) {
+    fun choose(c: CategoryEntity) {
         val rootId = if (c.level == 0) c.id else c.parentId
-        onSelect(CategorySelectChoice(c.id, rootId, label, c.level))
+        val parentName = c.parentId?.let { pid ->
+            scoped.firstOrNull { it.id == pid }?.name
+        }
+        val displayLabel = if (c.level == 1) {
+            CategoryDisplay.resolve(parentName, c.name)
+        } else {
+            c.name
+        }
+        onSelect(CategorySelectChoice(c.id, rootId, c.name, displayLabel, c.level))
         onDismiss()
     }
 
     val tiles: List<Pair<CategoryTile, () -> Unit>> = if (query.isNotBlank()) {
-        hits.map { (c, label) ->
-            Pair(tileOf(c, label), { choose(c, label) })
-        }
+        hits.map { c -> Pair(tileOf(c), { choose(c) }) }
     } else if (navRootId == null) {
-        roots.map { r -> Pair(tileOf(r, r.name), { choose(r, r.name) }) }
+        roots.map { r -> Pair(tileOf(r), { choose(r) }) }
     } else {
         val r = roots.firstOrNull { it.id == navRootId }
         if (r == null) {
             emptyList()
         } else {
             buildList {
-                add(Pair(tileOf(r, r.name), { choose(r, r.name) }))
+                add(Pair(tileOf(r), { choose(r) }))
                 childrenOf(r.id).forEach { c ->
-                    val label = CategoryDisplay.resolve(r.name, c.name)
-                    add(Pair(tileOf(c, label), { choose(c, label) }))
+                    add(Pair(tileOf(c), { choose(c) }))
                 }
             }
         }
@@ -193,7 +205,11 @@ fun CategorySelectDialog(
                                 selected = navRootId == null && query.isBlank(),
                                 onClick = {
                                     if (allowAll) {
-                                        onSelect(CategorySelectChoice(null, null, "全部分类", -1))
+                                        onSelect(
+                                            CategorySelectChoice(
+                                                null, null, "全部分类", "全部分类", -1
+                                            )
+                                        )
                                         onDismiss()
                                     } else {
                                         navRootId = null
@@ -242,9 +258,10 @@ fun CategorySelectDialog(
     }
 }
 
-private fun tileOf(c: CategoryEntity, label: String): CategoryTile = CategoryTile(
+/** 网格显示名一律用裸名；MUST NOT 拼父级前缀。 */
+private fun tileOf(c: CategoryEntity): CategoryTile = CategoryTile(
     id = c.id,
-    name = label,
+    name = c.name,
     iconName = c.iconName,
     colorHex = c.colorHex,
     enabled = c.enabled

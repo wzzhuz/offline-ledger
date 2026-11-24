@@ -246,3 +246,32 @@
        `CategoryPickerScreen` 零改动，`colorHex` 零改动
 - [x] 4.9.6 `defaultVersionName` → `0.2.37`；活文档 §2.6 / §7.3 / §7.38 / §8
        与 `openspec/project.md` 同步
+
+### 4.10 第 4 轮交互优化（Q1A / Q2A / Q3A，第 57 批）
+
+- [x] 4.10.1 排序页一级 / 二级**整格**挂拖动手柄，删掉所有「≡」小手柄；
+       一级短按展开与长按拖动共享 `MutableInteractionSource` 共存（v3.1.0 README「Use with Card」写法）
+- [x] 4.10.2 二级态外层末行不足 5 列时补 `weight(1f)` 空占位，格宽恒 1/5；
+       白卡内维持 `GridCells.Fixed(5)` 不改自适应列
+- [x] 4.10.3 Q1A：二级态静态一级格 `detectTapGestures(onLongPress)` 长按即自动收起二级区，
+       删「收起，排一级」按钮；返回键与再点已选中一级格仍可收起
+- [x] 4.10.4 Q2A：删白卡内小字、顶部「一级区已冻结…」、一级态两行引导、
+       底部「长按拖动一级，点按拖动二级」，只留分组标题与「保存 / 放弃」；
+       白卡底色 `0xFFF7F8FC` → `0xFFEAF0FF`，二级格仍白底圆角
+- [x] 4.10.5 Q3A：`CategorySelectChoice` 拆 `tileName`（裸名）与
+       `displayLabel`（`CategoryDisplay` 拼父级）；网格与搜索结果显示裸名，
+       筛选回填 `displayName` 仍拼父级；`CategoryPickerScreen` / `CategoryDisplay` 零改动
+- [x] 4.10.6 spec 两份 / design / proposal / 活文档 §2.6 §7.3 §7.39 §8 / project.md 同步；
+       `defaultVersionName` → `0.2.38`
+
+### 6.24–6.28 第 4 轮新增真机待验
+
+- [ ] 6.24 一级格整格长按拖动、短按展开二级两种手势共存且互不误触（共享 `MutableInteractionSource` 的实际手感）
+- [ ] 6.25 二级态长按任意一级格立即收起二级并回到一级态；收起后两层 `draftOrder` 不丢；
+       再长按一次可开始一级拖动（Q1A 已知代价：同一次手势无法跨容器接续）
+- [ ] 6.26 一级数非 5 倍数时末行空占位让列线对齐；白卡内二级末排格宽与前排一致，不被拉宽
+- [ ] 6.27 删光文本提示后首次进入是否仍能猜到可拖（可发现性）；浅蓝灰白卡 + 白格
+       是否足以区分二级区，与灰阶图标对比度是否够
+- [ ] 6.28 选择器网格与搜索结果二级均为裸名、不再被省略成「餐饮 / …」；
+       筛选 chip / 明细筛选 / 统计占比图例仍显示「一级 / 二级」；跨组搜索同名项归属缺失可接受
+

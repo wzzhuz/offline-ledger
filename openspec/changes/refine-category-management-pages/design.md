@@ -371,17 +371,18 @@ MUST NOT 当作一羽实现。只能按截图与使用者观察推断为**两态
 这同时满足使用者三个观察点：拖一级时二级折叠、两级互不干涉、
 二级「由横排一个变成横排 5 个」。`GridCells.Fixed(5)` 原生支持跨行跨列换位。
 灰阶降噪保留（一羽图 3 自身降饱和），彩色只在分类列表页与全量选择器；
-底部仍是「长按拖动一级，点按拖动二级」+「保存 / 放弃」。
+**第 4 轮优化后**：无三道横线手柄、无拖动说明文字，只留分组标题与「保存 / 放弃」，
+二级区靠浅蓝灰底 + 白格区分。
 
 #### 实现路径（避开已知坑）
 
 | 层 | 做法 | 规避的坑 |
 |---|---|---|
-| 一级态 | 单个 `LazyVerticalGrid(Fixed(5))` + `longPressDraggableHandle`；容器内**无 span / header**，`from.index` 直接对应 `draftOrder` 下标；`ReorderableItem` key 与 `item(key=…)` 一致 | 无 `GridItemSpan` → 不再有索引错位；沿用第 1 轮已跑通的 key 规则 |
-| 二级态外层 | **非惰性** `Column + Row(weight(1f))` 手工 5 列展示 15 个一级（3 行），静态、不挂拖柄；白卡按选中行位置插在对应 Row 之后 | 非惰性容器不参与滚动，白卡「插在中间」的 1:1 视觉成立且无同方向嵌套滚动 |
-| 二级态白卡内 | 第二套 `LazyVerticalGrid(Fixed(5))` + `rememberReorderableLazyGridState`，`draggableHandle` 点按拖；单父级最多 11 项 = 3 行，白卡限高、自身滚动 | 外层非惰性 → **不是**惰性套惰性；库原生让位 / 边缘滚动 / 补间全部复用 |
+| 一级态 | 单个 `LazyVerticalGrid(Fixed(5))`，**整格**挂 `longPressDraggableHandle`、短按展开共享 `MutableInteractionSource`；容器内**无 span / header**，`from.index` 直接对应 `draftOrder` 下标 | 无 `GridItemSpan` → 不再有索引错位；去掉 ≡ 手柄后整格可拖 |
+| 二级态外层 | **非惰性** `Column + Row(weight(1f))` 手工 5 列展示一级（3 行），静态、不挂拖柄，但**长按整格 → 自动收起回一级态**；末行不足 5 个补 `weight(1f)` 空占位；白卡按选中行位置插在对应 Row 之后 | 非惰性容器不参与滚动；空占位保证列宽恒 1/5 |
+| 二级态白卡内 | 第二套 `LazyVerticalGrid(Fixed(5))` + `rememberReorderableLazyGridState`，**整格**挂 `draggableHandle` 点按拖；单父级最多 11 项 = 3 行，白卡限高、自身滚动；底色改浅蓝灰 `0xFFEAF0FF`、二级格白底 | 外层非惰性 → **不是**惰性套惰性；`Fixed(5)` 保证末排格宽恒定 |
 | 互不干涉 | 两套独立 `LazyGridState` + 两套 reorder state，各自 `onMove` 只改自己那段 `draftOrder`；同一时刻只渲染一个可拖容器 | 库状态按容器实例隔离，一个容器拖动不会触发另一个的 `onMove` |
-| 兜底 | 每格保留上移 / 下移按钮供 TalkBack；`commitRootOrder` / `commitChildOrder` / `moveCategory` 不动 | 无障碍与列表页既有能力零回归 |
+| 兜底 | 每格 `semantics.customActions` 提供上移 / 下移（只列可行方向），MUST NOT 在小格里堆按钮；`commitRootOrder` / `commitChildOrder` / `moveCategory` 不动 | 无障碍与列表页既有能力零回归 |
 
 #### 库 README 的两条硬约束（MUST 遵守）
 
@@ -493,6 +494,46 @@ MUST NOT 当作一羽实现。只能按截图与使用者观察推断为**两态
 **零回归核对**：`CategoryPickerScreen.kt` 未改；记一笔快捷栏、明细列表行、账户详情、
 统计页仍用 `CategoryIcon`（中性圆 + 首字）；`colorHex` 与三处 DAO 投影未动；
 `AppDatabase.version = 5` 未动；`default_categories.json` 未动；零新增 Gradle 依赖。
+
+
+## 第 4 轮交互优化（Q1A / Q2A / Q3A，第 57 批）
+
+**触发**：v0.2.37 装机后使用者提 5 条——① 专门排序页不需要 ≡ 手柄提醒、应整格直接拖；
+② 展开一级后末排不满 5 列会被拉宽不对齐；③ 「收起，排一级」多一步，应长按一级即自动收起二级；
+④ 二级区小字提示多余，改用底色标注；⑤ 选择器二级拼「餐饮 / …」被省略，左侧已选一级无需拼接。
+
+**核查 v3.1.0 README 的补正**（上一轮留了半截结论）：
+- `longPressDraggableHandle` / `draggableHandle` 均有 `onDragStarted` / `onDragStopped` 回调；
+- 「Use with Card」段明确给出**可点击容器与拖动手柄共存的正式写法**：
+  两者共享一个 `MutableInteractionSource`，手柄把 drag events 发给它；
+  不是「需要避开的冲突」。本批据此把短按展开与长按整格拖动挂同一格。
+- 库支持 non-reorderable items / section headers，`from.index` 在有非拖 item 时须减偏移——
+  这正是 Q1B（单网格 + `GridItemSpan`）的风险来源，也是选 Q1A 的理由。
+
+**Q1A（保留两态互斥）**：二级态静态一级格用
+`Modifier.pointerInput { detectTapGestures(onLongPress = { expandedRootId = null }) }`
+触发收起，删掉「收起，排一级」按钮；左上返回键、再点已选中一级格仍可收起。
+MUST 明确区分：这里只是**状态切换触发器**，不是自实现排序拖动手势，
+不涉及坐标换算 / 让位 / 索引，MUST NOT 与 §7.38「4 轮 pointer pass 坑」混为一谈。
+代价如实登记：同一次手势无法跨两个容器接续，收起后需再长按一次才拖得动
+（使用者已知悉并选 A）。
+
+**Q2A**：删白卡内「二级分类 · 点按小手柄拖动排序」、顶部「一级区已冻结…」、
+一级态两行引导、底部「长按拖动一级，点按拖动二级」，以及「收起，排一级」按钮；
+只留分组标题（一级态「一级分类」/ 二级态「「餐饮」的二级分类」）与「保存 / 放弃」。
+白卡底色由 `0xFFF7F8FC` 改 `0xFFEAF0FF`，二级格仍白底圆角，靠底色差分区。
+**可发现性**列入真机待验：完全没有文本提示后，首次进入是否仍能猜到可拖。
+
+**末排对齐**：二级态外层 `roots.chunked(5)` 的末行补 `repeat(5 - row.size)`
+个 `Spacer(Modifier.weight(1f))`，格宽恒 1/5。白卡内是 `LazyVerticalGrid(Fixed(5))`，
+最后一排留白但格宽不变，MUST NOT 误改成自适应列。
+
+**Q3A（裸名显示、回填仍拼父级）**：`CategorySelectChoice` 拆成
+`tileName`（网格 / 搜索结果显示的裸名）与 `displayLabel`（回填筛选 chip 的
+`CategoryDisplay.resolve(父级, 子级)`）。MUST NOT 动第 29 批由统计占比图例、
+扇区下钻、筛选面板、明细筛选 chip 四处共用的显示名契约；
+`CategoryPickerScreen` 与 `CategoryDisplay` 本身零改动。
+跨组搜索不同父级下的同名二级看不出归属，是 Q3A 明确接受的代价。
 
 ## 验证
 

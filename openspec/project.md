@@ -645,3 +645,12 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   未随制品留存；Release 附件与 tag 不受影响，按 §7.33/§7.35 只认 Release assets。
   坚果云落盘因 job logs 403 无法确认，不写成已上传。归档仍需使用者明确说「可以归档」。
 
+## 第 57 批（v0.2.38）：排序页整格拖动 + 选择器裸名显示
+
+- **起因**：v0.2.37 装机后使用者提 5 条交互问题，拍板 Q1A / Q2A / Q3A「直接做完出包」。
+- **核查补正**：v3.1.0 README「Use with Card」段明确给出 `clickable` 与 `draggableHandle` 共存的正式写法（共享 `MutableInteractionSource`），并确认 `onDragStarted` / `onDragStopped` 存在；上一轮 design 里「共存需额外处理」的半截结论补齐。
+- **排序页**：一级 / 二级**整格**挂拖动手柄，删掉所有「≡」小手柄；一级短按展开与长按拖动共享 `MutableInteractionSource`。Q1A：二级态静态一级格 `detectTapGestures(onLongPress)` 长按即自动收起二级区，删「收起，排一级」按钮（左上返回键、再点已选中一级格仍可收起）。末行不足 5 列补 `weight(1f)` 空占位。Q2A：删白卡小字、顶部冻结说明、一级态两行引导、底部拖动提示，只留分组标题与「保存 / 放弃」；白卡底色 `0xFFEAF0FF`、二级格白底。
+- **选择器 Q3A**：`CategorySelectChoice` 拆 `tileName`（网格 / 搜索结果显示裸名）与 `displayLabel`（回填筛选 `displayName` 仍经 `CategoryDisplay` 拼父级）；第 29 批四处共用显示名契约零改动，`CategoryDisplay` / `CategoryPickerScreen` 零改动。
+- **零改表 / 零回归**：`AppDatabase.version = 5`、`default_categories.json`、`colorHex`、三处 DAO 投影、备份整表替换未动；零新增 Gradle 依赖；`defaultVersionName` → `0.2.38`，v0.2.37 直接覆盖安装。
+- **CI 全绿不替代真机**：活文档 §8 第 57 批新增 6.24–6.28 五项真机待验（尤其删光提示后的可发现性、整格短按/长按共存手感），既有项整体继承。归档仍需使用者明确说「可以归档」。
+
