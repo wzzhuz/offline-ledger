@@ -910,3 +910,17 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 授权与商标口径与第 64 批 [C] 完全一致，MUST NOT 写成「已解决授权」。
 - CI 全绿不替代真机，§8 第 65 批新增 3 项待验，既有项整体继承。
 
+### 第 65 批实测（v0.2.46 出包）
+
+- 代码/资源/文档 commit `648a0f495de1`，32 文件（22 PNG base64 blob）
+  逐 blob 双校验 PASS；六静态检查全绿；`AccountIconCatalog.kt` 零改动。
+- push CI `45390863499` 全绿（329 项单测）；出包 CI `45391543168` 全绿；
+  tag `v0.2.46` → `648a0f495de1`；Release 附件
+  `offline-ledger-v0.2.46-release-648a0f49.apk`（3405640 B，
+  SHA256 `98e6fa62a19c6a1c75ad5a070b2ff43f6f7836ca986a3382e8fb35b9bd0c08db`），`state=uploaded` + `digest` 与 notes 一致。
+- **触发与轮询拆分生效**：轮询工具调用同样超时，但触发已在独立极短调用里
+  完成，只注册 1 个 run，无重复 dispatch、无 cancel、无二次发布。
+- artifacts 3 个、无染绿、无失败步骤、`mapping.txt` 留存；
+  坚果云落盘 job logs 403 无法确认。
+- 三个 change 仍未归档，归档需使用者明确说「可以归档」。
+

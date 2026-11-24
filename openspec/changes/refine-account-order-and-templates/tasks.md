@@ -201,8 +201,11 @@
 - [x] 17.7 `privacy-security` spec 新增 1 条 Requirement；proposal / design /
       tasks / 活文档 / project.md 同步；版本号 `0.2.46`
 - [x] 17.8 `AccountIconCatalog.kt` 与三页 UI 零改动自查
-- [ ] 17.9 推送逐 blob 双校验 / 双 CI 全绿 / Release digest 一致
-- [ ] 17.10 实测回填；归档校验仍保持 `[ ]`
+- [x] 17.9 推送逐 blob 双校验（32 文件含 22 PNG）/ push CI
+      `45390863499` / 出包 CI `45391543168` / tag `v0.2.46` /
+      SHA256 `98e6fa62a19c6a1c75ad5a070b2ff43f6f7836ca986a3382e8fb35b9bd0c08db` / 单次 dispatch 无重复
+- [x] 17.10 实测回填（见活文档 §7.47 与 project.md）；
+      正式归档校验仍保持 `[ ]`
 
 ## 18. 第 65 批真机待验（`[ ]`）
 
