@@ -175,8 +175,11 @@
 - [x] 15.7 `tools/build_account_icons.py` + `tools/account_icon_sources.md`
 - [x] 15.8 `privacy-security` spec 修订 Q7 条文 + 新增 1 条 Requirement
 - [x] 15.9 版本号 `0.2.45`；proposal / design / tasks / 活文档 / project.md 同步
-- [ ] 15.10 推送逐 blob 双校验 / 双 CI 全绿 / Release digest 一致
-- [ ] 15.11 实测回填；归档校验仍保持 `[ ]`
+- [x] 15.10 推送逐 blob 双校验（37 文件含 26 PNG）/ push CI
+      `45386038965` / 出包 CI `45386948136` / tag `v0.2.45` /
+      SHA256 `3bad8260338ff1c51cbc7d93d8ad500351fe80e92357eb432af117fa0e4f47f9` / 重复 run `45387413474` 已 cancel 且无二次发布
+- [x] 15.11 实测回填（见活文档 §7.46 与 project.md）；
+      正式归档校验仍保持 `[ ]`
 
 ## 16. 第 64 批真机待验（`[ ]`）
 

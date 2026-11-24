@@ -870,3 +870,20 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   零 `INTERNET` 权限、零新增 Gradle 依赖、零表结构变更。
 - CI 全绿不替代真机，§8 第 64 批新增 6 项待验，既有项整体继承。
 
+### 第 64 批实测（v0.2.45 出包）
+
+- 代码 + 资源 + 文档最终 commit `63e378cce2a4`，37 文件（含 26 个 PNG
+  base64 blob）逐 blob 双校验 PASS；六静态检查全绿。
+- push CI `45386038965` 全绿（329 项单测）；出包 CI `45386948136` 全绿；
+  tag `v0.2.45` → `63e378cce2a4`；Release 附件
+  `offline-ledger-v0.2.45-release-63e378cc.apk`（3362552 B，
+  SHA256 `3bad8260338ff1c51cbc7d93d8ad500351fe80e92357eb432af117fa0e4f47f9`），`state=uploaded` + `digest` 与 notes 一致。
+- **重复 dispatch 如实登记**：长轮询工具调用超时重放，release workflow
+  出现两个 run；第二个 `45387413474` 在 26/28 步主动 cancel
+  （最终 `completed/cancelled`），发布步骤前挡住，tag / Release 资产 id
+  `786984464` / digest 均单一，无二次发布。教训：触发必须是独立极短调用，
+  轮询只查状态，MUST NOT 合进同一个长调用。
+- artifacts 3 个、无染绿、无失败步骤、`mapping.txt` 留存；
+  坚果云落盘 job logs 403 无法确认。
+- 三个 change 仍未归档，归档需使用者明确说「可以归档」。
+
