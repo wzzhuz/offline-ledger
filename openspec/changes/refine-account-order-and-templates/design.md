@@ -300,6 +300,11 @@ MUST NOT 再在 `StatsScreen` 或 `LedgerApp` 里拼一次。
 拼上 `(1122)` 会让往返把同一张卡当新账户。这条与「显示名」必须分开，
 是本次全量排查最容易改错的地方。
 
+> **第 63 批注**：上段关于 **CSV 导出** 的结论已被使用者要求显式推翻 ——
+> 它只防住了「导入当新账户」，却没防住「同名两卡静默归错」。
+> 现改为导出带展示名 + `cardLast4` 列、导入复合匹配。
+> **加密备份 `BackupAccount.name` 仍 MUST NOT 改**（走 `id` 还原）。
+
 ### 单测
 
 新增 `AccountDisplayLabelTest`（5 个用例，纯 JVM、不碰 Room Entity）：
@@ -311,4 +316,94 @@ null name 透传。锁住最容易漂移的分支。
 排行榜 `RankRowView` 与筛选 picker 行都是 `maxLines = 1`，
 组合名变长后可能截断；统计 / 筛选 / 明细三处观感与可区分度需真机看。
 CI 全绿不替代观感验收。
+
+---
+
+## 第 63 批实现要点：CSV 往返改成复合键
+
+### 为什么必须下沉到 core
+
+第 62 批的组合实现在 `ui/assets/AccountDisplayLabel.kt`，依赖 Room
+`AccountEntity`。而 CSV 导出 / 导入属于 `backup.csv` 纯 JVM 层，
+不能依赖 ui。若为了导出再写一份 `name + " (" + last4 + ")"`，
+就会出现「UI 一份、Codec 一份、SQL 一份」三处漂移 —— 正是 §7.44
+明令禁止的。所以抽 `core/AccountLabel.kt`：
+
+```
+core/accountLabel(name, last4)          ← 唯一实现（纯 JVM）
+core/stripAccountCardSuffix(name,last4) ← 严格互逆
+   ├─ ui.assets.accountBaseLabel(entity)   （Entity 重载）
+   ├─ ui/detail/* 的 DAO 投影组合
+   ├─ backup.csv.AccountCsvMatch           （解析 + 复合匹配）
+   └─ LedgerRepository.exportCsvRows       （导出展示名）
+```
+
+`ui/assets/AccountDisplayLabel.kt` 只留转发，MUST NOT 再写一份逻辑；
+`DetailScreen` / `RecordDetailPage` 的 import 改指 core。
+
+### CSV 格式（13 列，第 13 列可选）
+
+```
+date,type,amount,account,categoryRoot,category,note,currencyCode,
+counterparty,importSource,sourceId,description,cardLast4
+```
+
+- `account` = `accountLabel(a.name, a.cardLast4)` → 人眼可分
+- `cardLast4` = `a.cardLast4` 或空 → 机器精确匹配
+- `HEADER` 加列，`parseImport` / `parseRebuild` / `detectFormat`
+  三处 `optional` 集合都加 `cardLast4`，**老 8~12 列文件零改动仍可导入**
+- `CsvRow.cardLast4` 是末尾带默认值的参数，所有既有位置构造零破坏
+- `duplicateKey()` 仍用 `accountName`，自有导出重复导入保持幂等
+
+### 匹配算法（`AccountCsvMatch.kt`，纯 JVM）
+
+```
+parseAccountCell(cell, column):
+    inline = Regex("^(.*) \((\d{4})\)$") 匹配 account 尾部
+    base   = inline?.group1 ?: cell.trim()
+    last4  = column(4位数字) ?: inline?.group2
+    → ParsedAccount(base, last4)
+
+resolveAccount(refs, parsed):
+    hits = refs.filter {
+        stripAccountCardSuffix(it.name, it.cardLast4) == parsed.name
+            || it.name == parsed.name
+        && (parsed.last4 == null || it.cardLast4 == parsed.last4)
+    }
+    hits.size == 1 → Unique(id)
+    hits.isEmpty() → Missing
+    else           → Ambiguous（列出候选展示名）
+```
+
+`parsed.last4 == null` 表示老 CSV / 第三方账单：不限定卡号，
+但同名多条仍 MUST 报歧义。`stripAccountCardSuffix` 让旧库
+`name` 已含 ` (1122)` 的账户不会被判成缺失。
+
+### 四个消费点
+
+| 路径 | 行为 |
+|---|---|
+| `findImportCandidates` | 复合匹配；缺失/歧义跳过，**不报疑似候选**（宁可不报，不挂错卡） |
+| `importRecords` | 复合匹配；缺失/歧义抛 `IllegalArgumentException`，整批回滚 |
+| `rebuildFromOwnCsv` | `CsvRebuildResolver.resolve(rows, List<AccountRef>, ...)`，唯一命中才 ready；写入时复用同一个 id |
+| `importFirefly` | `targetName` 仍纯名，新增 `targetCardLast4`；同名多条时 `SettingsViewModel` 不自动映射，改用 isNew 让使用者在下拉里选（下拉显示展示名） |
+
+`CsvRebuildResolver` 保留旧 `Set<String>` 重载委托到新签名，
+既有单测零改动；新签名用 `AccountRef` 才能带卡号。
+
+### 数据语义红线（本批修订版）
+
+| 载体 | 口径 |
+|---|---|
+| CSV `account` + `cardLast4` | 展示名 + 复合键，**允许带卡号** |
+| 加密备份 `BackupAccount.name` | **仍是纯名**，走 `id` 还原，MUST NOT 改 |
+| Room `accounts.name` | **仍是纯名**，`cardLast4` 单一真相源 |
+| `CsvRow.duplicateKey()` | 不变（用 `accountName`） |
+
+### 风险
+
+`account` 列变长后 `CsvRow.duplicateKey()` 的派生 sourceId 与老文件不同，
+但 `recordDao.countDuplicate(accountId, ...)` 仍兜底，幂等性不丢。
+`parseAccountCell` 只认尾部 ` (4位数字)`，账户名本身带括号但不是 4 位数字
+时按字面处理，不误拆。真机需验 Excel 打开 13 列不乱码、重建后归属正确。
 

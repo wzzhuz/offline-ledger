@@ -19,10 +19,16 @@ data class CsvRebuildResolution(
 )
 
 object CsvRebuildResolver {
-    /** categoryPaths 元素形如 "居住" 或 "居住/水费"，含归档与停用分类。 */
+    /**
+     * 第 63 批：账户集合改用 `AccountRef`，按 `(name, cardLast4)` 复合匹配。
+     * 唯一命中才算 ready；缺失、歧义都算 skipped 并给出可读原因，
+     * MUST NOT 静默把同名两卡的流水归到第一张。
+     *
+     * categoryPaths 元素形如 "居住" 或 "居住/水费"，含归档与停用分类。
+     */
     fun resolve(
         rows: List<CsvRow>,
-        accountNames: Set<String>,
+        knownAccounts: List<AccountRef>,
         categoryPaths: Set<String>
     ): CsvRebuildResolution {
         val ready = mutableListOf<CsvRow>()
@@ -30,11 +36,17 @@ object CsvRebuildResolver {
         val missCategories = linkedSetOf<String>()
         var skipped = 0
         rows.forEach { row ->
-            val accountOk = row.accountName in accountNames
+            val parsed = parseAccountCell(row.accountName, row.cardLast4)
+            val match = resolveAccount(knownAccounts, parsed)
+            val accountOk = match is AccountMatch.Unique
             val path = if (row.category.isBlank()) row.categoryRoot
                        else row.categoryRoot + "/" + row.category
             val categoryOk = path in categoryPaths
-            if (!accountOk) missAccounts += row.accountName
+            when (match) {
+                is AccountMatch.Unique -> Unit
+                is AccountMatch.Missing -> missAccounts += match.reason
+                is AccountMatch.Ambiguous -> missAccounts += match.reason
+            }
             if (!categoryOk) missCategories += path
             if (accountOk && categoryOk) ready += row else skipped++
         }
@@ -42,4 +54,15 @@ object CsvRebuildResolver {
             ready, missAccounts.toList(), missCategories.toList(), skipped
         )
     }
+
+    /** 旧签名保留：纯名集合视为无卡号的账户，既有单测零改动。 */
+    fun resolve(
+        rows: List<CsvRow>,
+        accountNames: Set<String>,
+        categoryPaths: Set<String>
+    ): CsvRebuildResolution = resolve(
+        rows,
+        accountNames.map { AccountRef(0L, it, null) },
+        categoryPaths
+    )
 }

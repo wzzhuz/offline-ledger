@@ -2,7 +2,7 @@ package com.zwz.offlineledger.ui.detail
 
 import com.zwz.offlineledger.data.display.CategoryDisplay
 import com.zwz.offlineledger.ui.assets.accountBaseLabel
-import com.zwz.offlineledger.ui.assets.accountLabel
+import com.zwz.offlineledger.core.accountLabel
 import com.zwz.offlineledger.data.paging.DetailGranularity
 
 import androidx.activity.compose.BackHandler

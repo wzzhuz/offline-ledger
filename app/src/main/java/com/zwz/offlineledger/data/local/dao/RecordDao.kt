@@ -115,7 +115,9 @@ data class CsvSourceRow(
     val importSource: String = "",
     val sourceId: String = "",
     /** 第 43 批：列表主标题在有描述时用它；缺列时按空串兼容。 */
-    val description: String = ""
+    val description: String = "",
+    /** 第 63 批：账户卡号后四位，导出复合匹配键的第二列。 */
+    val accountCardLast4: String? = null
 )
 
 /** 第 23 批：账单导入前的疑似匹配候选（金额 + 账户 + 时间窗）。 */
@@ -479,6 +481,7 @@ interface RecordDao {
                COALESCE(r.sourceId, '') AS sourceId,
                COALESCE(r.description, '') AS description,
                COALESCE(a.name, '') AS accountName,
+               a.cardLast4 AS accountCardLast4,
                COALESCE(rc.name, '') AS rootName,
                COALESCE(c.name, '') AS categoryName
           FROM records r

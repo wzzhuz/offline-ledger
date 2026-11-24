@@ -163,3 +163,41 @@ MUST NOT 因 Popup 与新窗口同帧竞争而「点了删除没弹窗」。
 - **WHEN** 点「⋮」→「删除」
 - **THEN** 一定出现二次确认弹窗，含账户名 / 余额 / 红字警示 /「确认删除」/「取消」
 - **AND** 点「取消」后账户仍在、零写库
+
+---
+
+### Requirement: CSV 与 Firefly 导入按账户名与卡号后四位复合匹配
+
+**第 63 批**：账户表 SHALL 继续允许同名，唯一键仍是自增 `id`；
+CSV 与 Firefly 导入 MUST NOT 再用 `firstOrNull { it.name == ... }`
+静默命中同名第一张卡。
+CSV 导出 SHALL 在 `account` 列写 `accountLabel(name, cardLast4)` 展示名，
+并 SHALL 新增可选 `cardLast4` 列写卡号后四位；
+导入 SHALL 经 `parseAccountCell` 解析出 `(纯名, 后四位?)`，
+再经 `resolveAccount` 按复合键匹配：
+唯一命中 SHALL 用该 `id` 落流水；零命中 SHALL 明确报「账户不存在」；
+**多命中 SHALL 报歧义并列出候选展示名，MUST NOT 静默取第一条**。
+老 CSV / 第三方账单缺 `cardLast4` 列时 SHALL 回退纯名匹配且仍遵守上述唯一性要求。
+旧库 `name` 已含 ` (xxxx)` 后缀的账户 SHALL 经
+`stripAccountCardSuffix` 还原纯名后参与匹配。
+Firefly 映射 SHALL 携带 `targetCardLast4`，源名同名多条时 SHALL
+不自动映射、由使用者在显示展示名的下拉里明确选择。
+**加密备份 `BackupAccount.name` 与 Room `accounts.name` SHALL 仍是纯名**，
+`CsvRow.duplicateKey()` 契约 SHALL 不变。
+组合逻辑 SHALL 只有 `core/accountLabel` 一份实现，
+MUST NOT 在 SQL / Codec / Repository 里再拼一遍字符串。
+
+#### Scenario: 同名两卡往返各自归位
+
+- **GIVEN** 两张 `name = "工商银行"`、`cardLast4` 为 1122 / 3344 的账户各有流水
+- **WHEN** 导出 CSV 再重建
+- **THEN** 两笔流水分别回到原 `id` 账户，MUST NOT 归到同一张卡
+- **AND** 加密备份的账户名仍是纯名「工商银行」
+
+#### Scenario: 老文件歧义不静默错配
+
+- **GIVEN** 库里两张同名「工商银行」、一份无 `cardLast4` 列且账户列为纯名的老 CSV
+- **WHEN** 导入
+- **THEN** 报「账户不唯一，请指定 cardLast4」并整批回滚
+- **AND** 不产生任何流水写入
+

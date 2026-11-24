@@ -19,7 +19,14 @@ data class CsvRow(
     val importSource: String = "",
     val sourceId: String = "",
     /** 第 43 批：导出必带、导入缺列按空串处理（旧 CSV 兼容）。 */
-    val description: String = ""
+    val description: String = "",
+    /**
+     * 第 63 批：卡号后四位，账户**复合匹配键**的第二列。
+     * 导出必带、导入缺列按空串处理（老 8~12 列 CSV 仍可导入）。
+     * `accountName` 此时是展示名（含 `(1122)`），本列是机器键，
+     * MUST NOT 把两者合并成一个字符串后再解析。
+     */
+    val cardLast4: String = ""
 ) {
     /**
      * 导入去重键 = 账户 + 金额 + 日期 + 备注。

@@ -54,6 +54,36 @@ class CsvRebuildResolverTest {
     }
 
     @Test
+    fun `compound key resolves two same-name cards separately`() {
+        val refs = listOf(
+            AccountRef(1L, "工商银行", "1122"),
+            AccountRef(2L, "工商银行", "3344")
+        )
+        val rows = listOf(
+            row("工商银行 (1122)", "居住", "水费").copy(cardLast4 = "1122"),
+            row("工商银行 (3344)", "居住", "水费").copy(cardLast4 = "3344")
+        )
+        val r = CsvRebuildResolver.resolve(rows, refs, setOf("居住/水费"))
+        assertEquals(2, r.ready.size)
+        assertEquals(0, r.skippedMissing)
+        assertTrue(r.missingAccounts.isEmpty())
+    }
+
+    @Test
+    fun `legacy row without card column and duplicate names is reported ambiguous`() {
+        val refs = listOf(
+            AccountRef(1L, "工商银行", "1122"),
+            AccountRef(2L, "工商银行", "3344")
+        )
+        val r = CsvRebuildResolver.resolve(
+            listOf(row("工商银行", "居住", "水费")), refs, setOf("居住/水费")
+        )
+        assertEquals(0, r.ready.size)
+        assertEquals(1, r.skippedMissing)
+        assertTrue(r.missingAccounts.single().contains("cardLast4"))
+    }
+
+    @Test
     fun `same child name under different roots resolves separately`() {
         val r = CsvRebuildResolver.resolve(
             listOf(row("招行储蓄", "餐饮", "其他"), row("招行储蓄", "养车", "其他")),

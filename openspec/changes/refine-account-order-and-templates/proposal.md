@@ -197,7 +197,7 @@ CI 全绿仍不替代观感 / 手势 / 键盘验收，但**不替代的不再是
 
 | 位置 | 不改的理由 |
 |---|---|
-| `RecordDao` CSV 导出 `COALESCE(a.name,'') AS accountName` / `LedgerRepository` 导出映射 | **数据往返语义**：导出账户名拼上卡号，导入会把同一张卡当成新账户 |
+| ~~`RecordDao` CSV 导出 `COALESCE(a.name,'') AS accountName` / `LedgerRepository` 导出映射~~ | **第 63 批作废**：原理由「拼卡号会让导入当新账户」只防住了一种错，没防住「同名两卡静默归错」。改为导出带展示名 + `cardLast4` 列、导入复合匹配。加密备份 DTO 仍不改 |
 | `BackupAccount` / `CsvRow` / `FireflyCsvCodec` | 备份与 CSV DTO，同上 |
 | `AccountIconBox(name = account.name)`（资产页 / 独立排序页） | 只取首字画中性圆图标，传纯名才正确 |
 | `AddAccountDialog` 模板回填 `name = t.name`、编辑框 `stripLegacyCardSuffix` | 输入框 / 写入值，不是展示名 |
@@ -219,7 +219,61 @@ CI 全绿仍不替代观感 / 手势 / 键盘验收，但**不替代的不再是
 1. 筛选面板账户选项、picker 搜索、明细筛选 chip 均带后四位且可区分同名卡；
 2. 统计页账户排行与下钻 chip 带后四位；明细列表副行 / 流水详情页同样；
 3. 账户详情标题、删除确认、默认账户、对账 / 核对、回收站全部带后四位；
-4. CSV 导出与备份的账户列仍是纯名，导入往返不产生新账户；
+4. ~~CSV 导出与备份的账户列仍是纯名~~ → **第 63 批改**：CSV 导出带卡号 + 复合匹配；加密备份仍是纯名；
 5. 旧库含后缀账户在所有页面都只显示一次；
 6. 各页零回归、CI 全绿（但 CI 不替代真机）。
+
+---
+
+## 第 63 批（v0.2.44）：CSV 导出带卡号 + 导入按 (name, cardLast4) 复合匹配
+
+**触发**：第 62 批全量排查交付时如实登记的口径缺口 —— 账户表允许同名、
+唯一键是 `id`，但 CSV 导出只写纯名、导入 `firstOrNull { it.name == ... }`
+会静默命中第一张卡，卡号信息丢失、流水可能归错账户。
+使用者明确要求「导出带卡号 + 导入按 (name, cardLast4) 复合匹配」。
+
+### 决策（由我拟、无方向分歧）
+
+| 项 | 结论 |
+|---|---|
+| CSV 格式 | **新增可选第 13 列 `cardLast4`**；`account` 列改写**展示名** `accountLabel(name, last4)`。人眼在 Excel 里能一眼分清，机器用独立列精确匹配。老 8~12 列 CSV 缺列按空串兼容 |
+| 导入匹配 | `parseAccountCell(cell, column)` → `(纯名, 后四位?)`；`resolveAccount(refs, parsed)` 按复合键。显式列优先于单元格内联后缀 |
+| 同名且无卡号 | **报歧义并整批回滚**，列出候选展示名让使用者补 `cardLast4` 列；MUST NOT 静默取第一条 |
+| 旧库兼容 | `name` 本身已含 ` (1122)` 的账户先用 `stripAccountCardSuffix` 还原纯名再比，不判成缺失 |
+| 分层 | 组合逻辑从 `ui.assets` **下沉到 `core/AccountLabel.kt`**：UI 层与 `backup.csv` 纯 JVM 层共用唯一实现，`ui.assets` 只保留 Entity 重载与转发 |
+
+### 改动清单
+
+`core/AccountLabel.kt`（新增）、`ui/assets/AccountDisplayLabel.kt`（转发）、
+`DetailScreen` / `RecordDetailPage`（import 改 core）、
+`backup/csv/AccountCsvMatch.kt`（新增复合匹配器）、
+`CsvModels.kt`（`CsvRow.cardLast4`）、`CsvCodec.kt`（HEADER / 导出 / 两个 parser / detectFormat）、
+`CsvRebuildResolver.kt`（`List<AccountRef>` 新签名 + 旧 `Set<String>` 重载保留）、
+`FireflyModels.kt`（`targetCardLast4`）、
+`RecordDao.kt`（`CsvSourceRow.accountCardLast4` + 导出 SQL 补列）、
+`LedgerRepository.kt`（导出映射 + `findImportCandidates` / `importRecords` /
+`rebuildFromOwnCsv` / Firefly 映射四处）、
+`SettingsViewModel.kt`（同名多条不自动映射）、
+`FireflyImportScreen.kt`（下拉显示展示名 + 携带卡号）。
+新增 `AccountCsvMatchTest` 8 用例、`CsvCodecTest` 3 用例、
+`CsvRebuildResolverTest` 2 用例、`AccountDisplayLabelTest` 1 用例。
+
+### 刻意不改
+
+- **加密备份 / `BackupAccount.name`**：走 `id` 还原，本来就能区分同名两卡。
+- `CsvRow.duplicateKey()`：仍用 `accountName`；自有导出重复导入保持幂等。
+- Room `accounts.name` 字段：仍是纯名（`cardLast4` 是单一真相源），
+  MUST NOT 把卡号拼回落库值。
+- 表结构 / `Migrations.ALL` / `MigrationContractTest` / 两套排序 /
+  48 条模板 / 4 Tab / Q7 资源 / 零新增依赖 / `INTERNET` 权限。
+
+### 验收（由我拟）
+
+1. 两张同名卡导出后 `account` 列分别是「工商银行 (1122) / (3344)」、
+   `cardLast4` 列是 1122 / 3344；
+2. 该文件重建 / 导入后两笔流水分别回到原 id 账户；
+3. 老 CSV（无列、纯名）在唯一同名账户时仍能导入；同名多条时报错并回滚；
+4. 旧库 `name` 已含后缀的账户导出再导入仍能命中自身；
+5. Firefly 映射下拉能区分同名两卡，选中的卡号能精确落位；
+6. 加密备份往返零回归，`duplicateKey()` 契约不变。
 

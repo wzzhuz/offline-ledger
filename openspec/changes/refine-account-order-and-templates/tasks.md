@@ -113,7 +113,7 @@
       区分「展示名」与「数据键 / 图标入参 / 分类」
 - [x] 11.2 抽 `accountLabel(name, last4)` 唯一实现，`accountBaseLabel` 复用
 - [x] 11.3 `RecordRow` / `ReviewRow` 加 last4 字段，两条 SQL 补列
-      （CSV 导出投影零改动）
+      （CSV 导出投影零改动 → **第 63 批注：已作废**，见第 13 节）
 - [x] 11.4 筛选面板账户选项 + picker 搜索键
 - [x] 11.5 明细筛选 chip fallback、明细列表副行、流水详情页
 - [x] 11.6 统计页账户排行（连带下钻 chip）
@@ -130,7 +130,36 @@
 - [ ] 12.2 统计账户排行与下钻 chip 带后四位；`maxLines=1` 是否截断
 - [ ] 12.3 明细列表副行 / 流水详情页 / 账户详情 / 删除确认 / 默认账户 /
       对账 / 核对 / 回收站全部一致
-- [ ] 12.4 CSV 导出与备份账户列仍是纯名，导入往返不产生新账户
+- [ ] 12.4 ~~CSV 导出与备份账户列仍是纯名~~ → **第 63 批改**：
+       CSV 导出带卡号 + 复合匹配；加密备份仍是纯名
 - [ ] 12.5 旧库含后缀账户所有页面只显示一次
 - [ ] 12.6 §8 第 45–61 批全部真机未验项整体继承
+
+## 13. 第 63 批（v0.2.44）—— 导出带卡号 + 导入复合匹配
+
+- [x] 13.1 组合逻辑下沉 `core/AccountLabel.kt`；ui 层转发、4 处 import 改指 core
+- [x] 13.2 新增 `AccountCsvMatch.kt`（解析 + 复合匹配 + 歧义报错）
+- [x] 13.3 `CsvRow` / `CsvCodec` 加可选 `cardLast4` 第 13 列，三处 optional 兼容老文件
+- [x] 13.4 `CsvRebuildResolver` 新签名 `List<AccountRef>` + 保留旧 `Set<String>` 重载
+- [x] 13.5 `CsvSourceRow` 加列 + 导出 SQL 补 `a.cardLast4`；导出写展示名 + 卡号列
+- [x] 13.6 四处消费点：`findImportCandidates` / `importRecords` /
+      `rebuildFromOwnCsv` / `importFirefly`
+- [x] 13.7 Firefly 映射：`targetCardLast4`、下拉显示展示名、同名多条不自动映射
+- [x] 13.8 逐处标注第 62 批「CSV 导出 MUST NOT 改」作废（spec / proposal /
+      design / tasks / 活文档 / project.md）
+- [x] 13.9 单测：`AccountCsvMatchTest` 8、`CsvCodecTest` +3、
+      `CsvRebuildResolverTest` +2、`AccountDisplayLabelTest` +1
+- [x] 13.10 版本号 `0.2.44`；spec 新增 1 条 Requirement + 修订 1 条
+- [ ] 13.11 推送逐 blob 双校验 / 双 CI 全绿 / Release digest 一致
+- [ ] 13.12 实测回填；归档校验仍保持 `[ ]`
+
+## 14. 第 63 批真机待验（`[ ]`）
+
+- [ ] 14.1 两张同名卡导出 CSV 在 Excel 里 `account` / `cardLast4` 两列可区分、不乱码
+- [ ] 14.2 该文件重建 / 导入后两笔流水分别回到原 id 账户
+- [ ] 14.3 老 CSV 无列时唯一同名账户仍可导入；同名多条报错并整批回滚
+- [ ] 14.4 旧库 `name` 已含后缀的账户导出再导入命中自身
+- [ ] 14.5 Firefly 映射下拉能区分同名两卡、选中卡号精确落位
+- [ ] 14.6 加密备份往返零回归、`duplicateKey()` 幂等性不变
+- [ ] 14.7 §8 第 45–62 批全部真机未验项整体继承
 

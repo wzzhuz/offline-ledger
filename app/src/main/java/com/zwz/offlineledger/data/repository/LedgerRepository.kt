@@ -37,11 +37,16 @@ import com.zwz.offlineledger.backup.csv.CsvImportOutcome
 import com.zwz.offlineledger.backup.csv.CsvRebuildOutcome
 import com.zwz.offlineledger.backup.csv.CsvRebuildResolver
 import com.zwz.offlineledger.backup.csv.ImportCandidate
+import com.zwz.offlineledger.backup.csv.AccountMatch
+import com.zwz.offlineledger.backup.csv.AccountRef
+import com.zwz.offlineledger.backup.csv.parseAccountCell
+import com.zwz.offlineledger.backup.csv.resolveAccount
 import com.zwz.offlineledger.backup.csv.CsvRow
 import com.zwz.offlineledger.backup.csv.FireflyKind
 import com.zwz.offlineledger.backup.csv.FireflyMapping
 import com.zwz.offlineledger.backup.csv.FireflyPlan
 import com.zwz.offlineledger.backup.csv.FireflyImportOutcome
+import com.zwz.offlineledger.core.accountLabel
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.time.LedgerClock
@@ -669,11 +674,18 @@ class LedgerRepository @Inject constructor(
         val date = if (d.length == 8) {
             d.substring(0, 4) + "-" + d.substring(4, 6) + "-" + d.substring(6, 8)
         } else d
+        // 第 63 批：account 列写**展示名**（人眼可分同名两卡），
+        // cardLast4 列写机器匹配键；导入按 (name, cardLast4) 复合匹配。
+        // 绝不把卡号拼回 Room 的 name 字段，也不改 CSV 的 duplicateKey 契约。
+        val last4 = r.accountCardLast4?.takeIf {
+            it.length == 4 && it.all { ch -> ch.isDigit() }
+        }
         CsvRow(
             date = date,
             type = r.type,
             amountYuan = java.math.BigDecimal.valueOf(r.amountCents, 2).toPlainString(),
-            accountName = r.accountName,
+            accountName = accountLabel(r.accountName, last4) ?: r.accountName,
+            cardLast4 = last4.orEmpty(),
             categoryRoot = r.rootName,
             category = r.categoryName,
             note = r.note,
@@ -693,10 +705,13 @@ class LedgerRepository @Inject constructor(
      */
     suspend fun findImportCandidates(rows: List<CsvRow>): List<ImportCandidate> {
         val accounts = accountDao.all().filter { !it.isArchived }
+        val refs = toAccountRefs(accounts)
         val out = mutableListOf<ImportCandidate>()
         rows.forEachIndexed { index, row ->
-            val acc = accounts.firstOrNull { it.name == row.accountName }
-                ?: return@forEachIndexed
+            // 第 63 批：预览路径也按复合匹配；歧义时宁可不报候选，
+            // MUST NOT 静默挂到第一张同名卡上。
+            val accId = (resolveAccount(refs, parseAccountCell(row.accountName, row.cardLast4))
+                as? AccountMatch.Unique)?.ref?.id ?: return@forEachIndexed
             val cents = try {
                 Cents.fromYuan(row.amountYuan).value
             } catch (e: IllegalArgumentException) {
@@ -705,7 +720,7 @@ class LedgerRepository @Inject constructor(
             val ld = row.date.replace("-", "").toIntOrNull()
                 ?: return@forEachIndexed
             val hits = recordDao.importCandidates(
-                acc.id, cents, shiftLocalDate(ld, -1), shiftLocalDate(ld, 1)
+                accId, cents, shiftLocalDate(ld, -1), shiftLocalDate(ld, 1)
             )
             hits.forEach { h ->
                 out += ImportCandidate(
@@ -717,6 +732,11 @@ class LedgerRepository @Inject constructor(
         }
         return out
     }
+
+    /** 第 63 批：Entity → 纯 JVM 账户引用，供 CSV / Firefly 复合匹配复用。 */
+    private fun toAccountRefs(
+        accounts: List<com.zwz.offlineledger.data.local.entity.AccountEntity>
+    ): List<AccountRef> = accounts.map { AccountRef(it.id, it.name, it.cardLast4) }
 
     /** Int 型 YYYYMMDD 的跨月安全日期平移；纯 JVM，不碰设备时区。 */
     private fun shiftLocalDate(ld: Int, days: Long): Int {
@@ -737,13 +757,21 @@ class LedgerRepository @Inject constructor(
      */
     suspend fun importRecords(rows: List<CsvRow>): CsvImportOutcome = db.withTransaction {
         val accounts = accountDao.all().filter { !it.isArchived }
+        val refs = toAccountRefs(accounts)
         val categories = categoryDao.all()
         val aliases = aliasDao.all()
         var written = 0
         var skipped = 0
         rows.forEach { row ->
-            val account = accounts.firstOrNull { it.name == row.accountName }
-                ?: throw IllegalArgumentException("账户不存在或已归档：" + row.accountName)
+            // 第 63 批：按 (name, cardLast4) 复合匹配；同名且没带卡号时
+            // MUST 报错让使用者补列，MUST NOT 静默归到第一张卡。
+            val accountId = when (
+                val m = resolveAccount(refs, parseAccountCell(row.accountName, row.cardLast4))
+            ) {
+                is AccountMatch.Unique -> m.ref.id
+                is AccountMatch.Missing -> throw IllegalArgumentException(m.reason)
+                is AccountMatch.Ambiguous -> throw IllegalArgumentException(m.reason)
+            }
             val root = categories.firstOrNull {
                 it.level == 0 && !it.isArchived && it.name == row.categoryRoot
             } ?: throw IllegalArgumentException("一级分类不存在：" + row.categoryRoot)
@@ -761,7 +789,7 @@ class LedgerRepository @Inject constructor(
             val sourceId = row.sourceId.ifBlank { row.duplicateKey() }
             val importSource = row.importSource.ifBlank { "CSV" }
             val already = recordDao.countByImportSource(importSource, sourceId) > 0 ||
-                recordDao.countDuplicate(account.id, amountCents, ld, row.note) > 0
+                recordDao.countDuplicate(accountId, amountCents, ld, row.note) > 0
             if (already) {
                 skipped++
                 return@forEach
@@ -771,8 +799,8 @@ class LedgerRepository @Inject constructor(
                 amountCents = amountCents,
                 categoryId = child?.id ?: root.id,
                 rootCategoryId = root.id,
-                fromAccountId = if (type == RecordType.EXPENSE) account.id else null,
-                toAccountId = if (type == RecordType.INCOME) account.id else null,
+                fromAccountId = if (type == RecordType.EXPENSE) accountId else null,
+                toAccountId = if (type == RecordType.INCOME) accountId else null,
                 timestamp = RecurringSchedule.toEpochMilli(ld),
                 localDate = ld,
                 yearMonth = ld / 100,
@@ -821,13 +849,17 @@ class LedgerRepository @Inject constructor(
                 if (parent != null) categoryPaths += parent + "/" + c.name
             }
         }
-        val resolution = CsvRebuildResolver.resolve(
-            rows, accounts.map { it.name }.toSet(), categoryPaths
-        )
+        // 第 63 批：重建也走 (name, cardLast4) 复合键；归档账户仍算已知。
+        val refs = toAccountRefs(accounts)
+        val resolution = CsvRebuildResolver.resolve(rows, refs, categoryPaths)
         var written = 0
         var skippedDuplicate = 0
         resolution.ready.forEach { row ->
-            val account = accounts.first { it.name == row.accountName }
+            // resolver 已保证唯一命中，这里取回同一个 id，MUST NOT 再按纯名 first。
+            val accountId = (
+                resolveAccount(refs, parseAccountCell(row.accountName, row.cardLast4))
+                    as AccountMatch.Unique
+            ).ref.id
             val root = categories.first { it.level == 0 && it.name == row.categoryRoot }
             val child = if (row.category.isBlank()) null else categories.firstOrNull { c ->
                 c.level == 1 && c.parentId == root.id && c.name == row.category
@@ -839,7 +871,7 @@ class LedgerRepository @Inject constructor(
             val sourceId = row.sourceId.ifBlank { row.duplicateKey() }
             val importSource = row.importSource.ifBlank { "CSV" }
             val already = recordDao.countByImportSource(importSource, sourceId) > 0 ||
-                recordDao.countDuplicate(account.id, amountCents, ld, row.note) > 0
+                recordDao.countDuplicate(accountId, amountCents, ld, row.note) > 0
             if (already) {
                 skippedDuplicate++
                 return@forEach
@@ -849,8 +881,8 @@ class LedgerRepository @Inject constructor(
                 amountCents = amountCents,
                 categoryId = child?.id ?: root.id,
                 rootCategoryId = root.id,
-                fromAccountId = if (type == RecordType.EXPENSE) account.id else null,
-                toAccountId = if (type == RecordType.INCOME) account.id else null,
+                fromAccountId = if (type == RecordType.EXPENSE) accountId else null,
+                toAccountId = if (type == RecordType.INCOME) accountId else null,
                 timestamp = RecurringSchedule.toEpochMilli(ld),
                 localDate = ld,
                 yearMonth = ld / 100,
@@ -900,8 +932,12 @@ class LedgerRepository @Inject constructor(
             val choice = mapping.accounts[name]
             val targetName = choice?.targetName.orEmpty()
             if (targetName.isNotBlank()) {
-                val hit = existingAccounts.firstOrNull { it.name == targetName }
-                    ?: throw IllegalArgumentException("账户映射目标不存在：" + targetName)
+                // 第 63 批：映射目标按 (name, cardLast4) 复合匹配，
+                // 同名两卡靠 choice.targetCardLast4 精确落位。
+                val hit = existingAccounts.firstOrNull {
+                    it.name == targetName &&
+                        (choice.targetCardLast4 == null || it.cardLast4 == choice.targetCardLast4)
+                } ?: throw IllegalArgumentException("账户映射目标不存在：" + targetName)
                 accountIds[name] = hit.id
                 val opening = openingBySource[name]
                 if (opening != null) {

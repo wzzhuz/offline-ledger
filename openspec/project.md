@@ -782,8 +782,8 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **覆盖 13 处**：筛选面板账户选项（picker 搜索键同步）、明细筛选 chip fallback、
   **统计页账户排行（连带修好下钻 chip）**、明细列表副行、流水详情页两行、
   删除确认弹窗、账户详情标题、默认账户设置、对账 / 核对标题、回收站转出 / 转入。
-- **刻意不改**：CSV 导出投影 / `CsvRow` / `BackupAccount` /
-  Firefly 源账户列表 / 导入按名匹配（**数据往返键，拼卡号会让导入当新账户**）、
+- **刻意不改**：加密备份 `BackupAccount` / Firefly 源账户列表 /
+  ~~CSV 导出投影 / `CsvRow` / 导入按名匹配~~（**第 63 批已改**：带卡号 + 复合匹配）、
   模板回填与编辑框初始化、`AccountIconBox` 图标首字、所有分类维度。
 - 新增 `AccountDisplayLabelTest` 5 用例锁住旧库后缀去重；
   change 四件套追加第 62 批（reporting-ui 新增 1 条、ledger-transactions 修订）。
@@ -801,4 +801,28 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - artifacts 3 个、无染绿、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
 - 触发与轮询拆分 + 超时只查状态生效，无重复发布。
 - Q7 资源未进包；归档仍需使用者明确说「可以归档」。
+
+## 第 63 批（v0.2.44）：CSV 导出带卡号 + 导入 `(name, cardLast4)` 复合匹配
+
+- **起因**：第 62 批交付时如实登记的口径缺口 —— 账户表允许同名、
+  唯一键是 `id`，CSV 导出只写纯名、导入 `firstOrNull { it.name == ... }`
+  会静默命中第一张卡，卡号丢失、流水归错账户。
+- **组合逻辑下沉**：`core/AccountLabel.kt`（`accountLabel` 唯一实现 +
+  `stripAccountCardSuffix` 互逆），供 UI 层与 `backup.csv` 纯 JVM 层共用；
+  `ui/assets/AccountDisplayLabel.kt` 只留 Entity 重载与转发。
+- **CSV 13 列**（第 13 列 `cardLast4` 可选）：`account` 写展示名、
+  `cardLast4` 写机器键；老 8~12 列文件缺列按空串兼容。
+- **导入**：`AccountCsvMatch.parseAccountCell` + `resolveAccount` 复合匹配；
+  同名且无卡号 MUST 报歧义并整批回滚，MUST NOT 静默取第一条。
+  四个消费点 `findImportCandidates` / `importRecords` /
+  `rebuildFromOwnCsv` / `importFirefly` 全部接入。
+- **Firefly**：`FireflyAccountChoice.targetCardLast4`、下拉显示展示名、
+  源名同名多条不自动映射。
+- **刻意不改**：加密备份 `BackupAccount.name`（走 id 还原）、
+  Room `accounts.name`（仍是纯名）、`CsvRow.duplicateKey()`、
+  `Migrations.ALL` + `MigrationContractTest`、两套排序、48 条模板、
+  4 Tab、Q7 资源仍待补、零新增依赖、`INTERNET` 权限。
+- 逐处标注第 62 批「CSV 导出 MUST NOT 改」作废，不留矛盾文本；
+  change 四件套追加第 63 批（新增 2 条 Requirement / 修订 1 条）。
+- CI 全绿不替代真机，§8 第 63 批新增 7 项待验，既有项整体继承。
 

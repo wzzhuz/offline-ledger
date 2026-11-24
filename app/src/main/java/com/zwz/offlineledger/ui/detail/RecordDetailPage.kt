@@ -25,7 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.core.time.LedgerClock
-import com.zwz.offlineledger.ui.assets.accountLabel
+import com.zwz.offlineledger.core.accountLabel
 import com.zwz.offlineledger.data.local.dao.RecordRow
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.components.amountColor

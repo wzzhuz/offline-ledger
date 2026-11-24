@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.backup
 
 import com.zwz.offlineledger.backup.csv.CsvCodec
+import com.zwz.offlineledger.backup.csv.CsvFormat
 import com.zwz.offlineledger.backup.csv.CsvRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -104,6 +105,34 @@ class CsvCodecTest {
         val r = CsvCodec.parseImport(bytes)
         assertTrue(r.errors.isEmpty())
         assertEquals(1, r.rows.size)
+    }
+
+    @Test
+    fun roundtrip_keeps_account_display_name_and_card_column() {
+        val r = row().copy(accountName = "工商银行 (1122)", cardLast4 = "1122")
+        val back = CsvCodec.parseImport(CsvCodec.export(listOf(r)))
+        assertTrue(back.errors.isEmpty())
+        assertEquals("工商银行 (1122)", back.rows.single().accountName)
+        assertEquals("1122", back.rows.single().cardLast4)
+    }
+
+    @Test
+    fun old_header_without_card_column_still_parses_as_blank() {
+        val old = ("date,type,amount,account,categoryRoot,category,note,currencyCode," +
+            "counterparty,importSource,sourceId,description\r\n" + line() + "\r\n")
+            .toByteArray(Charsets.UTF_8)
+        val back = CsvCodec.parseImport(old)
+        assertTrue(back.errors.isEmpty())
+        assertEquals("", back.rows.single().cardLast4)
+        assertEquals("微信", back.rows.single().accountName)
+    }
+
+    @Test
+    fun old_own_export_is_still_detected_as_own() {
+        val oldHeader = ("date,type,amount,account,categoryRoot,category,note,currencyCode," +
+            "counterparty,importSource,sourceId\r\n" + line() + "\r\n")
+            .toByteArray(Charsets.UTF_8)
+        assertEquals(CsvFormat.OWN, CsvCodec.detectFormat(oldHeader))
     }
 
     @Test

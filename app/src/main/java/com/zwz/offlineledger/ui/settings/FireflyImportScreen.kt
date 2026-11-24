@@ -343,7 +343,9 @@ private fun FireflyAccountRow(
             Text(
                 text = if (choice.isNew) {
                     "新建 · " + choice.type
-                } else "映射到 · " + choice.targetName,
+                } else "映射到 · " +
+                    (accountLabel(choice.targetName, choice.targetCardLast4)
+                        ?: choice.targetName),
                 style = MaterialTheme.typography.labelSmall,
                 color = LedgerColors.Neutral
             )
@@ -357,6 +359,7 @@ private fun FireflyAccountRow(
                         onChange(
                             choice.copy(
                                 targetName = "", isNew = true,
+                                targetCardLast4 = null,
                                 type = FireflyCsvCodec.inferAccountType(choice.sourceName)
                             )
                         )
@@ -364,12 +367,15 @@ private fun FireflyAccountRow(
                     }
                 )
                 existing.filter { !it.isArchived }.forEach { a ->
+                    // 第 63 批：同名两卡在下拉里靠展示名区分，
+                    // targetName 仍是纯名，卡号单独带在 targetCardLast4。
                     DropdownMenuItem(
-                        text = { Text(a.name) },
+                        text = { Text(accountBaseLabel(a)) },
                         onClick = {
                             onChange(
                                 choice.copy(
                                     targetName = a.name, isNew = false,
+                                    targetCardLast4 = a.cardLast4,
                                     type = a.type.name
                                 )
                             )

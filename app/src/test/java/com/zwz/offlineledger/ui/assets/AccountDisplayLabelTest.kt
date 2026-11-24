@@ -1,5 +1,7 @@
 package com.zwz.offlineledger.ui.assets
 
+import com.zwz.offlineledger.core.accountLabel
+import com.zwz.offlineledger.core.stripAccountCardSuffix
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -45,5 +47,12 @@ class AccountDisplayLabelTest {
     fun `null name stays null`() {
         assertNull(accountLabel(null, "1122"))
         assertNull(accountLabel(null, null))
+    }
+
+    @Test
+    fun `strip is inverse of append`() {
+        assertEquals("工商银行", stripAccountCardSuffix("工商银行 (1122)", "1122"))
+        assertEquals("工商银行", stripAccountCardSuffix("工商银行", "1122"))
+        assertEquals("中行储蓄卡 (1122)", stripAccountCardSuffix("中行储蓄卡 (1122)", "3344"))
     }
 }

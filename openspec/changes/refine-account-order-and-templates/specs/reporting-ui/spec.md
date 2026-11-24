@@ -148,8 +148,14 @@ MUST NOT 在 UI 侧再拼一次。
 MUST NOT 直接显示 `row.fromAccountName` 纯名。
 资产页删除确认弹窗、账户详情标题、默认账户设置、对账 / 核对标题、
 回收站流水行 SHALL 全部带卡号。
-**CSV 导出 / 备份 DTO 的 `accountName` MUST NOT 被改动** ——
-那是数据往返语义，拼上卡号会让导入把同一张卡当成新账户。
+**第 63 批修订 CSV 往返语义**：CSV 导出的 `account` 列 SHALL 写
+**展示名**（`accountLabel(name, cardLast4)`，如「工商银行 (1122)」），
+并 SHALL 新增可选 `cardLast4` 列写机器匹配键；
+导入 SHALL 按 `(name, cardLast4)` 复合匹配，
+MUST NOT 再用 `firstOrNull { it.name == ... }` 静默命中同名第一张卡。
+**加密备份 / `BackupAccount.name` 仍是纯名且 MUST NOT 被改动**（走 `id` 还原）。
+第 62 批「CSV 导出 MUST NOT 改」的结论已被本批显式推翻，
+理由是它只防住了「导入当新账户」，却没防住「同名两卡静默归错」。
 
 #### Scenario: 筛选与统计不再撞名
 
@@ -158,10 +164,20 @@ MUST NOT 直接显示 `row.fromAccountName` 纯名。
 - **THEN** 三处都分别显示「工商银行 (1122)」与「工商银行 (3344)」
 - **AND** 筛选 picker 搜索框输入「3344」能定位到第二张卡
 
-#### Scenario: 导出数据语义不变
+#### Scenario: 导出带卡号且复合匹配回原账户
 
-- **GIVEN** 一张 `name = "工商银行"`、`cardLast4 = "1122"` 的账户有流水
-- **WHEN** 导出 CSV / 备份
-- **THEN** 账户列仍是纯名「工商银行」，MUST NOT 含 `(1122)`
-- **AND** 重新导入仍能匹配到同一账户，不产生新账户行
+- **GIVEN** 两张 `name = "工商银行"`、`cardLast4` 为 1122 / 3344 的账户各有流水
+- **WHEN** 导出 CSV
+- **THEN** `account` 列分别是「工商银行 (1122)」「工商银行 (3344)」，
+  `cardLast4` 列分别是 `1122` / `3344`
+- **WHEN** 用该文件重建 / 导入
+- **THEN** 两笔流水分别回到 id 对应的原账户，MUST NOT 归到同一张卡
+- **AND** 加密备份的 `BackupAccount.name` 仍是纯名「工商银行」
+
+#### Scenario: 老 CSV 同名歧义显式报错
+
+- **GIVEN** 库里有两张同名「工商银行」、卡号 1122 / 3344
+- **WHEN** 导入一份没有 `cardLast4` 列、账户列写纯名「工商银行」的老 CSV
+- **THEN** 导入 MUST 报「账户不唯一，请指定 cardLast4」并整批回滚
+- **AND** MUST NOT 静默把流水挂到第一张卡
 

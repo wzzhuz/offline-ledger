@@ -458,10 +458,15 @@ class SettingsViewModel(
                     categoryDao.all().filter { !it.isArchived }
                 }
                 val accountChoices = plan.accountNames.map { name ->
-                    val hit = existingAccounts.firstOrNull { it.name == name }
+                    // 第 63 批：源系统账户名里没有卡号，同名多条时 MUST NOT
+                    // 自动映射到第一张卡 —— 改为 isNew，让使用者在下拉里
+                    // 明确选目标（下拉项现在显示带卡号的展示名）。
+                    val sameName = existingAccounts.filter { it.name == name }
+                    val hit = sameName.takeIf { it.size == 1 }?.singleOrNull()
                     FireflyAccountChoice(
                         sourceName = name,
                         targetName = hit?.name ?: "",
+                        targetCardLast4 = hit?.cardLast4,
                         isNew = hit == null,
                         type = hit?.type?.name
                             ?: FireflyCsvCodec.inferAccountType(name)

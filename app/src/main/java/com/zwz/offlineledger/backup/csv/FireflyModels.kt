@@ -86,7 +86,9 @@ data class FireflyAccountChoice(
     val sourceName: String,
     val targetName: String,
     val isNew: Boolean,
-    val type: String
+    val type: String,
+    /** 第 63 批：目标账户的卡号后四位，同名两卡靠它精确映射。 */
+    val targetCardLast4: String? = null
 )
 
 /** 分类映射：targetRoot 为空表示按 FF3 原名自动新建；skip 表示不设分类。 */
