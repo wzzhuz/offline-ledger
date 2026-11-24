@@ -1,44 +1,42 @@
 package com.zwz.offlineledger.ui.assets
 
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
-import com.zwz.offlineledger.data.local.AccountTemplates
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,8 +47,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.money.Cents
@@ -59,17 +61,30 @@ import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.model.AccountType
 import com.zwz.offlineledger.data.model.displayName
 import com.zwz.offlineledger.engine.Reconciliation
-import com.zwz.offlineledger.ui.components.formatCents
+import com.zwz.offlineledger.ui.components.CategoryHeaderBlue
+import com.zwz.offlineledger.ui.components.CategoryIcon
 import com.zwz.offlineledger.ui.components.ListDivider
+import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.components.rememberKeyedReorder
 import com.zwz.offlineledger.ui.ledgerFactory
-import com.zwz.offlineledger.ui.theme.LedgerColors
 import com.zwz.offlineledger.ui.reconcile.ReconcileDialog
+import com.zwz.offlineledger.ui.theme.LedgerColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
+/**
+ * 第 59 批：资产账户页借鉴一羽记账的布局与密度。
+ *
+ * 借的是：蓝底顶部身份区、分组小竖条、图标 + 名称 + 金额右对齐的紧凑行、
+ * 信用负债「无欠款 / 可用」副文案、底部拇指区主操作、聚焦的模板选择 sheet。
+ * 不借的是：跨币种单一净资产总数、分组白卡 / 阴影、在线 IconFont 图标、
+ * 备注 / 隐藏 / 默认使用等业务字段（见 design.md 七条基线兼容表）。
+ *
+ * 数据侧零改动：`AssetsViewModel` / `AccountEntity` / `AppDatabase.version = 5` /
+ * `AccountTemplates` / `LedgerApp` 一律不动，v0.2.39 可直接覆盖安装。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssetsScreen(refreshTick: Int = 0) {
@@ -82,8 +97,7 @@ fun AssetsScreen(refreshTick: Int = 0) {
     val state by vm.state.collectAsState()
     val scope = rememberCoroutineScope()
 
-    /** 第 25 批：资产页专用刷新标志，与明细页 / 首屏加载三分离，避免双转圈。
-     *  导入后的自动刷新仍由 LedgerApp 的 refreshTick 通道驱动，这里不重复发事件。 */
+    /** 第 25 批：资产页专用刷新标志，与明细页 / 首屏加载三分离，避免双转圈。 */
     var isRefreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -95,9 +109,7 @@ fun AssetsScreen(refreshTick: Int = 0) {
     var editError by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<AccountEntity?>(null) }
 
-    // 第 20 批：资产页 Column+verticalScroll 改 LazyColumn，接入 reorderable 3.1.0。
-    // 删除自研「拖拽期间禁用父滚动 / 边缘 scrollBy / 实测行高」整套代码：
-    // 库接管长按窗口、pointer pass 顺序、边缘按距离变速滚动与 animateItem 让位补间。
+    // 第 20 批：资产页 LazyColumn + reorderable 3.1.0，本批原样保留。
     val listState = rememberLazyListState()
     val visible = state.accounts.filter { state.showArchived || !it.isArchived }
     val activeIds = visible.filter { !it.isArchived }.map { it.id }
@@ -129,87 +141,72 @@ fun AssetsScreen(refreshTick: Int = 0) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {        item(key = "assets-header") {
-            Column {
-                Text(text = "资产", style = MaterialTheme.typography.headlineMedium)
-                CurrencyGroupsCard(state)
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            ) {
+                item(key = "assets-header") {
+                    AssetHeader(
+                        state = state,
+                        onToggleArchived = { vm.toggleShowArchived() },
+                        onAdd = { addError = null; showAdd = true }
+                    )
+                }
+                AccountType.entries.forEach { type ->
+                    val group = visible.filter { it.type == type }
+                    item(key = "section-" + type.name) {
+                        Column {
+                            AssetSectionHeader(type.displayName(), group.size)
+                            if (group.isEmpty()) {
+                                EmptyHint("还没有" + type.displayName() + "账户")
+                            }
+                        }
+                    }
+                    items(
+                        accountOrder.ids.mapNotNull { id ->
+                            group.firstOrNull { it.id == id && !it.isArchived }
+                        },
+                        key = { accountOrder.keyOf(it.id) }
+                    ) { account ->
+                        ReorderableItem(reorderState, key = accountOrder.keyOf(account.id)) { _ ->
+                            // 第 59 批：拖柄挂整格，MUST NOT 再画三道横线「≡」小手柄。
+                            val dragHandle = with(this) {
+                                Modifier.longPressDraggableHandle(
+                                    onDragStopped = { accountOrder.commit() }
+                                )
+                            }
+                            AccountCard(
+                                account = account,
+                                dragModifier = dragHandle,
+                                onDetail = { detailId = account.id },
+                                onReconcile = { reconcileId = account.id },
+                                onEdit = { editError = null; editAccount = account },
+                                onDelete = { deleting = account },
+                                onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
+                                onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
+                            )
+                        }
+                    }
+                    // 已归档账户不参与拖拽，仍按列表展示。
+                    group.filter { it.isArchived }.forEach { account ->
+                        item(key = "archived-account-" + account.id) {
+                            AccountCard(
+                                account = account,
+                                onDetail = { detailId = account.id },
+                                onReconcile = { reconcileId = account.id },
+                                onEdit = { editError = null; editAccount = account },
+                                onDelete = { deleting = account },
+                                onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
+                                onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
+                            )
+                        }
+                    }
+                }
+                item(key = "assets-footer") {
                     Text(
-                        text = "账户（${state.accounts.count { !it.isArchived }}）",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FilterChip(
-                            selected = state.showArchived,
-                            onClick = { vm.toggleShowArchived() },
-                            label = { Text("含已归档") }
-                        )
-                        TextButton(onClick = { addError = null; showAdd = true }) { Text("+ 新增") }
-                    }
-                }
-            }
-        }
-        AccountType.entries.forEach { type ->
-            item(key = "section-" + type.name) {
-                Column {
-                    SectionTitle(type.displayName())
-                    if (visible.none { it.type == type }) {
-                        EmptyHint("还没有" + type.displayName() + "账户")
-                    }
-                }
-            }
-            val group = visible.filter { it.type == type }
-            items(
-                accountOrder.ids.mapNotNull { id ->
-                    group.firstOrNull { it.id == id && !it.isArchived }
-                },
-                key = { accountOrder.keyOf(it.id) }
-            ) { account ->
-                ReorderableItem(reorderState, key = accountOrder.keyOf(account.id)) { _ ->
-                    val dragHandle = with(this) {
-                        Modifier.longPressDraggableHandle(
-                            onDragStopped = { accountOrder.commit() }
-                        )
-                    }
-                    AccountCard(
-                        account = account,
-                        dragModifier = dragHandle,
-                        onDetail = { detailId = account.id },
-                        onReconcile = { reconcileId = account.id },
-                        onEdit = { editError = null; editAccount = account },
-                        onDelete = { deleting = account },
-                        onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
-                        onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
+                        text = "总负债仅作展示；各币种小计 = SUM(计入统计账户余额)。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LedgerColors.Neutral,
+                        modifier = Modifier.padding(top = 10.dp)
                     )
                 }
-            }
-            // 已归档账户不参与拖拽，仍按列表展示。
-            group.filter { it.isArchived }.forEach { account ->
-                item(key = "archived-account-" + account.id) {
-                    AccountCard(
-                        account = account,
-                        onDetail = { detailId = account.id },
-                        onReconcile = { reconcileId = account.id },
-                        onEdit = { editError = null; editAccount = account },
-                        onDelete = { deleting = account },
-                        onMove = { d -> scope.launch { vm.moveAccount(account.id, d) } },
-                        onArchived = { a -> scope.launch { vm.setArchived(account.id, a) } }
-                    )
-                }
-            }
-        }
-        item(key = "assets-footer") {
-            Text(
-                text = "总负债仅作展示；各币种小计 = SUM(计入统计账户余额)。",
-                style = MaterialTheme.typography.bodySmall,
-                color = LedgerColors.Neutral,
-                modifier = Modifier.padding(top = 10.dp)
-            )
-        }
             }
         }
         SnackbarHost(
@@ -278,36 +275,63 @@ fun AssetsScreen(refreshTick: Int = 0) {
     }
 }
 
+/**
+ * 第 59 批：蓝底顶部身份区。
+ * MUST NOT 把 state.groups 汇总成跨币种的单一「净资产」总数
+ * （基线 reporting-ui「资产页按币种分组且移除单一净资产总数」）。
+ */
 @Composable
-private fun CurrencyGroupsCard(state: AssetsUiState) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(text = "按币种的资产小计", style = MaterialTheme.typography.labelLarge)
+private fun AssetHeader(
+    state: AssetsUiState,
+    onToggleArchived: () -> Unit,
+    onAdd: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(CategoryHeaderBlue, RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("资产账户", style = MaterialTheme.typography.titleLarge, color = Color.White)
+            Spacer(Modifier.width(8.dp))
             Text(
-                text = "不同币种不汇总，避免虚假精确的总数",
+                text = "（" + state.accounts.count { !it.isArchived } + "）",
                 style = MaterialTheme.typography.bodySmall,
-                color = LedgerColors.Neutral
+                color = Color.White.copy(alpha = 0.85f)
             )
-            if (state.groups.isEmpty()) {
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onToggleArchived) {
                 Text(
-                    text = "还没有账户",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = LedgerColors.Neutral,
-                    modifier = Modifier.padding(top = 6.dp)
+                    text = if (state.showArchived) "隐藏已归档" else "含已归档",
+                    color = Color.White
                 )
             }
+            TextButton(onClick = onAdd) { Text("+ 新增", color = Color.White) }
+        }
+        Spacer(Modifier.height(6.dp))
+        if (state.groups.isEmpty()) {
+            Text(
+                text = "还没有账户",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.9f)
+            )
+        } else {
             state.groups.forEach { g ->
-                Column(modifier = Modifier.padding(top = 4.dp)) {
+                Column(modifier = Modifier.padding(vertical = 4.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = g.currencyCode + " 小计", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = g.currencyCode + " 小计",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
+                        )
                         Text(
                             text = formatCents(g.netCents) + " " + g.currencyCode,
                             style = MaterialTheme.typography.titleMedium,
-                            color = if (g.netCents < 0) LedgerColors.ExpenseRed
-                            else LedgerColors.IncomeGreen
+                            color = Color.White
                         )
                     }
                     Row(
@@ -316,12 +340,13 @@ private fun CurrencyGroupsCard(state: AssetsUiState) {
                     ) {
                         Text(
                             text = "资产 " + formatCents(g.assetsCents),
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.85f)
                         )
                         Text(
                             text = "负债 " + formatCents(g.liabilitiesCents),
                             style = MaterialTheme.typography.bodySmall,
-                            color = LedgerColors.ExpenseRed
+                            color = Color.White.copy(alpha = 0.85f)
                         )
                     }
                 }
@@ -330,14 +355,28 @@ private fun CurrencyGroupsCard(state: AssetsUiState) {
     }
 }
 
+/** 分组头：蓝色小竖条 + 分组名 + 账户数；不显示跨币种聚合金额。 */
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = LedgerColors.Neutral,
-        modifier = Modifier.padding(top = 6.dp, bottom = 1.dp)
-    )
+private fun AssetSectionHeader(text: String, count: Int) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(14.dp)
+                .background(CategoryHeaderBlue, RoundedCornerShape(2.dp))
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(text = text, style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = count.toString() + " 个账户",
+            style = MaterialTheme.typography.labelSmall,
+            color = LedgerColors.Neutral
+        )
+    }
 }
 
 @Composable
@@ -351,9 +390,11 @@ private fun EmptyHint(text: String) {
 }
 
 /**
- * 第 16 批：去掉 Card 底色与阴影，改明细页同款纯行（16dp 内边距 + 56dp 行高）。
- * 副信息仍是非点击的 labelSmall；下面 5 个操作是可点击的，故字号与触摸区
- * MUST 提升到 bodyMedium / ≥40dp（指南 §2.1 第三次应用）。
+ * 第 59 批：紧凑账户行。
+ * - 仍是纯行 + `ListDivider()`，MUST NOT 用 Card / 阴影（基线）。
+ * - 5 个横排 MiniAction 删除，7 项操作收进单「⋮」菜单。
+ * - 图标复用 `CategoryIcon`（中性圆 + 首字），零新增资源、零在线下载。
+ * - 拖柄挂整格，MUST NOT 再显示「≡」。
  */
 @Composable
 private fun AccountCard(
@@ -367,68 +408,75 @@ private fun AccountCard(
     dragModifier: Modifier? = null
 ) {
     var menu by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Column(
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(dragModifier ?: Modifier)
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            CategoryIcon(name = account.name, colorHex = null, size = 36)
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = account.name + " · " + account.currencyCode +
+                    text = account.name +
+                        (account.cardLast4?.let { " ($it)" } ?: "") +
+                        " · " + account.currencyCode +
                         if (account.isArchived) "（已归档）" else "",
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f)
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = formatCents(account.balanceCents),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (account.balanceCents < 0) LedgerColors.ExpenseRed
-                    else LedgerColors.IncomeGreen
+                val credit = Reconciliation.availableCredit(
+                    account.creditLimitCents, account.balanceCents
                 )
-            }
-            val credit = Reconciliation.availableCredit(
-                account.creditLimitCents, account.balanceCents
-            )
-            val extra = listOfNotNull(
-                if (account.type != AccountType.ASSET) account.type.displayName() else null,
-                credit?.let { "可用 " + formatCents(it) },
-                if (!account.includeInTotal) "不计入净资产" else null
-            ).joinToString(" · ")
-            if (extra.isNotBlank()) {
-                Text(
-                    text = extra,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = LedgerColors.Neutral
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MiniAction("详情", onDetail)
-                MiniAction("对账", onReconcile)
-                MiniAction("编辑", onEdit)
-                MiniAction(if (account.isArchived) "恢复" else "归档",
-                    { onArchived(!account.isArchived) })
-                MiniAction("删除", onDelete, LedgerColors.ExpenseRed)
-                // 第 20 批：库 draggableHandle；归档账户不传，手柄不显示。
-                if (dragModifier != null) {
-                    Box(
-                        modifier = dragModifier.size(40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("≡", style = MaterialTheme.typography.titleMedium,
-                            color = LedgerColors.Neutral)
+                val extra = buildList {
+                    if (account.type == AccountType.LIABILITY) {
+                        if (account.balanceCents == 0L) add("无欠款")
+                        credit?.let { add("可用 " + formatCents(it)) }
+                    } else if (account.type != AccountType.ASSET) {
+                        add(account.type.displayName())
                     }
+                    if (!account.includeInTotal) add("不计入净资产")
+                }.joinToString(" · ")
+                if (extra.isNotBlank()) {
+                    Text(
+                        text = extra,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LedgerColors.Neutral,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-                // 上移 / 下移降为无障碍兜底（TalkBack 无法执行拖动手势）。
+            }
+            Text(
+                text = formatCents(account.balanceCents),
+                style = MaterialTheme.typography.titleSmall,
+                color = if (account.balanceCents < 0) LedgerColors.ExpenseRed
+                else LedgerColors.IncomeGreen
+            )
+            Box {
                 IconButton(onClick = { menu = true }) {
                     Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("详情") },
+                        onClick = { menu = false; onDetail() })
+                    DropdownMenuItem(text = { Text("对账") },
+                        onClick = { menu = false; onReconcile() })
+                    DropdownMenuItem(text = { Text("编辑") },
+                        onClick = { menu = false; onEdit() })
+                    DropdownMenuItem(
+                        text = { Text(if (account.isArchived) "恢复" else "归档") },
+                        onClick = { menu = false; onArchived(!account.isArchived) }
+                    )
+                    DropdownMenuItem(text = { Text("删除", color = LedgerColors.ExpenseRed) },
+                        onClick = { menu = false; onDelete() })
                     DropdownMenuItem(text = { Text("上移") },
                         onClick = { menu = false; onMove(-1) })
                     DropdownMenuItem(text = { Text("下移") },
@@ -440,23 +488,30 @@ private fun AccountCard(
     }
 }
 
+/** 第 59 批：新建账户页分组标题（蓝色小竖条 + 文本）。 */
 @Composable
-private fun MiniAction(
-    text: String,
-    onClick: () -> Unit,
-    color: androidx.compose.ui.graphics.Color = LedgerColors.Neutral
-) {
-    Box(
-        modifier = Modifier
-            .heightIn(min = 40.dp)
-            .widthIn(min = 40.dp)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
+private fun AssetFormSectionTitle(text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
     ) {
-        Text(text = text, style = MaterialTheme.typography.bodyMedium, color = color)
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(14.dp)
+                .background(CategoryHeaderBlue, RoundedCornerShape(2.dp))
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(text = text, style = MaterialTheme.typography.titleSmall)
     }
 }
 
+/**
+ * 第 59 批：新建账户从 AlertDialog 小弹窗改近全屏 Dialog。
+ * 字段与顺序不变（名称 / 卡号后四位 / 类型 / 期初余额 / 信用额度），
+ * `onConfirm` 签名与 `AssetsViewModel.addAccount` 零改动。
+ * 不新增备注 / 隐藏 / 默认使用 / 图标字段，不升表、不加路由。
+ */
 @Composable
 private fun AddAccountDialog(
     onDismiss: () -> Unit,
@@ -468,76 +523,175 @@ private fun AddAccountDialog(
     var initial by remember { mutableStateOf("") }
     var limit by remember { mutableStateOf("") }
     var last4 by remember { mutableStateOf("") }
+    var showTemplateSheet by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    val save = { onConfirm(name, type, initial, limit, last4) }
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("新增账户") },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text("快捷创建（点选后自动填名称与类型）",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = LedgerColors.Neutral)
-                AccountTemplates.ALL.chunked(3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        row.forEach { t ->
-                            FilterChip(
-                                selected = name == t.name,
-                                onClick = { name = t.name; type = t.type },
-                                label = { Text(t.label, maxLines = 1) }
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color(0xFFF5F6FA)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(CategoryHeaderBlue)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                Icons.Filled.KeyboardArrowLeft,
+                                contentDescription = "返回",
+                                tint = Color.White
+                            )
+                        }
+                        Text(
+                            text = "添加资产账户",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = save) { Text("保存", color = Color.White) }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        AssetFormSectionTitle("账户信息")
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White, RoundedCornerShape(16.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CategoryIcon(
+                                name = name.ifBlank { "账" },
+                                colorHex = null,
+                                size = 44
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            OutlinedTextField(
+                                value = name,
+                                onValueChange = { name = it },
+                                placeholder = {
+                                    Text("账户名称", style = MaterialTheme.typography.bodyMedium)
+                                },
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                singleLine = true,
+                                modifier = Modifier.weight(1f).heightIn(min = 40.dp)
+                            )
+                        }
+                        Text(
+                            text = "点下方「从模板选择」可快速填入名称与类型",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                        OutlinedTextField(
+                            value = last4,
+                            onValueChange = { last4 = it.filter { ch -> ch.isDigit() }.take(4) },
+                            placeholder = {
+                                Text("卡号后四位（可选）", style = MaterialTheme.typography.bodyMedium)
+                            },
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                        )
+
+                        AssetFormSectionTitle("账户类型")
+                        AccountType.entries.chunked(2).forEach { pair ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                pair.forEach { t ->
+                                    FilterChip(
+                                        selected = type == t,
+                                        onClick = { type = t },
+                                        label = { Text(t.displayName()) }
+                                    )
+                                }
+                            }
+                        }
+
+                        AssetFormSectionTitle("余额")
+                        OutlinedTextField(
+                            value = initial,
+                            onValueChange = { initial = it },
+                            placeholder = {
+                                Text("期初余额（元，默认 0）", style = MaterialTheme.typography.bodyMedium)
+                            },
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                        )
+                        if (type == AccountType.LIABILITY) {
+                            OutlinedTextField(
+                                value = limit,
+                                onValueChange = { limit = it },
+                                placeholder = {
+                                    Text("信用额度（元，可空）", style = MaterialTheme.typography.bodyMedium)
+                                },
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                            )
+                        }
+
+                        AssetFormSectionTitle("快捷模板")
+                        Button(
+                            onClick = { showTemplateSheet = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("从模板选择（12 个）")
+                        }
+
+                        errorText?.let {
+                            Text(
+                                text = it,
+                                color = LedgerColors.ExpenseRed,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 6.dp)
                             )
                         }
                     }
-                }
-                OutlinedTextField(
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    value = name, onValueChange = { name = it },
-                    placeholder = { Text("账户名称", style = MaterialTheme.typography.bodyMedium) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
-                )
-                OutlinedTextField(
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    value = last4, onValueChange = { last4 = it.filter { ch -> ch.isDigit() }.take(4) },
-                    placeholder = { Text("卡号后四位（可选）", style = MaterialTheme.typography.bodyMedium) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
-                )
-                Column {
-                    AccountType.entries.chunked(2).forEach { pair ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            pair.forEach { t ->
-                                FilterChip(
-                                    selected = type == t,
-                                    onClick = { type = t },
-                                    label = { Text(t.displayName()) }
-                                )
-                            }
-                        }
+
+                    // 底部拇指区主操作：不随表单滚动，键盘弹起仍在可见区。
+                    Button(
+                        onClick = save,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .heightIn(min = 52.dp)
+                    ) {
+                        Text("保存")
                     }
                 }
-                OutlinedTextField(
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    value = initial, onValueChange = { initial = it },
-                    placeholder = { Text("期初余额（元，默认 0）", style = MaterialTheme.typography.bodyMedium) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
-                )
-                if (type == AccountType.LIABILITY) {
-                    OutlinedTextField(
-                        textStyle = MaterialTheme.typography.bodyMedium,
-                        value = limit, onValueChange = { limit = it },
-                        placeholder = { Text("信用额度（元，可空）", style = MaterialTheme.typography.bodyMedium) },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+
+                if (showTemplateSheet) {
+                    AccountTemplateSheet(
+                        onDismiss = { showTemplateSheet = false },
+                        onPick = { t ->
+                            name = t.name
+                            type = t.type
+                            showTemplateSheet = false
+                        }
                     )
                 }
-                errorText?.let { Text(text = it, color = LedgerColors.ExpenseRed) }
             }
-        },
-        confirmButton = {
-            Button(onClick = { onConfirm(name, type, initial, limit, last4) }) { Text("保存") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
-    )
+        }
+    }
 }
 
-/** 第三批：账户类型可改，解决「类型选错只能重建」。 */
+/** 第三批：账户类型可改，解决「类型选错只能重建」。本批零改动。 */
 @Composable
 private fun EditAccountDialog(
     account: AccountEntity,

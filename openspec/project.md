@@ -688,3 +688,14 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   教训：204 空响应的触发请求超时后 MUST 先查 runs 列表再决定是否补发，MUST NOT 直接重发。
 - 归档仍需使用者明确说「可以归档」。
 
+## 第 59 批（v0.2.40）：资产账户列表 + 新建账户页借鉴一羽
+
+- **起因**：三张一羽截图（资产列表 / 添加资产账户 / 选择银行），使用者要求「账户列表和新建账户的 ui 也参考一羽记账优化一下」，拍板 Q1A Q2A Q3A。
+- **纠错**：上一轮把参考图误当本 App 现状。核查 `AssetsScreen.kt` 后确认本 App 原为白底按币种小计 Card + `AlertDialog` 新建 + 12 个 `FilterChip` 模板，无账户图标 / 无银行 sheet / 无备注隐藏默认字段。本批以代码事实为准。
+- **Q1A 列表**：蓝底顶部身份区（仍逐币种显示资产 / 负债 / 小计，MUST NOT 跨币种单一净资产）、分组标题蓝色小竖条 + 账户数、账户行改「`CategoryIcon` 中性圆 + 名称/卡号后四位 + 金额右对齐 + 信用负债『无欠款 / 可用 X』副文案」；5 个横排 `MiniAction` 删除、7 项操作收进单「⋮」；拖柄改整格长按、去掉「≡」；纯行 + `ListDivider()` 保留。
+- **Q2A 新建**：`AddAccountDialog` 改近全屏 `Dialog`（蓝底 TopBar / 分组小竖条 / 图标名称小卡 / 底部大保存），字段与顺序、`onConfirm` 签名、`AssetsViewModel.addAccount` 零改动；不新增备注 / 隐藏 / 默认使用 / 图标字段，不升表、不加路由。
+- **Q3A 模板 sheet**：新增只读 `AccountTemplateSheet`（按 `group` 分组 + 2 列图标格 + 「自定义名称」入口 + 纯 `onPick` 回填），取代主表单 chips；基线「快捷账户模板替代预制账户行」整块 MODIFIED，语义全保留。不引入 IconFont 在线 PNG（需 `project.md` 显式授权联网，本批不申请）/ 字母索引 / 银行 logo。
+- **硬约束兼容**：`reporting-ui` 按币种分组且移除单一净资产总数、账户行纯行不用 Card、4 Tab 不变、`money-precision` 口径、无 `INTERNET` 权限、零表结构变更，逐条核对见 design.md。
+- **零回归**：`AssetsViewModel` / `AccountEntity` / `AccountTemplates` / `LedgerApp` / `EditAccountDialog` / 记一笔 / 明细 / 统计 / 分类 / 对账零改动；零新增依赖；`defaultVersionName` → `0.2.40`，v0.2.39 直接覆盖安装。
+- **CI 全绿不替代真机**：§8 第 59 批新增 6.30–6.34 待验，既有项整体继承。归档仍需使用者明确说「可以归档」。
+
