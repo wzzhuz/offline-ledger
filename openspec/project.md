@@ -971,3 +971,6 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   第 63 批两条诊断 comment、坚果云 403。
 - 零代码 / 零资源 / 零规格语义变化，**不出新包**，v0.2.46 仍是最新安装包。
 
+- 收尾 commit CI：`45406816252`「编译与校验」completed/success（docs-only，未出包）。
+- 报告数字订正：`archive/2026-11-24-*` 共 **16 个文件**（6+5+5），非 15。
+
