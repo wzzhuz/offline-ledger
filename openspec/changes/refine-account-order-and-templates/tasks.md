@@ -163,3 +163,27 @@
 - [ ] 14.6 加密备份往返零回归、`duplicateKey()` 幂等性不变
 - [ ] 14.7 §8 第 45–62 批全部真机未验项整体继承
 
+## 15. 第 64 批（v0.2.45）—— 账户品牌图标补齐
+
+- [x] 15.1 调研资源来源与授权：IconFont / Simple Icons /
+      icongo/bank-logos / Wikimedia / 官方素材
+- [x] 15.2 取回 21 家银行 SVG（MIT）+ 4 个 Simple Icons SVG（CC0）
+- [x] 15.3 统一裁切 + 白圆底转 128×128 PNG，落地 `drawable-nodpi/` 26 个
+- [x] 15.4 京东白条原创占位（不临摹商标）
+- [x] 15.5 `AccountIconCatalog.drawableFor()` 补 27 个编译期 `when` 分支
+- [x] 15.6 `assets/NOTICE` 追加第 64 批（[A]~[E] + 27 行逐项登记 + MIT 全文）
+- [x] 15.7 `tools/build_account_icons.py` + `tools/account_icon_sources.md`
+- [x] 15.8 `privacy-security` spec 修订 Q7 条文 + 新增 1 条 Requirement
+- [x] 15.9 版本号 `0.2.45`；proposal / design / tasks / 活文档 / project.md 同步
+- [ ] 15.10 推送逐 blob 双校验 / 双 CI 全绿 / Release digest 一致
+- [ ] 15.11 实测回填；归档校验仍保持 `[ ]`
+
+## 16. 第 64 批真机待验（`[ ]`）
+
+- [ ] 16.1 27 个键位三页均显示品牌图形，零网络请求
+- [ ] 16.2 自定义账户仍回退中性圆 + 首字
+- [ ] 16.3 卡种 12dp 小角标不与白圆底冲突、不挤名称
+- [ ] 16.4 28/34dp 下银行横版含字 logo 的可辨识度与整体观感
+- [ ] 16.5 R8 混淆后资源引用正常、NOTICE 与随包资源一一对应
+- [ ] 16.6 §8 第 45–63 批全部真机未验项整体继承
+

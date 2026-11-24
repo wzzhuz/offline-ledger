@@ -158,6 +158,9 @@ MUST NOT 用「· 储蓄卡」这类文字后缀挤占。
 
 ## 7. Q7 知识产权登记（如实，不写成结论）
 
+> **第 64 批注**：本节为第 60 批历史判断，资源已按使用者意见补齐；
+> 实际来源、逐项登记与商标口径见 `assets/NOTICE` [A]~[E] 与下文第 64 批要点。
+
 - 使用者判断：「用 Logo 指示账户归属，记账类，没有授权风险」，
   并指定 IconFont 为来源。**本批按此执行，不再劝阻**。
 - 上一轮所列公开材料与该判断**不一致**：工行官网《权利声明》要求
@@ -169,7 +172,7 @@ MUST NOT 用「· 储蓄卡」这类文字后缀挤占。
   「由使用者决策并承担」；也不复制一羽视觉资产。
 - IconFont 平台图标作者与授权逐个不同 → `assets/NOTICE` MUST 逐项登记
   作者 / 来源 / 授权类型 / 传递依赖，MUST NOT 用平台名称代替逐项审计。
-- **本批资源目录为空**：`AccountIconCatalog` 只含 `else` 回退分支，
+- **本批（第 60 批历史，已被第 64 批取代）资源目录为空**：`AccountIconCatalog` 只含 `else` 回退分支，
   三页全部中性圆 + 首字。拿到导出文件后补 `when` 分支即可，不改任何 UI 代码。
 
 ## 8. 风险与缓解
@@ -227,7 +230,7 @@ MUST NOT 用「· 储蓄卡」这类文字后缀挤占。
 
 `AccountQuickCandidates` 纯 JVM 契约、`cardLast4` 单一真相源、
 两套排序、`Migrations.ALL` 空 + `MigrationContractTest` 零改动、
-48 条模板清单、4 Tab、Q7 资源仍待补（本批不含任何品牌图形）、
+48 条模板清单、4 Tab、Q7 资源仍待补（**第 60 批历史，第 64 批已补齐**）、
 零新增 Gradle 依赖、`INTERNET` 权限。
 
 ### 验收（由我拟）
@@ -406,4 +409,74 @@ resolveAccount(refs, parsed):
 但 `recordDao.countDuplicate(accountId, ...)` 仍兜底，幂等性不丢。
 `parseAccountCell` 只认尾部 ` (4位数字)`，账户名本身带括号但不是 4 位数字
 时按字面处理，不误拆。真机需验 Excel 打开 13 列不乱码、重建后归属正确。
+
+---
+
+## 第 64 批实现要点：账户品牌图标实际补齐
+
+### 从哪获取（使用者明确要的答案）
+
+| 源 | 覆盖 | 许可 | 本批是否采用 |
+|---|---|---|---|
+| **icongo/bank-logos** | 422 个 SVG，含 21 家中国银行，1024×1024 viewBox | **MIT** | ✅ 采用 |
+| **Simple Icons** | wechat / alipay / meituan / tiktok 等品牌 | **CC0-1.0** | ✅ 采用 |
+| **IconFont（使用者最初指定）** | 海量 UGC 图标 | **逐个不同**，部分图库需打赏才商用 | ❌ 未采用 |
+| Wikimedia Commons | 部分 `PD-textlogo` 银行 logo | 公有领域（著作权），商标另算 | 备选 |
+| 各银行官网 / 官方 App 素材 | 官方徽记 | 需逐家书面许可 | 未取得 |
+
+**IconFont 为什么没用**：平台不生产图标，全部由设计师上传；单图标详情页
+授权标签可能是「非商业性免费」「商用需打赏（最低 3 元）」「CC0」「MIT」，
+官方库与 UGC 混排；下载需登录态导出。聚合页不等于「可随包分发」。
+本批拿不到登录态、更无法逐项核验，因此改用两个带明确开源许可的仓库，
+并把每个 slug 逐行登记进 NOTICE。若后续改用 IconFont，
+操作路径写在 `tools/account_icon_sources.md` 与 NOTICE [A2]。
+
+### 资源处理（可复现）
+
+```
+SVG (1024² 或 24²)
+  → cairosvg 512px 透明 PNG
+  → getbbox() 裁掉透明边距（银行横版 logo 会被放大到撑满）
+  → 等比缩到 104px
+  → 叠 128×128 白色圆底 + 3px 浅灰描边
+  → res/drawable-nodpi/ic_acct_<key>.png
+```
+
+白圆底放在**资源层**而不是 UI 层：`AccountIconBox` 里原本
+「有 res 直接显示 Icon、无 res 走 CategoryIcon 中性圆」，
+自带圆底后两者视觉尺寸一致，**UI 代码零改动**。
+`tools/build_account_icons.py` 可复现全流程（构建期工具，App 不执行）。
+
+### 27 个键位 / 26 个文件
+
+- 21 家银行：icbc / ccb / abc / boc / bocom / psbc / cmb / spdb / citic /
+  ceb / hxb / cmbc / cgb / cib / pab / czb / njcb / bob / bosc / jsb / nbcb
+- 6 个支付与网络信用：wechat / alipay / huabei / meituan / douyin / jdbaitiao
+- `huabei` 复用 `ic_acct_alipay`（花呗是支付宝旗下，母品牌图形指示归属），
+  所以 27 个键位只有 26 个 PNG。
+- `douyin` 用 Simple Icons 的 `tiktok` 音符（同品牌图形）。
+- `jdbaitiao` 无 CC0 / 明确授权图形 → **本作品原创**红底白「白」字，
+  MUST NOT 临摹京东商标；拿到授权直接替换同名 PNG。
+- `drawableFor()` 仍是编译期 `when` 显式常量表（T14），
+  MUST NOT 改成运行时反射。
+
+### 授权口径（如实，不写成「无风险」）
+
+使用者判断是「用 Logo 仅指示账户归属、记账类场景」。
+2026 年修订《商标法》第 73 条第 3 款：仅为指示用途、适用对象、应用场景
+或表明真实来源而使用相关注册商标，专用权人无权禁止正当使用，
+但容易导致混淆的除外 —— 这为指示性使用提供了依据。
+但 **MIT / CC0 只覆盖 SVG 代码与本项目原创绘制，不覆盖商标权**；
+Simple Icons 官方免责明确写「CC0 不意味着项目内所有 logo 也是 CC0，
+每个 logo 都是所属公司的商标」；工行 / 民生官网权利声明仍保留
+「未经书面许可不得复制、留存、编辑」等表述，本批未取得逐家书面授权。
+以上差异在 `assets/NOTICE` [C] 如实并列、标注由使用者决策并承担。
+
+### 已知限制（真机待验）
+
+银行 logo 是**横版含中文文字**，34dp 以下主要靠徽记颜色与形状区分，
+文字看不清；需要更清晰 MUST 换成纯徽记版本并重新登记。
+Simple Icons 的满幅色块（支付宝蓝 / 美团黄）与银行横版 logo
+在圆内的占幅不同，观感需真机看。所有资源随包分发、
+零 `INTERNET`、零新增 Gradle 依赖、零表结构变更。
 

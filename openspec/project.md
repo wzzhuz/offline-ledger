@@ -843,3 +843,30 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - artifacts 3 个、无染绿、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
 - Q7 资源未进包；归档仍需使用者明确说「可以归档」。
 
+## 第 64 批（v0.2.45）：账户品牌图标补齐 + 资源来源调研
+
+- **起因**：连续 4 版 Q7 停在「机制已就位、资源后补」，使用者要求
+  「账户的图标补齐一下，看下图标资源从哪获取」。
+- **来源**：`icongo/bank-logos`（**MIT**，21 家中国银行 SVG，422 个 SVG 里全都有）
+  + `Simple Icons`（**CC0-1.0**，微信 / 支付宝 / 美团 / TikTok）。
+  **IconFont 未采用**：UGC 图标授权逐个不同、部分图库需打赏才商用、
+  下载需登录态导出，平台聚合页不等于可随包分发；替换路径已写入
+  `tools/account_icon_sources.md` 与 `assets/NOTICE` [A2]。
+- **落地**：27 个 `iconKey` 全映射到本地图形，`res/drawable-nodpi/` 共
+  **26 个 PNG**（`huabei` 复用 `alipay`）；统一裁透明边距 + 128×128 白圆底，
+  圆底放资源层，**UI 代码零改动**；三页不再回退中性圆，自定义账户仍回退。
+- 京东白条无 CC0 / 明确授权图形 → **本作品原创**红底白「白」字占位，
+  MUST NOT 临摹商标；拿到授权直接替换同名 PNG。
+- `assets/NOTICE` 追加第 64 批 [A]~[E]：来源、**27 行逐项登记**、MIT 全文、
+  CC0 声明、商标口径如实并列（使用者判断 + 2026 修订《商标法》第 73 条第 3 款
+  指示性使用 + MIT/CC0 不覆盖商标权 + 未取得逐家书面授权，
+  MUST NOT 写成「无风险」）；第 60 批「资源目录为空」标注为历史。
+- `tools/build_account_icons.py` 可复现转换（构建期工具，App 不执行）；
+  `tools/account_icon_sources.md` 记录 slug 映射、IconFont 替换路径与备选源。
+- `privacy-security` spec 修订 Q7 条文 + 新增 1 条 Requirement；
+  change 四件套追加第 64 批。
+- **零回归**：`Migrations.ALL` 空 + `MigrationContractTest` 零改动、两套排序、
+  48 条模板、4 Tab、CSV 复合匹配、`accountLabel` 唯一实现、
+  零 `INTERNET` 权限、零新增 Gradle 依赖、零表结构变更。
+- CI 全绿不替代真机，§8 第 64 批新增 6 项待验，既有项整体继承。
+

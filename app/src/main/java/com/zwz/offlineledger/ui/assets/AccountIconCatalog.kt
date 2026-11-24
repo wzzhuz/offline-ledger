@@ -14,21 +14,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zwz.offlineledger.R
 import com.zwz.offlineledger.data.local.AccountTemplates
 import com.zwz.offlineledger.ui.components.CategoryIcon
 
 /**
- * 第 60 批 Q7：账户品牌图标的**编译期显式常量表**。
+ * 第 60 批 Q7 落地机制；**第 64 批补齐实际资源**。
  *
- * 使用者已明确「用 Logo 指示账户归属、记账类、可以从 IconFont 获取」，
- * 本批按此方向落地可插拔机制，但**资源目录为空**：沙盒拿不到 IconFont
- * 的登录态导出文件，且每份品牌图形必须在 `assets/NOTICE` 逐项登记
- * 作者 / 来源 / 授权类型 / 传递依赖（平台图标由不同作者上传，授权逐个不同）。
+ * 使用者已明确「用 Logo 指示账户归属、记账类场景」。第 64 批从
+ * `icongo/bank-logos`（MIT，21 家中国银行 SVG）与
+ * `Simple Icons`（CC0-1.0，微信 / 支付宝 / 美团 / 抖音）取回图形，
+ * 统一裁切 + 白圆底转成 128×128 PNG 放进 `drawable-nodpi/`；
+ * 京东白条无 CC0/明确授权图形，用本作品原创红色「白」字占位。
+ * 逐项来源、授权类型、商标口径 MUST 见 `assets/NOTICE` 第 64 批段落。
  *
- * 因此 `drawableFor` 本批只有 `else -> null`，三页全部回退
- * `CategoryIcon` 的中性圆 + 中文首字。补齐资源时只需：
- *   ① 放入本地 VectorDrawable ② 在此加 `when` 分支 ③ 补 `assets/NOTICE` 条目
- * UI 代码零改动。MUST NOT 用运行时字符串反射 / 查表映射（T14 编译坑）。
+ * IconFont 未采用：UGC 图标由不同作者上传、授权逐个不同，部分图库
+ * 需打赏才商用，且需登录态导出；平台聚合页不等于「可随包分发」。
+ * 若后续改用 IconFont，MUST 按每个图标详情页授权逐项替换资源与 NOTICE。
+ *
+ * 仍是**编译期显式常量表**：MUST NOT 用运行时字符串反射 / 查表映射
+ * （T14 编译坑）。补齐或替换资源只需：① 替换同名 PNG
+ * ② 需要新增键位时在此加 `when` 分支 ③ 同步 `assets/NOTICE` 条目，
+ * UI 代码零改动。
  */
 object AccountIconCatalog {
 
@@ -37,8 +44,39 @@ object AccountIconCatalog {
         AccountTemplates.ALL.firstOrNull { it.name == accountName }?.iconKey
 
     fun drawableFor(iconKey: String?): Int? = when (iconKey) {
-        // 第 60 批：Q7 资源待使用者提供导出文件 + 逐项授权登记后在此补分支。
-        // 示例："icbc" -> R.drawable.ic_bank_icbc
+        // 第 64 批：21 家银行，来自 icongo/bank-logos（MIT）。
+        "icbc" -> R.drawable.ic_acct_icbc
+        "ccb" -> R.drawable.ic_acct_ccb
+        "abc" -> R.drawable.ic_acct_abc
+        "boc" -> R.drawable.ic_acct_boc
+        "bocom" -> R.drawable.ic_acct_bocom
+        "psbc" -> R.drawable.ic_acct_psbc
+        "cmb" -> R.drawable.ic_acct_cmb
+        "spdb" -> R.drawable.ic_acct_spdb
+        "citic" -> R.drawable.ic_acct_citic
+        "ceb" -> R.drawable.ic_acct_ceb
+        "hxb" -> R.drawable.ic_acct_hxb
+        "cmbc" -> R.drawable.ic_acct_cmbc
+        "cgb" -> R.drawable.ic_acct_cgb
+        "cib" -> R.drawable.ic_acct_cib
+        "pab" -> R.drawable.ic_acct_pab
+        "czb" -> R.drawable.ic_acct_czb
+        "njcb" -> R.drawable.ic_acct_njcb
+        "bob" -> R.drawable.ic_acct_bob
+        "bosc" -> R.drawable.ic_acct_bosc
+        "jsb" -> R.drawable.ic_acct_jsb
+        "nbcb" -> R.drawable.ic_acct_nbcb
+        // 支付 / 网络信用，来自 Simple Icons（CC0-1.0）或本作品原创。
+        "wechat" -> R.drawable.ic_acct_wechat
+        "alipay" -> R.drawable.ic_acct_alipay
+        // 花呗是支付宝旗下，用母品牌图形指示归属（非花呗官方 logo）。
+        "huabei" -> R.drawable.ic_acct_alipay
+        "meituan" -> R.drawable.ic_acct_meituan
+        // 抖音月付：以同品牌 TikTok 图形指示字节跳动 / 抖音归属。
+        "douyin" -> R.drawable.ic_acct_douyin
+        // 京东白条：无 CC0 / 明确授权图形，用原创红色「白」字占位，
+        // MUST NOT 临摹京东商标；后续拿到授权可直接替换同名 PNG。
+        "jdbaitiao" -> R.drawable.ic_acct_jdbaitiao
         else -> null
     }
 }

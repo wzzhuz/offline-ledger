@@ -157,7 +157,7 @@ CI 全绿仍不替代观感 / 手势 / 键盘验收，但**不替代的不再是
 
 `AccountQuickCandidates` 纯 JVM 契约、`cardLast4` 单一真相源、
 两套排序、`Migrations.ALL` 空 + `MigrationContractTest` 零改动、
-48 条模板清单、4 Tab、Q7 资源仍待补（本批不含任何品牌图形）、
+48 条模板清单、4 Tab、Q7 资源仍待补（**第 60 批历史，第 64 批已补齐**）、
 零新增 Gradle 依赖、`INTERNET` 权限。
 
 ### 验收（由我拟）
@@ -212,7 +212,7 @@ CI 全绿仍不替代观感 / 手势 / 键盘验收，但**不替代的不再是
 - `RecordRow` / `ReviewRow` 各只被**一条** SQL 返回（`pagedFiltered` / `reviewRows`），
   加列不会造成别的查询缺列；`accountRecords` 不 JOIN accounts，无需改。
 - `Migrations.ALL` 空、`MigrationContractTest` 零改动、两套排序、
-  48 条模板、4 Tab、Q7 资源仍待补、零新增依赖、`INTERNET` 权限。
+  48 条模板、4 Tab、Q7 资源仍待补（**第 62 批历史，第 64 批已补齐**）、零新增依赖、`INTERNET` 权限。
 
 ### 验收（由我拟）
 
@@ -265,7 +265,7 @@ CI 全绿仍不替代观感 / 手势 / 键盘验收，但**不替代的不再是
 - Room `accounts.name` 字段：仍是纯名（`cardLast4` 是单一真相源），
   MUST NOT 把卡号拼回落库值。
 - 表结构 / `Migrations.ALL` / `MigrationContractTest` / 两套排序 /
-  48 条模板 / 4 Tab / Q7 资源 / 零新增依赖 / `INTERNET` 权限。
+  48 条模板 / 4 Tab / Q7 资源（**第 63 批历史，第 64 批已补齐**）/ 零新增依赖 / `INTERNET` 权限。
 
 ### 验收（由我拟）
 
@@ -276,4 +276,52 @@ CI 全绿仍不替代观感 / 手势 / 键盘验收，但**不替代的不再是
 4. 旧库 `name` 已含后缀的账户导出再导入仍能命中自身；
 5. Firefly 映射下拉能区分同名两卡，选中的卡号能精确落位；
 6. 加密备份往返零回归，`duplicateKey()` 契约不变。
+
+---
+
+## 第 64 批（v0.2.45）：账户品牌图标补齐 + 资源来源调研
+
+**触发**：使用者「账户的图标补齐一下，看下图标资源从哪获取」。
+第 60 批起连续 4 版 Q7 都停在「机制已就位、资源后补」，本批真正落地。
+
+### 从哪获取（调研结论）
+
+| 源 | 许可 | 结论 |
+|---|---|---|
+| `icongo/bank-logos` | MIT（仓库 LICENSE 全文已附 NOTICE [D]） | ✅ 取 21 家中国银行 SVG，422 个 SVG 里全都有 |
+| `Simple Icons` | CC0-1.0（`cdn.simpleicons.org`） | ✅ 取微信 / 支付宝 / 美团 / TikTok |
+| **IconFont**（使用者最初指定） | UGC 逐个不同，部分图库「商用需打赏（最低 3 元）」 | ❌ 需登录态导出、无法逐项核验，聚合页不等于可随包分发 |
+| Wikimedia Commons `PD-textlogo` | 著作权公有领域，商标另算 | 备选，未采用 |
+| 各银行官网品牌素材 | 需逐家书面许可 | 未取得 |
+
+### 落地
+
+- 27 个 `iconKey` 全部映射到本地图形，`res/drawable-nodpi/` 共 **26 个 PNG**
+  （`huabei` 复用 `alipay`）；三页不再回退中性圆，自定义账户仍回退。
+- 统一处理：SVG → 裁透明边距 → 等比 104px → **128×128 白圆底**，
+  圆底放在资源层，**UI 代码零改动**，与中性圆回退视觉一致。
+- `tools/build_account_icons.py` 可复现；`tools/account_icon_sources.md`
+  记录来源、slug 映射、IconFont 替换路径与备选源。
+- `assets/NOTICE` 追加第 64 批：[A] 来源 [A2] 未采用 IconFont 的原因
+  [B] **27 行逐项登记** [C] 授权与商标口径如实并列
+  [D] MIT 全文 [E] CC0 声明；第 60 批「资源目录为空」标注为历史。
+- 京东白条无 CC0 / 明确授权图形 → 本作品原创红底白「白」字占位，
+  MUST NOT 临摹京东商标，拿到授权直接替换同名 PNG。
+
+### 关键约束（零回归）
+
+`Migrations.ALL` 空 + `MigrationContractTest` 零改动、两套排序、
+48 条模板、4 Tab、CSV 复合匹配、`accountLabel` 唯一实现、
+**零 `INTERNET` 权限、零新增 Gradle 依赖、零表结构变更**。
+`drawableFor()` 仍是编译期 `when` 显式常量表（T14），不用反射。
+
+### 验收（由我拟）
+
+1. 27 个键位 `drawableFor()` 全返回非 null，共 26 个 PNG；
+2. 资产页 / 模板 sheet / 记一笔三页显示品牌图形、零网络请求；
+3. 自定义账户（`iconKey = null`）仍回退中性圆 + 首字；
+4. 卡种 12dp 小角标不被白圆底遮挡、不挤名称；
+5. 28/34dp 下的观感与可辨识度（银行横版含字，小尺寸靠徽记区分）；
+6. `assets/NOTICE` 逐项登记与随包资源一一对应，无「已获授权 / 无风险」表述；
+7. R8 混淆后 `R.drawable.*` 引用正常、APK 体积与 digest 一致。
 

@@ -36,10 +36,126 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ------------------------------------------------------------------
 
+
 ------------------------------------------------------------------
-第 60 批 · 账户品牌图标（AccountIconCatalog）资源登记
+第 64 批 · 账户品牌图标（AccountIconCatalog）实际资源登记
 ------------------------------------------------------------------
-状态：**资源目录为空，本批未引入任何品牌图形**。
+状态：**资源已补齐**。27 个 iconKey 全部有本地图形，
+app/src/main/res/drawable-nodpi/ic_acct_*.png 共 26 个文件
+（alipay 与 huabei 复用同一份图形，jdbaitiao 为本作品原创占位）。
+全部随包分发、零运行时网络请求、未申请 INTERNET、未新增 Gradle 依赖。
+
+[A] 资源从哪获取（本批实际采用）
+
+  1. icongo/bank-logos —— 21 家中国银行 SVG，仓库 MIT License。
+     https://github.com/icongo/bank-logos/tree/main/logos/
+     SVG 均为 1024x1024 viewBox，适合图标位；非 -rect 版本。
+  2. Simple Icons —— 微信 / 支付宝 / 美团 / TikTok，CC0-1.0。
+     https://simpleicons.org/  https://cdn.simpleicons.org/<slug>
+  3. 京东白条：未找到 CC0 / 明确授权图形，用本作品原创红色「白」字占位，
+     MUST NOT 临摹京东商标；拿到授权后直接替换同名 PNG 即可。
+
+[A2] 未采用 IconFont 的原因（使用者最初指定的来源）
+
+  IconFont 是 UGC 聚合平台：每个图标由不同作者上传，授权状态逐个不同；
+  部分图库标注「非商业性免费，商用需按图标打赏」，官方库与 UGC 混排。
+  下载需登录态导出，平台聚合页不等于「可随包分发」。
+  本批无法取得登录态、更无法逐项核验单图标授权，故改用上述两个
+  带明确开源许可的仓库，并把每一份图形的 slug 逐项登记如下。
+  若后续改用 IconFont：MUST 打开每个图标详情页核验授权 → 留存
+  授权页截图 / 打赏凭证 → 替换同名 PNG → 逐行改写本表「来源 / 授权」列。
+  操作路径：iconfont.cn 搜索银行名 → 加入项目 → 下载 SVG → 核验授权
+  → 转 PNG → 覆盖 ic_acct_<key>.png → 更新本文件。
+
+[B] 逐项登记（每份图形一行，MUST NOT 用平台名代替）
+
+  iconKey    | 品牌         | 来源文件 / slug                          | 授权类型        | 商标归属
+  -----------+--------------+------------------------------------------+-----------------+---------
+  icbc       | 工商银行         | icongo/bank-logos logos/icbc.svg                  | MIT (SVG 代码)  | 各银行
+  ccb        | 建设银行         | icongo/bank-logos logos/ccb.svg                   | MIT (SVG 代码)  | 各银行
+  abc        | 农业银行         | icongo/bank-logos logos/abchina.svg               | MIT (SVG 代码)  | 各银行
+  boc        | 中国银行         | icongo/bank-logos logos/boc.svg                   | MIT (SVG 代码)  | 各银行
+  bocom      | 交通银行         | icongo/bank-logos logos/bankcomm.svg              | MIT (SVG 代码)  | 各银行
+  psbc       | 邮储银行         | icongo/bank-logos logos/psbc.svg                  | MIT (SVG 代码)  | 各银行
+  cmb        | 招商银行         | icongo/bank-logos logos/cmbchina.svg              | MIT (SVG 代码)  | 各银行
+  spdb       | 浦发银行         | icongo/bank-logos logos/spdb.svg                  | MIT (SVG 代码)  | 各银行
+  citic      | 中信银行         | icongo/bank-logos logos/citicbank.svg             | MIT (SVG 代码)  | 各银行
+  ceb        | 光大银行         | icongo/bank-logos logos/cebbank.svg               | MIT (SVG 代码)  | 各银行
+  hxb        | 华夏银行         | icongo/bank-logos logos/hxb.svg                   | MIT (SVG 代码)  | 各银行
+  cmbc       | 民生银行         | icongo/bank-logos logos/cmbc.svg                  | MIT (SVG 代码)  | 各银行
+  cgb        | 广发银行         | icongo/bank-logos logos/cgbchina.svg              | MIT (SVG 代码)  | 各银行
+  cib        | 兴业银行         | icongo/bank-logos logos/cib.svg                   | MIT (SVG 代码)  | 各银行
+  pab        | 平安银行         | icongo/bank-logos logos/pingan.svg                | MIT (SVG 代码)  | 各银行
+  czb        | 浙商银行         | icongo/bank-logos logos/czbank.svg                | MIT (SVG 代码)  | 各银行
+  njcb       | 南京银行         | icongo/bank-logos logos/njcb.svg                  | MIT (SVG 代码)  | 各银行
+  bob        | 北京银行         | icongo/bank-logos logos/bankofbeijing.svg         | MIT (SVG 代码)  | 各银行
+  bosc       | 上海银行         | icongo/bank-logos logos/bosc.svg                  | MIT (SVG 代码)  | 各银行
+  jsb        | 江苏银行         | icongo/bank-logos logos/jsbchina.svg              | MIT (SVG 代码)  | 各银行
+  nbcb       | 宁波银行         | icongo/bank-logos logos/nbcb.svg                  | MIT (SVG 代码)  | 各银行
+  wechat     | 微信           | Simple Icons cdn/wechat                       | CC0-1.0 (SVG)   | 各权利人
+  alipay     | 支付宝          | Simple Icons cdn/alipay                       | CC0-1.0 (SVG)   | 各权利人
+  huabei     | 花呗           | Simple Icons cdn/alipay（母品牌，非花呗官方 logo）       | CC0-1.0 (SVG)   | 各权利人
+  meituan    | 美团月付         | Simple Icons cdn/meituan                      | CC0-1.0 (SVG)   | 各权利人
+  douyin     | 抖音月付         | Simple Icons cdn/tiktok（同品牌图形）                | CC0-1.0 (SVG)   | 各权利人
+  jdbaitiao  | 京东白条     | 本作品原创（tools/build_account_icons.py） | 本项目 MIT      | 不适用
+
+  转换方式：SVG → cairosvg 512px → 裁透明边距 → 等比缩到 104px
+  → 叠 128x128 白色圆底（3px 浅灰描边）→ drawable-nodpi PNG。
+  可复现脚本：tools/build_account_icons.py（构建期工具，App 不执行）。
+  原始 SVG 归档：tools/account_icon_sources.md。
+
+[C] 授权与商标口径（如实登记，MUST NOT 写成「无风险」）
+
+  - 使用者决策（2026-11-24）：用 Logo 仅指示账户归属，记账类场景。
+  - 2026 年修订《商标法》第 73 条第 3 款：仅为指示所提供商品的用途、
+    适用对象、应用场景等信息或者表明真实来源而使用相关注册商标，
+    注册商标专用权人无权禁止他人正当使用，但容易导致混淆的除外。
+  - 但上述 MIT / CC0 只覆盖图标 SVG 代码与本项目原创绘制部分，
+    **不覆盖各品牌商标权**；商标权仍归各权利人所有。
+  - Simple Icons 官方免责：CC0 不意味着项目内所有 logo 也是 CC0，
+    每个 logo 都是其所属公司的商标，使用者须遵守品牌指南、自行取得
+    正确权限。工行 / 民生等银行官网权利声明亦保留「未经书面许可不得
+    复制、留存、编辑」等表述；本批未取得逐家书面授权。
+  - 与使用者判断存在差异的部分，由使用者决策并承担，此处如实并列，
+    MUST NOT 写成「已解决 / 无风险 / 已获授权」的结论。
+  - 银行 logo 为横版含中文文字，34dp 以下主要靠徽记颜色与形状区分；
+    如需更清晰，MUST 换成各行的纯徽记版本并重新登记。
+
+[D] icongo/bank-logos MIT License 全文
+
+MIT License
+
+Copyright (c) 2022 IconGo
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+[E] Simple Icons CC0-1.0
+
+  https://creativecommons.org/publicdomain/zero/1.0/
+  图标代码以 CC0-1.0 发布；商标权利不在 CC0 放弃范围内（见 [C]）。
+  https://github.com/simple-icons/simple-icons
+
+
+------------------------------------------------------------------
+第 60 批 · 账户品牌图标（AccountIconCatalog）资源登记【历史，已被第 64 批取代】
+------------------------------------------------------------------
+状态（历史）：**资源目录为空，第 60 批未引入任何品牌图形**。
 
 本批只落地可插拔机制：`AccountTemplate.iconKey` 预留键位，
 `AccountIconCatalog.drawableFor()` 为编译期 `when` 显式常量表，
