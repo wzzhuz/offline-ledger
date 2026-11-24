@@ -209,3 +209,50 @@ MUST NOT 用「· 储蓄卡」这类文字后缀挤占。
   以 Release `asset.digest` 为准。
 - 真机：§8 第 60 批新增待验（观感 / 手势 / 键盘 / 模板滚动），既有项整体继承；
   **CI 全绿不替代观感 / 手势 / 键盘验收**；迁移不在验收范围。
+
+---
+
+## 第 61 批修订（v0.2.42）：记一笔卡号显示、图标密度、卡种可编辑
+
+使用者在 v0.2.41 真机后给出 3 条反馈，**三条都是缺陷级修复、无方向分歧**，
+按既有节奏一次性做完出包。
+
+| # | 核查事实 | 修法 |
+|---|---|---|
+| 1 | `AccountQuickItem` 只有 `id/name/isArchived/cardKind`，`labelOf` 只返回纯名；`cardLast4` **根本没进候选数据**。第 60 批的「显示名带 `(1234)`」只落在资产页 `AccountCard` 的内联 `shownName` 里，记一笔候选 / 全账户选择弹层 /「当前：」/ 独立排序页各自用 `account.name` | 新增 `accountBaseLabel()` 唯一组合点（含旧库后缀去重），四处统一复用；候选映射时把组合名传进 `AccountQuickItem.name`，`select`/`labelOf`/`promoteById` 纯 JVM 契约零改动；弹层搜索键也改按组合名，输入「1122」可搜到 |
+| 2 | 记一笔页面看得见的大图标是分类快捷栏 `CategoryIcon(size = 40/34)`；第 60 批刚给账户 chip 加的 12dp 小标志又撑宽了整排 | 分类快捷栏收紧到 **28/24dp**（分类管理页 5 列网格仍 40dp，两处密度各按各的场景）；`AccountKindBadge` 加 `size` 参数，记一笔传 **10dp**（6sp 字），Spacer 3→2dp，chip 文字加单行省略 |
+| 3 | 两条根因叠加：① 导入建账户 `AccountEntity(...)` 没写 `cardKind` / `quickOrder`；② **`EditAccountDialog` 的 `onConfirm` 写死传 `account.cardKind`**，就算有选择器也存不回去 | 新增页与编辑页都补「不设 / 储蓄卡 / 信用卡」三态选择；编辑页传选中的 `cardKind`；导入建账户补 `quickOrder` 与保守默认 `cardKind`（`LIABILITY → CREDIT`，`ASSET` 不猜——微信零钱/支付宝/储蓄卡混在一起，猜了会误标） |
+
+### 不改什么
+
+`AccountQuickCandidates` 纯 JVM 契约、`cardLast4` 单一真相源、
+两套排序、`Migrations.ALL` 空 + `MigrationContractTest` 零改动、
+48 条模板清单、4 Tab、Q7 资源仍待补（本批不含任何品牌图形）、
+零新增 Gradle 依赖、`INTERNET` 权限。
+
+### 验收（由我拟）
+
+1. 两张同名「工商银行」在记一笔候选 /「当前：」/ 全账户弹层分别显示 `(1122)` / `(3344)`；
+2. 弹层搜「3344」命中对应卡；旧库已含后缀的账户只显示一次；
+3. 分类快捷栏 28/24dp、账户小标志 10dp，分类管理网格仍 40dp；
+4. 导入的 LIABILITY 带「信」、ASSET 不带标志且可在编辑页改成「储」并落库；
+5. 编辑页改卡种保存后重进仍保持；记一笔 / 资产页 / 独立排序页零回归。
+
+
+### 第 61 批实现要点
+
+- `AccountDisplayLabel.kt`：`accountBaseLabel(account)` 与
+  `stripLegacyCardSuffix(name, last4)` 一正一反两个纯函数，
+  放 `ui.assets` 包（不进 `core`，避免 core 依赖 Room Entity，
+  维持 `AccountQuickCandidates` 的纯 JVM 分层）。
+- `AccountKindBadge(cardKind, modifier, size = 12)`：默认 12dp 供资产页 /
+  模板 sheet / 独立排序页，记一笔唯一传 10dp。
+- `RecordEditorDialog`：`CategoryIcon` 40/34→28/24；
+  候选 `AccountQuickItem(it.id, accountBaseLabel(it), ...)`；
+  弹层 `filter { accountBaseLabel(it).contains(query) }` 且显示组合名。
+- `AssetsScreen`：`shownName` 改调 `accountBaseLabel`；
+  Add/Edit 各加一行三态 FilterChip；Edit 的 `onConfirm` 传 `cardKind` 变量。
+- `LedgerRepository` 导入建账户：补 `quickOrder` 与
+  `cardKind = if (type == LIABILITY) "CREDIT" else null`。
+- 头部过时注释（「数据侧零改动 / version = 5 / v0.2.39 可覆盖安装」）同步更正，
+  MUST NOT 留着和第 60/61 批事实矛盾。

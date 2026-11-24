@@ -76,7 +76,11 @@ fun AccountIconBox(
  * 叠在图标圆右下角，MUST NOT 用「· 储蓄卡」这类文字后缀挤占账户名。
  */
 @Composable
-fun AccountKindBadge(cardKind: String?, modifier: Modifier = Modifier) {
+fun AccountKindBadge(
+    cardKind: String?,
+    modifier: Modifier = Modifier,
+    size: Int = 12
+) {
     // 不用 early return：Composable 重启函数里条件包裹最稳。
     val label = when (cardKind) {
         "DEBIT" -> "储"
@@ -88,15 +92,15 @@ fun AccountKindBadge(cardKind: String?, modifier: Modifier = Modifier) {
         val fg = if (cardKind == "CREDIT") Color(0xFF2A4FA0) else Color(0xFF236B36)
         Box(
             modifier = modifier
-                .size(12.dp)
+                .size(size.dp)
                 .background(bg, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = label,
                 color = fg,
-                fontSize = 7.sp,
-                lineHeight = 7.sp,
+                fontSize = if (size <= 10) 6.sp else 7.sp,
+                lineHeight = if (size <= 10) 6.sp else 7.sp,
                 maxLines = 1,
                 style = MaterialTheme.typography.labelSmall
             )

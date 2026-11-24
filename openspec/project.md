@@ -738,3 +738,25 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **Q7 资源未进包**，三页回退中性圆；`assets/` 无任何品牌图形。
 - 归档仍需使用者明确说「可以归档」。
 
+## 第 61 批（v0.2.42）：记一笔卡号显示、图标密度、卡种可编辑
+
+- **起因**：v0.2.41 真机三条反馈，均为缺陷级、无方向分歧，一次性做完出包。
+- **① 卡号**：新增 `accountBaseLabel()` / `stripLegacyCardSuffix()` 唯一组合点
+  （`ui.assets`，不进 core）。记一笔快捷候选 /「当前：」/ 全账户选择弹层 /
+  弹层搜索键 / 独立排序页 / 资产页账户行统一复用；候选映射把组合名传进
+  `AccountQuickItem.name`，纯 JVM 契约与单测零改动。多张同名银行卡可区分。
+- **② 密度**：记一笔分类快捷栏 `CategoryIcon` 40/34 → **28/24dp**；
+  `AccountKindBadge` 加 `size` 参数（默认 12），记一笔传 **10dp** + 6sp 字，
+  Spacer 3→2dp，chip 文字单行省略。分类管理 5 列网格仍 40dp，不连带。
+- **③ 卡种**：Add / Edit 两页补「不设 / 储蓄卡 / 信用卡」三态选择；
+  **Edit 的 `onConfirm` 从写死 `account.cardKind` 改为传当前 `cardKind` 变量**
+  （这是「编辑选不了」的真根因）；导入建账户补 `quickOrder` 与保守默认
+  `cardKind`（`LIABILITY → CREDIT`，`ASSET` 不猜，避免误标微信零钱 / 支付宝）。
+- change `refine-account-order-and-templates` 追加第 61 批：reporting-ui
+  修订 1 条 + 新增 1 条 Requirement、ledger-transactions 修订卡号条文并加
+  Scenario、proposal / design / tasks 同步。三个 change 仍未归档。
+- **零回归**：`AccountQuickCandidates` 契约、两套排序、`Migrations.ALL` 空、
+  `MigrationContractTest` 零改动、48 条模板、4 Tab、Q7 资源仍待补、
+  零新增依赖、`INTERNET` 权限全部不动。
+- CI 全绿不替代真机，§8 第 61 批新增 6 项待验，既有项整体继承。
+

@@ -217,8 +217,8 @@ private fun QuickSortRow(
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = account.name +
-                        (account.cardLast4?.let { " ($it)" } ?: ""),
+                    // 第 61 批：统一走 accountBaseLabel，旧库后缀自动去重。
+                    text = accountBaseLabel(account),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

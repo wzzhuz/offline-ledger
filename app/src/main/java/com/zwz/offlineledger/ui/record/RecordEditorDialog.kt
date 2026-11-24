@@ -66,6 +66,7 @@ import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.assets.AccountKindBadge
+import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.components.CategoryIcon
 import com.zwz.offlineledger.ui.components.CategorySelectDialog
@@ -438,7 +439,9 @@ private fun CategoryStrip(
                     .clickable { onSelectRoot(root.id) }
                     .padding(horizontal = 4.dp, vertical = 2.dp)
             ) {
-                CategoryIcon(root.name, root.colorHex, size = if (chosen) 40 else 34)
+                // 第 61 批：记一笔分类快捷栏图标收紧，40/34 → 28/24；
+                // 分类管理页的 5 列网格仍用 40dp，两处密度各按各的场景。
+                CategoryIcon(root.name, root.colorHex, size = if (chosen) 28 else 24)
                 Text(
                     text = root.name,
                     style = MaterialTheme.typography.labelSmall,
@@ -585,16 +588,17 @@ private fun AccountStrip(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                     )
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                        accounts.filter { it.name.contains(query, ignoreCase = true) }
-                            .forEach { a ->
+                        // 第 61 批：搜索键与显示名都走 accountBaseLabel，
+                        // 输入「1122」也能搜到对应卡；多张同名银行卡可区分。
+                        accounts.filter {
+                            accountBaseLabel(it).contains(query, ignoreCase = true)
+                        }.forEach { a ->
                                 TextButton(
                                     onClick = { onSelect(a.id); pickerTarget = null },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text(
-                                        AccountQuickCandidates.labelOf(
-                                            AccountQuickItem(a.id, a.name, a.isArchived, a.cardKind)
-                                        ) + " · " + a.currencyCode
+                                        accountBaseLabel(a) + " · " + a.currencyCode
                                     )
                                 }
                             }
@@ -628,9 +632,11 @@ private fun AccountQuickRow(
         )
     }
     // 第 44 批：候选 = 常用前 N 个 + 当前选中项（冷门 / 归档也一定可见）。
-    // 第 60 批：带上 cardKind，快捷 chip 用 12dp 小标志区分同名银行的储蓄卡 / 信用卡。
+    // 第 60 批：带上 cardKind 小标志；第 61 批：name 改传 accountBaseLabel，
+    // 让「当前：」文案与 chip 都带卡号后四位，多张同名银行卡可区分。
+    // labelOf / select / promoteById 全部按 id 工作，纯 JVM 契约零改动。
     val items = accounts.map {
-        AccountQuickItem(it.id, it.name, it.isArchived, it.cardKind)
+        AccountQuickItem(it.id, accountBaseLabel(it), it.isArchived, it.cardKind)
     }
     val shown = AccountQuickCandidates.select(items, selectedId, QUICK_COUNT)
     val current = AccountQuickCandidates.currentOrNull(items, selectedId)
@@ -659,12 +665,15 @@ private fun AccountQuickRow(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // 小标志叠在 chip 标签前，12dp，不使用文字后缀挤占账户名。
                         a.cardKind?.let {
-                            AccountKindBadge(it)
-                            Spacer(Modifier.width(3.dp))
+                            // 第 61 批：记一笔 chip 收窄到 10dp，减少横向占用。
+                            AccountKindBadge(it, size = 10)
+                            Spacer(Modifier.width(2.dp))
                         }
                         Text(
                             AccountQuickCandidates.labelOf(a),
-                            style = MaterialTheme.typography.labelSmall
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },

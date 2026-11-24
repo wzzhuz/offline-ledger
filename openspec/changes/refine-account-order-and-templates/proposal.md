@@ -139,3 +139,31 @@ CI 全绿仍不替代观感 / 手势 / 键盘验收，但**不替代的不再是
 → **需建 change**（本文件 `refine-account-order-and-templates`，
 与尚未归档的 `refine-category-management-pages`、`refine-asset-account-pages` 并存）。
 归档仍需使用者明确说「可以归档」。
+
+---
+
+## 第 61 批修订（v0.2.42）：记一笔卡号显示、图标密度、卡种可编辑
+
+使用者在 v0.2.41 真机后给出 3 条反馈，**三条都是缺陷级修复、无方向分歧**，
+按既有节奏一次性做完出包。
+
+| # | 核查事实 | 修法 |
+|---|---|---|
+| 1 | `AccountQuickItem` 只有 `id/name/isArchived/cardKind`，`labelOf` 只返回纯名；`cardLast4` **根本没进候选数据**。第 60 批的「显示名带 `(1234)`」只落在资产页 `AccountCard` 的内联 `shownName` 里，记一笔候选 / 全账户选择弹层 /「当前：」/ 独立排序页各自用 `account.name` | 新增 `accountBaseLabel()` 唯一组合点（含旧库后缀去重），四处统一复用；候选映射时把组合名传进 `AccountQuickItem.name`，`select`/`labelOf`/`promoteById` 纯 JVM 契约零改动；弹层搜索键也改按组合名，输入「1122」可搜到 |
+| 2 | 记一笔页面看得见的大图标是分类快捷栏 `CategoryIcon(size = 40/34)`；第 60 批刚给账户 chip 加的 12dp 小标志又撑宽了整排 | 分类快捷栏收紧到 **28/24dp**（分类管理页 5 列网格仍 40dp，两处密度各按各的场景）；`AccountKindBadge` 加 `size` 参数，记一笔传 **10dp**（6sp 字），Spacer 3→2dp，chip 文字加单行省略 |
+| 3 | 两条根因叠加：① 导入建账户 `AccountEntity(...)` 没写 `cardKind` / `quickOrder`；② **`EditAccountDialog` 的 `onConfirm` 写死传 `account.cardKind`**，就算有选择器也存不回去 | 新增页与编辑页都补「不设 / 储蓄卡 / 信用卡」三态选择；编辑页传选中的 `cardKind`；导入建账户补 `quickOrder` 与保守默认 `cardKind`（`LIABILITY → CREDIT`，`ASSET` 不猜——微信零钱/支付宝/储蓄卡混在一起，猜了会误标） |
+
+### 不改什么
+
+`AccountQuickCandidates` 纯 JVM 契约、`cardLast4` 单一真相源、
+两套排序、`Migrations.ALL` 空 + `MigrationContractTest` 零改动、
+48 条模板清单、4 Tab、Q7 资源仍待补（本批不含任何品牌图形）、
+零新增 Gradle 依赖、`INTERNET` 权限。
+
+### 验收（由我拟）
+
+1. 两张同名「工商银行」在记一笔候选 /「当前：」/ 全账户弹层分别显示 `(1122)` / `(3344)`；
+2. 弹层搜「3344」命中对应卡；旧库已含后缀的账户只显示一次；
+3. 分类快捷栏 28/24dp、账户小标志 10dp，分类管理网格仍 40dp；
+4. 导入的 LIABILITY 带「信」、ASSET 不带标志且可在编辑页改成「储」并落库；
+5. 编辑页改卡种保存后重进仍保持；记一笔 / 资产页 / 独立排序页零回归。

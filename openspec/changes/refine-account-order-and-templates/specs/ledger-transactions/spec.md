@@ -113,12 +113,15 @@ MUST NOT 再把 ` (1122)` 拼进 `name` 落库。
 新增与编辑账户 SHALL 都提供「卡号后四位（可选）」输入（4 位数字过滤），
 编辑 SHALL 经 `vm.editAccount` → `repository.updateAccountMeta` → DAO `UPDATE`
 写回 `cardLast4`，MUST NOT 出现「编辑改不了卡号」。
-全站展示 SHALL 统一由 `name + cardLast4` 组合一次；
+全站展示 SHALL 统一由 `accountBaseLabel()` 这一个组合点产出
+`name + cardLast4`，**第 61 批**：资产页账户行、记一笔快捷候选、
+记一笔全账户选择弹层、「当前：」文案、独立全部账户排序页
+SHALL 全部复用它，MUST NOT 各自内联拼一遍。
 对旧库中 `name` 已含 ` (xxxx)` 且 `cardLast4` 相同的账户，
 展示 SHALL 去重，MUST NOT 出现「中行储蓄卡(1122)(1122)」；
 旧 `name` SHALL 不被数据迁移改写（零数据迁移）。
-编辑页初始化 SHALL 剥掉历史后缀再填入名称输入框，
-MUST NOT 因一次编辑把后缀重新写回 `name`。
+编辑页初始化 SHALL 经 `stripLegacyCardSuffix()` 剥掉历史后缀再填入
+名称输入框，MUST NOT 因一次编辑把后缀重新写回 `name`。
 
 #### Scenario: 编辑改卡号
 
@@ -130,8 +133,9 @@ MUST NOT 因一次编辑把后缀重新写回 `name`。
 #### Scenario: 旧库双后缀被治愈
 
 - **GIVEN** 旧库账户 `name = "中行储蓄卡 (1122)"`、`cardLast4 = "1122"`
-- **WHEN** 覆盖安装后打开资产页
+- **WHEN** 卸载重装并恢复旧备份后打开资产页（测试数据、不考虑迁移）
 - **THEN** 只显示一次「(1122)」，MUST NOT 重复
+- **AND** 记一笔候选与全账户选择弹层同样只显示一次
 
 ---
 

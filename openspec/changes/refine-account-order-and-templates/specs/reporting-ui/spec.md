@@ -35,8 +35,16 @@ SHALL 允许**不同 `AccountType` 的账户一起参与排序**（常用置顶�
 MUST NOT 再取 `sortOrder` 的全局前 4。
 `AccountQuickCandidates.select` 的「常用前 N + 当前选中项必可见」
 语义 SHALL 保持不变，只更换传入列表的数据源顺序。
-每个候选 chip SHALL 以 12dp 小角标单字（「储」/「信」）
+每个候选 chip SHALL 以**10dp** 小角标单字（「储」/「信」）
 显示 `cardKind`，MUST NOT 用文字后缀挤占账户名宽度。
+**第 61 批**：候选与全账户选择弹层的 label SHALL 经 `accountBaseLabel()`
+带上 `cardLast4`（如「工商银行 (1122)」），MUST NOT 只显示纯名；
+「当前：」文案与弹层搜索键 SHALL 同样基于该组合名，
+输入后四位 MUST 能搜到对应卡。多张同名银行卡 SHALL 可区分。
+`AccountQuickCandidates.select` / `labelOf` / `promoteById`
+的纯 JVM 契约 SHALL 零改动，只更换映射进 `AccountQuickItem.name` 的字符串。
+记一笔分类快捷栏图标 SHALL 由 40/34dp 收紧为 **28/24dp**，
+分类管理页 5 列网格仍 SHALL 用 40dp（两处密度各按各的场景）。
 资产页分组内排序 MUST NOT 改变候选顺序。
 
 #### Scenario: 跨类型常用置顶
@@ -45,6 +53,21 @@ MUST NOT 再取 `sortOrder` 的全局前 4。
 - **WHEN** 打开记一笔
 - **THEN** 常用候选前两项就是这两张卡，且带各自的小标志
 - **AND** 资产页分组内顺序未因此改变
+
+#### Scenario: 多张同名银行卡可区分
+
+- **GIVEN** 两张账户名同为「工商银行」、卡号后四位分别为 1122 与 3344
+- **WHEN** 打开记一笔查看快捷候选 /「当前：」/ 全账户选择弹层
+- **THEN** 分别显示「工商银行 (1122)」与「工商银行 (3344)」
+- **AND** 在弹层搜索框输入「3344」能搜到第二张卡
+- **AND** 两张卡各带不占名称宽度的 10dp 卡种小标志
+
+#### Scenario: 记一笔图标密度收紧
+
+- **GIVEN** 打开记一笔
+- **WHEN** 查看分类快捷栏与账户候选 chip
+- **THEN** 一级分类圆图标为 28dp（选中）/ 24dp（未选中），账户小标志为 10dp
+- **AND** 分类管理页网格仍为 40dp，MUST NOT 被连带改小
 
 ---
 
@@ -74,3 +97,35 @@ SHALL 提供「保存 / 放弃」与一行「这里排的是记一笔里常用�
 - **GIVEN** 从资产页进入全部账户排序页
 - **WHEN** 查看底部导航
 - **THEN** 仍是明细 / 资产 / 统计 / 设置 4 个 Tab
+
+
+---
+
+### Requirement: 账户卡种可编辑且导入账户有保守默认值
+
+**第 61 批**：新增账户页与编辑账户页 SHALL 都提供
+「不设 / 储蓄卡 / 信用卡」三态 `cardKind` 选择，
+MUST NOT 只有从模板建卡时才带 `DEBIT` / `CREDIT`。
+编辑页 SHALL 把**当前选中的** `cardKind` 传给 `onConfirm` 落库，
+MUST NOT 写死传 `account.cardKind` 原值
+（第 60 批正是这样导致「编辑选不了卡种」）。
+导入 / CSV 等**非模板路径**建账户时 SHALL 一并写入 `quickOrder`
+与 `cardKind`：保守默认 `LIABILITY → "CREDIT"`，
+`ASSET` SHALL 不猜（微信零钱 / 支付宝 / 储蓄卡混在一起，猜了会误标），
+使用者 SHALL 可在编辑页随时改。
+账户图标位与记一笔 chip SHALL 以 `cardKind` 决定是否有「储 / 信」标志，
+未设置时 SHALL 不显示标志、MUST NOT 崩。
+
+#### Scenario: 导入账户补设卡种
+
+- **GIVEN** 通过导入建了一个 `ASSET` 账户、一个 `LIABILITY` 账户
+- **WHEN** 打开记一笔查看候选
+- **THEN** 信用负债账户带「信」标志，资产账户不带标志（不误标为「储」）
+- **WHEN** 编辑资产账户把卡种改成「储蓄卡」并保存
+- **THEN** `cardKind = "DEBIT"` 落库，列表与记一笔出现「储」标志
+
+#### Scenario: 编辑保存写回选中值
+
+- **GIVEN** 账户 `cardKind = null`
+- **WHEN** 编辑页选「信用卡」并保存
+- **THEN** `cardKind = "CREDIT"`，MUST NOT 仍为 null

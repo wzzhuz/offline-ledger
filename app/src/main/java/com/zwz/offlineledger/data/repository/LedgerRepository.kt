@@ -920,13 +920,20 @@ class LedgerRepository @Inject constructor(
                 }
                 val opening = openingBySource[name] ?: 0L
                 val id = accountDao.insert(
+                    // 第 61 批：导入建账户原先没写 cardKind / quickOrder，
+                    // 导致导入来的账户在记一笔里没有「储 / 信」小标志。
+                    // 保守默认：LIABILITY 归信用卡（信用负债即信用卡类），
+                    // ASSET 不猜（微信零钱 / 支付宝 / 储蓄卡混在一起，猜了会误标）。
+                    // 使用者可在编辑页随时改成「不设 / 储蓄卡 / 信用卡」。
                     AccountEntity(
                         name = name,
                         type = type,
                         initialBalanceCents = opening,
                         currencyCode = "CNY",
                         includeInTotal = true,
-                        sortOrder = existingAccounts.size + newAccounts
+                        sortOrder = existingAccounts.size + newAccounts,
+                        quickOrder = existingAccounts.size + newAccounts,
+                        cardKind = if (type == AccountType.LIABILITY) "CREDIT" else null
                     )
                 )
                 accountIds[name] = id

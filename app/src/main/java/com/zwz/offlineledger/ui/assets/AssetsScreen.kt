@@ -86,8 +86,9 @@ private val AccountTemplatesCount: Int get() = AccountTemplates.ALL.size
  * 不借的是：跨币种单一净资产总数、分组白卡 / 阴影、在线 IconFont 图标、
  * 备注 / 隐藏 / 默认使用等业务字段（见 design.md 七条基线兼容表）。
  *
- * 数据侧零改动：`AssetsViewModel` / `AccountEntity` / `AppDatabase.version = 5` /
- * `AccountTemplates` / `LedgerApp` 一律不动，v0.2.39 可直接覆盖安装。
+ * 第 60 批拆两套排序（`sortOrder` / `quickOrder`）、模板正规化、`version = 6`；
+ * 第 61 批补卡种编辑与记一笔卡号显示。头部注释随批同步，
+ * MUST NOT 继续写「数据侧零改动 / version = 5 / 可覆盖安装」。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -459,15 +460,10 @@ private fun AccountCard(
 
     // 第 60 批 Q3A：cardLast4 是单一真相源；旧库 name 已含 " (1122)" 时
     // 不再追加，MUST NOT 出现「中行储蓄卡(1122)(1122)」。
-    val shownName = buildString {
-        append(account.name)
-        account.cardLast4?.let { last4 ->
-            val suffix = " ($last4)"
-            if (!account.name.endsWith(suffix)) append(suffix)
-        }
-        append(" · " + account.currencyCode)
-        if (account.isArchived) append("（已归档）")
-    }
+    // 第 61 批：与记一笔 / 独立排序页共用同一组合点，旧库后缀去重逻辑只留一份。
+    val shownName = accountBaseLabel(account) +
+        " · " + account.currencyCode +
+        if (account.isArchived) "（已归档）" else ""
 
     Column(
         modifier = Modifier
@@ -686,6 +682,20 @@ private fun AddAccountDialog(
                             }
                         }
 
+                        // 第 61 批：自定义名称 / 导入来的账户也能设卡种，
+                        // 不再只有从模板建卡时才带 DEBIT / CREDIT。
+                        AssetFormSectionTitle("卡种（可选）")
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(null to "不设", "DEBIT" to "储蓄卡", "CREDIT" to "信用卡")
+                                .forEach { (k, label) ->
+                                    FilterChip(
+                                        selected = cardKind == k,
+                                        onClick = { cardKind = k },
+                                        label = { Text(label) }
+                                    )
+                                }
+                        }
+
                         AssetFormSectionTitle("余额")
                         OutlinedTextField(
                             value = initial,
@@ -766,7 +776,12 @@ private fun EditAccountDialog(
 ) {
     // 第 60 批 Q3A：旧库 name 可能已含 " (1122)"，初始化时剥掉，
     // 否则编辑一次会把历史后缀写回 name，与展示层组合成双后缀。
-    var name by remember { mutableStateOf(stripLegacyCardSuffix(account.name, account.cardLast4)) }
+    var name by remember {
+        mutableStateOf(stripLegacyCardSuffix(account.name, account.cardLast4))
+    }
+    // 第 61 批 Q3：编辑页补「卡种」状态。原实现把 account.cardKind 写死传给
+    // onConfirm，就算有选择器也存不回去——这才是「编辑也选择不了」的真根因。
+    var cardKind by remember { mutableStateOf(account.cardKind) }
     var last4 by remember { mutableStateOf(account.cardLast4 ?: "") }
     var type by remember { mutableStateOf(account.type) }
     var initial by remember { mutableStateOf(Cents(account.initialBalanceCents).toYuanString()) }
@@ -809,6 +824,18 @@ private fun EditAccountDialog(
                         }
                     }
                 }
+                // 第 61 批：编辑页补卡种三态选择，导入 / 自定义账户也能补上
+                //「储」「信」小标志；选中值由 cardKind 传给 onConfirm 落库。
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(null to "不设", "DEBIT" to "储蓄卡", "CREDIT" to "信用卡")
+                        .forEach { (k, label) ->
+                            FilterChip(
+                                selected = cardKind == k,
+                                onClick = { cardKind = k },
+                                label = { Text(label) }
+                            )
+                        }
+                }
                 OutlinedTextField(
                     textStyle = MaterialTheme.typography.bodyMedium,
                     value = initial, onValueChange = { initial = it },
@@ -849,7 +876,7 @@ private fun EditAccountDialog(
         },
         confirmButton = {
             Button(onClick = {
-                onConfirm(name, type, initial, limit, currency, include, last4, account.cardKind)
+                onConfirm(name, type, initial, limit, currency, include, last4, cardKind)
             }) {
                 Text("保存")
             }
@@ -859,9 +886,3 @@ private fun EditAccountDialog(
 }
 
 
-/** 第 60 批 Q3A：旧库 name 里冗余的 " (xxxx)" 后缀剥除，仅用于编辑框初始化。 */
-private fun stripLegacyCardSuffix(name: String, last4: String?): String {
-    if (last4 == null) return name
-    val suffix = " ($last4)"
-    return if (name.endsWith(suffix)) name.removeSuffix(suffix) else name
-}
