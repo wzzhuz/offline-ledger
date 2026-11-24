@@ -699,3 +699,17 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **零回归**：`AssetsViewModel` / `AccountEntity` / `AccountTemplates` / `LedgerApp` / `EditAccountDialog` / 记一笔 / 明细 / 统计 / 分类 / 对账零改动；零新增依赖；`defaultVersionName` → `0.2.40`，v0.2.39 直接覆盖安装。
 - **CI 全绿不替代真机**：§8 第 59 批新增 6.30–6.34 待验，既有项整体继承。归档仍需使用者明确说「可以归档」。
 
+### 第 59 批实测（v0.2.40 出包）
+
+- 代码 + 四件套 `7b4515fba3d5`（parent `9577ad6f4378`），10 文件逐 blob 校验 PASS；push CI `45329111449` 全绿。
+- 出包 CI `45329663851` completed success；tag `v0.2.40` → `7b4515fba3d5`；Release 附件
+  `offline-ledger-v0.2.40-release-7b4515fb.apk`（3,137,307 B，
+  SHA256 `4c1474fbd2625adfd19258713ba1a9d70e69a77aeb9c8e71901df1d41166c9e1`），
+  API `state=uploaded` + `digest` 与 notes 一致。debug.keystore 签名，v0.2.39 可直接覆盖安装。
+- Actions artifacts 3 个（release / mapping / metrics），全步骤无染绿，`mapping.txt` 随制品留存。
+- **操作偏差（第二次同类）**：工具层 502 重放整个触发调用，dispatch 发出两次，
+  第二个 run `45329992971` pending 时主动 cancel（202 → `completed cancelled`），
+  未产生第二次发布；资产 digest 单一。教训升级：触发与轮询 MUST 拆成独立调用，
+  脚本内幂等不足以抵抗整体重放。
+- 归档仍需使用者明确说「可以归档」。
+

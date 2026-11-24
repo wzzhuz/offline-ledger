@@ -38,11 +38,15 @@
 
 ## 5. 校验与交付
 
-- [ ] 5.1 推送后按 commit sha 逐文件 tree + content 双校验
-- [ ] 5.2 push CI 与出包 CI 全绿；Release 附件 `state=uploaded` + `digest` 与 notes 一致
-- [ ] 5.3 实测编号回填活文档 / project.md / tasks.md
+- [x] 5.1 推送后按 commit sha 逐文件 tree + content 双校验（`7b4515fba3d5`，10 文件 `远端校验: PASS`）
+- [x] 5.2 push CI `45329111449` 与出包 CI `45329663851` 全绿；Release 附件 `state=uploaded` + `digest` 与 notes 一致
+- [x] 5.3 实测编号回填活文档 §7.41 / project.md / tasks.md
 - [ ] 5.4 归档校验（无重复 Requirement 标题、每条 ≥1 Scenario、MODIFIED 整块替换）
-      —— 5.4 未做，本项保持 `[ ]`，归档需使用者明确说「可以归档」
+      —— 本地结构自查已 PASS（4 条 Requirement / 8 个 Scenario / MODIFIED 标题命中基线），
+      但 5.4 归档校验未正式执行，本项保持 `[ ]`，归档需使用者明确说「可以归档」
+      —— **第 59 批实测**：`7b4515fba3d5` / CI `45329111449` / `45329663851` /
+      tag `v0.2.40` / SHA256 `4c1474fbd2625adfd19258713ba1a9d70e69a77aeb9c8e71901df1d41166c9e1`；
+      dispatch 因工具层 502 重放两次，第二个 run `45329992971` 已 cancel
 - [ ] 5.5 **明确写出仍未验证的真机项**，不用「CI 全绿」替代观感 / 手势 / 键盘验证
 
 ## 6. 真机待验（第 59 批新增，刻意保留 `[ ]`）
