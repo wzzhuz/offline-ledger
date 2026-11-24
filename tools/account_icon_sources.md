@@ -3,7 +3,31 @@
 > 逐项授权登记与全文见 `app/src/main/assets/NOTICE`；转换脚本见
 > `tools/build_account_icons.py`（构建期工具，App 不执行、无网络权限）。
 
-## 本批实际采用
+## 第 65 批修订（当前口径）：银行改用纯徽记
+
+使用者反馈「带文字的反而看不清楚」，因此 21 家银行**全部**从横版
+`logos/<slug>.svg` 换成方形纯徽记 `logos/<slug>-rect.svg`（不带中文行名）。
+
+关键三步（已固化进 `tools/build_account_icons.py`）：
+1. 取 `-rect.svg`；
+2. **删掉自带的 1024 圆角纯白底 path**（`d="M0 0m224 0l576..."` +
+   `fill="#FFFFFF"`），否则 `getbbox()` 框住整张画布、徽记放大不了；
+3. `cebbank-rect.svg` 剔除紫色 `#6B1785` 的 `ank` 字样，只留黄色 E 徽记。
+
+`pingan-rect.svg`（橙色方块内「中国平安」）与京东白条无纯图形官方徽记，
+改用本作品原创纯几何符（零文字、不临摹商标）：
+`pab` 橙色圆角块 + 白色双弧/竖线，`jdbaitiao` 红色圆角块 + 三条白横杠。
+拿到官方纯图形授权后直接覆盖同名 PNG 即可。
+
+4 个 Simple Icons（wechat / alipay / meituan / douyin）不变：它们是满幅
+方块标而非横版行名细条，34dp 下清晰。`alipay`「支」与 `meituan`「美团」
+是官方方块文字标，本次范围按使用者原话限定为「银行 logo」，故保留。
+
+**第 64 批以下表格记录的是历史口径（横版），仅作来源与许可说明保留。**
+
+---
+
+## 本批实际采用（第 64 批历史）
 
 | 源 | 覆盖 | 许可 | 地址 |
 |---|---|---|---|
@@ -13,7 +37,7 @@
 
 ### 键位 → slug 映射
 
-`icbc→icbc, ccb→ccb, abc→abchina, boc→boc, bocom→bankcomm,
+`icbc→icbc-rect, ccb→ccb-rect, abc→abchina, boc→boc, bocom→bankcomm,
 psbc→psbc, cmb→cmbchina, spdb→spdb, citic→citicbank, ceb→cebbank,
 hxb→hxb, cmbc→cmbc, cgb→cgbchina, cib→cib, pab→pingan, czb→czbank,
 njcb→njcb, bob→bankofbeijing, bosc→bosc, jsb→jsbchina, nbcb→nbcb`

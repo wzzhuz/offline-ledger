@@ -38,6 +38,81 @@ SOFTWARE.
 
 
 ------------------------------------------------------------------
+第 65 批 · 银行图标改用纯徽记（不带中文行名）
+------------------------------------------------------------------
+状态：**21 家银行全部换成纯图形徽记**，`AccountIconCatalog.kt` 零改动，
+仅替换 `drawable-nodpi/ic_acct_*.png` 的 26 个文件内容。
+
+[65-A] 为什么要换
+
+第 64 批用的是 `xxx.svg`（横版）：内容是「徽记 + 中文/英文行名」，
+在 34dp 账户图标位缩成一条细线，文字完全看不清。使用者 2026-11-24
+反馈「银行 logo 选择不带中文的，就纯图形就行了，带文字的反而看不清楚」。
+本批改用同一仓库的 `xxx-rect.svg`：**方形纯徽记版**，去掉全部行名文字，
+放大撑满 128px 白圆底后辨识度明显提升。
+
+[65-B] 关键处理（MUST 保留在构建脚本里）
+
+1. 源文件名从 `logos/<slug>.svg` 改为 `logos/<slug>-rect.svg`（19 家）。
+2. **`-rect.svg` 自带一个 1024×1024 圆角纯白底 path**（`fill="#FFFFFF"`、
+   `d="M0 0m224 0l576..."`）。若不删掉它，`getbbox()` 会框住整张画布，
+   徽记放大不了 —— 第 64 批正是栽在这里，所以本批不只换源，还删白底，
+   让每个徽记真正缩到 104px 撑满圆。
+3. `cebbank-rect.svg` 是「黄色 E 徽记 + 紫色 `ank` 字样」：剔除
+   `#6B1785` 紫色 path，只留黄色徽记，不带任何文字。
+4. `pingan-rect.svg` 是橙色方块内「中国平安」文字标，无法裁出纯图形；
+   京东白条同理。**两家改用本作品原创纯几何符**（零文字、不临摹商标）：
+   - `pab`：橙色圆角块 + 白色双弧/竖线（品牌色 #EC681B）
+   - `jdbaitiao`：红色圆角块 + 三条白色横杠（品牌色 #E11B1B）
+   拿到官方纯图形授权后直接替换同名 PNG，并改写本段登记。
+5. 4 个 Simple Icons 图形（wechat / alipay / meituan / douyin）**不变**：
+   它们本来就是满幅方块标而非横版行名，34dp 下清晰。
+   `alipay`「支」与 `meituan`「美团」是官方方块文字标、不是银行行名细条；
+   本次改动范围按使用者原话限定为「银行 logo」，故保留并在此如实说明。
+6. `huabei` 仍复用 `ic_acct_alipay`，27 个键位 / 26 个 PNG 数量不变。
+
+[65-C] 逐项登记（替换第 64 批 [B] 表的银行行，授权类型不变）
+
+  iconKey    | 品牌         | 来源文件                                    | 授权类型       | 备注
+  -----------+--------------+---------------------------------------------+----------------+-------
+  icbc       | 工商银行         | icongo/bank-logos logos/icbc-rect.svg                 | MIT (SVG 代码)  | 纯徽记
+  ccb        | 建设银行         | icongo/bank-logos logos/ccb-rect.svg                  | MIT (SVG 代码)  | 纯徽记
+  abc        | 农业银行         | icongo/bank-logos logos/abchina-rect.svg              | MIT (SVG 代码)  | 纯徽记
+  boc        | 中国银行         | icongo/bank-logos logos/boc-rect.svg                  | MIT (SVG 代码)  | 纯徽记
+  bocom      | 交通银行         | icongo/bank-logos logos/bankcomm-rect.svg             | MIT (SVG 代码)  | 纯徽记
+  psbc       | 邮储银行         | icongo/bank-logos logos/psbc-rect.svg                 | MIT (SVG 代码)  | 纯徽记
+  cmb        | 招商银行         | icongo/bank-logos logos/cmbchina-rect.svg             | MIT (SVG 代码)  | 纯徽记
+  spdb       | 浦发银行         | icongo/bank-logos logos/spdb-rect.svg                 | MIT (SVG 代码)  | 纯徽记
+  citic      | 中信银行         | icongo/bank-logos logos/citicbank-rect.svg            | MIT (SVG 代码)  | 纯徽记
+  hxb        | 华夏银行         | icongo/bank-logos logos/hxb-rect.svg                  | MIT (SVG 代码)  | 纯徽记
+  cmbc       | 民生银行         | icongo/bank-logos logos/cmbc-rect.svg                 | MIT (SVG 代码)  | 纯徽记
+  cgb        | 广发银行         | icongo/bank-logos logos/cgbchina-rect.svg             | MIT (SVG 代码)  | 纯徽记
+  cib        | 兴业银行         | icongo/bank-logos logos/cib-rect.svg                  | MIT (SVG 代码)  | 纯徽记
+  czb        | 浙商银行         | icongo/bank-logos logos/czbank-rect.svg               | MIT (SVG 代码)  | 纯徽记
+  njcb       | 南京银行         | icongo/bank-logos logos/njcb-rect.svg                 | MIT (SVG 代码)  | 纯徽记
+  bob        | 北京银行         | icongo/bank-logos logos/bankofbeijing-rect.svg        | MIT (SVG 代码)  | 纯徽记
+  bosc       | 上海银行         | icongo/bank-logos logos/bosc-rect.svg                 | MIT (SVG 代码)  | 纯徽记
+  jsb        | 江苏银行         | icongo/bank-logos logos/jsbchina-rect.svg             | MIT (SVG 代码)  | 纯徽记
+  nbcb       | 宁波银行         | icongo/bank-logos logos/nbcb-rect.svg                 | MIT (SVG 代码)  | 纯徽记
+  ceb        | 光大银行     | logos/cebbank-rect.svg（剔除紫色 "ank" path） | MIT (SVG 代码)  | 仅留黄色徽记
+  pab        | 平安银行     | 本作品原创（tools/build_account_icons.py）    | 本项目 MIT      | 纯几何、非官方
+  jdbaitiao  | 京东白条     | 本作品原创（tools/build_account_icons.py）    | 本项目 MIT      | 纯几何、非官方
+  wechat     | 微信         | Simple Icons cdn/wechat                       | CC0-1.0 (SVG)   | 未改
+  alipay     | 支付宝       | Simple Icons cdn/alipay                       | CC0-1.0 (SVG)   | 未改，方块文字标
+  huabei     | 花呗         | 复用 ic_acct_alipay                           | CC0-1.0 (SVG)   | 母品牌
+  meituan    | 美团月付     | Simple Icons cdn/meituan                      | CC0-1.0 (SVG)   | 未改，方块文字标
+  douyin     | 抖音月付     | Simple Icons cdn/tiktok                       | CC0-1.0 (SVG)   | 未改
+
+[65-D] 授权与商标口径
+
+与第 64 批 [C] 完全一致，未扩大也未缩小：MIT / CC0 只覆盖 SVG 代码与
+本作品原创绘制部分，不覆盖各品牌商标权；未取得逐家书面授权；
+使用者判断与公开权利声明的差异由使用者决策并承担。
+本批只改「取哪个文件、怎么裁」，MUST NOT 写成「已解决授权问题」。
+`INTERNET` 权限、Gradle 依赖、表结构、Room 版本全部零改动。
+
+
+------------------------------------------------------------------
 第 64 批 · 账户品牌图标（AccountIconCatalog）实际资源登记
 ------------------------------------------------------------------
 状态：**资源已补齐**。27 个 iconKey 全部有本地图形，

@@ -887,3 +887,26 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   坚果云落盘 job logs 403 无法确认。
 - 三个 change 仍未归档，归档需使用者明确说「可以归档」。
 
+## 第 65 批（v0.2.46）：银行图标改用纯徽记（不带中文行名）
+
+- **起因**：使用者反馈「带文字的反而看不清楚」。第 64 批用的是横版
+  `xxx.svg`（徽记 + 中文/英文行名），34dp 下缩成细条；本批改用同一 MIT
+  仓库的 `xxx-rect.svg` **方形纯徽记版**，21 家银行全部去掉行名文字。
+- **关键修正**：`-rect.svg` 自带 1024 圆角纯白底 path，会让 `getbbox()`
+  框住整张画布、徽记放大不了。MUST 先删该 path 再裁切 —— 这才是第 64 批
+  「徽记偏小」的真正原因，本批不只是换源。
+- `ceb` 按 `fill="#6B1785"` 剔除紫色 `ank` 字样，只留黄色 E 徽记；
+  `pab` / `jdbaitiao` 官方无纯图形徽记 → 本作品原创纯几何符（零文字、
+  不临摹商标），登记为原创/非官方。
+- 4 个 Simple Icons 不变：满幅方块标而非横版细条；`alipay`「支」/
+  `meituan`「美团」是官方方块文字标。范围按使用者原话限定为「银行 logo」，
+  在 NOTICE [65-A]/[65-C] 明文写出该保留，MUST NOT 悄悄扩张。
+- `AccountIconCatalog.kt` 与三页 UI **零改动**，27 键位 / 26 PNG 数量不变，
+  `huabei` 仍复用 `alipay` —— 只替换 26 个 PNG 内容 + 构建脚本 + NOTICE + 文档。
+- `privacy-security` spec 新增 1 条 Requirement；change 四件套追加第 65 批。
+- **零回归**：`Migrations.ALL` 空 + `MigrationContractTest` 零改动、两套排序、
+  48 条模板、4 Tab、CSV 复合匹配、`accountLabel` 唯一实现、
+  零 `INTERNET` 权限、零新增 Gradle 依赖、零表结构变更。
+- 授权与商标口径与第 64 批 [C] 完全一致，MUST NOT 写成「已解决授权」。
+- CI 全绿不替代真机，§8 第 65 批新增 3 项待验，既有项整体继承。
+

@@ -190,3 +190,25 @@
 - [ ] 16.5 R8 混淆后资源引用正常、NOTICE 与随包资源一一对应
 - [ ] 16.6 §8 第 45–63 批全部真机未验项整体继承
 
+## 17. 第 65 批（v0.2.46）—— 银行纯徽记
+
+- [x] 17.1 下载 21 家 `-rect.svg`，渲染两版对比确认纯图形
+- [x] 17.2 删 `-rect` 自带圆角纯白底 path，让 getbbox 真正放大徽记
+- [x] 17.3 `ceb` 剔除紫色 `ank` path；`pab` / `jdbaitiao` 改原创纯几何符
+- [x] 17.4 重生成并覆盖 26 个 PNG（27 键位数量不变）
+- [x] 17.5 `tools/build_account_icons.py` / `account_icon_sources.md` 同步
+- [x] 17.6 `assets/NOTICE` 第 65 批 [65-A]~[65-D] 逐项登记
+- [x] 17.7 `privacy-security` spec 新增 1 条 Requirement；proposal / design /
+      tasks / 活文档 / project.md 同步；版本号 `0.2.46`
+- [x] 17.8 `AccountIconCatalog.kt` 与三页 UI 零改动自查
+- [ ] 17.9 推送逐 blob 双校验 / 双 CI 全绿 / Release digest 一致
+- [ ] 17.10 实测回填；归档校验仍保持 `[ ]`
+
+## 18. 第 65 批真机待验（`[ ]`）
+
+- [ ] 18.1 21 家银行 28/34dp 下无行名细条、徽记撑满圆且可辨
+- [ ] 18.2 自定义账户仍回退中性圆 + 首字，12dp 小角标不冲突
+- [ ] 18.3 27 键位 / 26 PNG 数量不变、Kotlin 与 UI 零改动
+- [ ] 18.4 R8 后资源引用正常、NOTICE 与随包资源一一对应
+- [ ] 18.5 §8 第 45–64 批全部真机未验项整体继承
+

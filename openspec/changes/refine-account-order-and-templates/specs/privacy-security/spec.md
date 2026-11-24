@@ -74,3 +74,42 @@ MUST NOT 写成「已获授权 / 无风险 / 已解决」。
 - **THEN** NOTICE [B] 表对应行 SHALL 改写为新来源与授权类型
 - **AND** MUST NOT 保留「MIT / CC0」旧值、MUST NOT 只写「来自 IconFont」
 
+---
+
+### Requirement: 银行图标使用纯图形徽记且不带中文行名
+
+**第 65 批**：随包分发的 21 家中国银行图标 SHALL 使用
+`icongo/bank-logos` 的 `logos/<slug>-rect.svg` **方形纯徽记版**，
+MUST NOT 使用横版 `logos/<slug>.svg`（其内容为「徽记 + 中文/英文行名」，
+在账户图标位缩成细条导致文字不可辨）。
+转换时 SHALL 删除 `-rect.svg` 自带的 1024 圆角纯白底 path，
+使 `getbbox()` 只框住彩色徽记并放大撑满圆，
+MUST NOT 保留白底（否则徽记无法放大）。
+`cebbank-rect.svg` SHALL 剔除紫色 `#6B1785` 的 `ank` 字样 path，
+只保留黄色徽记。
+`pingan-rect.svg` 为橙色方块内「中国平安」文字标、京东白条无纯图形
+官方徽记，两者 SHALL 用**本作品原创纯几何符**占位（零文字、
+MUST NOT 临摹商标），并在 `assets/NOTICE` 登记为原创、非官方 logo。
+4 个 Simple Icons 图形（wechat / alipay / meituan / douyin）SHALL 保持不变：
+它们是满幅方块标而非横版行名细条；`alipay`「支」与 `meituan`「美团」
+为官方方块文字标，本批范围按使用者原话限定为「银行 logo」，
+MUST 在 NOTICE 如实说明该保留，MUST NOT 悄悄扩张范围。
+`AccountIconCatalog.kt` 的 `when` 分支与 `R.drawable` 引用 SHALL 零改动，
+27 个键位 / 26 个 PNG 数量 SHALL 不变，`huabei` SHALL 继续复用 `alipay`。
+授权与商标口径 SHALL 与第 64 批 [C] 完全一致，
+MUST NOT 因换文件而写成「已解决授权问题」。
+
+#### Scenario: 21 家银行图标无行名文字
+
+- **GIVEN** 资产页 / 模板 sheet / 记一笔显示 21 家银行账户图标
+- **WHEN** 在 28/34dp 下查看
+- **THEN** 每家只显示纯图形徽记，MUST NOT 出现「中国工商银行」等行名细条
+- **AND** 徽记放大撑满白圆底，肉眼可辨
+
+#### Scenario: 替换资源不动 Kotlin
+
+- **GIVEN** 第 65 批只替换 `drawable-nodpi/ic_acct_*.png` 内容
+- **WHEN** 编译并运行
+- **THEN** `AccountIconCatalog.kt` 与三页 UI 代码零改动
+- **AND** 27 个键位仍全部返回非 null，PNG 仍为 26 个
+
