@@ -654,3 +654,14 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **零改表 / 零回归**：`AppDatabase.version = 5`、`default_categories.json`、`colorHex`、三处 DAO 投影、备份整表替换未动；零新增 Gradle 依赖；`defaultVersionName` → `0.2.38`，v0.2.37 直接覆盖安装。
 - **CI 全绿不替代真机**：活文档 §8 第 57 批新增 6.24–6.28 五项真机待验（尤其删光提示后的可发现性、整格短按/长按共存手感），既有项整体继承。归档仍需使用者明确说「可以归档」。
 
+### 第 57 批实测（v0.2.38 出包）
+
+- 代码 + 四件套 `ae8f1b3a013e`（parent `6783e847d148`），11 文件逐 blob 校验 PASS；push CI `45309157969` 全绿。
+- 出包 CI `45309689913` completed success；tag `v0.2.38` → `ae8f1b3a`；Release 附件
+  `offline-ledger-v0.2.38-release-ae8f1b3a.apk`（3,137,307 B，
+  SHA256 `daa22436b525d7662cab8ff94cf2c60f90b96f2f7b9e944f49a709628b98f7d6`），
+  API `state=uploaded` + `digest` 与 notes 一致。debug.keystore 签名，v0.2.37 可直接覆盖安装。
+- **正向差异**：本批 Actions artifacts **3 个**（release / mapping / metrics），全步骤无染绿，
+  `mapping.txt` 随制品留存；v0.2.37 那次为 0。坚果云落盘因 job logs 403 无法确认。
+- 归档仍需使用者明确说「可以归档」。
+

@@ -175,10 +175,14 @@
 - [x] 5.3 按最终 commit sha 查 tree，逐文件比对 blob sha，`远端校验: PASS`
 - [ ] 5.4 归档校验：无重复 Requirement 标题、每条 ≥1 Scenario、含 RFC2119、MODIFIED 整块替换
 - [ ] 5.5 给出真实 commit sha + run id；制品名带短 sha、不同名覆盖；`mapping.txt` 随对应 APK
-       —— v0.2.37 已出 Release 附件与 tag（见下），**Actions 制品列表仍为 0**：
+       —— v0.2.38 已出 Release 附件与 tag，制品名带短 sha `ae8f1b3a`；
+       **本批 Actions artifacts 为 3 个**（release / mapping / metrics），
+       全步骤 `outcome` 无 failure、无 `continue-on-error` 染绿，`mapping.txt` 确实随制品留存，
+       以 Release assets + `asset.digest` 为准。5.4 归档校验未做，本项仍保持 `[ ]`，
+       归档需使用者明确说「可以归档」
+       —— v0.2.37 曾出 Release 附件与 tag 但 **Actions 制品列表为 0**：
        「制品上传失败告警」步骤实际执行，可反证三个 continue-on-error 上传步骤
-       outcome=failure 被染绿（§7.33/§7.35）。**mapping.txt 未随制品留存**，
-       本项保持 `[ ]`，如实登记不写成已通过；以 Release assets + asset.digest 为准
+       outcome=failure 被染绿（§7.33/§7.35），`mapping.txt` 未随制品留存
        —— v0.2.36 已出 Release 附件与 tag，**但 Actions 制品列表未查到 v0.2.36 条目**
        （v0.2.34/35 同样不在，历史清理口径遗留，非本批引入）
 - [x] 5.6 无 `diag/` 残留、无 token 明文、Manifest 仍无 `INTERNET`
