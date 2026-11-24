@@ -50,7 +50,7 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
  * 显示名契约一字不动。
  *
  * 版式借一羽「添加二级分类」页：顶部搜索 + 左侧一级分组导航 + 右侧 5 列
- * 等宽彩色图标格。MUST NOT 含名称输入框、MUST NOT 含「继续添加」/ 保存按钮、
+ * 等宽彩色图标格（第 58 批改 4 列）。MUST NOT 含名称输入框、MUST NOT 含「继续添加」/ 保存按钮、
  * MUST NOT 暴露任何写库路径 —— 点任一项立即回填并关闭。
  *
  * 既有口径零回归：数据源不按 enabled 过滤（停用项可选、靠小角标表达）、
@@ -161,8 +161,9 @@ fun CategorySelectDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            Column(modifier = Modifier.padding(12.dp)) {
+        // 第 58 批（2B）：双层 padding 各收 12→8，把宽度还给右侧网格。
+        Surface(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+            Column(modifier = Modifier.padding(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -198,7 +199,8 @@ fun CategorySelectDialog(
 
                 // 固定高度：弹层不随分类数量增高（基线「统一网格与紧凑输入框」）。
                 Row(modifier = Modifier.fillMaxWidth().height(360.dp)) {
-                    LazyColumn(modifier = Modifier.width(96.dp).fillMaxHeight()) {
+                    // 第 58 批（2B）：左区 96→80dp，减少左右分区的疏离感。
+                    LazyColumn(modifier = Modifier.width(80.dp).fillMaxHeight()) {
                         item {
                             SelectNavItem(
                                 text = if (allowAll) "全部分类" else "全部一级",
@@ -226,7 +228,7 @@ fun CategorySelectDialog(
                             )
                         }
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(4.dp))
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -243,7 +245,10 @@ fun CategorySelectDialog(
                         } else {
                             CategoryIconGrid(
                                 tiles = tiles.map { it.first },
-                                columns = 5,
+                                // 第 58 批（1A）：4 列。5 列时右侧实得 208dp、
+                                // 每格文字区仅 37.6dp，4 字名被省略成 2 字；
+                                // 配合 2B 收窄后右侧实得 244dp、每格约 57dp。
+                                columns = 4,
                                 grayscale = false,
                                 onTile = { tile ->
                                     tiles.firstOrNull { it.first.id == tile.id }?.second?.invoke()

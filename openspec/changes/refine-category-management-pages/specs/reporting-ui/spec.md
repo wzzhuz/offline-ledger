@@ -99,7 +99,8 @@ MUST NOT 只追加 ADDED 而让两条相反要求并存（活文档 §5）。
 
 `FormRow("分类", onRowClick = …)` SHALL 与「账户 ›」同构，整行可点开全量选择器，
 label 自动带 `›`。全量选择器 SHALL 复用只读共享组件 `CategorySelectSheet`，
-采用**顶部搜索 + 左侧一级分组导航 + 右侧 5 列等宽彩色图标网格**，
+采用**顶部搜索 + 左侧一级分组导航 + 右侧 4 列等宽彩色图标网格**
+（导航 80dp / 间距 4dp / 双层 padding 各 8dp，见第 5 轮密度优化），
 MUST NOT 使用 Spinner / ExposedDropdown / DropdownMenu，
 MUST NOT 退化为按一级分组的 `WrapRow` chips 或需要长距离滚动的竖排 TextButton 列表。
 组标题本身 SHALL 可点 = 按一级直记；组内格子 SHALL 可点 = 选该二级。
@@ -138,7 +139,7 @@ MUST 仍经 `CategoryDisplay` 拼成「一级 / 二级」，MUST NOT 改第 29 �
 
 - **GIVEN** 记一笔与明细筛选面板
 - **WHEN** 分别打开分类全量选择器
-- **THEN** 两处均为同一分组导航 + 5 列等宽彩色图标网格版式
+- **THEN** 两处均为同一分组导航 + 4 列等宽彩色图标网格版式、4 字名完整可见
 - **AND** 均无名称输入框、无「继续添加」/ 保存按钮、无写库路径
 
 **理由**：第 52 批定下的「分组 chips + 搜索」是为了兼顾 106 行分类的可达性与

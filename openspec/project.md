@@ -665,3 +665,13 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   `mapping.txt` 随制品留存；v0.2.37 那次为 0。坚果云落盘因 job logs 403 无法确认。
 - 归档仍需使用者明确说「可以归档」。
 
+## 第 58 批（v0.2.39）：选择器 5→4 列 + 左右分区收窄
+
+- **起因**：v0.2.38 装机后使用者提两条（4 字名在 5 列下只显示 2 字、左右留白大），拍板 1A 2B「直接做完出包」。
+- **1A**：`CategorySelectSheet.kt` 右侧 `columns = 5 → 4`。360dp 下右侧原实得 208dp、5 列每格文字区 37.6dp（4 字需约 48dp）；改 4 列后 48dp。
+- **2B**：Dialog 外 padding 12→8、Surface 内 padding 12→8、左导航 `width(96.dp) → 80.dp`、Spacer 8→4；右侧实得 244dp、4 列每格约 57dp，4 字名完整可见。左右水平缝隙本就只有 8dp，根因是累计 152dp 非内容宽度占屏 42%。
+- **依据**：第 1 轮 design「风险与缓解」表早已登记「窄屏 5 列图标过小 → 降为 4 列」，代码未落地，本批补齐；原「分类选择」页 `CategoryPickerScreen` 本来就是 `columns = 4`。
+- **范围锁定**：只改一份只读组件（5 处数值）。分类管理列表页 `columns = 5`、排序页两套 `GridCells.Fixed(5)`、`CategoryIconGrid` / `CategoryTileCell` 格高与行距（三页共用，2B 明确不含紧凑格高）、`CategoryDisplay`、记一笔快捷栏、明细列表行、统计页、`colorHex`、`default_categories.json`、`AppDatabase.version = 5` 全部零改动；零新增 Gradle 依赖；`defaultVersionName` → `0.2.39`，v0.2.38 直接覆盖安装。
+- **边界**：7 字长名（赡养·代缴水电）在 57dp 下仍单行省略，MUST NOT 换行撑高格子；跨组搜索同名二级归属缺失仍沿用 Q3A 口径。
+- **CI 全绿不替代真机**：活文档 §8 第 58 批新增 6.29 待验，既有项整体继承。归档仍需使用者明确说「可以归档」。
+
