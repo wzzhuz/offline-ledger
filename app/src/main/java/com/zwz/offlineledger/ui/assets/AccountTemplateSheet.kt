@@ -28,21 +28,19 @@ import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.data.local.AccountTemplate
 import com.zwz.offlineledger.data.local.AccountTemplates
 import com.zwz.offlineledger.ui.components.CategoryHeaderBlue
-import com.zwz.offlineledger.ui.components.CategoryIcon
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /**
- * 第 59 批：只读「选择账户模板」底部 sheet。
+ * 第 60 批：只读「选择账户模板」底部 sheet。
  *
- * 借鉴一羽记账「选择银行」弹窗的组织方式（底部圆角卡 + 分组 + 2 列图标格 +
- * 底部自定义入口），但 MUST NOT 复制其视觉资产，也 MUST NOT 引入
- * 「IconFont 下载 PNG」等在线能力——Manifest 当前不声明 `INTERNET`，联网需 `project.md` 显式授权，本批不申请。
+ * 48 条模板按 group 分四组（支付余额 / 银行储蓄卡 / 银行信用卡 / 网络信用），
+ * 资产组与信用负债组 MUST NOT 混排（基线要求）。
+ * Q6A：label 用银行正规全称，卡种用 12dp 小角标贴在图标右下角，
+ * 不占名称宽度。Q7：iconKey 走 AccountIconCatalog，资源待补时回退中性圆。
  *
- * 承载的是基线 `ledger-transactions`「快捷账户模板替代预制账户行」已定下的语义：
- * 按资产组 / 信用负债组展示、点选自动填名称与类型、卡号后四位仍由主表单输入。
- * 组件本身**无任何写库路径**：`onPick` 只回填两个 UI 状态。
- *
- * 没有字母索引：一羽有上百个银行，本 App 只有 12 个模板，按 `group` 分组已足够。
+ * 组件本身**无任何写库路径**：onPick 只回填 UI 状态（名称 / 类型 / 卡种）。
+ * 遮罩只压暗、MUST NOT 挂 clickable——无 pointerInput 的 Column 不消费点击，
+ * 点 sheet 内空白会穿透到遮罩导致误关（§7.41）。
  */
 @Composable
 fun AccountTemplateSheet(
@@ -50,8 +48,6 @@ fun AccountTemplateSheet(
     onPick: (AccountTemplate) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 遮罩只做视觉压暗：MUST NOT 挂 clickable——无 pointerInput 的 Column 不会消费点击，
-    // 点 sheet 内空白会穿透到遮罩导致误关。关闭只走「关闭」/「自定义名称」两个显式入口。
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -61,7 +57,7 @@ fun AccountTemplateSheet(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .heightIn(max = 520.dp)
+                .heightIn(max = 560.dp)
                 .background(Color.White, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
@@ -99,6 +95,12 @@ fun AccountTemplateSheet(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(text = group, style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = items.size.toString() + " 项",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral
+                        )
                     }
                     items.chunked(2).forEach { row ->
                         Row(
@@ -112,7 +114,7 @@ fun AccountTemplateSheet(
                                     onClick = { onPick(t) }
                                 )
                             }
-                            // 末行不足 2 个补空占位，MUST NOT 让单格被拉宽（§7.39）。
+                            // 末行不足 2 个补空占位，保持列对齐（§7.39）。
                             if (row.size == 1) Spacer(Modifier.weight(1f))
                         }
                         Spacer(Modifier.height(6.dp))
@@ -144,8 +146,12 @@ private fun TemplateTile(
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // CategoryIcon 忽略 colorHex，天然中性圆 + 首字；零新增图标资源。
-        CategoryIcon(name = template.label, colorHex = null, size = 32)
+        AccountIconBox(
+            name = template.label,
+            cardKind = template.cardKind,
+            iconKey = template.iconKey,
+            size = 32
+        )
         Spacer(Modifier.width(8.dp))
         Text(
             text = template.label,

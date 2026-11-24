@@ -45,12 +45,14 @@ interface AccountDao {
     @Query("UPDATE accounts SET lastReconciledAt = :at, lastReconciledBalanceCents = :balance WHERE id = :id")
     suspend fun updateReconciliationAnchor(id: Long, at: Long, balance: Long)
 
-    /** 阶段 7：账户编辑支持期初余额与币种；调用方 MUST 在事务末尾重算。 */
-    @Query("UPDATE accounts SET name = :name, includeInTotal = :includeInTotal, creditLimitCents = :creditLimitCents, sortOrder = :sortOrder, initialBalanceCents = :initialBalanceCents, currencyCode = :currencyCode WHERE id = :id")
+    /** 阶段 7：账户编辑支持期初余额与币种；调用方 MUST 在事务末尾重算。
+     *  第 60 批：补 cardLast4 / cardKind，修掉「编辑账户改不了卡号信息」。 */
+    @Query("UPDATE accounts SET name = :name, includeInTotal = :includeInTotal, creditLimitCents = :creditLimitCents, sortOrder = :sortOrder, initialBalanceCents = :initialBalanceCents, currencyCode = :currencyCode, cardLast4 = :cardLast4, cardKind = :cardKind WHERE id = :id")
     suspend fun updateAccountMeta(
         id: Long, name: String, includeInTotal: Boolean,
         creditLimitCents: Long?, sortOrder: Int,
-        initialBalanceCents: Long, currencyCode: String
+        initialBalanceCents: Long, currencyCode: String,
+        cardLast4: String?, cardKind: String?
     )
 
     /** 显式批量统一币种：只改标签，不改金额。 */
@@ -76,6 +78,16 @@ interface AccountDao {
 
     @Query("UPDATE accounts SET sortOrder = :order WHERE id = :id")
     suspend fun updateSortOrder(id: Long, order: Int)
+
+    /** 第 60 批：记一笔优先顺序，与分组内 sortOrder 完全隔离。 */
+    @Query("SELECT * FROM accounts ORDER BY quickOrder, id")
+    suspend fun allByQuickOrder(): List<AccountEntity>
+
+    @Query("UPDATE accounts SET quickOrder = :order WHERE id = :id")
+    suspend fun updateQuickOrder(id: Long, order: Int)
+
+    @Query("SELECT COALESCE(MAX(quickOrder), -1) FROM accounts")
+    suspend fun maxQuickOrder(): Int
 
     /** 阶段 8：年度资产趋势的当前余额基准，按币种、不混算。 */
     @Query("SELECT COALESCE(SUM(balanceCents), 0) FROM accounts WHERE includeInTotal = 1 AND currencyCode = :cc")

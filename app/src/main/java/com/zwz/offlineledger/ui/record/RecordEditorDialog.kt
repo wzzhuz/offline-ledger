@@ -65,6 +65,7 @@ import com.zwz.offlineledger.core.time.YearMonthMath
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
+import com.zwz.offlineledger.ui.assets.AccountKindBadge
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.components.CategoryIcon
 import com.zwz.offlineledger.ui.components.CategorySelectDialog
@@ -592,7 +593,7 @@ private fun AccountStrip(
                                 ) {
                                     Text(
                                         AccountQuickCandidates.labelOf(
-                                            AccountQuickItem(a.id, a.name, a.isArchived)
+                                            AccountQuickItem(a.id, a.name, a.isArchived, a.cardKind)
                                         ) + " · " + a.currencyCode
                                     )
                                 }
@@ -627,7 +628,10 @@ private fun AccountQuickRow(
         )
     }
     // 第 44 批：候选 = 常用前 N 个 + 当前选中项（冷门 / 归档也一定可见）。
-    val items = accounts.map { AccountQuickItem(it.id, it.name, it.isArchived) }
+    // 第 60 批：带上 cardKind，快捷 chip 用 12dp 小标志区分同名银行的储蓄卡 / 信用卡。
+    val items = accounts.map {
+        AccountQuickItem(it.id, it.name, it.isArchived, it.cardKind)
+    }
     val shown = AccountQuickCandidates.select(items, selectedId, QUICK_COUNT)
     val current = AccountQuickCandidates.currentOrNull(items, selectedId)
     // 明确写出「当前是谁」，避免一排 chip 没一个选中时被误读成默认账户。
@@ -652,10 +656,17 @@ private fun AccountQuickRow(
                 selected = a.id == selectedId,
                 onClick = { onSelect(a.id) },
                 label = {
-                    Text(
-                        AccountQuickCandidates.labelOf(a),
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // 小标志叠在 chip 标签前，12dp，不使用文字后缀挤占账户名。
+                        a.cardKind?.let {
+                            AccountKindBadge(it)
+                            Spacer(Modifier.width(3.dp))
+                        }
+                        Text(
+                            AccountQuickCandidates.labelOf(a),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                 },
                 leadingIcon = {},
                 modifier = Modifier.padding(end = 4.dp)

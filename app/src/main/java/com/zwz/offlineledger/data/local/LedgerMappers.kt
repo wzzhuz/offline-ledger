@@ -51,7 +51,9 @@ fun AccountEntity.toDto(): BackupAccount = BackupAccount(
     isArchived = isArchived, sortOrder = sortOrder, currencyCode = currencyCode,
     lastReconciledAt = lastReconciledAt,
     lastReconciledBalanceCents = lastReconciledBalanceCents,
-    cardLast4 = cardLast4
+    cardLast4 = cardLast4,
+    quickOrder = quickOrder,
+    cardKind = cardKind
 )
 
 fun BackupAccount.toEntity(): AccountEntity = AccountEntity(
@@ -61,7 +63,9 @@ fun BackupAccount.toEntity(): AccountEntity = AccountEntity(
     isArchived = isArchived, sortOrder = sortOrder, currencyCode = currencyCode,
     lastReconciledAt = lastReconciledAt,
     lastReconciledBalanceCents = lastReconciledBalanceCents,
-    cardLast4 = cardLast4
+    cardLast4 = cardLast4,
+    quickOrder = quickOrder,
+    cardKind = cardKind
 )
 
 fun CategoryEntity.toDto(): BackupCategory = BackupCategory(

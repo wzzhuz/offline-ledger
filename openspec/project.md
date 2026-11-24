@@ -713,3 +713,16 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   脚本内幂等不足以抵抗整体重放。
 - 归档仍需使用者明确说「可以归档」。
 
+## 第 60 批（v0.2.41）：账户排序拆分、模板正规化与回归修复
+
+- **起因**：v0.2.40 出包后 8 条真机反馈，拍板 Q1A / Q2A（没弹窗）/ Q3A / Q4A / Q5A / Q6A（小标志）/ Q7（IconFont）；确认时追加「现在都是测试数据，不需要考虑升级迁移」。
+- **Q1A**：蓝底区逐币种组标「净资产」、负债红字负号（负号纯展示，`liabilitiesCents` 仍为绝对值）；账户行负余额红字负数不动。MUST NOT 出现跨币种单一总数。
+- **Q2A**：删除确认加固（账户名 / 余额 / 红字警示 /「确认删除」）；`pendingDelete + LaunchedEffect(menu)` 把弹窗触发与 `DropdownMenu` dismiss 解耦，修真机「没弹窗」。
+- **Q3A**：`name` 只存纯名、`cardLast4` 单一真相源，展示层组合一次并对旧库去重；`EditAccountDialog` 补卡号输入，打通 `vm.editAccount` → `repository.updateAccountMeta` → DAO `UPDATE` 四层写路径。
+- **Q4A**：`AccountEntity` 加 `quickOrder` / `cardKind`，`AppDatabase version = 6`；`sortOrder` 只管资产页分组内、`quickOrder` 管记一笔优先；新增独立「全部账户排序」页（路由 `account-quick-sort`，reorderable + 保存/放弃 + `draftOrder` 分离）。`RecordEditorViewModel` 撤掉会盖掉用户排序的 30 天频次排序，主排序键改 `quickOrder`。
+- **Q5A / Q6A**：模板扩到 21 家银行 × 2 卡种 + 支付余额 2 + 网络信用 4 = 48 条，四组不混排；`label`/`name` 改正规全称「工商银行」，卡种由 `cardKind` 表达，12dp 单字小角标叠在图标右下角、不占名称宽度。
+- **Q7**：按使用者判断执行（用 Logo 指示账户归属、IconFont 来源），不再劝阻。本批只落地可插拔机制：`AccountIconCatalog` 编译期 `when(iconKey)` + `else` 回退中性圆首字 + `assets/NOTICE` 逐项登记模板。**资源目录为空，包里无 logo**；判断与公开权利声明的差异如实登记、由使用者决策并承担，不写成「无风险」结论。
+- **升表口径**：使用者明确不考虑迁移 → `Migrations.ALL` 保持 `emptyArray()`、`MigrationContractTest` 零改动；但 `version = 6`、`SeedData` INSERT 补两列常量、备份 DTO 加带默认值字段并补齐 Mappers 仍 SHALL 做。测试期卸载重装、装前导出。
+- **零回归**：`moveAccount` / `commitAccountOrderAll` / `AccountQuickCandidates.select` / `Migrations.ALL` / 4 Tab / 记一笔快捷语义 / 零新增依赖 / `INTERNET` 权限全部不动。
+- **CI 全绿不替代真机**：§8 第 60 批新增待验，既有项整体继承；覆盖安装数据不丢不在验收范围。归档仍需使用者明确说「可以归档」。
+

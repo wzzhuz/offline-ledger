@@ -35,3 +35,26 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ------------------------------------------------------------------
+
+------------------------------------------------------------------
+第 60 批 · 账户品牌图标（AccountIconCatalog）资源登记
+------------------------------------------------------------------
+状态：**资源目录为空，本批未引入任何品牌图形**。
+
+本批只落地可插拔机制：`AccountTemplate.iconKey` 预留键位，
+`AccountIconCatalog.drawableFor()` 为编译期 `when` 显式常量表，
+当前仅 `else -> null`，三页统一回退中性圆 + 中文首字。
+
+使用者决策（2026-11-24）：用 Logo 指示账户归属、记账类场景、
+可从 IconFont 获取对应 logo 资源。该判断与上轮所列公开权利声明
+（工行 / 民生官网权利声明、Simple Icons 商标免责、
+《商标法》第 43 条、第三方逐家许可口径）存在差异，
+由使用者决策并承担，此处如实登记，不写成「已解决 / 无风险」。
+
+补齐资源时的逐项登记格式（每份图形一行，MUST NOT 用平台名代替）：
+
+  iconKey | 品牌 | 作者/上传者 | 来源链接 | 授权类型 | 传递依赖 | 登记日期
+
+IconFont 是聚合平台，每个图标由不同作者上传、授权状态逐个不同；
+平台聚合页不等于「可随包分发」。未逐项登记前 MUST NOT 加入 assets/。
+

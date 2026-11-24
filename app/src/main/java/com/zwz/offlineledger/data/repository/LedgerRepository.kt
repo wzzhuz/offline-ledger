@@ -348,12 +348,14 @@ class LedgerRepository @Inject constructor(
         creditLimitCents: Long?,
         sortOrder: Int,
         initialBalanceCents: Long,
-        currencyCode: String
+        currencyCode: String,
+        cardLast4: String?,
+        cardKind: String?
     ) = db.withTransaction {
         require(name.isNotBlank()) { "账户名不能为空" }
         accountDao.updateAccountMeta(
             id, name, includeInTotal, creditLimitCents, sortOrder,
-            initialBalanceCents, currencyCode
+            initialBalanceCents, currencyCode, cardLast4, cardKind
         )
         rebuildAllBalancesInternal()
     }
@@ -392,10 +394,16 @@ class LedgerRepository @Inject constructor(
         rebuildAllBalancesInternal()
     }
 
-    /** 第三批：账户自定义排序，顺序同步到记一笔的常用账户平铺。 */
+    /** 第三批：账户自定义排序（分组内 sortOrder）。
+     *  第 60 批：这句注释里的「同步到记一笔」已作废——记一笔改读 quickOrder。 */
     suspend fun reorderAccounts(orderedIds: List<Long>) = db.withTransaction {
         orderedIds.forEachIndexed { index, id -> accountDao.updateSortOrder(id, index) }
         rebuildAllBalancesInternal()
+    }
+
+    /** 第 60 批：记一笔优先顺序，一次性写入，MUST NOT 碰 sortOrder。 */
+    suspend fun reorderQuickAccounts(orderedIds: List<Long>) = db.withTransaction {
+        orderedIds.forEachIndexed { index, id -> accountDao.updateQuickOrder(id, index) }
     }
 
     // ---------------------------------------------------------------

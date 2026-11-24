@@ -69,7 +69,8 @@ class AssetsViewModel(
         type: AccountType,
         initialYuan: String,
         creditLimitYuan: String,
-        cardLast4: String = ""
+        cardLast4: String = "",
+        cardKind: String? = null
     ): String? {
         if (name.isBlank()) return "账户名不能为空"
         val initialCents = try {
@@ -84,18 +85,21 @@ class AssetsViewModel(
         }
         return try {
             repository.createAccount(
+                // 第 60 批 Q3A：name 只存纯名，MUST NOT 再拼 " (1122)"；
+                // cardLast4 是单一真相源，展示层组合一次。
                 AccountEntity(
-                    name = name.trim() +
-                        if (cardLast4.length == 4 && cardLast4.all { it.isDigit() })
-                            " (" + cardLast4 + ")" else "",
+                    name = name.trim(),
                     cardLast4 = cardLast4.takeIf {
                         it.length == 4 && it.all { ch -> ch.isDigit() }
                     },
+                    cardKind = cardKind,
                     type = type,
                     initialBalanceCents = initialCents,
                     balanceCents = initialCents,
                     creditLimitCents = limitCents,
                     sortOrder = accountDao.count(),
+                    // 新建账户追加到记一笔优先序列末尾，不挤掉已排好的常用账户。
+                    quickOrder = accountDao.maxQuickOrder() + 1,
                     currencyCode = prefs.defaultCurrency
                 )
             )
@@ -114,7 +118,9 @@ class AssetsViewModel(
         initialYuan: String,
         limitYuan: String,
         currencyCode: String,
-        includeInTotal: Boolean
+        includeInTotal: Boolean,
+        cardLast4: String,
+        cardKind: String?
     ): String? {
         if (name.isBlank()) return "账户名不能为空"
         val initialCents = try {
@@ -135,7 +141,12 @@ class AssetsViewModel(
                 creditLimitCents = limitCents,
                 sortOrder = account.sortOrder,
                 initialBalanceCents = initialCents,
-                currencyCode = currencyCode
+                currencyCode = currencyCode,
+                // 第 60 批 Q3A：编辑页改卡号在此写回，修掉「改不了卡号信息」。
+                cardLast4 = cardLast4.takeIf {
+                    it.length == 4 && it.all { ch -> ch.isDigit() }
+                },
+                cardKind = cardKind
             )
             if (type != account.type) repository.updateAccountType(account.id, type)
             reload()
@@ -227,6 +238,22 @@ class AssetsViewModel(
                 .sortedBy { it.sortOrder }.map { it.id }
             val archived = all.filter { it.isArchived }.map { it.id }
             repository.reorderAccounts(valid + rest + archived)
+            reload()
+        }
+    }
+
+    /**
+     * 第 60 批 Q4A：记一笔优先顺序，一次性写入，只碰 quickOrder。
+     * MUST NOT 调用 reorderAccounts（那是资产页分组内 sortOrder）。
+     */
+    fun commitQuickOrderAll(orderedIds: List<Long>) {
+        viewModelScope.launch {
+            val all = _state.value.accounts
+            val byId = all.associateBy { it.id }
+            val valid = orderedIds.mapNotNull { byId[it] }.map { it.id }
+            val rest = all.filter { it.id !in valid }
+                .sortedBy { it.quickOrder }.map { it.id }
+            repository.reorderQuickAccounts(valid + rest)
             reload()
         }
     }

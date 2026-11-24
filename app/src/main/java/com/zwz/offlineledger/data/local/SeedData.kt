@@ -161,9 +161,13 @@ object SeedData {
         }
         for (x in accounts) {
             val limit = x.creditLimitCents?.toString() ?: "NULL"
-            out += "INSERT INTO accounts (id, name, type, initialBalanceCents, balanceCents, creditLimitCents, includeInTotal, isArchived, sortOrder, currencyCode, lastReconciledAt, lastReconciledBalanceCents, cardLast4) " +
+            // 第 60 批：列清单补 quickOrder / cardKind；全新库与备份恢复走 Entity
+            // 创建路径，缺列会直接 SQL 报错。虽不注册迁移，这两列仍 SHALL 对齐。
+            out += "INSERT INTO accounts (id, name, type, initialBalanceCents, balanceCents, creditLimitCents, includeInTotal, isArchived, sortOrder, currencyCode, lastReconciledAt, lastReconciledBalanceCents, cardLast4, quickOrder, cardKind) " +
                 "VALUES (${x.id}, '${x.name}', '${x.type.name}', 0, 0, $limit, 1, 0, " +
-                "${x.sortOrder}, 'CNY', NULL, NULL, NULL)"
+                // accounts 目前是 emptyList()（零账户首启），此处直接写默认常量，
+                // MUST NOT 引用 AccountSeed 上不存在的字段导致编译失败。
+                "${x.sortOrder}, 'CNY', NULL, NULL, NULL, 0, NULL)"
         }
         return out
     }

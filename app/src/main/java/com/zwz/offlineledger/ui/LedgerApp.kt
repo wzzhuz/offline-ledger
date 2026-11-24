@@ -36,6 +36,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.zwz.offlineledger.ui.assets.AccountQuickSortScreen
 import com.zwz.offlineledger.ui.assets.AssetsScreen
 import com.zwz.offlineledger.ui.budget.BudgetManagerScreen
 import com.zwz.offlineledger.ui.detail.DetailScreen
@@ -163,7 +164,16 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                     onEdit = { id -> openEditor(id) }
                 )
             }
-            composable("assets") { AssetsScreen(refreshTick = refreshTick) }
+            composable("assets") {
+                AssetsScreen(
+                    refreshTick = refreshTick,
+                    onOpenQuickSort = { navController.navigate("account-quick-sort") }
+                )
+            }
+            // 第 60 批 Q4A：独立「全部账户排序」页，不改 4 Tab 结构。
+            composable("account-quick-sort") {
+                AccountQuickSortScreen(onBack = { goBack() })
+            }
             composable("stats") {
                 StatsScreen(
                     refreshTick = refreshTick,

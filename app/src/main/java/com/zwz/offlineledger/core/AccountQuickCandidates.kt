@@ -4,7 +4,9 @@ package com.zwz.offlineledger.core
 data class AccountQuickItem(
     val id: Long,
     val name: String,
-    val isArchived: Boolean
+    val isArchived: Boolean,
+    /** 第 60 批：卡种小标志；带默认值，既有单测构造零改动。 */
+    val cardKind: String? = null
 )
 
 /**

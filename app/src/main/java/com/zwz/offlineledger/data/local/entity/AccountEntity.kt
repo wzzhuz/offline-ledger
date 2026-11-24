@@ -26,6 +26,13 @@ data class AccountEntity(
     /** 阶段 3 对账锚点，字段先预留。 */
     @ColumnInfo(name = "lastReconciledAt") val lastReconciledAt: Long? = null,
     @ColumnInfo(name = "lastReconciledBalanceCents") val lastReconciledBalanceCents: Long? = null,
-    /** 第 30 批：卡号后四位，仅用于区分同名卡片，不参与任何金额运算。 */
-    @ColumnInfo(name = "cardLast4") val cardLast4: String? = null
+    /** 第 30 批：卡号后四位，仅用于区分同名卡片，不参与任何金额运算。
+     *  第 60 批：改为**单一真相源**——name SHALL 只存纯名，展示层组合一次。 */
+    @ColumnInfo(name = "cardLast4") val cardLast4: String? = null,
+    /** 第 60 批：记一笔优先顺序，全账户不分类型；与分组内 sortOrder 互不干涉。
+     *  使用者明确「测试数据、不考虑升级迁移」，故 version=6 但不注册 Migration。 */
+    @ColumnInfo(name = "quickOrder") val quickOrder: Int = 0,
+    /** 第 60 批：卡种 DEBIT / CREDIT / null。正规银行全称下同名两卡靠它区分，
+     *  UI 用 12dp 小角标表达，MUST NOT 把卡种拼回账户名。 */
+    @ColumnInfo(name = "cardKind") val cardKind: String? = null
 )

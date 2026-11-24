@@ -71,20 +71,22 @@ class RecordEditorViewModel(
     /** 每次打开编辑器都调用一次，避免复用 ViewModel 时残留上一次的状态。 */
     fun load(recordId: Long?) {
         viewModelScope.launch {
-            val a = accountDao.all()
+            // 第 60 批 Q4A：数据源改按 quickOrder，记一笔候选由「全部账户排序」页决定。
+            val a = accountDao.allByQuickOrder()
             // 第 52 批：数据源改为全量，停用项不再「查不到」。过滤下沉到 UI 快捷栏，
             // 全量选择器仍可选停用项；统计 / 历史 / 导出一直读全量，不受影响。
             val c = categoryDao.all()
             _accounts.value = a
             _categories.value = c
             _counterparties.value = runCatching { recordDao.distinctCounterparties() }.getOrDefault(emptyList())
-            // 阶段 8：常用账户置顶（最近 30 天流水频次），冷门账户仍可从「全部账户」弹层搜到。
-            val since = LedgerClock.fromEpochMilli(System.currentTimeMillis() - 30L * 86_400_000L).localDate
-            val rank = runCatching { recordDao.recentAccountUsage(since) }
-                .getOrDefault(emptyList()).mapIndexed { i, r -> r.id to i }.toMap()
-            val sorted = a.sortedBy { acc ->
-                if (acc.isArchived) Int.MAX_VALUE else (rank[acc.id] ?: (1000 + acc.sortOrder))
-            }
+            // 第 60 批：30 天流水频次排序会盖掉使用者在独立页排好的常用顺序，
+            // 故撤掉。主排序键改为 quickOrder（全部账户、不分类型），归档沉底。
+            // 「常用」由使用者在「全部账户排序」页显式定义，不再由频次隐式推断。
+            val sorted = a.sortedWith(
+                compareBy<AccountEntity> { it.isArchived }
+                    .thenBy { it.quickOrder }
+                    .thenBy { it.id }
+            )
             _accounts.value = sorted
             _counterpartySuggestions.value = emptyList()
             // 第 6 批：偏好默认账户优先，其次进程内记忆，最后按常用频次取第一个。

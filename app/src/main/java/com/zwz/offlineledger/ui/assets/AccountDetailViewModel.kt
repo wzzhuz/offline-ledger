@@ -58,7 +58,10 @@ class AccountDetailViewModel(
             repository.updateAccountMeta(
                 accountId, name, includeInTotal, creditLimitCents, sortOrder,
                 cur?.initialBalanceCents ?: 0L,
-                cur?.currencyCode ?: LedgerCurrency.DEFAULT
+                cur?.currencyCode ?: LedgerCurrency.DEFAULT,
+                // 第 60 批：账户详情只改元数据，卡号与卡种保持原值。
+                cur?.cardLast4,
+                cur?.cardKind
             )
             reload(accountId)
         }

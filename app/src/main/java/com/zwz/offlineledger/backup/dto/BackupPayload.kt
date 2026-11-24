@@ -13,7 +13,11 @@ data class BackupAccount(
     val lastReconciledAt: Long? = null,
     val lastReconciledBalanceCents: Long? = null,
     /** 第 34 批：卡号后四位，带默认值兼容旧备份，恢复时不再丢失。 */
-    val cardLast4: String? = null
+    val cardLast4: String? = null,
+    /** 第 60 批：记一笔优先顺序；旧备份缺键取 0（排末尾），不破坏兼容。 */
+    val quickOrder: Int = 0,
+    /** 第 60 批：卡种；旧备份缺键取 null（无小标志）。 */
+    val cardKind: String? = null
 )
 
 @Serializable

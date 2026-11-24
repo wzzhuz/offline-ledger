@@ -58,6 +58,7 @@ import com.zwz.offlineledger.core.currency.LedgerCurrency
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.data.local.entity.AccountEntity
+import com.zwz.offlineledger.data.local.AccountTemplates
 import com.zwz.offlineledger.data.model.AccountType
 import com.zwz.offlineledger.data.model.displayName
 import com.zwz.offlineledger.engine.Reconciliation
@@ -74,6 +75,9 @@ import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
+/** 模板清单数量随 Q5A 扩容自动跟随，MUST NOT 再硬编码 12。 */
+private val AccountTemplatesCount: Int get() = AccountTemplates.ALL.size
+
 /**
  * 第 59 批：资产账户页借鉴一羽记账的布局与密度。
  *
@@ -87,7 +91,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AssetsScreen(refreshTick: Int = 0) {
+fun AssetsScreen(refreshTick: Int = 0, onOpenQuickSort: () -> Unit = {}) {
     val context = LocalContext.current
     val vm: AssetsViewModel = viewModel(
         factory = ledgerFactory(context) { ep ->
@@ -146,7 +150,8 @@ fun AssetsScreen(refreshTick: Int = 0) {
                     AssetHeader(
                         state = state,
                         onToggleArchived = { vm.toggleShowArchived() },
-                        onAdd = { addError = null; showAdd = true }
+                        onAdd = { addError = null; showAdd = true },
+                        onOpenQuickSort = onOpenQuickSort
                     )
                 }
                 AccountType.entries.forEach { type ->
@@ -218,9 +223,9 @@ fun AssetsScreen(refreshTick: Int = 0) {
     if (showAdd) {
         AddAccountDialog(
             onDismiss = { showAdd = false },
-            onConfirm = { name, type, initial, limit, last4 ->
+            onConfirm = { name, type, initial, limit, last4, cardKind ->
                 scope.launch {
-                    val err = vm.addAccount(name, type, initial, limit, last4)
+                    val err = vm.addAccount(name, type, initial, limit, last4, cardKind)
                     if (err == null) { showAdd = false; addError = null } else addError = err
                 }
             },
@@ -232,9 +237,11 @@ fun AssetsScreen(refreshTick: Int = 0) {
         EditAccountDialog(
             account = account,
             onDismiss = { editAccount = null },
-            onConfirm = { name, type, initial, limit, cc, include ->
+            onConfirm = { name, type, initial, limit, cc, include, last4, cardKind ->
                 scope.launch {
-                    val err = vm.editAccount(account, name, type, initial, limit, cc, include)
+                    val err = vm.editAccount(
+                        account, name, type, initial, limit, cc, include, last4, cardKind
+                    )
                     if (err == null) { editAccount = null; editError = null } else editError = err
                 }
             },
@@ -243,15 +250,32 @@ fun AssetsScreen(refreshTick: Int = 0) {
     }
 
     deleting?.let { account ->
+        // 第 60 批 Q2A：真机反馈「点删除没弹窗」。除了在 AccountCard 里用
+        // pendingDelete + LaunchedEffect(menu) 把触发与 DropdownMenu dismiss 解耦，
+        // 弹窗本身也补上账户名 / 余额 / 红字警示 /「确认删除」四个明确要素。
         AlertDialog(
             onDismissRequest = { deleting = null },
             title = { Text("删除账户") },
-            text = { Text("确定删除「" + account.name + "」？有流水的账户不能删除，只能归档。") },
+            text = {
+                Column {
+                    Text("账户：" + account.name, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "当前余额：" + formatCents(account.balanceCents),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "⚠ 有流水的账户不能删除，只能归档；此操作不可撤销。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LedgerColors.ExpenseRed
+                    )
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch { vm.deleteAccount(account.id) }
                     deleting = null
-                }) { Text("删除", color = LedgerColors.ExpenseRed) }
+                }) { Text("确认删除", color = LedgerColors.ExpenseRed) }
             },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("取消") } }
         )
@@ -284,7 +308,8 @@ fun AssetsScreen(refreshTick: Int = 0) {
 private fun AssetHeader(
     state: AssetsUiState,
     onToggleArchived: () -> Unit,
-    onAdd: () -> Unit
+    onAdd: () -> Unit,
+    onOpenQuickSort: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -323,8 +348,10 @@ private fun AssetHeader(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        // Q1A：组内叫「净资产」；仍是逐币种分组，
+                        // MUST NOT 汇总成跨币种单一总数（基线 reporting-ui）。
                         Text(
-                            text = g.currencyCode + " 小计",
+                            text = g.currencyCode + " · 净资产",
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White
                         )
@@ -339,17 +366,29 @@ private fun AssetHeader(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "资产 " + formatCents(g.assetsCents),
+                            text = "资产 +" + formatCents(g.assetsCents),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f)
                         )
+                        // Q1A：负债恢复红字 + 负号。CurrencyGroup.liabilitiesCents
+                        // 仍是 displayTotals 给的正绝对值，负号纯展示、不参与运算；
+                        // 蓝底上取高对比浅红，语义与 ExpenseRed 同系。
                         Text(
-                            text = "负债 " + formatCents(g.liabilitiesCents),
+                            text = "负债 -" + formatCents(g.liabilitiesCents),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f)
+                            color = Color(0xFFFFCDD2)
                         )
                     }
                 }
+            }
+        }
+        // Q4A：全部账户排序页入口固定在顶部身份区，不新增第 5 个 Tab。
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = onOpenQuickSort) {
+                Text("记一笔优先排序 ›", color = Color.White)
             }
         }
     }
@@ -408,6 +447,28 @@ private fun AccountCard(
     dragModifier: Modifier? = null
 ) {
     var menu by remember { mutableStateOf(false) }
+    // 第 60 批 Q2A：DropdownMenu 的 Popup dismiss 与 AlertDialog 新窗口同帧会竞争，
+    // 真机表现为「点删除没弹窗」。把触发延迟到 menu 完全关闭之后。
+    var pendingDelete by remember { mutableStateOf(false) }
+    LaunchedEffect(menu) {
+        if (!menu && pendingDelete) {
+            pendingDelete = false
+            onDelete()
+        }
+    }
+
+    // 第 60 批 Q3A：cardLast4 是单一真相源；旧库 name 已含 " (1122)" 时
+    // 不再追加，MUST NOT 出现「中行储蓄卡(1122)(1122)」。
+    val shownName = buildString {
+        append(account.name)
+        account.cardLast4?.let { last4 ->
+            val suffix = " ($last4)"
+            if (!account.name.endsWith(suffix)) append(suffix)
+        }
+        append(" · " + account.currencyCode)
+        if (account.isArchived) append("（已归档）")
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -420,14 +481,16 @@ private fun AccountCard(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            CategoryIcon(name = account.name, colorHex = null, size = 36)
+            AccountIconBox(
+                name = account.name,
+                cardKind = account.cardKind,
+                iconKey = AccountIconCatalog.iconKeyFor(account.name),
+                size = 36
+            )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = account.name +
-                        (account.cardLast4?.let { " ($it)" } ?: "") +
-                        " · " + account.currencyCode +
-                        if (account.isArchived) "（已归档）" else "",
+                    text = shownName,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -476,7 +539,7 @@ private fun AccountCard(
                         onClick = { menu = false; onArchived(!account.isArchived) }
                     )
                     DropdownMenuItem(text = { Text("删除", color = LedgerColors.ExpenseRed) },
-                        onClick = { menu = false; onDelete() })
+                        onClick = { menu = false; pendingDelete = true })
                     DropdownMenuItem(text = { Text("上移") },
                         onClick = { menu = false; onMove(-1) })
                     DropdownMenuItem(text = { Text("下移") },
@@ -515,7 +578,7 @@ private fun AssetFormSectionTitle(text: String) {
 @Composable
 private fun AddAccountDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, AccountType, String, String, String) -> Unit,
+    onConfirm: (String, AccountType, String, String, String, String?) -> Unit,
     errorText: String?
 ) {
     var name by remember { mutableStateOf("") }
@@ -523,9 +586,10 @@ private fun AddAccountDialog(
     var initial by remember { mutableStateOf("") }
     var limit by remember { mutableStateOf("") }
     var last4 by remember { mutableStateOf("") }
+    var cardKind by remember { mutableStateOf<String?>(null) }
     var showTemplateSheet by remember { mutableStateOf(false) }
 
-    val save = { onConfirm(name, type, initial, limit, last4) }
+    val save = { onConfirm(name, type, initial, limit, last4, cardKind) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -651,7 +715,7 @@ private fun AddAccountDialog(
                             onClick = { showTemplateSheet = true },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("从模板选择（12 个）")
+                            Text("从模板选择（" + AccountTemplatesCount + " 个）")
                         }
 
                         errorText?.let {
@@ -682,6 +746,7 @@ private fun AddAccountDialog(
                         onPick = { t ->
                             name = t.name
                             type = t.type
+                            cardKind = t.cardKind
                             showTemplateSheet = false
                         }
                     )
@@ -696,10 +761,13 @@ private fun AddAccountDialog(
 private fun EditAccountDialog(
     account: AccountEntity,
     onDismiss: () -> Unit,
-    onConfirm: (String, AccountType, String, String, String, Boolean) -> Unit,
+    onConfirm: (String, AccountType, String, String, String, Boolean, String, String?) -> Unit,
     errorText: String?
 ) {
-    var name by remember { mutableStateOf(account.name) }
+    // 第 60 批 Q3A：旧库 name 可能已含 " (1122)"，初始化时剥掉，
+    // 否则编辑一次会把历史后缀写回 name，与展示层组合成双后缀。
+    var name by remember { mutableStateOf(stripLegacyCardSuffix(account.name, account.cardLast4)) }
+    var last4 by remember { mutableStateOf(account.cardLast4 ?: "") }
     var type by remember { mutableStateOf(account.type) }
     var initial by remember { mutableStateOf(Cents(account.initialBalanceCents).toYuanString()) }
     var limit by remember { mutableStateOf(
@@ -718,6 +786,15 @@ private fun EditAccountDialog(
                     textStyle = MaterialTheme.typography.bodyMedium,
                     value = name, onValueChange = { name = it },
                     placeholder = { Text("账户名称", style = MaterialTheme.typography.bodyMedium) }, modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp), singleLine = true
+                )
+                // 第 60 批 Q3A：编辑页补上卡号输入，修掉「改不了卡号信息」。
+                OutlinedTextField(
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    value = last4,
+                    onValueChange = { last4 = it.filter { ch -> ch.isDigit() }.take(4) },
+                    placeholder = { Text("卡号后四位（可选）", style = MaterialTheme.typography.bodyMedium) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+                    singleLine = true
                 )
                 Column {
                     AccountType.entries.chunked(2).forEach { pair ->
@@ -771,10 +848,20 @@ private fun EditAccountDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(name, type, initial, limit, currency, include) }) {
+            Button(onClick = {
+                onConfirm(name, type, initial, limit, currency, include, last4, account.cardKind)
+            }) {
                 Text("保存")
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
+}
+
+
+/** 第 60 批 Q3A：旧库 name 里冗余的 " (xxxx)" 后缀剥除，仅用于编辑框初始化。 */
+private fun stripLegacyCardSuffix(name: String, last4: String?): String {
+    if (last4 == null) return name
+    val suffix = " ($last4)"
+    return if (name.endsWith(suffix)) name.removeSuffix(suffix) else name
 }
