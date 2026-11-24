@@ -62,7 +62,27 @@ jobs:
       # assembleDebug 只编译主源码，不碰 src/test。
       # 必须单独跑一次 test，否则测试文件写错了也照样「编译通过」。
       - name: 运行单元测试
-        run: gradle testDebugUnitTest --stacktrace --no-daemon
+        run: |
+          set -o pipefail
+          gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/unit63.log
+
+      - name: 临时诊断回写（用完即撤销）
+        if: failure()
+        env:
+          DIAG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, urllib.request
+          body = open('/tmp/unit63.log', errors='replace').read()
+          payload = json.dumps({'body': '```\n' + body[-28000:] + '\n```'}).encode()
+          url = ('https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] +
+                 '/commits/' + os.environ['GITHUB_SHA'] + '/comments')
+          req = urllib.request.Request(url, data=payload, method='POST', headers={
+              'Authorization': 'Bearer ' + os.environ['DIAG_TOKEN'],
+              'Accept': 'application/vnd.github+json',
+              'Content-Type': 'application/json', 'User-Agent': 'diag'})
+          print('comment status', urllib.request.urlopen(req, timeout=30).status)
+          PYEOF
 
       - name: 编译 Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon
