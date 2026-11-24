@@ -826,3 +826,20 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   change 四件套追加第 63 批（新增 2 条 Requirement / 修订 1 条）。
 - CI 全绿不替代真机，§8 第 63 批新增 7 项待验，既有项整体继承。
 
+### 第 63 批实测（v0.2.44 出包）
+
+- 最终代码 commit `fe77fc594a21`（首推 `12b33b0bb9a6`），
+  逐 blob 双校验 PASS；`build.yml` 按原版 byte-for-byte 恢复、无诊断残留。
+- push CI `45374828888` 全绿（329 项单测）；出包 CI `45375451757` 全绿；
+  tag `v0.2.44` → `fe77fc594a21`；Release 附件
+  `offline-ledger-v0.2.44-release-fe77fc59.apk`（3202803 B，
+  SHA256 `65c03c226e2a7326200fa180691dc19c84babca63273186795332d5f7418db97`），`state=uploaded` + `digest` 与 notes 一致。
+- **三次失败如实登记**：① `choice` 可空 + `FireflyImportScreen` 两个 import
+  丢失（批量脚本改内存却没写回就重读文件）；② 编译通过后
+  `CsvRebuildResolverTest` 因缺项报告格式被改成带前缀 reason 而失败，
+  修为「缺失用纯名、歧义才附提示」。两次临时诊断（日志回写 commit
+  comment）用完即撤销；两条诊断 comment 因 PAT 权限 404 未能删除，
+  挂在中间 commit 上、不影响交付物。
+- artifacts 3 个、无染绿、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
+- Q7 资源未进包；归档仍需使用者明确说「可以归档」。
+

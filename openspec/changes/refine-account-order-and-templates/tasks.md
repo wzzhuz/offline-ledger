@@ -150,8 +150,8 @@
 - [x] 13.9 单测：`AccountCsvMatchTest` 8、`CsvCodecTest` +3、
       `CsvRebuildResolverTest` +2、`AccountDisplayLabelTest` +1
 - [x] 13.10 版本号 `0.2.44`；spec 新增 1 条 Requirement + 修订 1 条
-- [ ] 13.11 推送逐 blob 双校验 / 双 CI 全绿 / Release digest 一致
-- [ ] 13.12 实测回填；归档校验仍保持 `[ ]`
+- [x] 13.11 推送逐 blob 双校验 / 双 CI 全绿 / Release digest 一致
+- [x] 13.12 实测回填；归档校验仍保持 `[ ]`
 
 ## 14. 第 63 批真机待验（`[ ]`）
 
