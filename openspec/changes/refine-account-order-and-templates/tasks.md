@@ -94,9 +94,9 @@
 - [x] 9.7 `reporting-ui` 修订 1 条 + 新增 1 条 Requirement；
       `ledger-transactions` 修订卡号条文并加 Scenario
 - [x] 9.8 版本号 `0.2.42`；活文档 §7.43 / project.md 同步
-- [ ] 9.9 推送后逐 blob tree + content 双校验
-- [ ] 9.10 push CI 与出包 CI 全绿；Release `state=uploaded` + `digest` 一致
-- [ ] 9.11 实测编号回填；归档校验仍保持 `[ ]`
+- [x] 9.9 推送后逐 blob tree + content 双校验
+- [x] 9.10 push CI 与出包 CI 全绿；Release `state=uploaded` + `digest` 一致
+- [x] 9.11 实测编号回填；归档校验仍保持 `[ ]`
 
 ## 10. 第 61 批真机待验（刻意保留 `[ ]`）
 
