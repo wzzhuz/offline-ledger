@@ -726,3 +726,15 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **零回归**：`moveAccount` / `commitAccountOrderAll` / `AccountQuickCandidates.select` / `Migrations.ALL` / 4 Tab / 记一笔快捷语义 / 零新增依赖 / `INTERNET` 权限全部不动。
 - **CI 全绿不替代真机**：§8 第 60 批新增待验，既有项整体继承；覆盖安装数据不丢不在验收范围。归档仍需使用者明确说「可以归档」。
 
+### 第 60 批实测（v0.2.41 出包）
+
+- 28 文件 `cc3001ccf25d6934a4d394e1b73f0e7ea5f6abb7`（parent `fdb2b4277363`），逐 blob 校验 PASS；push CI `45349768835` 全绿。
+- 出包 CI `45350453088` completed success；tag `v0.2.41` → `cc3001ccf25d`；
+  Release 附件 `offline-ledger-v0.2.41-release-cc3001cc.apk`（3202803 B，
+  SHA256 `9bad3782c6f2d09df0376afb8f5dc94cca3870b740bd0e84154e8e0dac7673f0`），API `state=uploaded` + `digest` 与 notes 一致。
+- Actions artifacts 3 个，无染绿，`mapping.txt` 随制品留存；坚果云步骤 success 但
+  job logs 403，落盘无法独立确认。
+- **触发与轮询拆分生效**：dispatch 204 只注册 1 个 run，无重复、无 cancel、无二次发布。
+- **Q7 资源未进包**，三页回退中性圆；`assets/` 无任何品牌图形。
+- 归档仍需使用者明确说「可以归档」。
+

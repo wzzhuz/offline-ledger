@@ -59,10 +59,14 @@
 
 ## 7. 校验与交付
 
-- [ ] 7.1 推送后按 commit sha 逐文件 tree + content 双校验
-- [ ] 7.2 push CI 与出包 CI 全绿；Release 附件 `state=uploaded` + `digest` 与 notes 一致
-- [ ] 7.3 实测编号回填活文档 / project.md / tasks.md
-- [ ] 7.4 归档校验 —— 本项保持 `[ ]`，归档需使用者明确说「可以归档」
+- [x] 7.1 推送后按 commit sha 逐文件 tree + content 双校验
+- [x] 7.2 push CI 与出包 CI 全绿；Release 附件 `state=uploaded` + `digest` 与 notes 一致
+- [x] 7.3 实测编号回填活文档 / project.md / tasks.md
+- [ ] 7.4 归档校验 —— 本地结构自查 PASS（8 条 Requirement / 15 Scenario /
+      2 条 MODIFIED 命中基线），但正式归档校验未执行，本项保持 `[ ]`
+      —— **第 60 批实测**：`cc3001ccf25d6934a4d394e1b73f0e7ea5f6abb7` / push CI `45349768835` /
+      出包 CI `45350453088` / tag `v0.2.41` / SHA256 `9bad3782c6f2d09df0376afb8f5dc94cca3870b740bd0e84154e8e0dac7673f0` /
+      dispatch 单次无重复
 - [ ] 7.5 **明确写出仍未验证的真机项**，不用「CI 全绿」替代
 
 ## 8. 真机待验（第 60 批新增，刻意保留 `[ ]`）
