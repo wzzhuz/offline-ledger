@@ -44,7 +44,9 @@ object CsvRebuildResolver {
             val categoryOk = path in categoryPaths
             when (match) {
                 is AccountMatch.Unique -> Unit
-                is AccountMatch.Missing -> missAccounts += match.reason
+                // 缺失沿用原始单元格名，保持既有「缺项报告」格式（纯账户名去重列表）；
+                // 歧义才附带候选与 cardLast4 提示，让使用者知道怎么补列。
+                is AccountMatch.Missing -> missAccounts += row.accountName
                 is AccountMatch.Ambiguous -> missAccounts += match.reason
             }
             if (!categoryOk) missCategories += path

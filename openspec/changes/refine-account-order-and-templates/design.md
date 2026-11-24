@@ -385,7 +385,7 @@ resolveAccount(refs, parsed):
 |---|---|
 | `findImportCandidates` | 复合匹配；缺失/歧义跳过，**不报疑似候选**（宁可不报，不挂错卡） |
 | `importRecords` | 复合匹配；缺失/歧义抛 `IllegalArgumentException`，整批回滚 |
-| `rebuildFromOwnCsv` | `CsvRebuildResolver.resolve(rows, List<AccountRef>, ...)`，唯一命中才 ready；写入时复用同一个 id |
+| `rebuildFromOwnCsv` | `CsvRebuildResolver.resolve(rows, List<AccountRef>, ...)`，唯一命中才 ready；写入时复用同一个 id。缺项报告沿用原始账户名（保持既有报告格式），歧义才附候选与 `cardLast4` 提示 |
 | `importFirefly` | `targetName` 仍纯名，新增 `targetCardLast4`；同名多条时 `SettingsViewModel` 不自动映射，改用 isNew 让使用者在下拉里选（下拉显示展示名） |
 
 `CsvRebuildResolver` 保留旧 `Set<String>` 重载委托到新签名，
