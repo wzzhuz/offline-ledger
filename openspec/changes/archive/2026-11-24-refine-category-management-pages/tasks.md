@@ -173,7 +173,7 @@
 - [x] 5.2 `check_kotlin_strings.py` PASS；另跑去注释/字符串括号平衡、重复 import、
       `setValue` / `getValue` 导入自查，10 个文件全 OK
 - [x] 5.3 按最终 commit sha 查 tree，逐文件比对 blob sha，`远端校验: PASS`
-- [ ] 5.4 归档校验：无重复 Requirement 标题、每条 ≥1 Scenario、含 RFC2119、MODIFIED 整块替换
+- [x] 5.4 归档校验：无重复 Requirement 标题、每条 ≥1 Scenario、含 RFC2119、MODIFIED 整块替换
 - [ ] 5.5 给出真实 commit sha + run id；制品名带短 sha、不同名覆盖；`mapping.txt` 随对应 APK
        —— v0.2.39 已出 Release 附件与 tag，制品名带短 sha `bd2e3d7c`；
        **Actions artifacts 为 3 个**（release / mapping / metrics），
@@ -236,7 +236,8 @@
 
 - [ ] 7.1 把 **4 条 MODIFIED** 按标题整块替换回 `openspec/specs/`，**5 条 ADDED** 合并；
        并把 `reporting-ui`「分类全量选择器采用分组 chips 且不用下拉框」标题
-       更名为「…采用分组导航与等宽网格」（标题原名仅作替换锚点）
+       更名为「…采用分组导航与等宽网格」（**延后**：进行中 change 仍以旧标题作
+       ADDED 锚点，更名会加剧规格腐烂；见归档报告 R4，待其收口后统一处理）
 - [ ] 7.2 change 文件夹移到 `openspec/changes/archive/<日期>-refine-category-management-pages/`
 - [ ] 7.3 校验 specs 已反映新行为，无规格腐烂
 
@@ -302,3 +303,14 @@
        不被截断；收窄后左右分区的疏离感是否改善、网格与导航是否仍对齐；
        分类管理列表页 / 排序页仍为 5 列且观感与 v0.2.38 一致（零回归）
 
+---
+
+## 归档执行记录（2026-11-24）
+
+- 使用者明确「可以归档」，本 change 于本日收口。
+- delta 已按 change 顺序折叠进 `openspec/specs/`，共 9 条；
+  目录整体移入 `archive/2026-11-24-refine-category-management-pages/`。
+- 归档校验（无重复 Requirement 标题 / 每条 ≥1 Scenario / 含 RFC2119 /
+  MODIFIED 整块替换 / specs 反映现行行为）已执行，结果见 `归档报告.md`。
+- 此前各批留 `[ ]` 的「归档校验」项统一勾核（1 处）。
+- 归档时发现并修正的规格腐烂 R1–R5，详见归档报告「合并修订清单」。

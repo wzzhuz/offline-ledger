@@ -801,43 +801,48 @@ MUST NOT 有外键、MUST NOT 产生任何复式分录或余额联动。
 
 ### Requirement: 账户类型可改与自定义排序
 
+
 系统 SHALL 允许修正账户类型（资产 ↔ 信用负债）并重算余额；
 SHALL 允许无流水账户物理删除、有流水账户 MUST 改为归档；
-SHALL 提供已归档账户查看与恢复入口；
-账户排序展示 SHALL 按 `AccountType` 分组，**第 20 批修订**：SHALL 与分类一级 /
-模板共用 `sh.calvin.reorderable:reorderable:3.1.0`（`ReorderableItem` +
-`longPressDraggableHandle` + `rememberKeyedReorder` 适配层），资产页容器 SHALL 为
-`LazyColumn`；库 SHALL 负责拖动中让位补间与边缘按距离变速滚动，
-MUST NOT 出现「上下拖动同时滚屏导致拖拽被释放」，也 MUST NOT 再自研
-「拖拽期间禁用父滚动 / 实测行高阈值」。松手 SHALL 经 `commitAccountOrderAll`
-一次性写入 `sortOrder`；上移 / 下移 SHALL 保留在「⋯」菜单内作为无障碍兜底，
-MUST NOT 作为主入口；顺序 SHALL 同步到记一笔的常用账户平铺。
-所有新增写操作 MUST 包在同一个数据库事务内并在末尾重算余额。
-资产页账户行 SHALL 与明细页同为纯行（16dp 内边距 + 56dp 行高 + `ListDivider`），
-MUST NOT 用 `Card` 底色 / 阴影或 1dp 间距表达边界；
-行内详情 / 对账 / 编辑 / 归档 / 删除等可点操作 SHALL 用 `bodyMedium`
-且触摸区 MUST ≥40dp，MUST NOT 用 `labelSmall` 裸 `Text` 表达可点击项。
+SHALL 提供已归档账户查看与恢复入口。
+**第 60 批：排序 SHALL 拆为两套互不干涉的顺序**：
 
-**理由**：使用者反馈「资产页账号列表因为底色看起来视觉效果没有明细页大」
-「副标题是需要可以点击的，现在感觉字体偏小」「资产页排序还是上移、下移」；
-第 16 批按标题整块 MODIFIED，避免 specs 同时存在「上移 / 下移排序」与
-「统一拖拽排序」两条相反要求。
+- `sortOrder` SHALL 只作用于资产页**同 `AccountType` 分组内**排序，
+  SHALL 与分类一级 / 模板共用 `sh.calvin.reorderable:reorderable:3.1.0`
+  （`ReorderableItem` + `longPressDraggableHandle` + `rememberKeyedReorder`），
+  资产页容器 SHALL 为 `LazyColumn`；松手 SHALL 经 `commitAccountOrderAll`
+  一次性写入；上移 / 下移 SHALL 保留在「⋯」菜单内作无障碍兜底。
+  MUST NOT 改动 `moveAccount` 的分组内交换语义。
+- `quickOrder` SHALL 作用于**全部账户、不分类型**的「记一笔优先」顺序，
+  SHALL 由独立「全部账户排序」页维护，该页 SHALL 用同一套 reorderable 库、
+  SHALL 提供「保存 / 放弃」，`draftOrder` MUST 与已落库 `quickOrder` 完全分离：
+  放弃 MUST 零写库，保存 SHALL 经 `commitQuickOrderAll` 一次性写入。
+  记一笔常用候选 SHALL 按 `quickOrder` 取前 4，SHALL 允许跨类型混排把常用置顶。
+- 两套顺序 MUST NOT 互相写入；独立排序页 MUST NOT 改动 `sortOrder`。
+- `AccountEntity` SHALL 新增 `quickOrder` 列，Room SHALL 升 `version 6`。
+  **使用者明确「现在都是测试数据，不需要考虑升级迁移」**：
+  `Migrations.ALL` SHALL 保持 `emptyArray()`，MUST NOT 注册迁移常量，
+  `MigrationContractTest` 的 ALL 断言 SHALL 零改动，
+  `SeedData` 的 accounts INSERT 列清单 SHALL 补齐两字段以保证全新库可建。
+  测试期 SHALL 卸载重装、装前导出，MUST NOT 用 `fallbackToDestructiveMigration`。
 
-#### Scenario: 类型选错后修正
-- **GIVEN** 一个被误建为「资产」的信用卡账户
-- **WHEN** 编辑中改为「信用负债」并保存
-- **THEN** 账户出现在信用负债分组，余额重算后数值一致
+**基线「顺序 SHALL 同步到记一笔的常用账户平铺」由此作废**：
+正是这一句让分组内排序污染记一笔，是使用者第 5 条反馈的根因。
 
-#### Scenario: 有流水账户禁止删除
-- **GIVEN** 某账户已关联流水
-- **WHEN** 用户点「删除」
-- **THEN** 系统拒绝并提示改用归档，历史流水保持完整
+#### Scenario: 分组内排序不污染记一笔
 
-#### Scenario: 组内拖拽实时让位
-- **GIVEN** 「资产账户」组内有 6 个账户
-- **WHEN** 长按第 1 个账户手柄向下拖过第 2 个
-- **THEN** 拖动过程中其余账户立即让位，负债组顺序不变
-- **AND** 松手后重进资产页顺序保持
+- **GIVEN** 资产页「资产账户」分组内有 A、B 两个账户
+- **WHEN** 把 B 拖到 A 前面并松手
+- **THEN** `sortOrder` 改变、资产页分组内顺序变化
+- **AND** `quickOrder` 零变化，记一笔常用候选前 4 与拖动前完全一致
+
+#### Scenario: 独立页保存与放弃
+
+- **GIVEN** 打开「全部账户排序」页，把某个信用负债账户拖到首位
+- **WHEN** 点「放弃」后重进
+- **THEN** 顺序与进入前一致、`quickOrder` 零写库
+- **WHEN** 改点「保存」后打开记一笔
+- **THEN** 该账户出现在常用候选前 4，且资产页分组内顺序不变
 
 ---
 
@@ -978,12 +983,59 @@ MUST NOT 拼接进备注，且 MUST 在导入结果中明示未迁移。
 预置分类 SHALL 来自随包 JSON 而非 Kotlin 常量；`AppDatabase.version` SHALL 为 5（第 51 批核实，旧文写 3 为文档债）。`SeedCallback.onCreate` 只对**全新库**生效，更换预制清单 MUST 全新安装，MUST NOT 声称覆盖安装或导入旧备份后能生效。
 
 ### Requirement: 快捷账户模板替代预制账户行
-首次启动 SHALL 为零账户；资产页新增账户对话框 SHALL 提供只读快捷模板，按资产组与信用负债组展示，点选后自动填名称与类型，并可填卡号后四位。花呗 / 白条 / 美团月付 / 抖音月付 MUST 归信用负债组，MUST NOT 与支付宝余额、微信零钱并列。
 
-#### Scenario: 三击建卡
-- **WHEN** 使用者点「招行储蓄卡」模板并输入 1234 后保存
-- **THEN** 创建 `LIABILITY` 之外的资产账户，显示名带 `(1234)`，`cardLast4` 落库
+
+首次启动 SHALL 为零账户；新增账户页 SHALL 提供只读快捷模板，
+由 `AccountTemplateSheet` 底部 sheet 承载，按 `group` 分为
+「支付余额 / 银行储蓄卡 / 银行信用卡 / 网络信用」四组，
+**资产组与信用负债组 MUST NOT 混在同一组**。
+模板清单 SHALL 覆盖六大行、邮储 / 交行、主要股份行与南京银行等城商行，
+共 21 家银行，每家 SHALL 各有储蓄卡与信用卡一条，
+连同支付余额与网络信用合计 48 条。
+模板 `label` / `name` SHALL 用银行**正规全称**（如「工商银行」），
+MUST NOT 再用「工行储蓄卡」这类把卡种拼进名称的写法；
+卡种 SHALL 由 `cardKind`（`DEBIT` / `CREDIT` / null）表达，
+UI SHALL 以**12dp 小角标单字**（「储」/「信」）贴在账户图标右下角，
+MUST NOT 用文字后缀挤占名称宽度。
+花呗 / 白条 / 美团月付 / 抖音月付 SHALL 归「网络信用」组，
+MUST NOT 与支付宝余额、微信零钱并列。
+sheet SHALL 为 2 列等宽图标格、末行不足 2 个补 `weight(1f)` 空占位，
+4~5 字名 SHALL 单行完整可见。
+点选模板 SHALL 只回填账户名称、账户类型与 `cardKind`，
+SHALL 立即关闭 sheet，MUST NOT 写库、MUST NOT 清空已填卡号后四位；
+sheet 底部 SHALL 保留「自定义名称」入口。
+主表单 SHALL 保留「卡号后四位（可选）」输入，`needsLast4` 模板仍 SHALL 可落库。
+模板 `iconKey` SHALL 映射到**随包本地**品牌图形
+（27 个键位 / 26 个 PNG，逐项授权登记见 `privacy-security`），
+MUST NOT 引入在线图标库 / PNG 下载 / 字母索引，
+MUST NOT 复制其它 App 的视觉资产。
+
+#### Scenario: 三击建卡不再冗余拼接
+
+- **WHEN** 使用者选「招商银行」储蓄卡模板、输入 1234 后保存
+- **THEN** `name` 为纯名「招商银行」、`cardLast4 = "1234"`、`cardKind = "DEBIT"` 落库
+- **AND** 展示名为「招商银行 (1234)」且**只出现一次**后缀
 - **AND** 不产生任何预制账户行
+
+#### Scenario: 同名银行的储蓄卡与信用卡可区分
+
+- **GIVEN** 已存在「工商银行」储蓄卡账户
+- **WHEN** 再从「银行信用卡」组选「工商银行」信用卡模板并保存
+- **THEN** 两个账户 `name` 同为正规全称，但 `cardKind` 分别为 `DEBIT` / `CREDIT`
+- **AND** 列表与记一笔 chip 上各有一个不占名称宽度的小标志
+
+#### Scenario: 四组不混排
+
+- **GIVEN** 打开模板 sheet
+- **WHEN** 查看分组
+- **THEN** 支付余额 / 银行储蓄卡 / 银行信用卡 / 网络信用四组各自独立
+- **AND** 花呗 / 京东白条 / 美团月付 / 抖音月付均在网络信用组
+
+**理由**：Q5A 扩清单 + Q6A 正规命名 + Q3A 卡号单一真相源，三项合并整块
+替换基线原文，MUST NOT 追加 ADDED 让「显示名带 `(1234)`」与
+「`name` 不冗余拼接」两条相反要求并存。
+
+---
 
 ### Requirement: 商户别名归一一期
 `counterparty_aliases(pattern → shortName)` SHALL 在 CSV / Firefly III 导入落库前把商户全称归一成手工简称；`records.counterparty` MUST 保持自由文本，MUST NOT 引入外键或对方管理页。无命中时 MUST 原样返回。
@@ -995,3 +1047,104 @@ MUST NOT 拼接进备注，且 MUST 在导入结果中明示未迁移。
 #### Scenario: 未知商户不动
 - **WHEN** 交易对方无匹配别名
 - **THEN** 落库文本与账单原文逐字一致
+
+---
+
+### Requirement: 账户卡号后四位可编辑且名称不冗余拼接
+
+`cardLast4` SHALL 是卡号后四位的**单一真相源**，`name` SHALL 只存纯账户名，
+MUST NOT 再把 ` (1122)` 拼进 `name` 落库。
+新增与编辑账户 SHALL 都提供「卡号后四位（可选）」输入（4 位数字过滤），
+编辑 SHALL 经 `vm.editAccount` → `repository.updateAccountMeta` → DAO `UPDATE`
+写回 `cardLast4`，MUST NOT 出现「编辑改不了卡号」。
+全站展示 SHALL 统一由 `accountLabel(name, last4)` **唯一实现**产出
+`name + cardLast4`（`accountBaseLabel(account)` 只是它的 Entity 重载），
+**第 61 批**覆盖资产页账户行、记一笔快捷候选、记一笔全账户选择弹层、
+「当前：」文案、独立全部账户排序页；
+**第 62 批全量排查**后再覆盖筛选面板账户选项、明细筛选 chip、
+统计页账户排行（及其下钻 chip）、明细列表副行、流水详情页、
+账户详情标题、删除确认弹窗、默认账户设置、对账 / 核对标题、回收站行。
+DAO 投影（`RecordRow` / `ReviewRow`）SHALL 只把 `name` 与 `cardLast4`
+原样带出，组合 MUST 在 UI 侧调用 `accountLabel()`，
+**MUST NOT 在 SQL 里再拼一遍字符串**（两处逻辑会漂移）。
+MUST NOT 各自内联拼一遍。
+对旧库中 `name` 已含 ` (xxxx)` 且 `cardLast4` 相同的账户，
+展示 SHALL 去重，MUST NOT 出现「中行储蓄卡(1122)(1122)」；
+旧 `name` SHALL 不被数据迁移改写（零数据迁移）。
+编辑页初始化 SHALL 经 `stripLegacyCardSuffix()` 剥掉历史后缀再填入
+名称输入框，MUST NOT 因一次编辑把后缀重新写回 `name`。
+
+#### Scenario: 编辑改卡号
+
+- **GIVEN** 一个 `name = "中国银行"`、`cardLast4 = "1122"` 的账户
+- **WHEN** 编辑把卡号改为 3344 并保存
+- **THEN** `name` 仍是「中国银行」、`cardLast4 = "3344"`
+- **AND** 列表与记一笔显示「中国银行 (3344)」，只出现一次后缀
+
+#### Scenario: 旧库双后缀被治愈
+
+- **GIVEN** 旧库账户 `name = "中行储蓄卡 (1122)"`、`cardLast4 = "1122"`
+- **WHEN** 卸载重装并恢复旧备份后打开资产页（测试数据、不考虑迁移）
+- **THEN** 只显示一次「(1122)」，MUST NOT 重复
+- **AND** 记一笔候选与全账户选择弹层同样只显示一次
+
+---
+
+---
+
+### Requirement: 删除账户必须有可达的二次确认
+
+资产页删除账户 SHALL 弹出二次确认 `AlertDialog`，
+SHALL 显示账户名、当前余额与「有流水的账户不能删除，只能归档」提示，
+SHALL 有红色警示文案，确认按钮 SHALL 为红色「确认删除」，
+SHALL 有「取消」按钮。取消 MUST NOT 删除。
+确认弹窗的触发 SHALL 与 `DropdownMenu` 的 dismiss **解耦**
+（`pendingDelete + LaunchedEffect(menu)`），
+MUST NOT 因 Popup 与新窗口同帧竞争而「点了删除没弹窗」。
+`vm.deleteAccount` 的「有流水只能归档」事务语义 SHALL 零改动。
+
+#### Scenario: 点删除一定弹确认
+
+- **GIVEN** 资产页某账户行
+- **WHEN** 点「⋮」→「删除」
+- **THEN** 一定出现二次确认弹窗，含账户名 / 余额 / 红字警示 /「确认删除」/「取消」
+- **AND** 点「取消」后账户仍在、零写库
+
+---
+
+---
+
+### Requirement: CSV 与 Firefly 导入按账户名与卡号后四位复合匹配
+
+**第 63 批**：账户表 SHALL 继续允许同名，唯一键仍是自增 `id`；
+CSV 与 Firefly 导入 MUST NOT 再用 `firstOrNull { it.name == ... }`
+静默命中同名第一张卡。
+CSV 导出 SHALL 在 `account` 列写 `accountLabel(name, cardLast4)` 展示名，
+并 SHALL 新增可选 `cardLast4` 列写卡号后四位；
+导入 SHALL 经 `parseAccountCell` 解析出 `(纯名, 后四位?)`，
+再经 `resolveAccount` 按复合键匹配：
+唯一命中 SHALL 用该 `id` 落流水；零命中 SHALL 明确报「账户不存在」；
+**多命中 SHALL 报歧义并列出候选展示名，MUST NOT 静默取第一条**。
+老 CSV / 第三方账单缺 `cardLast4` 列时 SHALL 回退纯名匹配且仍遵守上述唯一性要求。
+旧库 `name` 已含 ` (xxxx)` 后缀的账户 SHALL 经
+`stripAccountCardSuffix` 还原纯名后参与匹配。
+Firefly 映射 SHALL 携带 `targetCardLast4`，源名同名多条时 SHALL
+不自动映射、由使用者在显示展示名的下拉里明确选择。
+**加密备份 `BackupAccount.name` 与 Room `accounts.name` SHALL 仍是纯名**，
+`CsvRow.duplicateKey()` 契约 SHALL 不变。
+组合逻辑 SHALL 只有 `core/accountLabel` 一份实现，
+MUST NOT 在 SQL / Codec / Repository 里再拼一遍字符串。
+
+#### Scenario: 同名两卡往返各自归位
+
+- **GIVEN** 两张 `name = "工商银行"`、`cardLast4` 为 1122 / 3344 的账户各有流水
+- **WHEN** 导出 CSV 再重建
+- **THEN** 两笔流水分别回到原 `id` 账户，MUST NOT 归到同一张卡
+- **AND** 加密备份的账户名仍是纯名「工商银行」
+
+#### Scenario: 老文件歧义不静默错配
+
+- **GIVEN** 库里两张同名「工商银行」、一份无 `cardLast4` 列且账户列为纯名的老 CSV
+- **WHEN** 导入
+- **THEN** 报「账户不唯一，请指定 cardLast4」并整批回滚
+- **AND** 不产生任何流水写入

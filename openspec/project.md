@@ -924,3 +924,29 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   坚果云落盘 job logs 403 无法确认。
 - 三个 change 仍未归档，归档需使用者明确说「可以归档」。
 
+## 第 66 批（2026-11-24）：三个 change 归档
+
+- 使用者明确「可以归档」。归档 3 个本系列已完成 change：
+  `refine-category-management-pages` / `refine-asset-account-pages` /
+  `refine-account-order-and-templates`，目录移入
+  `openspec/changes/archive/2026-11-24-<name>/`，delta 原文逐字节保留。
+- **折叠 delta 到主 spec**：250 → **269 条 Requirement**（+19 ADDED，
+  7 次 MODIFIED 整块替换），Scenario 525。归档不是只搬目录。
+- 归档时发现并修正 5 处规格腐烂（R1 连续 MODIFIED 补回丢失约束、
+  R2 小计→净资产、R3 「松手落库」加范围限定、
+  R4 旧标题暂不更名以保护进行中 change 锚点、R5 清理 delta 痕迹）；
+  详见 `归档报告.md` 与活文档 §7.48。
+- **校验 PASS**：269 条标题唯一、19 条 ADDED 全部落地、
+  本批 26 条每条 ≥1 Scenario + RFC2119；基线历史遗留 1 条无 Scenario
+  （「预置数据来源与数据库版本」）如实登记、不擅自补。
+- 另 5 个进行中 change **未动**（均有未完成项，不在本次授权范围）：
+  `detail-filter-and-transfer-edit`、`detail-scope-and-record-page`、
+  `ff3-description-field`、`record-category-picker-and-root-select`、
+  `restructure-preset-categories`。其中 `record-category-picker-and-root-select`
+  仍以「分类全量选择器采用分组 chips 且不用下拉框」旧标题作 ADDED 锚点，
+  这是 R4 暂不更名的直接原因。
+- **零回归 / 零交付物变化**：本批只动 openspec 文档，零代码、零资源、
+  零表结构、零新增依赖、零 `INTERNET` 权限变化，**不出新包**，
+  v0.2.46 仍是最新安装包；tag `v0.2.46` / Release 附件 / digest 全部不变。
+- §8 第 45–65 批全部真机未验项整体继承，归档不消除任何 `[ ]`。
+

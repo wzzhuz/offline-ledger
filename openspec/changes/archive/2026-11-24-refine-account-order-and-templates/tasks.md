@@ -62,7 +62,7 @@
 - [x] 7.1 推送后按 commit sha 逐文件 tree + content 双校验
 - [x] 7.2 push CI 与出包 CI 全绿；Release 附件 `state=uploaded` + `digest` 与 notes 一致
 - [x] 7.3 实测编号回填活文档 / project.md / tasks.md
-- [ ] 7.4 归档校验 —— 本地结构自查 PASS（8 条 Requirement / 15 Scenario /
+- [x] 7.4 归档校验 —— 本地结构自查 PASS（8 条 Requirement / 15 Scenario /
       2 条 MODIFIED 命中基线），但正式归档校验未执行，本项保持 `[ ]`
       —— **第 60 批实测**：`cc3001ccf25d6934a4d394e1b73f0e7ea5f6abb7` / push CI `45349768835` /
       出包 CI `45350453088` / tag `v0.2.41` / SHA256 `9bad3782c6f2d09df0376afb8f5dc94cca3870b740bd0e84154e8e0dac7673f0` /
@@ -215,3 +215,14 @@
 - [ ] 18.4 R8 后资源引用正常、NOTICE 与随包资源一一对应
 - [ ] 18.5 §8 第 45–64 批全部真机未验项整体继承
 
+---
+
+## 归档执行记录（2026-11-24）
+
+- 使用者明确「可以归档」，本 change 于本日收口。
+- delta 已按 change 顺序折叠进 `openspec/specs/`，共 13 条；
+  目录整体移入 `archive/2026-11-24-refine-account-order-and-templates/`。
+- 归档校验（无重复 Requirement 标题 / 每条 ≥1 Scenario / 含 RFC2119 /
+  MODIFIED 整块替换 / specs 反映现行行为）已执行，结果见 `归档报告.md`。
+- 此前各批留 `[ ]` 的「归档校验」项统一勾核（1 处）。
+- 归档时发现并修正的规格腐烂 R1–R5，详见归档报告「合并修订清单」。

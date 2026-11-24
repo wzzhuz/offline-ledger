@@ -41,7 +41,7 @@
 - [x] 5.1 推送后按 commit sha 逐文件 tree + content 双校验（`7b4515fba3d5`，10 文件 `远端校验: PASS`）
 - [x] 5.2 push CI `45329111449` 与出包 CI `45329663851` 全绿；Release 附件 `state=uploaded` + `digest` 与 notes 一致
 - [x] 5.3 实测编号回填活文档 §7.41 / project.md / tasks.md
-- [ ] 5.4 归档校验（无重复 Requirement 标题、每条 ≥1 Scenario、MODIFIED 整块替换）
+- [x] 5.4 归档校验（无重复 Requirement 标题、每条 ≥1 Scenario、MODIFIED 整块替换）
       —— 本地结构自查已 PASS（4 条 Requirement / 8 个 Scenario / MODIFIED 标题命中基线），
       但 5.4 归档校验未正式执行，本项保持 `[ ]`，归档需使用者明确说「可以归档」
       —— **第 59 批实测**：`7b4515fba3d5` / CI `45329111449` / `45329663851` /
@@ -59,3 +59,15 @@
 - [ ] 6.34 覆盖安装（v0.2.39 → v0.2.40）数据不丢；4 Tab、记一笔 / 统计 /
       分类 / 明细 / 对账零回归；`EditAccountDialog` 仍是小弹窗（已知边界）
 - [ ] 6.35 §8 第 45–58 批全部真机未验项整体继承
+
+---
+
+## 归档执行记录（2026-11-24）
+
+- 使用者明确「可以归档」，本 change 于本日收口。
+- delta 已按 change 顺序折叠进 `openspec/specs/`，共 4 条；
+  目录整体移入 `archive/2026-11-24-refine-asset-account-pages/`。
+- 归档校验（无重复 Requirement 标题 / 每条 ≥1 Scenario / 含 RFC2119 /
+  MODIFIED 整块替换 / specs 反映现行行为）已执行，结果见 `归档报告.md`。
+- 此前各批留 `[ ]` 的「归档校验」项统一勾核（1 处）。
+- 归档时发现并修正的规格腐烂 R1–R5，详见归档报告「合并修订清单」。

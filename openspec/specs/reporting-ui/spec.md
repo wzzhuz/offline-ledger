@@ -922,8 +922,6 @@ AlertDialog 遮挡图表；横屏放大页的完整数值表 MUST 保留；跨�
 - **THEN** 该点出现一条竖向虚线，图下显示该月收入 / 支出 / 净结余，可清除选中
 
 
-## ADDED Requirements
-
 ### Requirement: 分类管理与回收站为独立页面
 分类管理与回收站 SHALL 为全屏独立页面（Navigation 路由），MUST NOT 是内容受限的小弹窗；
 设置页 SHALL 重排为不超过 5 组的分组列表，点组进入各自二级页；
@@ -1249,9 +1247,35 @@ MUST NOT 用 `Card` 底色 / 阴影或 1dp 间距表达边界（第 16 批修正
 与 `ui/components/ReorderListSupport.kt`；资产页 SHALL 改 `LazyColumn`，
 MUST NOT 用 `Column + verticalScroll`。库 SHALL 负责拖动中 `animateItem()` 让位补间、
 长按窗口、pointer pass、边缘按距离变速自动滚动；业务层 SHALL 只在 `onMove` 改内存
-顺序、松手一次性落库。分类二级 chips 为网格，SHALL 保留自研 `WrapRow` 自适应布局
-与操作弹层上移 / 下移；上移 / 下移同时 SHALL 保留为无障碍兜底，
-MUST NOT 作为主入口。`WrapRow` SHALL 默认左对齐、占满父宽、行尾留白在右。
+顺序、松手一次性落库。
+**范围限定（归档补注）**：本段约束**列表页就地拖动**；独立排序页
+SHALL 按「独立分类排序页与临时顺序」与「全部账户排序独立页」执行
+`draftOrder` 临时顺序 + 保存 / 放弃，MUST NOT 在该页松手即落库。
+
+**本批整块修订（替换第 16 / 20 批 `WrapRow` 自适应 chips 表述）**：
+分类列表页二级 SHALL 为固定列数等宽图标网格（默认 5 列、窄屏 4 列，
+`Row + weight(1f)`、固定格高、均匀 gutter、长名单行 ellipsis，
+末格为「添加子类」），MUST NOT 再用按文本宽度收缩的自适应 chips，
+MUST NOT 把「（停用）」拼进名称，MUST NOT 让短名行的剩余留白碎在行尾，
+MUST NOT 用 `LazyVerticalGrid` 嵌进 `LazyColumn.item {}` 造成同方向嵌套滚动，
+MUST NOT 用 `@OptIn(ExperimentalLayoutApi)` 的 `FlowRow`（T12），
+MUST NOT 用 `Card` 底色 / 阴影表达格子边界。
+分类排序页 SHALL 为两态互斥：一级态二级区折叠不渲染、
+二级态白卡内为 5 列等宽图标网格，两级 SHALL 各用一套
+`rememberReorderableLazyGridState`（库原生支持 Grid）、互不干涉；
+列表页仍 SHALL 为等宽图标网格。排序页一级 / 二级 SHALL **整格直接拖动**，
+MUST NOT 再画三道横线小手柄；二级态长按任意一级格 SHALL 自动收起二级区，
+MUST NOT 设「收起，排一级」按钮；末行不足 5 列 SHALL 补 `weight(1f)` 空占位保持列对齐；
+二级区 SHALL 以明显不同的浅色底标注，MUST NOT 再用小字重复拖动提示。
+上移 / 下移 SHALL 在列表页二级操作弹层保留为无障碍兜底
+（TalkBack 无法执行拖动手势），MUST NOT 作为主入口。
+分类管理新增的排序页与分类选择页 SHALL 仍为全屏独立页（Navigation 路由），
+MUST NOT 做成内容受限的小弹窗，MUST NOT 新增第 5 个底部 Tab；
+排序页的 `draftOrder` 临时顺序 SHALL 与已落库 `sortOrder` 分离，
+放弃 MUST NOT 写库，保存 SHALL 一次性全量写回且 MUST NOT 丢项。
+分类列表页一级 SHALL 保持竖排 `LazyColumn`，MUST NOT 把 15 个一级横排塞进一屏；
+底部胶囊入口与大 `+` FAB SHALL 在列表滚动时保持可见。
+
 依赖取舍按 2026-11-17 使用者澄清：判断标准是「是否默认回传厂商且用户不可控」，
 不是「依赖数量」；仍 MUST 记录坐标、许可证与传递依赖审计，仍 MUST NOT 引入
 广告 / 埋点 / 崩溃上报 / 远程配置 SDK。零表结构变更。
@@ -1259,8 +1283,8 @@ MUST NOT 作为主入口。`WrapRow` SHALL 默认左对齐、占满父宽、行�
 #### Scenario: 分类增多不推走入口
 
 - **GIVEN** 系统有 10 个一级分类与 20 个二级分类
-- **WHEN** 打开分类管理页
-- **THEN** 新增入口仍在 TopBar 固定可见
+- **WHEN** 打开分类管理页并滚动列表
+- **THEN** 新增入口与大 `+` FAB 仍固定可见
 
 #### Scenario: 六页分割线一致
 
@@ -1268,8 +1292,26 @@ MUST NOT 作为主入口。`WrapRow` SHALL 默认左对齐、占满父宽、行�
 - **WHEN** 查看相邻两行之间
 - **THEN** 均为同一颜色 / 厚度 / 16dp 内缩的细线，无卡片贴片或无线留白
 
+#### Scenario: 等宽网格不留碎白
+- **GIVEN** 「居住」下有 11 个二级，含 7 字长名与停用项
+- **WHEN** 展开「居住」
+- **THEN** 二级呈 5 列等宽格、gutter 均匀、行尾无大片碎留白
+- **AND** 长名单行省略、停用为小角标、末格为「添加子类」
+
+#### Scenario: 排序页放弃不落库
+- **GIVEN** 在排序页拖动过一级与二级但未保存
+- **WHEN** 按返回并选择放弃
+- **THEN** 库内 `sortOrder` 零变化，重进列表页顺序不变
+- **AND** 底部 4 Tab 结构与进入前一致
+
 **理由**：第 15 批把「统一网格」从「左边界 + 行高量级」补完第三半——
 行与行之间的边界也要单一来源；第 12 批只同步了容器骨架，没同步分割写法。
+使用者 2026-11-23 用真机对照图纠正了「等宽图标网格必然留白大」的外推：
+留白来自 `WrapRow` 按文本收缩 + 行尾余量 + 停用后缀拼进名称，
+不是固定列数网格本身。本批按标题整块替换，
+MUST NOT 只追加 ADDED 而让两条相反要求并存（活文档 §5）。
+
+---
 
 ### Requirement: 洞察总结卡给出可解释的均值与笔数
 
@@ -1460,26 +1502,40 @@ MUST NOT 清空已设筛选条件、MUST NOT 重建 Pager 把列表弹回顶部�
 
 ### Requirement: 分类全量选择器采用分组 chips 且不用下拉框
 
+> **标题与归档注记**：标题沿用基线原名，**现行语义以本节正文为准**（分组导航 + 4 列等宽网格，
+> 已非 chips）。delta 原文要求归档时更名为「…采用分组导航与等宽网格」，但核查发现
+> 进行中 change `record-category-picker-and-root-select` 仍以旧标题作 ADDED 锚点，
+> 此时更名会让其旧语义被当新 Requirement 追加、造成更严重的规格腐烂，
+> 故**暂不更名**；待 5 个进行中 change 收口后统一更名并修正该条的 ADDED→MODIFIED。
+
 `FormRow("分类", onRowClick = …)` SHALL 与「账户 ›」同构，整行可点开全量选择器，
-label 自动带 `›`。全量选择器 SHALL 采用**按一级分组的 WrapRow chips + 搜索框**，
+label 自动带 `›`。全量选择器 SHALL 复用只读共享组件 `CategorySelectSheet`，
+采用**顶部搜索 + 左侧一级分组导航 + 右侧 4 列等宽彩色图标网格**
+（导航 80dp / 间距 4dp / 双层 padding 各 8dp，见第 5 轮密度优化），
 MUST NOT 使用 Spinner / ExposedDropdown / DropdownMenu，
-MUST NOT 退化成需要长距离滚动的竖排 TextButton 列表。
-组标题本身 SHALL 可点 = 按一级直记；组内 chip SHALL 可点 = 选该二级。
+MUST NOT 退化为按一级分组的 `WrapRow` chips 或需要长距离滚动的竖排 TextButton 列表。
+组标题本身 SHALL 可点 = 按一级直记；组内格子 SHALL 可点 = 选该二级。
 点任一项 SHALL **立即选中并关闭弹层**，MUST NOT 加二次确认。
+
 未归档的停用一级 / 二级 SHALL 全部可见可搜并带「停用」角标；归档项 SHALL 不进选择器。
-搜索命中 SHALL 跨组平铺，二级 label MUST 经 `CategoryDisplay` 风格拼成「一级 / 二级」，
-避免不同父级下的同名项混淆。
+搜索命中 SHALL 跨组平铺。网格与搜索结果的二级**显示名 SHALL 用裸名**（左侧已选一级，
+MUST NOT 拼成「餐饮 / …」被单行省略）；选中后回填的筛选 `displayName`
+MUST 仍经 `CategoryDisplay` 拼成「一级 / 二级」，MUST NOT 改第 29 批共用口径。
+选择器 SHALL 显示彩色 `CategoryIconCatalog` 图标，
+但记一笔快捷栏、明细列表行、账户详情与统计页 SHALL 仍是中性圆 + 首字。
+明细筛选面板 `PickRow("分类")` SHALL 复用同一组件，
+固定高度弹层 MUST NOT 撑高筛选面板本体。
 
 #### Scenario: 从更多分类里选停用项
 
 - **GIVEN** 新记一笔，默认快捷栏只有 7 个启用一级
-- **WHEN** 点「分类 ›」→ 搜索「话费」→ 点「居住 / 话费（停用）」
+- **WHEN** 点「分类 ›」→ 搜索「话费」→ 点裸名「话费」（带停用小角标）网格格
 - **THEN** 弹层关闭，`categoryId = 4007`、`rootCategoryId = 4`
 - **AND** 快捷栏临时显示「居住」一级与选中的「话费」chip，保存成功
 
 #### Scenario: 按一级直记
 
-- **GIVEN** 全量选择器展开「学习娱乐（停用）」组
+- **GIVEN** 全量选择器展开「学习娱乐（停用）」分组
 - **WHEN** 点组标题
 - **THEN** 立即按该一级选中并关闭弹层，MUST NOT 弹出「就按xx记」或确认框
 
@@ -1488,9 +1544,291 @@ MUST NOT 退化成需要长距离滚动的竖排 TextButton 列表。
 - **GIVEN** 中小屏手机打开记一笔
 - **WHEN** 不滚动、不点「分类 ›」
 - **THEN** 金额、分类快捷栏、账户、日期、对方、描述、保存按钮仍一屏可见
-- **AND** 页面上没有「更多分类」chip
+- **AND** 页面上没有「更多分类」chip、没有常驻的名称输入框
 
-**理由**：使用者第 52 批反馈「停用项应像选择更多账户一样可达，但不要用下拉框、要尽可能方便选择」，
-并指出「就按xx记」是多余的二次确认、点一级本就该直接按一级记。账户侧第 8/44 批已验证
-「整行 › 入口 + 全量弹层 + 当前选中项兜底」这套交互，分类侧沿用同一模式但把长列表换成分组 chips，
-兼顾 106 行分类的可达性与「记账不能变慢」铁律 3。
+#### Scenario: 两处选择器复用同一组件
+
+- **GIVEN** 记一笔与明细筛选面板
+- **WHEN** 分别打开分类全量选择器
+- **THEN** 两处均为同一分组导航 + 4 列等宽彩色图标网格版式、4 字名完整可见
+- **AND** 均无名称输入框、无「继续添加」/ 保存按钮、无写库路径
+
+**理由**：第 52 批定下的「分组 chips + 搜索」是为了兼顾 106 行分类的可达性与
+「记账不能变慢」铁律 3；使用者 2026-11-23 装机体验 v0.2.36 后明确指出
+一羽「添加二级分类」页的左导航 + 等宽网格版式「应该比原来的分类选择好」，
+并对新选择器图标明确放行彩色 Tabler（A）。本批保留「整行 › 入口 + 立即选中 +
+停用项可达 + 首屏不被挤占」这些已验证结论，只替换弹层内部版式；
+按标题整块 MODIFIED，MUST NOT 追加 ADDED 让两条相反要求并存（活文档 §5）。
+
+---
+
+### Requirement: 资产页蓝底身份区与分组头部强化
+
+资产页 SHALL 以蓝底顶部身份区承载页面标题、账户数与「含已归档」/「+ 新增」入口，
+并在身份区内**按 `currencyCode` 逐组**展示资产 / 负债 / 净资产。
+MUST NOT 把 `state.groups` 汇总成一个跨币种的单一「净资产」总数，
+MUST NOT 因借鉴一羽记账截图而违反基线「资产页按币种分组且移除单一净资产总数」。
+账户分组标题 SHALL 用蓝色小竖条 + 分组名 + 账户数表达，
+MUST NOT 显示按 `AccountType` 聚合的跨币种金额。
+账户行 SHALL 保持纯行 + `ListDivider()`，MUST NOT 用 `Card` 底色 / 阴影 / 1dp 间距
+表达行边界（基线「管理类页面入口固定且列表与编辑分离」）。
+
+#### Scenario: 两币种账户不出现虚假总数
+
+- **GIVEN** 一个 HKD 账户与一个 CNY 账户
+- **WHEN** 打开资产页查看蓝底身份区
+- **THEN** 出现 HKD / CNY 两组各自的资产 / 负债 / 净资产
+- **AND** 页面不出现把两币种加在一起的单一净资产数额
+
+#### Scenario: 分组标题不混算
+
+- **GIVEN** 「资产账户」分组下有 CNY 与 HKD 两个账户
+- **WHEN** 查看分组标题
+- **THEN** 显示蓝色小竖条、分组名与「2 个账户」，MUST NOT 显示跨币种分组金额
+
+---
+
+---
+
+> **归档注记**：本条「小计」标签按第 60 批 Q1A 统一为「净资产」，见「资产页逐币种净资产标签与负债红字负数」。
+
+### Requirement: 资产账户行紧凑化且操作收进菜单
+
+资产账户行 SHALL 以「图标圆 + 名称 / 卡号后四位 / 币种 + 金额右对齐 + 副文案」
+组织，图标 SHALL 复用 `CategoryIcon` 的中性圆 + 中文首字，
+MUST NOT 引入彩色图标、银行 logo 资源或在线图标下载（联网能力 SHALL 先经 `project.md` 显式授权，本批不申请）。
+信用负债账户 SHALL 在余额为零时显示「无欠款」、有额度时沿用
+`Reconciliation.availableCredit` 显示「可用 X」；
+「不计入净资产」与「已归档」标注 SHALL 保留。
+行操作 SHALL 收进单个「⋮」紧凑菜单，菜单 SHALL 含
+详情 / 对账 / 编辑 / 归档或恢复 / 删除 / 上移 / 下移七项，
+MUST NOT 再用多个文字按钮横排撑高行。
+`longPressDraggableHandle` SHALL 挂在整格行根上，
+MUST NOT 再显示三道横线「≡」小手柄；`rememberKeyedReorder`、
+`commitAccountOrderAll` 与上移 / 下移 TalkBack 兜底 SHALL 零回归。
+
+#### Scenario: 行紧凑且七项可达
+
+- **GIVEN** 一个含卡号后四位的储蓄卡账户与一个信用负债账户
+- **WHEN** 查看账户行并点「⋮」
+- **THEN** 行显示图标圆、名称带 `(last4)`、金额右对齐；信用负债显示「无欠款」或「可用 X」
+- **AND** 菜单七项逐项可达，长按整格仍可拖动排序
+- **AND** 页面不出现「≡」手柄与横排文字操作按钮
+
+---
+
+---
+
+### Requirement: 新建账户页采用近全屏紧凑表单
+
+新增账户 SHALL 由 `AlertDialog` 小弹窗改为近全屏 `Dialog`
+（`usePlatformDefaultWidth = false`）：蓝底 TopBar「← 添加资产账户 / 保存」、
+分组小竖条、「图标 + 账户名称」紧凑白底小卡、底部大保存按钮。
+表单字段与顺序 SHALL 保持不变（账户名称 / 卡号后四位 / 账户类型 /
+期初余额 / 信用额度），`onConfirm` 签名与 `AssetsViewModel.addAccount` SHALL 零改动；
+输入框 SHALL 用 `placeholder` 与 `heightIn(min)`，MUST NOT 用浮动 `label` 或固定 `height`。
+MUST NOT 新增备注、隐藏账户、默认使用或账户图标等业务字段，
+MUST NOT 升 `AppDatabase` 版本；`EditAccountDialog` 本批 SHALL 零改动。
+MUST NOT 新增 Navigation 路由或改变 4 Tab 结构。
+
+#### Scenario: 新建页字段零回归
+
+- **GIVEN** 打开「+ 新增」
+- **WHEN** 点「招行储蓄卡」模板、输入卡号后四位 1234 与期初余额 1000 并保存
+- **THEN** 创建非 `LIABILITY` 的资产账户，名称带 `(1234)`，期初余额重算生效
+- **AND** 页面仍是 4 Tab、无新路由、数据库版本不变
+
+#### Scenario: 键盘弹起仍可保存
+
+- **GIVEN** 中小屏手机在新建页聚焦「期初余额」
+- **WHEN** 软键盘弹起
+- **THEN** 底部大保存按钮仍可见可点，表单区可滚动，MUST NOT 被键盘完全遮挡
+
+---
+
+### Requirement: 资产页逐币种净资产标签与负债红字负数
+
+资产页蓝底身份区 SHALL 按 `currencyCode` **逐组**渲染，
+每组 SHALL 把原「X 小计」标为「**净资产**」，
+SHALL 以常规色显示「资产 +X」、以**红色系高对比浅红**（蓝底取 `0xFFFFCDD2`，与 `ExpenseRed` 同系）显示「负债 -X」
+（负号为纯展示文本，`CurrencyGroup.liabilitiesCents` 仍为绝对值、
+MUST NOT 参与任何运算）。
+账户行负余额 SHALL 继续以红字负数显示，MUST NOT 被本批改掉。
+MUST NOT 把各组 `netCents` 汇总成一个跨币种的单一「净资产」总数，
+MUST NOT 违反基线「资产页按币种分组且移除单一净资产总数」。
+
+#### Scenario: 两币种各自净资产
+
+- **GIVEN** 一个 HKD 账户与一个 CNY 账户，其中 CNY 有一笔信用负债欠款
+- **WHEN** 打开资产页查看蓝底区
+- **THEN** 出现 HKD / CNY 两组各自的「净资产」，CNY 组负债为红字负号
+- **AND** 页面不出现把两币种加在一起的单一净资产数额
+
+#### Scenario: 账户行负数语义不变
+
+- **GIVEN** 信用卡账户 `balanceCents = -50000`
+- **WHEN** 查看账户行
+- **THEN** 金额显示为负数且为红字，MUST NOT 变成绝对值或白字
+
+---
+
+---
+
+### Requirement: 记一笔常用候选按独立优先级排序且带卡种标志
+
+记一笔常用账户候选 SHALL 按 `quickOrder` 排序取前 4，
+SHALL 允许**不同 `AccountType` 的账户一起参与排序**（常用置顶），
+MUST NOT 再取 `sortOrder` 的全局前 4。
+`AccountQuickCandidates.select` 的「常用前 N + 当前选中项必可见」
+语义 SHALL 保持不变，只更换传入列表的数据源顺序。
+每个候选 chip SHALL 以**10dp** 小角标单字（「储」/「信」）
+显示 `cardKind`，MUST NOT 用文字后缀挤占账户名宽度。
+**第 61 批**：候选与全账户选择弹层的 label SHALL 经 `accountBaseLabel()`
+带上 `cardLast4`（如「工商银行 (1122)」），MUST NOT 只显示纯名；
+「当前：」文案与弹层搜索键 SHALL 同样基于该组合名，
+输入后四位 MUST 能搜到对应卡。多张同名银行卡 SHALL 可区分。
+`AccountQuickCandidates.select` / `labelOf` / `promoteById`
+的纯 JVM 契约 SHALL 零改动，只更换映射进 `AccountQuickItem.name` 的字符串。
+记一笔分类快捷栏图标 SHALL 由 40/34dp 收紧为 **28/24dp**，
+分类管理页 5 列网格仍 SHALL 用 40dp（两处密度各按各的场景）。
+资产页分组内排序 MUST NOT 改变候选顺序。
+
+#### Scenario: 跨类型常用置顶
+
+- **GIVEN** 使用者在「全部账户排序」页把一张信用卡与一张储蓄卡排到前两位
+- **WHEN** 打开记一笔
+- **THEN** 常用候选前两项就是这两张卡，且带各自的小标志
+- **AND** 资产页分组内顺序未因此改变
+
+#### Scenario: 多张同名银行卡可区分
+
+- **GIVEN** 两张账户名同为「工商银行」、卡号后四位分别为 1122 与 3344
+- **WHEN** 打开记一笔查看快捷候选 /「当前：」/ 全账户选择弹层
+- **THEN** 分别显示「工商银行 (1122)」与「工商银行 (3344)」
+- **AND** 在弹层搜索框输入「3344」能搜到第二张卡
+- **AND** 两张卡各带不占名称宽度的 10dp 卡种小标志
+
+#### Scenario: 记一笔图标密度收紧
+
+- **GIVEN** 打开记一笔
+- **WHEN** 查看分类快捷栏与账户候选 chip
+- **THEN** 一级分类圆图标为 28dp（选中）/ 24dp（未选中），账户小标志为 10dp
+- **AND** 分类管理页网格仍为 40dp，MUST NOT 被连带改小
+
+---
+
+---
+
+### Requirement: 全部账户排序独立页
+
+系统 SHALL 提供独立「全部账户排序」页（NavHost 路由 `account-quick-sort`），
+入口 SHALL 在资产页蓝底身份区固定可见，MUST NOT 新增第 5 个底部 Tab。
+该页 SHALL 以单一 `LazyColumn` 展示**全部未归档账户、不分类型**，
+SHALL 复用 `sh.calvin.reorderable:reorderable:3.1.0` 与
+`rememberKeyedReorder`，MUST NOT 自写 `Modifier.pointerInput`；
+SHALL 提供「保存 / 放弃」与一行「这里排的是记一笔里常用账户的先后顺序」提示。
+`draftOrder` SHALL 与已落库 `quickOrder` 完全分离：
+放弃 MUST 零写库，保存 SHALL 一次性写入并在完成后刷新。
+每行 SHALL 显示小标志、账户名与类型标签，
+上移 / 下移 SHALL 以 `semantics.customActions` 保留作 TalkBack 兜底。
+
+#### Scenario: 保存与放弃
+
+- **GIVEN** 在独立页拖动若干账户后
+- **WHEN** 点「放弃」
+- **THEN** 页面关闭、`quickOrder` 零变化、记一笔候选不变
+- **WHEN** 重新进入拖动后点「保存」
+- **THEN** `quickOrder` 一次性写回、记一笔候选按新顺序、`sortOrder` 零变化
+
+#### Scenario: 导航格数不变
+
+- **GIVEN** 从资产页进入全部账户排序页
+- **WHEN** 查看底部导航
+- **THEN** 仍是明细 / 资产 / 统计 / 设置 4 个 Tab
+
+
+---
+
+---
+
+### Requirement: 账户卡种可编辑且导入账户有保守默认值
+
+**第 61 批**：新增账户页与编辑账户页 SHALL 都提供
+「不设 / 储蓄卡 / 信用卡」三态 `cardKind` 选择，
+MUST NOT 只有从模板建卡时才带 `DEBIT` / `CREDIT`。
+编辑页 SHALL 把**当前选中的** `cardKind` 传给 `onConfirm` 落库，
+MUST NOT 写死传 `account.cardKind` 原值
+（第 60 批正是这样导致「编辑选不了卡种」）。
+导入 / CSV 等**非模板路径**建账户时 SHALL 一并写入 `quickOrder`
+与 `cardKind`：保守默认 `LIABILITY → "CREDIT"`，
+`ASSET` SHALL 不猜（微信零钱 / 支付宝 / 储蓄卡混在一起，猜了会误标），
+使用者 SHALL 可在编辑页随时改。
+账户图标位与记一笔 chip SHALL 以 `cardKind` 决定是否有「储 / 信」标志，
+未设置时 SHALL 不显示标志、MUST NOT 崩。
+
+#### Scenario: 导入账户补设卡种
+
+- **GIVEN** 通过导入建了一个 `ASSET` 账户、一个 `LIABILITY` 账户
+- **WHEN** 打开记一笔查看候选
+- **THEN** 信用负债账户带「信」标志，资产账户不带标志（不误标为「储」）
+- **WHEN** 编辑资产账户把卡种改成「储蓄卡」并保存
+- **THEN** `cardKind = "DEBIT"` 落库，列表与记一笔出现「储」标志
+
+#### Scenario: 编辑保存写回选中值
+
+- **GIVEN** 账户 `cardKind = null`
+- **WHEN** 编辑页选「信用卡」并保存
+- **THEN** `cardKind = "CREDIT"`，MUST NOT 仍为 null
+
+---
+
+---
+
+### Requirement: 筛选与统计的账户显示名与全站一致
+
+**第 62 批**：筛选面板的账户选项 SHALL 经 `accountBaseLabel()` 带上
+`cardLast4`，MUST NOT 只显示纯名；picker 的搜索按 label 匹配，
+输入后四位 SHALL 能定位到对应卡。
+明细页的筛选 chip（含 `accountDisplayName` 为空时的 fallback）SHALL
+同样带卡号。
+统计页「账户」维度排行 SHALL 经 `accountBaseLabel()` 带卡号；
+`InsightData.RankItem.name` 同时是下钻 `filterByAccount()` 的只读展示名，
+故从统计跳明细后的筛选 chip SHALL 自动带上卡号，
+MUST NOT 在 UI 侧再拼一次。
+明细列表副行与流水详情页 SHALL 经 `accountLabel()` 组合 DAO 投影的
+`fromAccountName` / `fromAccountLast4`（转入同理），
+MUST NOT 直接显示 `row.fromAccountName` 纯名。
+资产页删除确认弹窗、账户详情标题、默认账户设置、对账 / 核对标题、
+回收站流水行 SHALL 全部带卡号。
+**第 63 批修订 CSV 往返语义**：CSV 导出的 `account` 列 SHALL 写
+**展示名**（`accountLabel(name, cardLast4)`，如「工商银行 (1122)」），
+并 SHALL 新增可选 `cardLast4` 列写机器匹配键；
+导入 SHALL 按 `(name, cardLast4)` 复合匹配，
+MUST NOT 再用 `firstOrNull { it.name == ... }` 静默命中同名第一张卡。
+**加密备份 / `BackupAccount.name` 仍是纯名且 MUST NOT 被改动**（走 `id` 还原）。
+第 62 批「CSV 导出 MUST NOT 改」的结论已被本批显式推翻，
+理由是它只防住了「导入当新账户」，却没防住「同名两卡静默归错」。
+
+#### Scenario: 筛选与统计不再撞名
+
+- **GIVEN** 两张账户名同为「工商银行」、卡号后四位 1122 / 3344
+- **WHEN** 打开筛选面板账户选项、统计页账户排行、从排行跳明细后的筛选 chip
+- **THEN** 三处都分别显示「工商银行 (1122)」与「工商银行 (3344)」
+- **AND** 筛选 picker 搜索框输入「3344」能定位到第二张卡
+
+#### Scenario: 导出带卡号且复合匹配回原账户
+
+- **GIVEN** 两张 `name = "工商银行"`、`cardLast4` 为 1122 / 3344 的账户各有流水
+- **WHEN** 导出 CSV
+- **THEN** `account` 列分别是「工商银行 (1122)」「工商银行 (3344)」，
+  `cardLast4` 列分别是 `1122` / `3344`
+- **WHEN** 用该文件重建 / 导入
+- **THEN** 两笔流水分别回到 id 对应的原账户，MUST NOT 归到同一张卡
+- **AND** 加密备份的 `BackupAccount.name` 仍是纯名「工商银行」
+
+#### Scenario: 老 CSV 同名歧义显式报错
+
+- **GIVEN** 库里有两张同名「工商银行」、卡号 1122 / 3344
+- **WHEN** 导入一份没有 `cardLast4` 列、账户列写纯名「工商银行」的老 CSV
+- **THEN** 导入 MUST 报「账户不唯一，请指定 cardLast4」并整批回滚
+- **AND** MUST NOT 静默把流水挂到第一张卡
