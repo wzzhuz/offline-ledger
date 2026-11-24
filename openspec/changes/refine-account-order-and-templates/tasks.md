@@ -121,8 +121,8 @@
 - [x] 11.8 新增 `AccountDisplayLabelTest` 5 用例
 - [x] 11.9 `ledger-transactions` 修订卡号条文；`reporting-ui` 新增 1 条 Requirement
 - [x] 11.10 版本号 `0.2.43`；活文档 §7.44 / project.md 同步
-- [ ] 11.11 推送逐 blob 双校验 / 双 CI 全绿 / Release digest 一致
-- [ ] 11.12 实测回填；归档校验仍保持 `[ ]`
+- [x] 11.11 推送逐 blob 双校验 / 双 CI 全绿 / Release digest 一致
+- [x] 11.12 实测回填；归档校验仍保持 `[ ]`
 
 ## 12. 第 62 批真机待验（`[ ]`）
 

@@ -791,3 +791,14 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   48 条模板、4 Tab、Q7 资源仍待补、零新增依赖、`INTERNET` 权限。
 - CI 全绿不替代真机，§8 第 62 批新增 6 项待验，既有项整体继承。
 
+### 第 62 批实测（v0.2.43 出包）
+
+- 20 文件 `3496c6cd02f8658dbf62a1811bea53e889d52e1b`（parent `81e103162a26`），逐 blob 校验 PASS；
+  push CI `45366356321` 全绿（含 Room 投影加列与新增 5 条单测）。
+- 出包 CI `45367272605` completed success；tag `v0.2.43` → `3496c6cd02f8`；
+  Release 附件 `offline-ledger-v0.2.43-release-3496c6cd.apk`（3202807 B，
+  SHA256 `9030571bce9549bb13699e82344e4ae05566558437e84e7cf3c22204ef4b4ebc`），`state=uploaded` + `digest` 与 notes 一致。
+- artifacts 3 个、无染绿、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
+- 触发与轮询拆分 + 超时只查状态生效，无重复发布。
+- Q7 资源未进包；归档仍需使用者明确说「可以归档」。
+
