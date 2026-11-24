@@ -1,6 +1,8 @@
 package com.zwz.offlineledger.ui.detail
 
 import com.zwz.offlineledger.data.display.CategoryDisplay
+import com.zwz.offlineledger.ui.assets.accountBaseLabel
+import com.zwz.offlineledger.ui.assets.accountLabel
 import com.zwz.offlineledger.data.paging.DetailGranularity
 
 import androidx.activity.compose.BackHandler
@@ -185,7 +187,8 @@ fun DetailScreen(
                             (filter.counterpartyDisplayName ?: filter.counterpartyQuery)
                     filter.accountId != null ->
                         "账户：" + (filter.accountDisplayName ?: (
-                            accounts.firstOrNull { it.id == filter.accountId }?.name ?: "账户"
+                            accounts.firstOrNull { it.id == filter.accountId }
+                                ?.let { accountBaseLabel(it) } ?: "账户"
                         ))
                     else -> null
                 }
@@ -554,7 +557,9 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
         val z = java.time.Instant.ofEpochMilli(row.timestamp).atZone(LedgerClock.zoneId)
         "%02d:%02d".format(z.hour, z.minute)
     }
-    val account = row.fromAccountName ?: row.toAccountName ?: "-"
+    // 第 62 批：明细列表副行也带卡号。DAO 投影只给原值，组合走 accountLabel。
+    val account = accountLabel(row.fromAccountName, row.fromAccountLast4)
+        ?: accountLabel(row.toAccountName, row.toAccountLast4) ?: "-"
     val category = row.categoryName ?: "转账"
     val party = row.counterparty.takeIf { it.isNotBlank() }
     val desc = row.description.takeIf { it.isNotBlank() }

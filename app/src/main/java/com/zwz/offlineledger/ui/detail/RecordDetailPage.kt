@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.core.time.LedgerClock
+import com.zwz.offlineledger.ui.assets.accountLabel
 import com.zwz.offlineledger.data.local.dao.RecordRow
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.components.amountColor
@@ -97,8 +98,15 @@ fun RecordDetailPage(
                 })
                 DetailLine("时间", timeText)
                 DetailLine("分类", row.categoryName?.takeIf { it.isNotBlank() } ?: "转账（无分类）")
-                DetailLine("支出 / 转出账户", row.fromAccountName ?: "-")
-                DetailLine("收入 / 转入账户", row.toAccountName ?: "-")
+                // 第 62 批：流水详情页与列表、筛选、统计用同一套账户显示名。
+                DetailLine(
+                    "支出 / 转出账户",
+                    accountLabel(row.fromAccountName, row.fromAccountLast4) ?: "-"
+                )
+                DetailLine(
+                    "收入 / 转入账户",
+                    accountLabel(row.toAccountName, row.toAccountLast4) ?: "-"
+                )
                 DetailLine("交易对方", row.counterparty.takeIf { it.isNotBlank() } ?: "—")
                 DetailLine("描述", row.description.takeIf { it.isNotBlank() } ?: "—")
                 DetailLine("备注", row.note.takeIf { it.isNotBlank() } ?: "—")

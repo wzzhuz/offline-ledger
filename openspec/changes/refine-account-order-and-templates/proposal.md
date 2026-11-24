@@ -167,3 +167,59 @@ CI 全绿仍不替代观感 / 手势 / 键盘验收，但**不替代的不再是
 3. 分类快捷栏 28/24dp、账户小标志 10dp，分类管理网格仍 40dp；
 4. 导入的 LIABILITY 带「信」、ASSET 不带标志且可在编辑页改成「储」并落库；
 5. 编辑页改卡种保存后重进仍保持；记一笔 / 资产页 / 独立排序页零回归。
+
+---
+
+## 第 62 批（v0.2.43）：账户显示名全量排查
+
+**触发**：v0.2.42 真机反馈「筛选里面账户不显示卡号，统计页也是，
+**全量排查一下**」。
+
+### 排查结论：第 61 批只覆盖了 6 处，还有 13 处漏点
+
+| # | 漏点 | 修法 |
+|---|---|---|
+| 1 | `FilterSheet` 账户选项 `it.name` | `accountBaseLabel(it)`；picker 搜索键同步变成组合名 |
+| 2 | `DetailScreen` 明细筛选 chip 的 fallback `?.name` | `?.let { accountBaseLabel(it) }` |
+| 3 | `StatsViewModel` 账户排行 `accNames[it.id]?.name` | `accountBaseLabel`；**连带修好统计下钻 chip**（`RankItem.name` 就是 `filterByAccount` 的只读展示名） |
+| 4 | `DetailScreen` 明细列表副行 `row.fromAccountName` | `accountLabel(name, last4)` |
+| 5 | `RecordDetailPage` 流水详情页两行账户名 | 同上 |
+| 6 | `RecordDao` 两条 SQL 投影只给纯名 | `RecordRow` / `ReviewRow` 加 `fromAccountLast4` / `toAccountLast4`，SQL 补两列；**组合仍在 UI 侧** |
+| 7 | `AssetsScreen` 删除确认弹窗 | `accountBaseLabel(account)` |
+| 8 | `AssetsScreen` 账户详情标题 | `?.let { accountBaseLabel(it) }` |
+| 9 | `SettingsPages` 默认账户（选中态 + 下拉项） | `accountBaseLabel` |
+| 10 | `ReconcileViewModel` 对账标题 | `accountBaseLabel(acc)` |
+| 11 | `ReviewViewModel` 核对标题 | `acc?.let { accountBaseLabel(it) }` |
+| 12 | `TrashViewModel` 回收站转出 / 转入 | `accountBaseLabel` |
+| 13 | 组合逻辑分散：`accountBaseLabel` 自己内联了一份 | 抽出 `accountLabel(name, last4)` 唯一实现，`accountBaseLabel` 只是 Entity 重载 |
+
+### 刻意不改（全量清单的另一半，附理由）
+
+| 位置 | 不改的理由 |
+|---|---|
+| `RecordDao` CSV 导出 `COALESCE(a.name,'') AS accountName` / `LedgerRepository` 导出映射 | **数据往返语义**：导出账户名拼上卡号，导入会把同一张卡当成新账户 |
+| `BackupAccount` / `CsvRow` / `FireflyCsvCodec` | 备份与 CSV DTO，同上 |
+| `AccountIconBox(name = account.name)`（资产页 / 独立排序页） | 只取首字画中性圆图标，传纯名才正确 |
+| `AddAccountDialog` 模板回填 `name = t.name`、编辑框 `stripLegacyCardSuffix` | 输入框 / 写入值，不是展示名 |
+| `FireflyImportScreen` 源账户列表、`SettingsViewModel` 按 name 匹配映射 | 导入映射的**数据键**，且源账户无 `cardLast4` |
+| `CategoryDisplay` / `CategoryEntity.name` / 预算项 / 占比图例 / `DonutChart` | 分类维度，不是账户 |
+| `StatsViewModel` 交易对方排行 / 分类排行、`StatsScreen` 分类维度 | 同上 |
+
+### 关键约束
+
+- `accountLabel()` 是**唯一组合实现**；DAO 只带原值，MUST NOT 在 SQL 里拼字符串。
+- 旧库 `name` 已含 ` (1122)` 时 MUST NOT 追加第二次（新增 5 条纯 JVM 单测锁住）。
+- `RecordRow` / `ReviewRow` 各只被**一条** SQL 返回（`pagedFiltered` / `reviewRows`），
+  加列不会造成别的查询缺列；`accountRecords` 不 JOIN accounts，无需改。
+- `Migrations.ALL` 空、`MigrationContractTest` 零改动、两套排序、
+  48 条模板、4 Tab、Q7 资源仍待补、零新增依赖、`INTERNET` 权限。
+
+### 验收（由我拟）
+
+1. 筛选面板账户选项、picker 搜索、明细筛选 chip 均带后四位且可区分同名卡；
+2. 统计页账户排行与下钻 chip 带后四位；明细列表副行 / 流水详情页同样；
+3. 账户详情标题、删除确认、默认账户、对账 / 核对、回收站全部带后四位；
+4. CSV 导出与备份的账户列仍是纯名，导入往返不产生新账户；
+5. 旧库含后缀账户在所有页面都只显示一次；
+6. 各页零回归、CI 全绿（但 CI 不替代真机）。
+

@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -506,7 +507,8 @@ fun PreferenceSettingsScreen(onBack: () -> Unit) {
         Box {
             TextButton(onClick = { accountExpanded = true }) {
                 Text(
-                    chosenAccount?.name ?: "未设置",
+                    // 第 62 批：默认账户显示名带卡号。
+                    chosenAccount?.let { accountBaseLabel(it) } ?: "未设置",
                     style = MaterialTheme.typography.titleMedium
                 )
             }
@@ -520,7 +522,7 @@ fun PreferenceSettingsScreen(onBack: () -> Unit) {
                 )
                 state.accounts.filter { !it.isArchived }.forEach { a ->
                     DropdownMenuItem(
-                        text = { Text(a.name + " · " + a.currencyCode) },
+                        text = { Text(accountBaseLabel(a) + " · " + a.currencyCode) },
                         onClick = { vm.setDefaultAccountId(a.id); accountExpanded = false }
                     )
                 }

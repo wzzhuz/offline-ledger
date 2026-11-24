@@ -129,3 +129,39 @@ MUST NOT 写死传 `account.cardKind` 原值
 - **GIVEN** 账户 `cardKind = null`
 - **WHEN** 编辑页选「信用卡」并保存
 - **THEN** `cardKind = "CREDIT"`，MUST NOT 仍为 null
+
+---
+
+### Requirement: 筛选与统计的账户显示名与全站一致
+
+**第 62 批**：筛选面板的账户选项 SHALL 经 `accountBaseLabel()` 带上
+`cardLast4`，MUST NOT 只显示纯名；picker 的搜索按 label 匹配，
+输入后四位 SHALL 能定位到对应卡。
+明细页的筛选 chip（含 `accountDisplayName` 为空时的 fallback）SHALL
+同样带卡号。
+统计页「账户」维度排行 SHALL 经 `accountBaseLabel()` 带卡号；
+`InsightData.RankItem.name` 同时是下钻 `filterByAccount()` 的只读展示名，
+故从统计跳明细后的筛选 chip SHALL 自动带上卡号，
+MUST NOT 在 UI 侧再拼一次。
+明细列表副行与流水详情页 SHALL 经 `accountLabel()` 组合 DAO 投影的
+`fromAccountName` / `fromAccountLast4`（转入同理），
+MUST NOT 直接显示 `row.fromAccountName` 纯名。
+资产页删除确认弹窗、账户详情标题、默认账户设置、对账 / 核对标题、
+回收站流水行 SHALL 全部带卡号。
+**CSV 导出 / 备份 DTO 的 `accountName` MUST NOT 被改动** ——
+那是数据往返语义，拼上卡号会让导入把同一张卡当成新账户。
+
+#### Scenario: 筛选与统计不再撞名
+
+- **GIVEN** 两张账户名同为「工商银行」、卡号后四位 1122 / 3344
+- **WHEN** 打开筛选面板账户选项、统计页账户排行、从排行跳明细后的筛选 chip
+- **THEN** 三处都分别显示「工商银行 (1122)」与「工商银行 (3344)」
+- **AND** 筛选 picker 搜索框输入「3344」能定位到第二张卡
+
+#### Scenario: 导出数据语义不变
+
+- **GIVEN** 一张 `name = "工商银行"`、`cardLast4 = "1122"` 的账户有流水
+- **WHEN** 导出 CSV / 备份
+- **THEN** 账户列仍是纯名「工商银行」，MUST NOT 含 `(1122)`
+- **AND** 重新导入仍能匹配到同一账户，不产生新账户行
+

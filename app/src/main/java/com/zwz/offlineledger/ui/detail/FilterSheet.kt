@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.ui.detail
 
 import com.zwz.offlineledger.data.display.CategoryDisplay
+import com.zwz.offlineledger.ui.assets.accountBaseLabel
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -126,8 +127,11 @@ fun FilterSheet(
         "全部" to null, "支出" to "EXPENSE",
         "收入" to "INCOME", "转账" to "TRANSFER"
     )
+    // 第 62 批：筛选面板账户选项带卡号后四位；picker 的搜索按 label 匹配，
+    // 于是输入「3344」也能定位到那张卡，多张同名银行卡不再分不出来。
     val accountOptions = listOf<Pair<String, String?>>("全部账户" to null) +
-        accounts.filter { !it.isArchived }.map { it.name to it.id.toString() }
+        accounts.filter { !it.isArchived }
+            .map { accountBaseLabel(it) to it.id.toString() }
     // 第 52 批：停用语义收窄为「默认快捷栏不展示、全量选择器仍可选」。
     // 筛选面板本身就是带搜索的全量选择器，去掉 enabled 过滤即可对齐，不新增入口；
     // 归档项仍不进选择器（归档 = 不再新选），停用项加角标便于分辨。

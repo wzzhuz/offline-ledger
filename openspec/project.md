@@ -771,3 +771,23 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **轮询超时只查状态、不重发触发**：新 run 仍只有 1 个，无重复发布。
 - Q7 资源未进包；归档仍需使用者明确说「可以归档」。
 
+## 第 62 批（v0.2.43）：账户显示名全量排查
+
+- **起因**：v0.2.42 真机反馈「筛选里面账户不显示卡号，统计页也是，全量排查一下」。
+  第 61 批虽抽了 `accountBaseLabel()`，但只接上 6 处，仍有 **13 处漏点**。
+- **唯一组合实现**：`accountLabel(name, last4)`，`accountBaseLabel(account)`
+  只是 Entity 重载；`RecordRow` / `ReviewRow` 加 `fromAccountLast4` /
+  `toAccountLast4`，两条 SQL 只补原值列，组合 MUST 在 UI 侧做，
+  MUST NOT 在 SQL 里再拼一遍字符串。
+- **覆盖 13 处**：筛选面板账户选项（picker 搜索键同步）、明细筛选 chip fallback、
+  **统计页账户排行（连带修好下钻 chip）**、明细列表副行、流水详情页两行、
+  删除确认弹窗、账户详情标题、默认账户设置、对账 / 核对标题、回收站转出 / 转入。
+- **刻意不改**：CSV 导出投影 / `CsvRow` / `BackupAccount` /
+  Firefly 源账户列表 / 导入按名匹配（**数据往返键，拼卡号会让导入当新账户**）、
+  模板回填与编辑框初始化、`AccountIconBox` 图标首字、所有分类维度。
+- 新增 `AccountDisplayLabelTest` 5 用例锁住旧库后缀去重；
+  change 四件套追加第 62 批（reporting-ui 新增 1 条、ledger-transactions 修订）。
+- **零回归**：`Migrations.ALL` 空 + `MigrationContractTest` 零改动、两套排序、
+  48 条模板、4 Tab、Q7 资源仍待补、零新增依赖、`INTERNET` 权限。
+- CI 全绿不替代真机，§8 第 62 批新增 6 项待验，既有项整体继承。
+

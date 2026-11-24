@@ -259,7 +259,8 @@ fun AssetsScreen(refreshTick: Int = 0, onOpenQuickSort: () -> Unit = {}) {
             title = { Text("删除账户") },
             text = {
                 Column {
-                    Text("账户：" + account.name, style = MaterialTheme.typography.bodyMedium)
+                    // 第 62 批：删除确认也要能看出删的是哪张卡。
+                    Text("账户：" + accountBaseLabel(account), style = MaterialTheme.typography.bodyMedium)
                     Text(
                         "当前余额：" + formatCents(account.balanceCents),
                         style = MaterialTheme.typography.bodyMedium
@@ -285,7 +286,9 @@ fun AssetsScreen(refreshTick: Int = 0, onOpenQuickSort: () -> Unit = {}) {
     detailId?.let { id ->
         AccountDetailDialog(
             accountId = id,
-            accountName = state.accounts.firstOrNull { it.id == id }?.name ?: "账户详情",
+            // 第 62 批：账户详情标题带卡号，多张同名卡不混淆。
+            accountName = state.accounts.firstOrNull { it.id == id }
+                ?.let { accountBaseLabel(it) } ?: "账户详情",
             onDismiss = { detailId = null },
             onChanged = { vm.reload() }
         )

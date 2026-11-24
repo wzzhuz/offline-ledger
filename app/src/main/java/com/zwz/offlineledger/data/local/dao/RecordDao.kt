@@ -44,7 +44,10 @@ data class RecordRow(
     val importSource: String = "",
     val sourceId: String = "",
     /** 第 43 批：列表主标题在有描述时用它；缺列时按空串兼容。 */
-    val description: String = ""
+    val description: String = "",
+    /** 第 62 批：DAO 只带出原值，组合一律交给 `accountLabel()`。 */
+    val fromAccountLast4: String? = null,
+    val toAccountLast4: String? = null
 )
 
 /** 账户详情专属流水行。 */
@@ -83,7 +86,10 @@ data class ReviewRow(
     val fromAccountName: String?,
     val toAccountName: String?,
     val categoryId: Long?,
-    val suspectFlags: Int
+    val suspectFlags: Int,
+    /** 第 62 批：同上，投影只带原值。 */
+    val fromAccountLast4: String? = null,
+    val toAccountLast4: String? = null
 )
 
 /** 日期头用的整月按日合计，最多 31 行，不随分页加载跳变。 */
@@ -195,7 +201,8 @@ interface RecordDao {
                COALESCE(r.sourceId, '') AS sourceId,
                COALESCE(r.description, '') AS description,
                c.name AS categoryName, c.colorHex AS categoryColorHex,
-               fa.name AS fromAccountName, ta.name AS toAccountName
+               fa.name AS fromAccountName, ta.name AS toAccountName,
+               fa.cardLast4 AS fromAccountLast4, ta.cardLast4 AS toAccountLast4
           FROM records r
           LEFT JOIN categories c ON r.categoryId = c.id
           LEFT JOIN accounts fa ON r.fromAccountId = fa.id
@@ -308,6 +315,7 @@ interface RecordDao {
                r.localDate AS localDate, r.timestamp AS timestamp, r.note AS note,
                c.name AS categoryName,
                fa.name AS fromAccountName, ta.name AS toAccountName,
+               fa.cardLast4 AS fromAccountLast4, ta.cardLast4 AS toAccountLast4,
                r.categoryId AS categoryId,
                  (CASE WHEN r.amountCents = 0 THEN 1 ELSE 0 END)
                + (CASE WHEN r.categoryId IS NULL AND r.type <> 'TRANSFER' THEN 2 ELSE 0 END)

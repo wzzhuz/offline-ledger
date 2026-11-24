@@ -8,6 +8,7 @@ import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
 import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 import com.zwz.offlineledger.data.repository.LedgerRepository
+import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import com.zwz.offlineledger.ui.components.formatCents
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,8 +74,9 @@ class TrashViewModel(
             root != null && leaf != null && root != leaf -> root + " / " + leaf
             else -> leaf ?: root ?: "转账"
         }
-        val from = fromAccountId?.let { accounts[it]?.name }
-        val to = toAccountId?.let { accounts[it]?.name }
+        // 第 62 批：回收站行的转出 / 转入账户同样带卡号。
+        val from = fromAccountId?.let { accounts[it]?.let { a -> accountBaseLabel(a) } }
+        val to = toAccountId?.let { accounts[it]?.let { a -> accountBaseLabel(a) } }
         val accountText = when {
             from != null && to != null -> from + " → " + to
             else -> from ?: to ?: "-"

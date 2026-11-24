@@ -256,3 +256,59 @@ MUST NOT 用「· 储蓄卡」这类文字后缀挤占。
   `cardKind = if (type == LIABILITY) "CREDIT" else null`。
 - 头部过时注释（「数据侧零改动 / version = 5 / v0.2.39 可覆盖安装」）同步更正，
   MUST NOT 留着和第 60/61 批事实矛盾。
+
+---
+
+## 第 62 批实现要点：组合逻辑下沉到投影层之外
+
+**问题**：第 61 批抽了 `accountBaseLabel()`，但只把 6 个页面接上；
+`account.name` 在 UI 层还有 13 处直接引用，DAO 投影更是从 SQL 直接取
+`fa.name`，完全绕过组合点。使用者一句「全量排查」正好点破：
+**只抽函数不等于全站统一，必须把每个消费点逐一过一遍**。
+
+### 三层结构（最终形态）
+
+```
+AccountEntity ──accountBaseLabel(account)──┐
+                                           ├─→ accountLabel(name, last4)  ← 唯一实现
+RecordRow / ReviewRow（DAO 只带原值）──────┘         ↑
+                                         UI 各消费点一律调它
+```
+
+- `accountLabel(name: String?, last4: String?): String?`：
+  空 last4 原样返回；旧 `name` 已以 ` (last4)` 结尾时不再追加；
+  `name` 为 null 时返回 null（供 `?:` 链使用）。
+- `accountBaseLabel(account)` = `accountLabel(account.name, account.cardLast4) ?: ""`。
+- `RecordRow` / `ReviewRow` 加 `fromAccountLast4` / `toAccountLast4`
+  （带默认值，无手工构造点，零破坏）；两条 SQL 各补两列。
+  **不在 SQL 里 `|| ' (' || cardLast4 || ')'`** —— 那样旧库去重逻辑要写第二遍，
+  且 SQL 与 Kotlin 两份必然漂移。
+
+### 一条改动连带修好几处
+
+`StatsViewModel` 账户排行的 `InsightData.RankItem.name` 不只是排行榜文字，
+它还是 `onOpenAccountInDetail(id, row.name, ...)` →
+`DetailViewModel.filterByAccount()` → `RecordFilter.accountDisplayName`
+→ 明细筛选 chip 的**唯一来源**。所以改这一行，统计排行 + 下钻 chip 同时修好，
+MUST NOT 再在 `StatsScreen` 或 `LedgerApp` 里拼一次。
+
+### 数据语义红线
+
+`RecordDao` 的 CSV 导出投影 `COALESCE(a.name,'') AS accountName`、
+`LedgerRepository` 的 `CsvRow(accountName = r.accountName)`、
+`BackupAccount.name` 一律**不动**。导出列是导入时的账户匹配键，
+拼上 `(1122)` 会让往返把同一张卡当新账户。这条与「显示名」必须分开，
+是本次全量排查最容易改错的地方。
+
+### 单测
+
+新增 `AccountDisplayLabelTest`（5 个用例，纯 JVM、不碰 Room Entity）：
+无 last4 原样、追加一次、旧库后缀不重复、旧库后缀与新 last4 不同时追加、
+null name 透传。锁住最容易漂移的分支。
+
+### 真机待验
+
+排行榜 `RankRowView` 与筛选 picker 行都是 `maxLines = 1`，
+组合名变长后可能截断；统计 / 筛选 / 明细三处观感与可区分度需真机看。
+CI 全绿不替代观感验收。
+

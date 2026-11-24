@@ -15,6 +15,7 @@ import com.zwz.offlineledger.engine.BudgetProgress
 import com.zwz.offlineledger.engine.ChartData
 import com.zwz.offlineledger.engine.ChartData.ChartSlice
 import com.zwz.offlineledger.data.display.CategoryDisplay
+import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import com.zwz.offlineledger.engine.InsightData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -330,8 +331,17 @@ class StatsViewModel(
             val cpItems = recordDao.insightTopCounterparties(from, to, cc, 5)
                 .map { InsightData.RankItem(it.name, it.totalCents, it.cnt) }
             val accNames = accountDao.all().associateBy { it.id }
+            // 第 62 批：统计页「账户」排行带卡号。RankItem.name 同时也是
+            // 下钻 filterByAccount 的只读展示名，所以这一处改动会连带修好
+            // 「从统计跳明细后的筛选 chip」，MUST NOT 在 UI 侧再拼一次。
             val accItems = recordDao.insightTopAccounts(from, to, cc, 5)
-                .map { InsightData.RankItem(accNames[it.id]?.name ?: ("账户 " + it.id), it.totalCents, it.cnt, it.id) }
+                .map { accRank ->
+                    val label = accNames[accRank.id]?.let { accountBaseLabel(it) }
+                        ?: ("账户 " + accRank.id)
+                    InsightData.RankItem(
+                        label, accRank.totalCents, accRank.cnt, accRank.id
+                    )
+                }
             val catItems = roots.map { InsightData.RankItem(it.name, it.cents, 0, it.id) }
             val units = when (s.mode) {
                 StatsMode.MONTH ->

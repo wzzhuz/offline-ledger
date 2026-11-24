@@ -8,6 +8,7 @@ import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.repository.LedgerRepository
 import com.zwz.offlineledger.engine.Reconciliation
+import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,7 +53,7 @@ class ReconcileViewModel(
             ).size
             _state.value = ReconcileState(
                 accountId = accountId,
-                accountName = acc.name,
+                accountName = accountBaseLabel(acc),
                 bookCents = acc.balanceCents,
                 anchorAfterCount = count,
                 loaded = true

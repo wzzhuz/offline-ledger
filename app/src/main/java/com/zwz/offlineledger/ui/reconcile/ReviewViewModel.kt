@@ -7,6 +7,7 @@ import com.zwz.offlineledger.data.local.dao.AccountDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.ReviewRow
 import com.zwz.offlineledger.engine.Reconciliation
+import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,7 +58,7 @@ class ReviewViewModel(
                 .toYuanString().trimEnd('0').trimEnd('.')
             _state.value = ReviewState(
                 accountId = accountId,
-                accountName = acc?.name ?: "账户",
+                accountName = acc?.let { accountBaseLabel(it) } ?: "账户",
                 anchorLabel = label,
                 lookupText = if (differenceCents > 0) diffYuan else "",
                 loaded = true

@@ -113,10 +113,17 @@ MUST NOT 再把 ` (1122)` 拼进 `name` 落库。
 新增与编辑账户 SHALL 都提供「卡号后四位（可选）」输入（4 位数字过滤），
 编辑 SHALL 经 `vm.editAccount` → `repository.updateAccountMeta` → DAO `UPDATE`
 写回 `cardLast4`，MUST NOT 出现「编辑改不了卡号」。
-全站展示 SHALL 统一由 `accountBaseLabel()` 这一个组合点产出
-`name + cardLast4`，**第 61 批**：资产页账户行、记一笔快捷候选、
-记一笔全账户选择弹层、「当前：」文案、独立全部账户排序页
-SHALL 全部复用它，MUST NOT 各自内联拼一遍。
+全站展示 SHALL 统一由 `accountLabel(name, last4)` **唯一实现**产出
+`name + cardLast4`（`accountBaseLabel(account)` 只是它的 Entity 重载），
+**第 61 批**覆盖资产页账户行、记一笔快捷候选、记一笔全账户选择弹层、
+「当前：」文案、独立全部账户排序页；
+**第 62 批全量排查**后再覆盖筛选面板账户选项、明细筛选 chip、
+统计页账户排行（及其下钻 chip）、明细列表副行、流水详情页、
+账户详情标题、删除确认弹窗、默认账户设置、对账 / 核对标题、回收站行。
+DAO 投影（`RecordRow` / `ReviewRow`）SHALL 只把 `name` 与 `cardLast4`
+原样带出，组合 MUST 在 UI 侧调用 `accountLabel()`，
+**MUST NOT 在 SQL 里再拼一遍字符串**（两处逻辑会漂移）。
+MUST NOT 各自内联拼一遍。
 对旧库中 `name` 已含 ` (xxxx)` 且 `cardLast4` 相同的账户，
 展示 SHALL 去重，MUST NOT 出现「中行储蓄卡(1122)(1122)」；
 旧 `name` SHALL 不被数据迁移改写（零数据迁移）。
