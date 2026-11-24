@@ -223,6 +223,6 @@
 - delta 已按 change 顺序折叠进 `openspec/specs/`，共 13 条；
   目录整体移入 `archive/2026-11-24-refine-account-order-and-templates/`。
 - 归档校验（无重复 Requirement 标题 / 每条 ≥1 Scenario / 含 RFC2119 /
-  MODIFIED 整块替换 / specs 反映现行行为）已执行，结果见 `归档报告.md`。
+  MODIFIED 整块替换 / specs 反映现行行为）已执行，结果见 `openspec/归档报告.md`。
 - 此前各批留 `[ ]` 的「归档校验」项统一勾核（1 处）。
 - 归档时发现并修正的规格腐烂 R1–R5，详见归档报告「合并修订清单」。

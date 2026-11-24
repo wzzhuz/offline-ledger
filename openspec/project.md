@@ -754,7 +754,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   `cardKind`（`LIABILITY → CREDIT`，`ASSET` 不猜，避免误标微信零钱 / 支付宝）。
 - change `refine-account-order-and-templates` 追加第 61 批：reporting-ui
   修订 1 条 + 新增 1 条 Requirement、ledger-transactions 修订卡号条文并加
-  Scenario、proposal / design / tasks 同步。三个 change 仍未归档。
+  Scenario、proposal / design / tasks 同步。三个 change 仍未归档（历史，第 66 批已归档）。
 - **零回归**：`AccountQuickCandidates` 契约、两套排序、`Migrations.ALL` 空、
   `MigrationContractTest` 零改动、48 条模板、4 Tab、Q7 资源仍待补、
   零新增依赖、`INTERNET` 权限全部不动。
@@ -885,7 +885,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   轮询只查状态，MUST NOT 合进同一个长调用。
 - artifacts 3 个、无染绿、无失败步骤、`mapping.txt` 留存；
   坚果云落盘 job logs 403 无法确认。
-- 三个 change 仍未归档，归档需使用者明确说「可以归档」。
+- 三个 change 仍未归档，归档需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 65 批（v0.2.46）：银行图标改用纯徽记（不带中文行名）
 
@@ -922,7 +922,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   完成，只注册 1 个 run，无重复 dispatch、无 cancel、无二次发布。
 - artifacts 3 个、无染绿、无失败步骤、`mapping.txt` 留存；
   坚果云落盘 job logs 403 无法确认。
-- 三个 change 仍未归档，归档需使用者明确说「可以归档」。
+- 三个 change 仍未归档，归档需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 66 批（2026-11-24）：三个 change 归档
 
@@ -935,7 +935,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 归档时发现并修正 5 处规格腐烂（R1 连续 MODIFIED 补回丢失约束、
   R2 小计→净资产、R3 「松手落库」加范围限定、
   R4 旧标题暂不更名以保护进行中 change 锚点、R5 清理 delta 痕迹）；
-  详见 `归档报告.md` 与活文档 §7.48。
+  详见 `openspec/归档报告.md` 与活文档 §7.48。
 - **校验 PASS**：269 条标题唯一、19 条 ADDED 全部落地、
   本批 26 条每条 ≥1 Scenario + RFC2119；基线历史遗留 1 条无 Scenario
   （「预置数据来源与数据库版本」）如实登记、不擅自补。
@@ -949,4 +949,25 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   零表结构、零新增依赖、零 `INTERNET` 权限变化，**不出新包**，
   v0.2.46 仍是最新安装包；tag `v0.2.46` / Release 附件 / digest 全部不变。
 - §8 第 45–65 批全部真机未验项整体继承，归档不消除任何 `[ ]`。
+
+### 第 66 批归档验收复核（报告补建）
+
+使用者「可以归档」后的归档动作已在 `71ba9357072d` 完成（parent
+`0c0e1ad7`），本段是**独立复核收尾**，不重复执行归档：
+
+- 复核 PASS：主 spec **269 条 Requirement / 525 Scenario**、重复标题 0、
+  26 条 delta 全部命中（19 ADDED + 7 MODIFIED 整块替换）、本批 26 条
+  每条 ≥1 Scenario + RFC2119。
+- 本地 ↔ 远端 `71ba9357072d` **564 个 blob 完全一致**；六静态检查全 PASS；
+  归档 CI `45396623048`「编译与校验」completed success。
+- **补建 `openspec/归档报告.md`**：归档 commit 在 7 处文档引用了
+  `归档报告.md` 但仓库中并无此文件（悬空引用）。报告已按复核数据写成，
+  7 处引用统一改为仓库根相对路径 `openspec/归档报告.md`。
+- 5 处「仍未归档」历史时点表述逐处标注「历史，第 66 批已归档」，
+  不留两份相反状态。
+- 遗留项如实登记：§8 真机未验 26 条 `[ ]` 整体继承；R4 旧标题待
+  5 个进行中 change 收口后统一更名；基线历史 1 条无 Scenario 且
+  `version SHALL 为 5` 已过时（实际 6），归档前即存在、不擅自改；
+  第 63 批两条诊断 comment、坚果云 403。
+- 零代码 / 零资源 / 零规格语义变化，**不出新包**，v0.2.46 仍是最新安装包。
 
