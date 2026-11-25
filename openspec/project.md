@@ -1152,3 +1152,19 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
   其余 6 个进行中 change 与 3 个已归档 change 未动。
 
+### 第 70 批实测（v0.2.50 出包）
+
+- 实现 `933f5fda0d63`（12 文件 / blob 585）→ 诊断 `864f5835` / `4ceace1a`
+  → 修复 `2d0301e77122`（2 文件，`build.yml` 逐字节恢复）。
+- push CI：首轮 `45557524260` failure（漏 `size` / `Offset` import）→
+  修复后 `45558262022` **success**；出包 CI `45558932688` success（28 步无染绿）。
+- tag `v0.2.50` → `2d0301e77122`；Release 附件
+  `offline-ledger-v0.2.50-release-2d0301e7.apk`
+  （3463448 B，SHA256 `4465783f01b712de8e232520276787528bbf869b1273b5cc5e0277c17ad58180`），`state=uploaded` + `digest` 与 notes 一致。
+- artifacts 3 个、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
+- **唯一缺陷**：新增自绘图标漏补两条 import，非设计问题；
+  两个诊断 comment 删除 404（PAT 权限不足），挂在中间 commit 上，如实登记。
+- 触发与轮询拆分生效，单次 dispatch、无重复发布。
+- 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
+  仍待使用者明确说「可以归档」。
+
