@@ -59,9 +59,11 @@ class ExtraAmountBalanceTest {
 
     @Test
     fun `05 优惠支出按实付扣款 原价不进余额`() {
+        // LedgerRecord 是纯 JVM 余额模型，只带 feeCents；优惠不参与余额，
+        // 因此这里没有 discountCents 参数（MUST NOT 给余额模型加无意义字段）。
         val expense = LedgerRecord(
             id = 3L, type = RecordType.EXPENSE, amountCents = 47_001L,
-            fromAccountId = 1L, toAccountId = null, discountCents = null
+            fromAccountId = 1L, toAccountId = null
         )
         val d = LedgerEngine.deltasFrom(listOf(expense))
         assertEquals(-47_001L, d[1L])

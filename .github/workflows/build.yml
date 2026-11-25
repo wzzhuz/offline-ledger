@@ -62,16 +62,7 @@ jobs:
       # assembleDebug 只编译主源码，不碰 src/test。
       # 必须单独跑一次 test，否则测试文件写错了也照样「编译通过」。
       - name: 运行单元测试
-        id: unit_test
-        run: |
-          set -o pipefail
-          gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/unit_test.log
-      - name: 临时诊断：回写单测日志到 commit comment
-        if: failure() && steps.unit_test.outcome == 'failure'
-        run: python3 scripts/_diag67.py
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_SHA: ${{ github.sha }}
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: 编译 Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon
