@@ -1000,3 +1000,21 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   累计优惠统计、SETTLEMENT 自动冲减、「不计预算」开关均留待后续决策。
 - 按「测试数据、不考虑升级迁移」：**先导出备份再卸载重装**。
 
+### 第 67 批实测（v0.2.47 出包）
+
+- 代码/资源/文档 `8aa71422`（30 文件，总 blob 577）→ 诊断 `f9dd486c`
+  → 修复 `46785976`（tag 指向它）；`build.yml` 原版逐字节恢复、
+  `scripts/_diag67.py` 删除、诊断 comment DELETE 204，**无残留**。
+- 首轮 CI `45524636857` failure：纯 JVM `LedgerRecord` 无 `discountCents`
+  （优惠不参与余额，模型只加 `feeCents` 正确）；日志被 403 拦截，
+  临时回写 commit comment 拿到原文。修复 CI `45525450637` 全绿。
+- 出包 CI `45526043408` 全绿；tag `v0.2.47` → `46785976`；
+  Release 附件 `offline-ledger-v0.2.47-release-46785976.apk`
+  （3422028 B，SHA256 `d307f0937c39136bf47406ea48607d5b0a79134c586c1dfa08bdae68c5b7fe9e`），
+  `state=uploaded` + `digest` 与 notes 一致。
+- artifacts 3 个、无染绿、无失败步骤、`mapping.txt` 留存；
+  坚果云落盘 job logs 403 无法确认。
+- 触发与轮询拆分生效，单次 dispatch、无重复发布。
+- 三个已归档 change 与 5 个进行中 change 未动；`add-discount-and-fee`
+  仍待使用者明确说「可以归档」。
+
