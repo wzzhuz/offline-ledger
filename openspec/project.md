@@ -1108,3 +1108,21 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
   其余 6 个进行中 change 与 3 个已归档 change 未动。
 
+### 第 69 批实测（v0.2.49 出包）
+
+- 实现 `d4db6260c8c6`（18 文件 / blob 585）→ 诊断 `fef56373` →
+  修复 `c8440eb34cb4`（2 文件，`build.yml` 逐字节恢复）。
+- push CI：首轮 `45552642980` failure（KSP 缺列）→ 修复后
+  `45553250628` **success**；出包 CI `45553797437` success（28 步无染绿）。
+- tag `v0.2.49` → `c8440eb34cb4`；Release 附件
+  `offline-ledger-v0.2.49-release-c8440eb3.apk`
+  （3463448 B，SHA256 `9b72ee069c8e422646b3047d521bdcf9f0e4f785aedb33dfcf25d982f930daf4`），`state=uploaded` + `digest` 与 notes 一致。
+- artifacts 3 个、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
+- **唯一缺陷**：扩 `DrillRow` 漏了第 13 批 `insightCategoryDetailRows`
+  同样返回该类型，Room 要求非空新列 MUST 出现在 SQL 结果里；
+  已补齐 LEFT JOIN 与全部新列。诊断 comment 删除 404（PAT 权限不足），
+  挂在中间 commit 上，内容仅 CI 日志，如实登记。
+- 触发与轮询拆分生效，单次 dispatch、无重复发布。
+- 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
+  仍待使用者明确说「可以归档」。
+
