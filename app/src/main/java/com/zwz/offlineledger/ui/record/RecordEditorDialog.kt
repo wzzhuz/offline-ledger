@@ -58,6 +58,7 @@ import com.zwz.offlineledger.core.AccountQuickCandidates
 import com.zwz.offlineledger.core.AccountQuickItem
 import com.zwz.offlineledger.core.CategoryQuickCandidates
 import com.zwz.offlineledger.core.CategoryQuickItem
+import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.time.MonthRange
@@ -154,6 +155,8 @@ fun RecordEditorDialog(
                         style = MaterialTheme.typography.displaySmall,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
+                    // 第 67 批：优惠 / 手续费折叠入口。默认收起，编辑态有值自动展开。
+                    ExtraAmountSection(state = state, vm = vm)
                     // 第 7 批：日期时间是自解释的元数据，不再占一行网格标签，
                     // 也不再与金额挤同一行（长金额会挤压右侧）。金额保住视觉锚点。
                     DateTimeRow(
@@ -847,4 +850,115 @@ fun FormDivider() {
         modifier = Modifier.fillMaxWidth().height(1.dp)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     )
+}
+
+/**
+ * 第 67 批：优惠 / 手续费入口。
+ *
+ * 金额真相源仍是 `state.amountExpr`（实付）；这里只收「附加金额」本身，
+ * 原价 / 实际扣款全部由整数分推导，MUST NOT 引入第二个金额列。
+ * 支出 / 收入只显示优惠；转账只显示手续费，并用 extraAsDiscount 切换
+ 「转账优惠」（落库为负 feeCents，与一羽 CSV 手册口径一致）。
+ */
+@Composable
+private fun ExtraAmountSection(state: EditorState, vm: RecordEditorViewModel) {
+    var expanded by remember { mutableStateOf(false) }
+    LaunchedEffect(state.extraExpr) {
+        if (state.extraExpr.isNotBlank()) expanded = true
+    }
+    val isTransfer = state.type == RecordType.TRANSFER
+    val label = if (isTransfer) {
+        if (state.extraAsDiscount) "转账优惠" else "手续费"
+    } else "优惠"
+    Column {
+        TextButton(onClick = { expanded = !expanded }) {
+            Text(
+                text = if (expanded) "▾ $label / 附加金额" else "▸ 添加$label",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        if (expanded) {
+            if (isTransfer) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("记为：", style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { vm.setExtraAsDiscount(false) }) {
+                        Text(
+                            "手续费",
+                            color = if (!state.extraAsDiscount) MaterialTheme.colorScheme.primary
+                            else LedgerColors.Neutral
+                        )
+                    }
+                    TextButton(onClick = { vm.setExtraAsDiscount(true) }) {
+                        Text(
+                            "转账优惠",
+                            color = if (state.extraAsDiscount) MaterialTheme.colorScheme.primary
+                            else LedgerColors.Neutral
+                        )
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = state.extraExpr,
+                onValueChange = { vm.setExtra(it) },
+                label = { Text("$label（元）") },
+                placeholder = { Text("0.00") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            ExtraAmountSummary(state = state, label = label)
+        }
+    }
+    FormDivider()
+}
+
+/** 三行金额只读预览；输入未成型时不渲染，避免展示一个错误的「约等于」。 */
+@Composable
+private fun ExtraAmountSummary(state: EditorState, label: String) {
+    if (state.amountExpr.isBlank() || state.extraExpr.isBlank()) return
+    val amount = try {
+        Cents.fromYuan(state.amountExpr.trim()).value
+    } catch (e: IllegalArgumentException) {
+        return
+    }
+    val extra = try {
+        Cents.fromYuan(state.extraExpr.trim()).value
+    } catch (e: IllegalArgumentException) {
+        return
+    }
+    val isTransfer = state.type == RecordType.TRANSFER
+    val signedFee = if (isTransfer && state.extraAsDiscount) -extra else extra
+    val lines: List<Pair<String, String>> = if (isTransfer) {
+        listOf(
+            "转出金额" to Cents(amount).toYuanString(),
+            label to (if (signedFee < 0) "-" else "") + Cents(kotlin.math.abs(signedFee)).toYuanString(),
+            "实际扣款" to Cents(amount + signedFee).toYuanString()
+        )
+    } else {
+        listOf(
+            "原始金额" to Cents(amount + extra).toYuanString(),
+            "优惠" to Cents(extra).toYuanString(),
+            "实际金额" to Cents(amount).toYuanString()
+        )
+    }
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        lines.forEach { (k, v) ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    k,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(v, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        if (isTransfer) {
+            Text(
+                "手续费不计入收支，仅影响账户余额",
+                style = MaterialTheme.typography.labelSmall,
+                color = LedgerColors.Neutral
+            )
+        }
+    }
 }

@@ -208,6 +208,7 @@ class LedgerRepository @Inject constructor(
                 excludeFromStats = it.excludeFromStats,
                 linkedRecordId = it.linkedRecordId,
                 currencyCode = it.currencyCode,
+                discountCents = it.discountCents, feeCents = it.feeCents,
                 counterparty = it.counterparty,
                 importSource = it.importSource,
                 sourceId = it.sourceId
@@ -693,7 +694,13 @@ class LedgerRepository @Inject constructor(
             counterparty = r.counterparty,
             importSource = r.importSource,
             sourceId = r.sourceId,
-            description = r.description
+            description = r.description,
+            discountYuan = r.discountCents?.let {
+                java.math.BigDecimal.valueOf(it, 2).toPlainString()
+            } ?: "",
+            feeYuan = r.feeCents?.let {
+                java.math.BigDecimal.valueOf(it, 2).toPlainString()
+            } ?: ""
         )
     }
 
@@ -809,7 +816,11 @@ class LedgerRepository @Inject constructor(
                 excludeFromStats = false,
                 counterparty = CounterpartyNormalizer.normalize(row.counterparty, aliases),
                 importSource = importSource,
-                sourceId = sourceId
+                sourceId = sourceId,
+                discountCents = row.discountYuan.takeIf { it.isNotBlank() }
+                    ?.let { Cents.fromYuan(it).value },
+                feeCents = row.feeYuan.takeIf { it.isNotBlank() }
+                    ?.let { Cents.fromYuan(it).value }
             )
             recordDao.insert(withResolvedRoot(entity))
             written++
@@ -891,7 +902,11 @@ class LedgerRepository @Inject constructor(
                 excludeFromStats = false,
                 counterparty = CounterpartyNormalizer.normalize(row.counterparty, aliases),
                 importSource = importSource,
-                sourceId = sourceId
+                sourceId = sourceId,
+                discountCents = row.discountYuan.takeIf { it.isNotBlank() }
+                    ?.let { Cents.fromYuan(it).value },
+                feeCents = row.feeYuan.takeIf { it.isNotBlank() }
+                    ?.let { Cents.fromYuan(it).value }
             )
             recordDao.insert(withResolvedRoot(entity))
             written++

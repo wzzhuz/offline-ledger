@@ -54,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -649,14 +650,47 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
                 maxLines = 2
             )
         }
-        Text(
-            text = signedAmount(type, row.amountCents),
-            color = amountColor(type),
-            style = MaterialTheme.typography.titleSmall,
-            textAlign = TextAlign.End,
-            maxLines = 1,
+        // 第 67 批：带附加金额时给划线原价与小标签，主金额仍是实付真相源。
+        val d = row.discountCents
+        val f = row.feeCents
+        val extraLabel = when {
+            d != null && d > 0L -> "优惠 " + Cents(d).toYuanString()
+            f != null && f > 0L -> "手续费 " + Cents(f).toYuanString()
+            f != null && f < 0L -> "转账优惠 " + Cents(-f).toYuanString()
+            else -> null
+        }
+        val originalCents = d?.takeIf { it > 0L }?.let { row.amountCents + it }
+        val positiveExtra = d != null || (f ?: 0L) < 0L
+        Column(
+            horizontalAlignment = Alignment.End,
             modifier = Modifier.width(92.dp)
-        )
+        ) {
+            if (originalCents != null) {
+                Text(
+                    text = Cents(originalCents).toYuanString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral,
+                    textDecoration = TextDecoration.LineThrough,
+                    maxLines = 1
+                )
+            }
+            if (extraLabel != null) {
+                Text(
+                    text = extraLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (positiveExtra) MaterialTheme.colorScheme.primary
+                    else LedgerColors.Neutral,
+                    maxLines = 1
+                )
+            }
+            Text(
+                text = signedAmount(type, row.amountCents),
+                color = amountColor(type),
+                style = MaterialTheme.typography.titleSmall,
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+        }
     }
     ListDivider(Modifier.padding(horizontal = 16.dp))
 }

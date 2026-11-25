@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.core.time.LedgerClock
+import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.accountLabel
 import com.zwz.offlineledger.data.local.dao.RecordRow
 import com.zwz.offlineledger.data.model.RecordType
@@ -89,6 +90,21 @@ fun RecordDetailPage(
                     style = MaterialTheme.typography.headlineMedium,
                     color = amountColor(type)
                 )
+                // 第 67 批：附加金额三行只读展示；原价由 amount + discount 推导，
+                // MUST NOT 从数据库读一个不存在的原价列。
+                val d = row.discountCents
+                val f = row.feeCents
+                if (d != null && d > 0L) {
+                    DetailLine("原始金额", Cents(row.amountCents + d).toYuanString() + " 元")
+                    DetailLine("优惠", "-" + Cents(d).toYuanString() + " 元")
+                    DetailLine("实际金额", Cents(row.amountCents).toYuanString() + " 元")
+                } else if (f != null && f > 0L) {
+                    DetailLine("手续费", Cents(f).toYuanString() + " 元")
+                    DetailLine("转出实际扣款", Cents(row.amountCents + f).toYuanString() + " 元")
+                } else if (f != null && f < 0L) {
+                    DetailLine("转账优惠", Cents(-f).toYuanString() + " 元")
+                    DetailLine("转出实际扣款", Cents(row.amountCents + f).toYuanString() + " 元")
+                }
                 Spacer(Modifier.height(12.dp))
                 DetailLine("类型", when (type) {
                     RecordType.EXPENSE -> "支出"

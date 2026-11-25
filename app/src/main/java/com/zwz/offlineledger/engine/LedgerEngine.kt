@@ -20,7 +20,10 @@ object LedgerEngine {
     fun deltasFrom(records: List<LedgerRecord>): Map<Long, Long> {
         val result = mutableMapOf<Long, Long>()
         for (r in records) {
-            r.fromAccountId?.let { result[it] = (result[it] ?: 0L) - r.amountCents }
+            // 第 67 批：TRANSFER 的转出侧额外扣 fee（负 fee = 转账优惠，少扣）。
+            // 与 RecordDao.aggregateAccountDeltas 的 SQL 严格等价，MUST 同步改两处。
+            val fee = if (r.type == RecordType.TRANSFER) (r.feeCents ?: 0L) else 0L
+            r.fromAccountId?.let { result[it] = (result[it] ?: 0L) - r.amountCents - fee }
             r.toAccountId?.let { result[it] = (result[it] ?: 0L) + r.amountCents }
         }
         return result

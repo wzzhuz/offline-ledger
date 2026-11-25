@@ -47,7 +47,10 @@ data class RecordRow(
     val description: String = "",
     /** 第 62 批：DAO 只带出原值，组合一律交给 `accountLabel()`。 */
     val fromAccountLast4: String? = null,
-    val toAccountLast4: String? = null
+    val toAccountLast4: String? = null,
+    /** 第 67 批：附加金额；明细行画划线原价与「优惠 X」标签用。 */
+    val discountCents: Long? = null,
+    val feeCents: Long? = null
 )
 
 /** 账户详情专属流水行。 */
@@ -117,7 +120,10 @@ data class CsvSourceRow(
     /** 第 43 批：列表主标题在有描述时用它；缺列时按空串兼容。 */
     val description: String = "",
     /** 第 63 批：账户卡号后四位，导出复合匹配键的第二列。 */
-    val accountCardLast4: String? = null
+    val accountCardLast4: String? = null,
+    /** 第 67 批：CSV 导出附加金额两列。 */
+    val discountCents: Long? = null,
+    val feeCents: Long? = null
 )
 
 /** 第 23 批：账单导入前的疑似匹配候选（金额 + 账户 + 时间窗）。 */
@@ -156,7 +162,10 @@ interface RecordDao {
     @Query(
         """
         SELECT accountId, SUM(deltaCents) AS deltaCents FROM (
-            SELECT fromAccountId AS accountId, -amountCents AS deltaCents
+            SELECT fromAccountId AS accountId,
+                   -(amountCents + COALESCE(
+                       CASE WHEN type = 'TRANSFER' THEN feeCents ELSE 0 END, 0
+                   )) AS deltaCents
               FROM records WHERE fromAccountId IS NOT NULL
             UNION ALL
             SELECT toAccountId AS accountId, amountCents AS deltaCents
@@ -202,6 +211,7 @@ interface RecordDao {
                COALESCE(r.importSource, '') AS importSource,
                COALESCE(r.sourceId, '') AS sourceId,
                COALESCE(r.description, '') AS description,
+               r.discountCents AS discountCents, r.feeCents AS feeCents,
                c.name AS categoryName, c.colorHex AS categoryColorHex,
                fa.name AS fromAccountName, ta.name AS toAccountName,
                fa.cardLast4 AS fromAccountLast4, ta.cardLast4 AS toAccountLast4
@@ -482,6 +492,7 @@ interface RecordDao {
                COALESCE(r.description, '') AS description,
                COALESCE(a.name, '') AS accountName,
                a.cardLast4 AS accountCardLast4,
+               r.discountCents AS discountCents, r.feeCents AS feeCents,
                COALESCE(rc.name, '') AS rootName,
                COALESCE(c.name, '') AS categoryName
           FROM records r

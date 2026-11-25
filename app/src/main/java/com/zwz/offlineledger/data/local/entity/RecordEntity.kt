@@ -59,6 +59,14 @@ data class RecordEntity(
      */
     @ColumnInfo(name = "description", defaultValue = "''")
     val description: String = "",
+    /**
+     * 第 67 批：附加金额（单位分，可空）。`amountCents` 恒为实际金额（实付），
+     * 原价 = amountCents + discountCents，MUST NOT 再落一个原价列。
+     * discountCents 仅 EXPENSE / INCOME，MUST 0 < d <= amountCents。
+     */
+    @ColumnInfo(name = "discountCents") val discountCents: Long? = null,
+    /** 仅 TRANSFER；正数=手续费，**负数=转账优惠**（与一羽 CSV 手册一致）。 */
+    @ColumnInfo(name = "feeCents") val feeCents: Long? = null,
     /** 导入来源标记；手工记账恒为 null，NULL 在 SQLite 唯一索引里互不冲突。 */
     @ColumnInfo(name = "importSource")
     val importSource: String? = null,

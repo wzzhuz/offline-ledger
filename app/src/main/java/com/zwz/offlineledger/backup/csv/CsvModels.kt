@@ -26,7 +26,14 @@ data class CsvRow(
      * `accountName` 此时是展示名（含 `(1122)`），本列是机器键，
      * MUST NOT 把两者合并成一个字符串后再解析。
      */
-    val cardLast4: String = ""
+    val cardLast4: String = "",
+    /**
+     * 第 67 批：附加金额两列（元字符串，导出必带、导入缺列按空串）。
+     * 支出/收入用 discount，转账用 fee；fee 可为负数表示转账优惠。
+     * MUST NOT 参与 duplicateKey()，否则同一笔账会被当成新流水。
+     */
+    val discountYuan: String = "",
+    val feeYuan: String = ""
 ) {
     /**
      * 导入去重键 = 账户 + 金额 + 日期 + 备注。

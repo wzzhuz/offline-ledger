@@ -17,6 +17,7 @@ import com.zwz.offlineledger.data.model.LedgerCategory
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.data.repository.LedgerRepository
 import com.zwz.offlineledger.engine.CategoryTree
+import com.zwz.offlineledger.engine.ExtraAmountRules
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,10 @@ data class EditorState(
     val counterparty: String = "",
     /** 第 43 批：描述独立输入，不并入备注。 */
     val description: String = "",
+    /** 第 67 批：附加金额输入（元字符串）。支出/收入=优惠，转账=手续费。 */
+    val extraExpr: String = "",
+    /** 仅转账：true=转账优惠（落库为负 fee），false=手续费（正 fee）。 */
+    val extraAsDiscount: Boolean = false,
     val excludeFromStats: Boolean = false,
     val loaded: Boolean = false
 )
@@ -125,6 +130,14 @@ class RecordEditorViewModel(
                         note = r.note,
                         counterparty = r.counterparty,
                         description = r.description,
+                        // 第 67 批：编辑态回填附加金额；原价由 amount + discount 推导，
+                        // 输入框只填「附加金额」本身，MUST NOT 读一个不存在的原价列。
+                        extraExpr = when {
+                            r.discountCents != null -> Cents(r.discountCents).toYuanString()
+                            r.feeCents != null -> Cents(kotlin.math.abs(r.feeCents)).toYuanString()
+                            else -> ""
+                        },
+                        extraAsDiscount = (r.feeCents ?: 0L) < 0L,
                         excludeFromStats = r.excludeFromStats,
                         loaded = true
                     )
@@ -178,7 +191,10 @@ class RecordEditorViewModel(
             else (current ?: visible.firstOrNull()),
             expandedRootId = null,
             fromAccountId = s.fromAccountId ?: defaultAcc,
-            toAccountId = s.toAccountId ?: defaultAcc
+            toAccountId = s.toAccountId ?: defaultAcc,
+            // 切换类型时附加金额语义会变（优惠 ↔ 手续费），清空避免串味。
+            extraExpr = "",
+            extraAsDiscount = false
         )
     }
 
@@ -240,6 +256,16 @@ class RecordEditorViewModel(
     /** 第 43 批：描述独立于对方与备注，编辑态与列表主标题共用。 */
     fun setDescription(v: String) {
         _state.value = _state.value.copy(description = v)
+    }
+
+    /** 第 67 批：附加金额（正数输入，单位元）；负数语义由 extraAsDiscount 表达。 */
+    fun setExtra(v: String) {
+        _state.value = _state.value.copy(extraExpr = v)
+    }
+
+    /** 仅转账：切换「手续费 / 转账优惠」。 */
+    fun setExtraAsDiscount(v: Boolean) {
+        _state.value = _state.value.copy(extraAsDiscount = v)
     }
 
     /** 阶段 8：键入一两个字即从全部历史交易对方模糊联想。 */
@@ -314,6 +340,21 @@ class RecordEditorViewModel(
         }
         if (amountCents <= 0L) return "金额必须大于 0"
 
+        // 第 67 批：附加金额解析与唯一校验入口。amountCents 仍是实付真相源。
+        val extraCents = if (s.extraExpr.isBlank()) null else try {
+            Cents.fromYuan(s.extraExpr.trim()).value
+        } catch (e: IllegalArgumentException) {
+            return e.message ?: "附加金额格式非法"
+        }
+        val discountCents = if (s.type == RecordType.EXPENSE || s.type == RecordType.INCOME)
+            extraCents else null
+        val feeCents = if (s.type == RecordType.TRANSFER)
+            extraCents?.let { if (s.extraAsDiscount) -it else it } else null
+        val extraError = ExtraAmountRules.validate(
+            s.type, amountCents, discountCents, feeCents
+        )
+        if (extraError != null) return extraError
+
         val accountError = when (s.type) {
             RecordType.EXPENSE -> if (s.fromAccountId == null) "请选择支出账户" else null
             RecordType.INCOME -> if (s.toAccountId == null) "请选择收入账户" else null
@@ -366,7 +407,9 @@ class RecordEditorViewModel(
             note = s.note,
             excludeFromStats = s.excludeFromStats,
             counterparty = s.counterparty.trim(),
-            description = s.description.trim()
+            description = s.description.trim(),
+            discountCents = discountCents,
+            feeCents = feeCents
         )
         return try {
             if (editingId == null) {

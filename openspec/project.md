@@ -974,3 +974,29 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 收尾 commit CI：`45406816252`「编译与校验」completed/success（docs-only，未出包）。
 - 报告数字订正：`archive/2026-11-24-*` 共 **16 个文件**（6+5+5），非 15。
 
+## 第 67 批：优惠 / 手续费（change `add-discount-and-fee`，v0.2.47）
+
+- **定位**：一羽官方口径「还原真实消费情况」；官方 CSV 手册定义
+  「金额=实际金额」「优惠=正且 ≤ 账单金额」「手续费负数=转账优惠」
+  「还款相当于转账」。**一羽没有累计省钱报表**，那是另一类产品思路。
+- **真相源**：`amountCents` = 实付（TRANSFER 场景为转账面额），
+  新增可空 `discountCents` / `feeCents`，`records` + `trash` 同步，
+  `version 6 → 7`。原价由整数加法推导，30 多处 `SUM(amountCents)` 零改写。
+- **余额**：仅 TRANSFER 的 from 侧加 fee，DAO SQL 与 `LedgerEngine.deltasFrom`
+  双实现同步；`COALESCE` 兜可空。手续费不进收支统计，UI 明示。
+- **Q3A 路径变更（如实）**：由「SETTLEMENT 自动冲减」改为
+  「TRANSFER + 负 fee（转账优惠）」，依据官方「还款相当于转账」；
+  账效等价、零新增流水、零 linkedRecordId 联动，spec Requirement 已同步改写。
+  自动冲减本批**未实现**。
+- **全链路**：Mappers 4 处、CSV 15 列（老 8~13 列兼容）、备份 DTO/快照、
+  回收站、Repository 导出与两处导入换算、ViewModel 校验/回填/保存、
+  记一笔折叠入口 + 三行金额、明细划线原价 + 蓝/灰标签、详情页三行。
+- **验证**：新增 3 组纯 JVM 单测 + `scripts/check_extra_amount.py`；
+  七个静态检查全 PASS。`duplicateKey()` 与账户复合匹配键零改动。
+- **零回归**：`Migrations.ALL` 空 + MigrationContractTest 零改动、
+  两套排序、48 条模板、CSV 复合匹配、`accountLabel` 唯一实现、
+  零 `INTERNET`、零新增 Gradle 依赖。三个已归档 change 与 5 个进行中 change 未动。
+- **边界**：筛选/规则按优惠查询等 `ff3-description-field` 收口；
+  累计优惠统计、SETTLEMENT 自动冲减、「不计预算」开关均留待后续决策。
+- 按「测试数据、不考虑升级迁移」：**先导出备份再卸载重装**。
+

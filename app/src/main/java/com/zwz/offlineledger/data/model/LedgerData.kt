@@ -15,7 +15,9 @@ data class LedgerRecord(
     val toAccountId: Long?,
     val categoryId: Long? = null,
     val rootCategoryId: Long? = null,
-    val excludeFromStats: Boolean = false
+    val excludeFromStats: Boolean = false,
+    /** 第 67 批：仅 TRANSFER 有意义；正数手续费 / 负数转账优惠。 */
+    val feeCents: Long? = null
 )
 
 data class LedgerAdjustment(

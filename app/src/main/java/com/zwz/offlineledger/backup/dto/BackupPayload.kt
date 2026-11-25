@@ -45,7 +45,10 @@ data class BackupRecord(
     val importSource: String? = null,
     val sourceId: String? = null,
     /** 第 43 批：带默认值，旧备份缺键解析为空串，不破坏兼容。 */
-    val description: String = ""
+    val description: String = "",
+    /** 第 67 批：附加金额；带默认值让旧备份仍可解析。 */
+    val discountCents: Long? = null,
+    val feeCents: Long? = null
 )
 
 @Serializable

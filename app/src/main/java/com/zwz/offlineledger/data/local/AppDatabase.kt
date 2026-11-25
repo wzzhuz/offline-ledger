@@ -26,6 +26,9 @@ import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 
 /**
+ * 第 67 批：version 升到 7（records / trash 增加 discountCents / feeCents）。
+ * 仍不注册 Migration，Migrations.ALL 保持 emptyArray()，
+ * 测试数据 MUST 卸载重装；装之前先导出。
  * 第 60 批：version 升到 6（accounts 增加 quickOrder / cardKind）。
  * 使用者明确「现在都是测试数据，不需要考虑升级迁移」：
  * 仍不注册 Migration，Migrations.ALL 保持 emptyArray()，
@@ -59,7 +62,7 @@ import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
         RuleGroupEntity::class,
         RuleEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

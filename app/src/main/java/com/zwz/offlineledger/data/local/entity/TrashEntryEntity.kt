@@ -34,6 +34,9 @@ data class TrashEntryEntity(
     /** 第 43 批：与 records.description 同步，删除->恢复不丢描述。 */
     @ColumnInfo(name = "description", defaultValue = "''")
     val description: String = "",
+    /** 第 67 批：与 records 同步，删除→恢复 MUST NOT 丢附加金额。 */
+    @ColumnInfo(name = "discountCents") val discountCents: Long? = null,
+    @ColumnInfo(name = "feeCents") val feeCents: Long? = null,
     /** 第 23 批：与 records.importSource 同步。 */
     @ColumnInfo(name = "importSource") val importSource: String? = null,
     @ColumnInfo(name = "sourceId") val sourceId: String? = null,
