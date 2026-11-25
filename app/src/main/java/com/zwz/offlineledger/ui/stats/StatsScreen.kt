@@ -1041,7 +1041,7 @@ private fun TagRankCard(state: StatsUiState, refreshTick: Int) {
             )
             rows.forEach { r ->
                 Text(
-                    text = "#" + r.name + "  " + formatCents(r.hitCents) +
+                    text = "#" + r.name + "  " + formatCents(r.hitCents ?: 0L) +
                         "  ·  " + (r.hitCount ?: 0) + " 笔",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 8.dp)

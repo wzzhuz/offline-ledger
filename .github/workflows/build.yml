@@ -63,39 +63,7 @@ jobs:
       # assembleDebug 只编译主源码，不碰 src/test。
       # 必须单独跑一次 test，否则测试文件写错了也照样「编译通过」。
       - name: 运行单元测试
-        run: |
-          set -o pipefail
-          gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/ci_unit.log
-
-      # 第 75 批临时诊断：日志被运行环境 403 拦截时把原文写到 commit comment，用完即撤销。
-      - name: 回写单测日志（临时诊断）
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          python3 - <<'PY'
-          import os, json, urllib.request
-          p = '/tmp/ci_unit.log'
-          raw = open(p, errors='replace').read() if os.path.exists(p) else 'no log file'
-          # --stacktrace 会把 e: 错误行挤出尾部，先滤掉 Gradle / Kotlin 堆栈
-          keep = [l for l in raw.splitlines()
-                  if not l.lstrip().startswith('at ')
-                  and 'org.gradle.internal' not in l
-                  and 'kotlin.gradle' not in l
-                  and 'DefaultBuildOperation' not in l]
-          t = '\n'.join(keep)[-28000:]
-          body = json.dumps({'body': '```\n' + t + '\n```'}).encode()
-          url = 'https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/comments'
-          req = urllib.request.Request(url, data=body, method='POST', headers={
-              'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
-              'Accept': 'application/vnd.github+json',
-              'User-Agent': 'ci-diag', 'Content-Type': 'application/json'})
-          try:
-              with urllib.request.urlopen(req, timeout=30) as x:
-                  print('diag posted', x.status)
-          except Exception as e:
-              print('diag failed', e)
-          PY
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: 编译 Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon
