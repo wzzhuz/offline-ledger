@@ -384,3 +384,102 @@ drawLine(start = g.p2, end = Offset(g.endX, g.y))   // 变成斜线！
 `ChartData` / `StatsLegend` / 统计口径、标题三件套、`StatsCard` 零 elevation、
 `LedgerTheme` 色值、图例灰条、`OtherRankCard` 折叠卡、`StatsDrillSheet`、
 `version = 7`、`Migrations.ALL`、零 `INTERNET`。
+
+---
+
+## 12. 第 72 批修订：径向折点（撤回第 71 批的固定 x 竖线）
+
+> 本节只改 `DonutChart.guides` 与 `SwitchLevelIcon` 的呈现；
+> 第 69–71 批的口径解耦、页内 sheet、折叠只读卡、纯白卡全部保留。
+
+### 12.1 为什么第 71 批修完还是交错
+
+第 71 批把「水平段变斜线」修好了，但留下一个更根本的问题：
+
+```kotlin
+val kneeX = if (side) cx - (outer + lead) else cx + (outer + lead)
+knee = Offset(kneeX, targetY)
+```
+
+**折点 x 同侧固定**。环左半圆上的锚点 x 从 `cx - outer` 到 `cx` 不等，
+却全部被连到 `x = cx - (outer + lead)` 这一条竖线上。
+当大扇区占 77.86% / 83.21%、剩下 11 / 6 个小扇区挤在 12 点左侧一小段
+角度里时，这些锚点几乎重合、而标签 y 被铺到整个高度 ——
+一簇点扇形散开到一条竖线，真机图三/四那个交叉就是这么来的。
+
+另外第 71 批的降级判据 `capacity = (h - 2*pad) / minGap` 用的是**整个图表
+高度**，250dp 高算出单侧约 12 个，图四 11 个没触发降级。但真正决定能不能
+放的是**折点 y 的实际跨度**（窄角度里只有几十 dp），高度判据完全没兜住。
+
+### 12.2 一羽的做法：折点在径向延长线上
+
+看一羽图一/二：每条线的圆点（折点）**沿环外缘的弧分布**，x 各不相同；
+水平线从各自圆点水平延伸到文字，文字在圆点同 y、线之上。
+
+```
+mid   = startAngle + sweepAngle / 2
+c, sn = cos(mid), sin(mid)
+outer = radius + thickness / 2
+radialR = outer + lead                    // lead = 10dp，很短
+anchor = (cx + outer*c,    cy + outer*sn)
+knee   = (cx + radialR*c,  cy + radialR*sn)   // ← 同一角度，径向延伸
+```
+
+`anchor → knee` 是**严格径向线段**。所有径向线段从圆心向外发散，
+只在圆心相交，而我们的线段都在 `r ∈ [outer, outer+lead]`、`r > 0`，
+因此**任意两条互不相交**（数学保证，不靠调参）。
+
+`knee → (endX, knee.y)` 严格水平；因左右半圆 `sin(mid)` 各自单调，
+按角度排布时 `knee.y` 天然有序，水平段彼此平行不相交；
+且相邻 `knee.y` 间隔 ≥ `minGap` > `lead` 时，各径向线的 y 区间不重叠，
+水平段也不会穿过别人的径向线。
+
+### 12.3 布局算法
+
+```
+raw = sectors.mapIndexed { i, s -> RawGuide(index=i, anchor, knee, left=c<0) }
+
+fun minAdjacent(list) = list.sortedBy{knee.y}
+                            .zipWithNext{ a,b -> b.knee.y - a.knee.y }.min()
+
+两侧分别：
+  group = raw.filter{left==side}.sortedBy{knee.y}
+  if (minAdjacent(group) < minGap) {           // 18dp
+      group = group.sortedBy{index}.take(3).sortedBy{knee.y}   // 金额 Top3
+      while (group.size>1 && minAdjacent(group) < minGap)
+          group = group.sortedBy{index}.dropLast(1).sortedBy{knee.y}
+  }
+  GuideLine(y = knee.y, endX = side?edge:w-edge, ...)
+```
+
+- **没有标签 y 下推、没有整体平移、没有 pad clamp**：折点 y、圆点 y、
+  水平线 y、标签 y 全部同源，MUST NOT 再出现「改了 A 忘改 B」。
+- 判据用**实际最小相邻间隔**，不再用图表高度；一羽图一 5 类 / 图二 12 类
+  与本 App 大类 6~7 类都能全量标注，图四那种窄角度 11 小类才降 Top3。
+- 降级后保留全局 index，颜色仍 `ChartData.chartArgb(id, i)` 与 `drawArc` 同源。
+- 文字 `absoluteOffset` 的 y 从 `g.y - 8dp` 改 `g.y - 16dp`，
+  贴在自己那条水平线**上方**，不压线、不盖环（一羽图一即是如此）。
+
+### 12.4 图标：小、细、淡
+
+第 71 批的半箭头形状对了，但 20dp / `sw=2f` / 饱和 `CategoryHeaderBlue` /
+32dp `IconButton` 与粗体 `titleMedium` 并排太"抢"。
+一羽那个是浅灰蓝细线小标记。本批只改观感参数：
+
+| 项 | 71 | 72 |
+|---|---|---|
+| Canvas 尺寸 | 20dp | **14dp** |
+| 线宽 | 2f | **1.2f** |
+| 颜色 | `CategoryHeaderBlue` | **`CategoryHeaderBlue.copy(alpha=0.55f)`** |
+| 按钮盒 | 32dp | **24dp** |
+| 半箭头形状 | 4 条 drawLine | 不变 |
+
+`tip` 同步 7dp → 4.5dp，`x1/x2` 收到 1dp。按钮仍 `IconButton` 保持可点与
+ripple，MUST NOT 改回 32dp。
+
+### 12.5 明确未动
+
+环半径 `0.60f`、图高 250dp、pointerInput 命中判定、
+`ChartData` / `StatsLegend` / 统计口径、标题三件套、`StatsCard` 零 elevation、
+`LedgerTheme` 色值、图例灰条、`OtherRankCard` 折叠卡、`StatsDrillSheet`、
+`version = 7`、`Migrations.ALL`、零 `INTERNET`。

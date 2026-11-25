@@ -79,15 +79,18 @@ def main():
                 "absoluteOffset", "StatsLegend.percentText", "endX", "0.60f"):
         if key not in donut:
             errors.append("DonutChart 缺指示线要素: " + key)
-    # 第 71 批：水平段严格水平、保序布局、动态容量 Top3 兜底
-    for key in ("g.knee", "knee = Offset(kneeX, targetY)", "end = Offset(g.endX, g.y)",
-                "sortedBy { it.anchor.y }", "coerceIn(pad, h - pad)", "capacity",
-                "take(3)", "Float.NEGATIVE_INFINITY", "maxOf(desired, last + minGap)"):
+    # 第 72 批：径向折点 + 相邻间隔判据 + 不交错优先；MUST NOT 回到固定 x 竖线
+    for key in ("radialR", "Offset(cx + radialR * c", "minAdjacent", "it.knee.y",
+                "take(3)", "dropLast(1)", "Float.POSITIVE_INFINITY", "g.knee",
+                "end = Offset(g.endX, g.y)", "g.y - 16.dp.toPx()",
+                "g.anchor, end = g.knee"):
         if key not in donut:
-            errors.append("DonutChart 缺第 71 批不交错布局要素: " + key)
-    if "var y: Float" in donut or "p2" in donut:
-        errors.append("指示线仍残留可变 y / 旧折点 p2（会画成斜的水平段）")
-    # 第 71 批：切换图标 MUST 是半箭头（2 横线 + 2 半尖斜线 = 4 条 drawLine）
+            errors.append("DonutChart 缺第 72 批径向折点要素: " + key)
+    for key in ("kneeX", "coerceIn(pad", "Float.NEGATIVE_INFINITY", "capacity",
+                "maxOf(desired", "sortedBy { it.anchor.y }", "var y: Float", "p2"):
+        if key in donut:
+            errors.append("第 72 批已撤回的旧布局残留（会再次交错）: " + key)
+    # 第 72 批：切换图标 MUST 是「小细淡」半箭头（4 条 drawLine）
     si = stats.split("private fun SwitchLevelIcon()", 1)
     if len(si) < 2:
         errors.append("缺 SwitchLevelIcon")
@@ -96,8 +99,18 @@ def main():
         n = seg.count("drawLine(")
         if n != 4:
             errors.append("SwitchLevelIcon 不是半箭头（drawLine 应为 4，实际 %d）" % n)
-        if "yu - tip" not in seg or "yd + tip" not in seg:
-            errors.append("SwitchLevelIcon 缺上半尖 / 下半尖斜线")
+        for key in ("Modifier.size(14.dp)", "1.2f", "copy(alpha = 0.55f)",
+                    "yu - tip", "yd + tip"):
+            if key not in seg:
+                errors.append("SwitchLevelIcon 缺第 72 批小细淡要素: " + key)
+        for key in ("Modifier.size(20.dp)", "val sw = 2f",
+                    "val c = CategoryHeaderBlue\n"):
+            if key in seg:
+                errors.append("SwitchLevelIcon 仍是上一版大/粗/饱和箭头: " + key)
+    if "modifier = Modifier.size(24.dp)" not in stats:
+        errors.append("切换按钮包围盒未收紧到 24dp")
+    if "modifier = Modifier.size(32.dp)" in stats:
+        errors.append("切换按钮包围盒仍是 32dp（大且突兀）")
     # 只查 import 与真实调用：注释里写「零 drawText / TextMeasurer」不算。
     for key in ("import androidx.compose.ui.text.TextMeasurer",
                 "import androidx.compose.foundation.layout.FlowRow",
@@ -201,7 +214,7 @@ def main():
             print("  FAIL", e)
         print(f"check_stats_merge: {len(errors)} 项失败")
         return 1
-    print("check_stats_merge: PASS (第71批 半箭头 / 指示线保序严格水平不交错 / Top3动态兜底 / 第70批全部 / 零改表 / 8 MODIFIED)")
+    print("check_stats_merge: PASS (第72批 径向折点不汇聚 / 相邻间隔判据 / 小细淡半箭头 / 第70-71批全部 / 零改表 / 8 MODIFIED)")
     return 0
 
 

@@ -1206,3 +1206,29 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
   仍待使用者明确说「可以归档」。
 
+## 第 72 批：径向折点 + 小细淡切换图标（change `polish-stats-like-yiyu` 再修订，v0.2.52）
+
+- **触发**：4 张真机对比图（一羽小类 5/12 类 vs 我们的大类 7 / 小类 12 类）
+  +「线还是存在交错」「切换箭头太大和丑了，很突兀」。
+- **① 指示线（撤回第 71 批固定 x 竖线）**：定位到真因是
+  `kneeX = cx ± (outer+lead)` 把同侧所有折点排到一条竖线，
+  小扇区挤在窄角度时扇形汇聚成交错；且第 71 批按图表高度算 capacity
+  没兜住图四。本批折点改为**每个扇区沿自身中点角的 `radialR` 径向点**，
+  `anchor→knee` 是从圆心发散的径向短线（数学上永不相交），
+  `knee→(endX, knee.y)` 严格水平、标签 `y = knee.y` 贴线之上 16dp，
+  **取消一切标签 y 下推 / 整体平移 / pad clamp**。
+  降级判据改用**实际最小相邻折点 y 间隔**（<18dp 才按金额 Top3，
+  仍挤则继续减到不交错或只剩 1 条），环与图例始终全量。
+- **② 图标**：半箭头形状不变，改 14dp / 1.2f 细线 /
+  `CategoryHeaderBlue` 55% 浅蓝灰 / 24dp 按钮盒，紧贴文字、不再抢标题。
+- **口径零改动**：`StatsViewModel` / `ChartData` / `RecordDao` / `InsightData` /
+  `StatsLegend` / `StatsDrillRange` / `LedgerTheme` / `version = 7` 全部不动；
+  环半径 0.60f、点击命中、标题三件套、灰底白卡零 elevation、图例灰条、
+  折叠只读卡、页内 sheet 全保留 → **v0.2.51 直接覆盖安装**。
+- **验证**：delta 12 条 / **51 Scenario**（1 条 MODIFIED + 1 条 ADDED 措辞），
+  8 条 MODIFIED 命中基线、ADDED 与既有 284 条零冲突；
+  八个静态检查全 PASS（新增径向折点、`minAdjacent`、`dropLast(1)` 断言，
+  并把 `kneeX` / 高度 capacity / y 下推残留列为 FAIL）。
+- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
+  其余 6 个进行中 change 与 3 个已归档 change 未动。
+

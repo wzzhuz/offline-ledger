@@ -408,7 +408,9 @@ private fun CategoryShareCard(
                                 if (isRoot) SliceLevel.CHILD else SliceLevel.ROOT
                             )
                         },
-                        modifier = Modifier.size(32.dp)
+                        // 第 72 批：收紧按钮包围盒，让小箭头紧贴「大类 / 小类」，
+                        // 不再像上一版那样隔着一大块空白、显得突兀。
+                        modifier = Modifier.size(24.dp)
                     ) {
                         SwitchLevelIcon()
                     }
@@ -972,24 +974,25 @@ private fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
 }
 
 /**
- * 第 71 批：一羽式**半箭头**切换图标（形如 `⇌`）。
+ * 第 72 批：一羽式**半箭头**切换图标（形如 `⇌`），按真机反馈收小、收细、收淡。
  *
- * 上一版是两条完整三角箭头（每个箭头尖画上下两条斜线），太"实"。
- * 一羽那个是「上箭头只有上半个尖、下箭头只有下半个尖」的鱼叉形：
- * 上：一条横线 + 右端只保留**左上→右端点**那一条斜线；
- * 下：一条横线 + 左端只保留**右下→左端点**那一条斜线。
+ * 形状沿用第 71 批（上箭头只有上半个尖、下箭头只有下半个尖的鱼叉形），
+ * 但上一版 20dp / 2f 线宽 / 饱和蓝 / 32dp 按钮包围盒太"抢"，
+ * 和粗体「大类 / 小类」并排显得大而突兀。一羽那个是**浅灰蓝细线小图标**，
+ * 几乎与口径文字同等视觉重量、紧贴文字右侧。
+ * 本批：14dp、1.2f 线宽、CategoryHeaderBlue 55% 透明、24dp 按钮盒。
  * 零新增依赖 / 零资源 / 零实验性 API，只用 Canvas.drawLine。
  */
 @Composable
 private fun SwitchLevelIcon() {
-    Canvas(modifier = Modifier.size(20.dp)) {
+    Canvas(modifier = Modifier.size(14.dp)) {
         val w = size.width
         val h = size.height
-        val c = CategoryHeaderBlue
-        val sw = 2f
-        val x1 = 2.dp.toPx()
-        val x2 = w - 4.dp.toPx()
-        val tip = 7.dp.toPx()
+        val c = CategoryHeaderBlue.copy(alpha = 0.55f)
+        val sw = 1.2f
+        val x1 = 1.dp.toPx()
+        val x2 = w - 1.dp.toPx()
+        val tip = 4.5.dp.toPx()
         val yu = h * 0.34f
         val yd = h * 0.66f
         // 上 →：只画上半个箭头尖

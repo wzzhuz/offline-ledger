@@ -78,13 +78,17 @@ fun DonutChart(
     // 指示线数据：纯 Compose 侧按量到的尺寸算，Canvas 与 Text 共用同一份，
     // MUST NOT 在 DrawScope 里回写 state（会引发重组循环）。
     //
-    // 第 71 批修「连接线交错」：
-    //  旧算法把标签 y 下推后**没同步更新折点 y**，所谓「水平折线」其实是斜线，
-    //  多条必然交叉；且 last 从 10dp 起算会无谓下推顶部标签、又没有上界。
-    //  新算法：① 每侧按环上锚点 y 排序**保序**；② 分配目标 y（最小间距 +
-    //  整体平移进 [pad, h-pad]，绝不越界）；③ 折点 x 固定、y = 目标 y，
-    //  水平段严格水平且彼此平行；④ 斜线段只从环外缘到折点，短且不跨线。
-    //  极端到单侧放不下时才按使用者给的兜底只标金额 Top3。
+    // 第 72 批按一羽真机图重做（第 70/71 批两次都没抓到真因）：
+    //  第 70 批：标签 y 下推后折点 y 没同步 → 水平段变斜线。
+    //  第 71 批：修了斜线，但**折点 x 固定在同一条竖线上** → 多个扇区外缘点
+    //     被一起拉到同一竖线，形成扇形汇聚，真机图三/四仍交错。
+    //  一羽的做法：折点是**每个扇区沿自身中点角径向延伸**得到的点，
+    //     x 各不相同、沿环外缘弧分布；anchor→knee 是严格径向短线，
+    //     从圆心发散、数学上永不相交；knee→(endX, knee.y) 严格水平，
+    //     标签 y = knee.y（贴在线上方），顺序天然随角度有序。
+    //  只剩「相邻折点 y 间隔 < minGap」时才按金额降序降级到 Top3
+    //  （使用者给的退路），判据用**实际折点 y 的最小相邻间隔**，
+    //  MUST NOT 再拿整个图表高度算容量（小扇区挤在窄角度里会误判）。
     val guides = remember(sectors, boxSize, totalCents) {
         val w = boxSize.width.toFloat()
         val h = boxSize.height.toFloat()
@@ -96,61 +100,47 @@ fun DonutChart(
             val radius = min(cx, cy) * 0.60f
             val thickness = radius * 0.42f
             val outer = radius + thickness / 2f
-            val lead = with(density) { 12.dp.toPx() }
+            val lead = with(density) { 10.dp.toPx() }
+            val radialR = outer + lead
             val edge = with(density) { 4.dp.toPx() }
-            val pad = with(density) { 14.dp.toPx() }
-            val minGap = with(density) { 20.dp.toPx() }
-            val usable = h - 2f * pad
-            // 单侧真正放得下的标签数；超出才降级（不是按分类数拍脑袋）。
-            val capacity = (usable / minGap).toInt() + 1
+            val minGap = with(density) { 18.dp.toPx() }
 
             // 保留全局 index，保证指示线颜色与 drawArc 完全同源。
-            val raw = sectors.mapIndexed { i, s ->
-                val mid = ((s.startAngle + s.sweepAngle / 2f) * PI / 180f).toFloat()
+            val raw = sectors.mapIndexed { i, sec ->
+                val mid = ((sec.startAngle + sec.sweepAngle / 2f) * PI / 180f).toFloat()
                 val c = cos(mid)
                 val sn = sin(mid)
                 RawGuide(
                     index = i,
-                    sector = s,
+                    sector = sec,
                     anchor = Offset(cx + outer * c, cy + outer * sn),
+                    knee = Offset(cx + radialR * c, cy + radialR * sn),
                     left = c < 0f
                 )
             }
 
+            // 一组里相邻折点 y 的最小间隔；< minGap 就会挤 / 交错。
+            fun minAdjacent(list: List<RawGuide>): Float {
+                if (list.size < 2) return Float.POSITIVE_INFINITY
+                val sorted = list.sortedBy { it.knee.y }
+                return sorted.zipWithNext { a, b -> b.knee.y - a.knee.y }
+                    .minOrNull() ?: Float.POSITIVE_INFINITY
+            }
+
             val out = mutableListOf<GuideLine>()
             listOf(true, false).forEach { side ->
-                // 降级只在「真的放不下」时发生，且按原 index（金额降序）取 Top3。
-                var group0 = raw.filter { it.left == side }
-                if (group0.size > capacity) {
-                    group0 = group0.sortedBy { it.index }.take(3)
+                var group = raw.filter { it.left == side }.sortedBy { it.knee.y }
+                if (group.isEmpty()) return@forEach
+                // 只在「真的挤」时降级到金额 Top3；极端到 Top3 仍挤则继续
+                // 按金额从大到小保留，直到不交错或只剩 1 条（不交错优先）。
+                if (minAdjacent(group) < minGap) {
+                    group = group.sortedBy { it.index }.take(3).sortedBy { it.knee.y }
+                    while (group.size > 1 && minAdjacent(group) < minGap) {
+                        group = group.sortedBy { it.index }.dropLast(1).sortedBy { it.knee.y }
+                    }
                 }
-                // 保序：按环上锚点 y 排，标签顺序与扇区顺序一致 → 不交错。
-                val group = group0.sortedBy { it.anchor.y }
-                val n = group.size
-                if (n == 0) return@forEach
-
-                // ① 以锚点 y 为基础做最小间距下推（保序）
-                val ys = FloatArray(n)
-                var last = Float.NEGATIVE_INFINITY
-                for (k in 0 until n) {
-                    val desired = group[k].anchor.y
-                    ys[k] = if (last == Float.NEGATIVE_INFINITY) desired
-                    else maxOf(desired, last + minGap)
-                    last = ys[k]
-                }
-                // ② 整体平移进可用范围（跨度 <= usable，不会挤到边界）
-                val shift = when {
-                    ys[0] < pad -> pad - ys[0]
-                    ys[n - 1] > h - pad -> (h - pad) - ys[n - 1]
-                    else -> 0f
-                }
-                for (k in 0 until n) ys[k] = (ys[k] + shift).coerceIn(pad, h - pad)
-
-                val kneeX = if (side) cx - (outer + lead) else cx + (outer + lead)
                 val endX = if (side) edge else w - edge
-                for (k in 0 until n) {
-                    val g = group[k]
-                    val targetY = ys[k]
+                group.forEach { g ->
                     out.add(
                         GuideLine(
                             index = g.index,
@@ -158,9 +148,9 @@ fun DonutChart(
                             label = g.sector.slice.name + " " +
                                 StatsLegend.percentText(g.sector.slice.cents, totalCents),
                             anchor = g.anchor,
-                            knee = Offset(kneeX, targetY),
+                            knee = g.knee,
                             endX = endX,
-                            y = targetY,
+                            y = g.knee.y,
                             left = side
                         )
                     )
@@ -224,8 +214,8 @@ fun DonutChart(
                             style = stroke
                         )
                     }
-                    // 第 71 批：环外指示线 = 短斜引线 + **严格水平**折线 + 折点小圆点。
-                    // knee.y == g.y，水平段彼此平行，MUST NOT 再出现斜的「水平段」。
+                    // 第 72 批：环外指示线 = **径向短线** + 严格水平折线 + 折点小圆点。
+                    // anchor→knee 沿同一角度从圆心发散，永不相交；knee.y == g.y。
                     val lineWidth = 1.5f
                     val dot = 2.5f
                     guides.forEach { g ->
@@ -257,7 +247,8 @@ fun DonutChart(
                             with(density) {
                                 IntOffset(
                                     (if (g.left) 4.dp.toPx() else (-4).dp.toPx()).toInt(),
-                                    (g.y - 8.dp.toPx()).toInt()
+                                    // 文字贴在自己那条水平线上方，不压线、不盖环。
+                                    (g.y - 16.dp.toPx()).toInt()
                                 )
                             }
                         }
@@ -364,15 +355,16 @@ fun DonutChart(
     }
 }
 
-/** 布局中间量：环外缘锚点 + 全局 index（颜色与 drawArc 同源）。 */
+/** 布局中间量：环外缘锚点 + 径向折点 + 全局 index（颜色与 drawArc 同源）。 */
 private class RawGuide(
     val index: Int,
     val sector: ChartSector,
     val anchor: Offset,
+    val knee: Offset,
     val left: Boolean
 )
 
-/** 一条引导线的数据，Canvas 画线 / Text 定位共用。knee.y == y，水平段严格水平。 */
+/** 一条引导线的数据。knee 是径向折点，knee.y == y，水平段严格水平。 */
 private class GuideLine(
     val index: Int,
     val color: Color,
