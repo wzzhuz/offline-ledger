@@ -1,12 +1,13 @@
 package com.zwz.offlineledger.ui.charts
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,9 +24,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.engine.ChartData
 import com.zwz.offlineledger.engine.ChartData.ChartSector
+import com.zwz.offlineledger.engine.StatsLegend
+import com.zwz.offlineledger.ui.components.CategoryGlyph
+import com.zwz.offlineledger.ui.components.CategoryIcon
 import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import kotlin.math.PI
@@ -33,9 +39,16 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * 原生 Canvas 环形图。刻意不用 DrawScope.drawText / TextMeasurer，
- * 也不用 FlowRow（ExperimentalLayoutApi）：中心总额与图例全用
- * 普通 Compose Text / Column / Row 叠加，零版本相关 API。
+ * 原生 Canvas 环形图 + 第 68 批一羽式图例列表。
+ *
+ * 刻意不用 DrawScope.drawText / TextMeasurer，也不用 FlowRow /
+ * BoxWithConstraints（ExperimentalLayoutApi / 版本相关 API）：
+ * 环外悬浮百分比需要 Canvas 文本测量或复杂 offset 定位，
+ * 本批改由**图例列表每行**承载百分比（见 change design 2.2）。
+ *
+ * 图例整行可点且触摸区 >=40dp，与扇区共用同一个 onSectorClick（第 27 批契约）。
+ * 分类维度传 categoryIds 显示彩色 Tabler 图标，缺项 / 其他维度回退中性圆 + 首字。
+ * 二级展开由 expandableIds / expandedChildren 驱动，子行直接调 onChildClick。
  */
 @Composable
 fun DonutChart(
@@ -43,9 +56,16 @@ fun DonutChart(
     totalCents: Long,
     centerLabel: String,
     onSectorClick: (Int) -> Unit,
+    categoryIds: List<Long?> = emptyList(),
+    expandableIds: Set<Long> = emptySet(),
+    expandedId: Long? = null,
+    onExpandToggle: (Long) -> Unit = {},
+    expandedChildren: List<Triple<Long, String, Long>> = emptyList(),
+    onChildClick: (Long, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    val chartHeight = 220.dp
+    val chartHeight = 210.dp
+    val legendRows = StatsLegend.rows(sectors.map { it.slice }, totalCents)
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier.fillMaxWidth().height(chartHeight),
@@ -103,58 +123,120 @@ fun DonutChart(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(text = centerLabel, style = MaterialTheme.typography.labelSmall)
                 Text(
-                    text = formatCents(totalCents) + " 元",
+                    text = "¥" + formatCents(totalCents),
                     style = MaterialTheme.typography.titleMedium
                 )
             }
         }
 
-        // 图例：每行两项，普通 Column + Row，不依赖任何实验性布局 API。
-        // 第 27 批起每项整行可点（点击等价于点对应扇区）。
+        // 第 68 批：一羽式图例列表（每行一项），与环同屏可见、允许纵向滚动。
+        // 第 27 批契约保留：整行可点、触摸区 >=40dp、与扇区共用 onSectorClick。
         Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            sectors.chunked(2).forEachIndexed { rowIndex, group ->
+            legendRows.forEach { row ->
+                val cid = categoryIds.getOrNull(row.index)
+                val expandable = cid != null && cid in expandableIds
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
+                        .clickable { onSectorClick(row.index) }
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
                 ) {
-                    group.forEachIndexed { colIndex, s ->
-                        val i = rowIndex * 2 + colIndex
-                        // 第 27 批：图例与扇区共用同一个 onSectorClick，
-                        // 整行可点、色块加大、触摸区 >=40dp，不再只有圈能点。
+                    if (cid != null) {
+                        // Q2A：统计占比图例放行彩色 Tabler；iconName 为空按预置 id 回查，
+                        // 覆盖安装零写库；目录缺项自动回退中性圆 + 首字。
+                        CategoryGlyph(
+                            name = row.name,
+                            iconName = "",
+                            colorHex = "",
+                            grayscale = false,
+                            size = 32,
+                            categoryId = cid
+                        )
+                    } else {
+                        // 收款方 / 账户维度没有分类图标：中性圆 + 中文首字。
+                        CategoryIcon(name = row.name, colorHex = null, size = 32)
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 10.dp)
+                    ) {
+                        Text(
+                            text = row.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = row.percentText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral,
+                            maxLines = 1
+                        )
+                    }
+                    Text(
+                        text = "¥" + formatCents(row.cents),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = LedgerColors.ExpenseRed,
+                        maxLines = 1
+                    )
+                    if (expandable) {
+                        TextButton(onClick = { onExpandToggle(cid) }) {
+                            Text(if (expandedId == cid) "⌃" else "⌄")
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(4.dp))
+                    }
+                }
+                if (cid != null && expandedId == cid) {
+                    expandedChildren.forEach { (kidId, kidName, kidCents) ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
                                 .heightIn(min = 40.dp)
-                                .clickable { onSectorClick(i) }
-                                .padding(horizontal = 4.dp)
+                                .clickable { onChildClick(kidId, kidName) }
+                                .padding(start = 48.dp, end = 4.dp)
                         ) {
-                            Canvas(modifier = Modifier.size(12.dp)) {
-                                drawCircle(
-                                    color = Color(ChartData.chartArgb(s.slice.id, i).toInt())
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "└ " + kidName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = StatsLegend.percentText(kidCents, totalCents),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = LedgerColors.Neutral
                                 )
                             }
                             Text(
-                                text = " " + s.slice.name + " " + formatCents(s.slice.cents),
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                modifier = Modifier.padding(start = 4.dp)
+                                text = "¥" + formatCents(kidCents),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1
                             )
                         }
                     }
-                    if (group.size == 1) {
-                        androidx.compose.foundation.layout.Spacer(
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
+                // 细分割线：纯行 + 分割线，不叠卡片 / 阴影（基线要求）。
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .padding(horizontal = 4.dp)
+                        .background(LedgerColors.Neutral.copy(alpha = 0.12f))
+                )
             }
         }
         if (sectors.isEmpty()) {
             Text(
                 text = "本期没有支出记录",
                 style = MaterialTheme.typography.bodySmall,
-                color = LedgerColors.Neutral
+                color = LedgerColors.Neutral,
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
     }

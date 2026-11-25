@@ -1018,3 +1018,36 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 三个已归档 change 与 5 个进行中 change 未动；`add-discount-and-fee`
   仍待使用者明确说「可以归档」。
 
+## 第 68 批：统计页参考一羽记账（change `polish-stats-like-yiyu`，v0.2.48）
+
+- **触发**：5 张真机对照图；使用者「分类排行考虑合入分类占比」「其他页面参考一羽」；
+  Q1A Q2A Q3A Q4A + 验收按我拟的。
+- **Q1A 合体**：`CategoryInsightCard` 单卡承载环形图 + 一羽式图例列表
+  （彩色图标 / 名称 / 百分比 / 金额，整行可点 ≥40dp），维度 chip
+  「分类 / 收款方 / 账户」，分类维度保留「按大类 / 按小类」；
+  删除独立 `RankInsightCard`。**6 条 MODIFIED 整块替换**基线
+  「两卡不得合并」与「统计页 SHALL 中性圆」条文，撤回 §7.3 旧外推：
+  一羽式是同卡上下排布，不是第 13 批的互斥切换 chip。
+- **Q2A 彩色图标第三次放宽**：统计页分类占比图例用 `CategoryGlyph`
+  （Tabler MIT，覆盖安装按预置 id 回查零写库，缺项回退中性圆）；
+  记一笔快捷栏 / 明细列表行 / 账户详情仍中性圆 + 首字；
+  `colorHex` 与 `ChartData.chartArgb` 扇区色板零改动。
+- **Q3A 统计页内**：蓝底身份区（复用 `CategoryHeaderBlue`）+「分析 / 概览」
+  两个真实 Tab；小结卡支出红进度条；趋势卡蓝色圆角气泡 +
+  「笔数 / 日均 / 单日最高 / 峰值日」四项摘要（全部派生自既有 state，零新增 DAO）。
+  不新增分类聚合页、不动底部 4 Tab、不引入收支类型切换。
+- **口径零改动**：`StatsViewModel` / `ChartData` / `RecordDao` / `InsightData` /
+  `StatsDrillRange` / `version = 7` / `Migrations.ALL` 全部不动；
+  统计仍按 `SUM(amountCents)` 实付口径，净支出切片与三级下钻路径不变。
+  新增纯 JVM `StatsLegend` + 7 条单测，新增 `check_stats_merge.py` 静态断言
+  下钻契约四层与彩色图标范围。
+- **明确未做（不假装完成）**：图例「(N条)」笔数（分类维度无 count，
+  新增聚合会撞基线）；环外悬浮百分比（禁用 `drawText` / `TextMeasurer`，
+  改由图例承载）；一羽「概览」页 1:1（未提供截图，按精简版分析等价实现）。
+- **验证**：8 个静态检查全 PASS；spec delta 6 MODIFIED + 2 ADDED = 8 条 /
+  32 Scenario，每条 ≥1 Scenario、含 RFC2119、标题唯一，6 条 MODIFIED 全部命中基线。
+- **零回归**：CSV 复合匹配、账户显示名、两套排序、48 条模板、银行纯徽记、
+  第 67 批优惠 / 手续费全链路、零改表 → **v0.2.47 直接覆盖安装**。
+- `add-discount-and-fee` 与其余 5 个进行中 change 未动；本 change 仍需使用者
+  明确说「可以归档」。
+
