@@ -1168,3 +1168,29 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
   仍待使用者明确说「可以归档」。
 
+## 第 71 批：半箭头切换图标 + 指示线不交错（change `polish-stats-like-yiyu` 再修订，v0.2.51）
+
+- **触发**：真机两条——切换图标要一羽「上半尖 / 下半尖」造型；
+  饼图连接线交错，「实在解决不了，连接线只连接 top3?」。
+- **① 图标**：`SwitchLevelIcon` 从两条完整三角箭头（6 条 `drawLine`）
+  改为半箭头 `⇌`（上尖只上半、下尖只下半，4 条 `drawLine`）；
+  仍是 Canvas 自绘，按钮 / 标题三件套零改动。
+- **② 交错根因**：第 70 批标签 y 下推后**折点 y 未同步**，
+  「水平折线」实际是斜线；`last` 固定 10dp 无谓下推顶部标签、无上界 clamp。
+  修法：每侧按 `anchor.y` **保序** → `maxOf` 最小间距（首项不推）→
+  整体 `shift` + `coerceIn(pad, h-pad)` → 折点 x 固定且 `knee.y == y`，
+  水平段严格水平、圆点与文字同 y；`GuideLine.y` 改回 `val`、`p1/p2` 改 `anchor/knee`。
+- **Top3 兜底**：`capacity = (图表高 - 2*pad) / minGap + 1`（250dp 时单侧约 12），
+  只在某侧标签数真的超过容量时按金额降序 `take(3)`；
+  正常 4~6 类全量标注，环与图例始终全量，降级保留全局 index 不串色。
+- **口径零改动**：`StatsViewModel` / `ChartData` / `RecordDao` / `InsightData` /
+  `StatsLegend` / `StatsDrillRange` / `LedgerTheme` / `version = 7` 全部不动；
+  标题三件套、灰底白卡零 elevation、图例灰条、折叠只读卡、页内 sheet 全保留 →
+  **v0.2.50 直接覆盖安装**。
+- **验证**：delta 12 条 / **48 Scenario**（1 条 MODIFIED + 1 条 ADDED 措辞），
+  8 条 MODIFIED 命中基线、ADDED 与既有 284 条零冲突；
+  八个静态检查全 PASS（新增半箭头 4 条 drawLine、严格水平段、保序、
+  动态容量、`var y`/`p2` 残留列为 FAIL）。
+- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
+  其余 6 个进行中 change 与 3 个已归档 change 未动。
+

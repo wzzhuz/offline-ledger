@@ -75,10 +75,29 @@ def main():
             errors.append("DonutChart 缺灰条: " + key)
     if "heightIn(min = 44.dp)" not in donut:
         errors.append("图例整行触摸区未保持 >=40dp")
-    for key in ("onSizeChanged", "GuideLine(", "drawLine(", "drawCircle(",
+    for key in ("onSizeChanged", "GuideLine(", "RawGuide(", "drawLine(", "drawCircle(",
                 "absoluteOffset", "StatsLegend.percentText", "endX", "0.60f"):
         if key not in donut:
             errors.append("DonutChart 缺指示线要素: " + key)
+    # 第 71 批：水平段严格水平、保序布局、动态容量 Top3 兜底
+    for key in ("g.knee", "knee = Offset(kneeX, targetY)", "end = Offset(g.endX, g.y)",
+                "sortedBy { it.anchor.y }", "coerceIn(pad, h - pad)", "capacity",
+                "take(3)", "Float.NEGATIVE_INFINITY", "maxOf(desired, last + minGap)"):
+        if key not in donut:
+            errors.append("DonutChart 缺第 71 批不交错布局要素: " + key)
+    if "var y: Float" in donut or "p2" in donut:
+        errors.append("指示线仍残留可变 y / 旧折点 p2（会画成斜的水平段）")
+    # 第 71 批：切换图标 MUST 是半箭头（2 横线 + 2 半尖斜线 = 4 条 drawLine）
+    si = stats.split("private fun SwitchLevelIcon()", 1)
+    if len(si) < 2:
+        errors.append("缺 SwitchLevelIcon")
+    else:
+        seg = si[1][:900]
+        n = seg.count("drawLine(")
+        if n != 4:
+            errors.append("SwitchLevelIcon 不是半箭头（drawLine 应为 4，实际 %d）" % n)
+        if "yu - tip" not in seg or "yd + tip" not in seg:
+            errors.append("SwitchLevelIcon 缺上半尖 / 下半尖斜线")
     # 只查 import 与真实调用：注释里写「零 drawText / TextMeasurer」不算。
     for key in ("import androidx.compose.ui.text.TextMeasurer",
                 "import androidx.compose.foundation.layout.FlowRow",
@@ -182,7 +201,7 @@ def main():
             print("  FAIL", e)
         print(f"check_stats_merge: {len(errors)} 项失败")
         return 1
-    print("check_stats_merge: PASS (第70批 文本+独立图标 / 灰底纯白零elevation / 环外指示线 / 撤回蓝底混卡跨Tab / 页内sheet / 零改表 / 8 MODIFIED)")
+    print("check_stats_merge: PASS (第71批 半箭头 / 指示线保序严格水平不交错 / Top3动态兜底 / 第70批全部 / 零改表 / 8 MODIFIED)")
     return 0
 
 

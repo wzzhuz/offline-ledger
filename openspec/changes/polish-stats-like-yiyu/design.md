@@ -312,3 +312,75 @@ Box(Modifier.height(250.dp).onSizeChanged { boxSize = it }) {
 | 静态检查 | `scripts/check_stats_merge.py` |
 | 四件套 | 本目录（proposal / design / tasks + 两份 delta spec） |
 | 文档 | 活文档 §7.52、`openspec/project.md` 第 70 批 |
+
+---
+
+## 11. 第 71 批修订：半箭头与不交错指示线
+
+### 11.1 图标：从完整三角箭头到 `⇌` 半箭头
+
+第 70 批用 6 条 `drawLine` 画了两支完整箭头（每支横线 + 上下两条斜线组成
+三角尖），观感偏"实"。一羽截图里的 `⇌` 其实是**鱼叉形**：
+
+```
+上： ─────────────→   只画「左上 → 右端点」一条斜线（上半个尖）
+下： ←─────────────   只画「右下 → 左端点」一条斜线（下半个尖）
+```
+
+即 `U+21CC right harpoon over left harpoon`。实现只改 `SwitchLevelIcon` 函数体：
+`yu = h*0.34f` / `yd = h*0.66f`，`tip = 7.dp`，4 条 `drawLine`。
+颜色仍 `CategoryHeaderBlue`，尺寸仍 20dp，按钮仍 32dp —— 按钮与标题三件套
+一行未动，MUST NOT 顺手改别处。
+
+### 11.2 交错根因：折点 y 与标签 y 脱钩
+
+第 70 批 `guides` 里：
+
+```kotlin
+y = p2.y                                  // 标签 y 初始 = 折点 y
+...
+if (g.y < last + gap) g.y = last + gap    // 只改 g.y，p2 不动
+...
+drawLine(start = g.p2, end = Offset(g.endX, g.y))   // 变成斜线！
+```
+
+「水平折线」在下推后变成斜线，且 `last` 从固定 `10.dp` 起算会**无谓下推**
+最顶部那个标签（哪怕它本来离别人很远），又没有上界 clamp，标签多时
+会跑出 250dp 图表盖住图例。三处叠加 → 真机看到交错。
+
+### 11.3 新布局：保序 + 整体平移 + 严格水平段
+
+```
+① raw = 每个扇区 (全局 index, 中点角算出的环外缘 anchor, left = cos<0)
+② 每侧 group0 = 该侧扇区；若 size > capacity 才按 index(金额降序) take(3)
+   group = group0.sortedBy { anchor.y }        // 保序：标签顺序 = 扇区顺序
+③ ys[k] = maxOf(anchor.y, last + minGap)       // 从 NEGATIVE_INFINITY 起，不下推首项
+   shift = 把整体平移进 [pad, h-pad]，再 coerceIn
+   （跨度 <= usable，所以不会挤到边界造成新重叠）
+④ kneeX = cx ± (outer + lead)                  // 同侧折点 x 固定
+   knee = Offset(kneeX, ys[k])；水平段 knee → (endX, ys[k])
+```
+
+- `GuideLine` 的 `y` 由 `var` 改回 `val`，`p1/p2` 改为 `anchor/knee`；
+  `knee.y == y` 由构造保证，**水平段绝不可能再是斜线**。
+- 圆点从 `p2` 移到 `knee`，末端 `Text` 的 `absoluteOffset` 仍用 `g.y - 8dp`，
+  三者严格同 y。
+- 斜线段 `anchor → knee` 只在环外缘到折点的窄带内；因标签顺序与环上锚点
+  顺序一致、折点 x 固定、且目标 y 尽量贴近锚点 y，视觉上互不交叉。
+- 颜色仍用**全局 index** 调 `ChartData.chartArgb(id, i)`，与 `drawArc` 同源；
+  降级 `take(3)` 后仍保留原 index，MUST NOT 重新编号导致颜色串味。
+
+### 11.4 兜底：动态容量，不是拍脑袋的分类数
+
+`capacity = ((h - 2*pad) / minGap).toInt() + 1`，250dp 高 / 20dp 间距时
+单侧约 12 个。只有当某侧标签数**真的超过容量**才按金额降序只标 Top3。
+这正好对应使用者「实在解决不了，连接线只连接 top3」——
+**解决得了就不降级**；一羽截图那 4~5 类、乃至 10 类以内都全量标注。
+环与图例列表始终全量，降级只影响指示线，不新增任何提示文字（不加戏）。
+
+### 11.5 明确未动
+
+环半径 `0.60f`、图高 250dp、pointerInput 命中判定、
+`ChartData` / `StatsLegend` / 统计口径、标题三件套、`StatsCard` 零 elevation、
+`LedgerTheme` 色值、图例灰条、`OtherRankCard` 折叠卡、`StatsDrillSheet`、
+`version = 7`、`Migrations.ALL`、零 `INTERNET`。

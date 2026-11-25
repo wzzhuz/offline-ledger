@@ -77,6 +77,14 @@ fun DonutChart(
 
     // 指示线数据：纯 Compose 侧按量到的尺寸算，Canvas 与 Text 共用同一份，
     // MUST NOT 在 DrawScope 里回写 state（会引发重组循环）。
+    //
+    // 第 71 批修「连接线交错」：
+    //  旧算法把标签 y 下推后**没同步更新折点 y**，所谓「水平折线」其实是斜线，
+    //  多条必然交叉；且 last 从 10dp 起算会无谓下推顶部标签、又没有上界。
+    //  新算法：① 每侧按环上锚点 y 排序**保序**；② 分配目标 y（最小间距 +
+    //  整体平移进 [pad, h-pad]，绝不越界）；③ 折点 x 固定、y = 目标 y，
+    //  水平段严格水平且彼此平行；④ 斜线段只从环外缘到折点，短且不跨线。
+    //  极端到单侧放不下时才按使用者给的兜底只标金额 Top3。
     val guides = remember(sectors, boxSize, totalCents) {
         val w = boxSize.width.toFloat()
         val h = boxSize.height.toFloat()
@@ -88,37 +96,77 @@ fun DonutChart(
             val radius = min(cx, cy) * 0.60f
             val thickness = radius * 0.42f
             val outer = radius + thickness / 2f
-            val lead = with(density) { 14.dp.toPx() }
-            val edge = with(density) { 6.dp.toPx() }
-            val list = sectors.mapIndexed { i, s ->
+            val lead = with(density) { 12.dp.toPx() }
+            val edge = with(density) { 4.dp.toPx() }
+            val pad = with(density) { 14.dp.toPx() }
+            val minGap = with(density) { 20.dp.toPx() }
+            val usable = h - 2f * pad
+            // 单侧真正放得下的标签数；超出才降级（不是按分类数拍脑袋）。
+            val capacity = (usable / minGap).toInt() + 1
+
+            // 保留全局 index，保证指示线颜色与 drawArc 完全同源。
+            val raw = sectors.mapIndexed { i, s ->
                 val mid = ((s.startAngle + s.sweepAngle / 2f) * PI / 180f).toFloat()
                 val c = cos(mid)
                 val sn = sin(mid)
-                val p1 = Offset(cx + outer * c, cy + outer * sn)
-                val p2 = Offset(cx + (outer + lead) * c, cy + (outer + lead) * sn)
-                val left = c < 0f
-                GuideLine(
+                RawGuide(
                     index = i,
-                    color = Color(ChartData.chartArgb(s.slice.id, i).toInt()),
-                    label = s.slice.name + " " +
-                        StatsLegend.percentText(s.slice.cents, totalCents),
-                    p1 = p1,
-                    p2 = p2,
-                    endX = if (left) edge else w - edge,
-                    y = p2.y,
-                    left = left
+                    sector = s,
+                    anchor = Offset(cx + outer * c, cy + outer * sn),
+                    left = c < 0f
                 )
             }
-            // 同侧按 y 排开，避免几条线叠在一起（一羽截图也是上下错开）。
-            val gap = with(density) { 22.dp.toPx() }
+
+            val out = mutableListOf<GuideLine>()
             listOf(true, false).forEach { side ->
-                var last = with(density) { 10.dp.toPx() }
-                list.filter { it.left == side }.sortedBy { it.y }.forEach { g ->
-                    if (g.y < last + gap) g.y = last + gap
-                    last = g.y
+                // 降级只在「真的放不下」时发生，且按原 index（金额降序）取 Top3。
+                var group0 = raw.filter { it.left == side }
+                if (group0.size > capacity) {
+                    group0 = group0.sortedBy { it.index }.take(3)
+                }
+                // 保序：按环上锚点 y 排，标签顺序与扇区顺序一致 → 不交错。
+                val group = group0.sortedBy { it.anchor.y }
+                val n = group.size
+                if (n == 0) return@forEach
+
+                // ① 以锚点 y 为基础做最小间距下推（保序）
+                val ys = FloatArray(n)
+                var last = Float.NEGATIVE_INFINITY
+                for (k in 0 until n) {
+                    val desired = group[k].anchor.y
+                    ys[k] = if (last == Float.NEGATIVE_INFINITY) desired
+                    else maxOf(desired, last + minGap)
+                    last = ys[k]
+                }
+                // ② 整体平移进可用范围（跨度 <= usable，不会挤到边界）
+                val shift = when {
+                    ys[0] < pad -> pad - ys[0]
+                    ys[n - 1] > h - pad -> (h - pad) - ys[n - 1]
+                    else -> 0f
+                }
+                for (k in 0 until n) ys[k] = (ys[k] + shift).coerceIn(pad, h - pad)
+
+                val kneeX = if (side) cx - (outer + lead) else cx + (outer + lead)
+                val endX = if (side) edge else w - edge
+                for (k in 0 until n) {
+                    val g = group[k]
+                    val targetY = ys[k]
+                    out.add(
+                        GuideLine(
+                            index = g.index,
+                            color = Color(ChartData.chartArgb(g.sector.slice.id, g.index).toInt()),
+                            label = g.sector.slice.name + " " +
+                                StatsLegend.percentText(g.sector.slice.cents, totalCents),
+                            anchor = g.anchor,
+                            knee = Offset(kneeX, targetY),
+                            endX = endX,
+                            y = targetY,
+                            left = side
+                        )
+                    )
                 }
             }
-            list
+            out
         }
     }
 
@@ -176,19 +224,20 @@ fun DonutChart(
                             style = stroke
                         )
                     }
-                    // 第 70 批：环外指示线 = 斜引线 + 水平折线 + 端点小圆点。
+                    // 第 71 批：环外指示线 = 短斜引线 + **严格水平**折线 + 折点小圆点。
+                    // knee.y == g.y，水平段彼此平行，MUST NOT 再出现斜的「水平段」。
                     val lineWidth = 1.5f
                     val dot = 2.5f
                     guides.forEach { g ->
                         drawLine(
-                            color = g.color, start = g.p1, end = g.p2,
+                            color = g.color, start = g.anchor, end = g.knee,
                             strokeWidth = lineWidth
                         )
                         drawLine(
-                            color = g.color, start = g.p2,
+                            color = g.color, start = g.knee,
                             end = Offset(g.endX, g.y), strokeWidth = lineWidth
                         )
-                        drawCircle(color = g.color, radius = dot, center = g.p2)
+                        drawCircle(color = g.color, radius = dot, center = g.knee)
                     }
                 }
             }
@@ -315,14 +364,22 @@ fun DonutChart(
     }
 }
 
-/** 一条引导线的数据，Canvas 画线 / Text 定位共用。y 可被去重叠逻辑下推。 */
+/** 布局中间量：环外缘锚点 + 全局 index（颜色与 drawArc 同源）。 */
+private class RawGuide(
+    val index: Int,
+    val sector: ChartSector,
+    val anchor: Offset,
+    val left: Boolean
+)
+
+/** 一条引导线的数据，Canvas 画线 / Text 定位共用。knee.y == y，水平段严格水平。 */
 private class GuideLine(
     val index: Int,
     val color: Color,
     val label: String,
-    val p1: Offset,
-    val p2: Offset,
+    val anchor: Offset,
+    val knee: Offset,
     val endX: Float,
-    var y: Float,
+    val y: Float,
     val left: Boolean
 )

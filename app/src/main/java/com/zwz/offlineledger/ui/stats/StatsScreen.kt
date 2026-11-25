@@ -971,7 +971,15 @@ private fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
     )
 }
 
-/** 自绘的 ⇄ 小图标：两条反向箭头，零新增依赖 / 零资源 / 零实验性 API。 */
+/**
+ * 第 71 批：一羽式**半箭头**切换图标（形如 `⇌`）。
+ *
+ * 上一版是两条完整三角箭头（每个箭头尖画上下两条斜线），太"实"。
+ * 一羽那个是「上箭头只有上半个尖、下箭头只有下半个尖」的鱼叉形：
+ * 上：一条横线 + 右端只保留**左上→右端点**那一条斜线；
+ * 下：一条横线 + 左端只保留**右下→左端点**那一条斜线。
+ * 零新增依赖 / 零资源 / 零实验性 API，只用 Canvas.drawLine。
+ */
 @Composable
 private fun SwitchLevelIcon() {
     Canvas(modifier = Modifier.size(20.dp)) {
@@ -981,14 +989,14 @@ private fun SwitchLevelIcon() {
         val sw = 2f
         val x1 = 2.dp.toPx()
         val x2 = w - 4.dp.toPx()
-        val tip = 9.dp.toPx()
-        // 上箭头 →
-        drawLine(c, Offset(x1, h * 0.33f), Offset(x2, h * 0.33f), sw)
-        drawLine(c, Offset(x2 - tip, h * 0.20f), Offset(x2, h * 0.33f), sw)
-        drawLine(c, Offset(x2 - tip, h * 0.46f), Offset(x2, h * 0.33f), sw)
-        // 下箭头 ←
-        drawLine(c, Offset(w - x1, h * 0.67f), Offset(4.dp.toPx(), h * 0.67f), sw)
-        drawLine(c, Offset(4.dp.toPx() + tip, h * 0.54f), Offset(4.dp.toPx(), h * 0.67f), sw)
-        drawLine(c, Offset(4.dp.toPx() + tip, h * 0.80f), Offset(4.dp.toPx(), h * 0.67f), sw)
+        val tip = 7.dp.toPx()
+        val yu = h * 0.34f
+        val yd = h * 0.66f
+        // 上 →：只画上半个箭头尖
+        drawLine(c, Offset(x1, yu), Offset(x2, yu), sw)
+        drawLine(c, Offset(x2 - tip, yu - tip), Offset(x2, yu), sw)
+        // 下 ←：只画下半个箭头尖
+        drawLine(c, Offset(x2, yd), Offset(x1, yd), sw)
+        drawLine(c, Offset(x1 + tip, yd + tip), Offset(x1, yd), sw)
     }
 }
