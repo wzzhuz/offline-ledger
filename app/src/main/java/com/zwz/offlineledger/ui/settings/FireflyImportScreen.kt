@@ -11,13 +11,17 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,12 +34,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.backup.csv.FireflyAccountChoice
+import com.zwz.offlineledger.backup.csv.FireflyOpeningPolicy
 import com.zwz.offlineledger.backup.csv.FireflyCategoryChoice
 import com.zwz.offlineledger.backup.csv.FireflyCsvCodec
 import com.zwz.offlineledger.core.accountLabel
+import com.zwz.offlineledger.ui.components.CategorySelectDialog
+import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import com.zwz.offlineledger.backup.csv.FireflyImportOutcome
 import com.zwz.offlineledger.data.local.entity.AccountEntity
+import com.zwz.offlineledger.data.local.entity.CategoryEntity
+import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /**
@@ -135,23 +144,43 @@ fun FireflyImportScreen(
                             color = LedgerColors.Neutral
                         )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "覆盖已有账户的期初余额",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = st.overwriteOpening,
-                            onCheckedChange = { vm.setFireflyOverwriteOpening(it) }
-                        )
+                    // 第 74 批（Q2A）：布尔开关 → 三态策略。
+                    Text(
+                        text = "已有账户的期初余额",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        FireflyOpeningPolicy.values().forEach { p ->
+                            FilterChip(
+                                selected = st.openingPolicy == p,
+                                onClick = { vm.setFireflyOpeningPolicy(p) },
+                                label = {
+                                    Text(
+                                        when (p) {
+                                            FireflyOpeningPolicy.KEEP -> "保持"
+                                            FireflyOpeningPolicy.OVERWRITE -> "覆盖"
+                                            FireflyOpeningPolicy.ADJUST -> "差额调整"
+                                        }
+                                    )
+                                },
+                                modifier = Modifier.padding(end = 6.dp)
+                            )
+                        }
                     }
                     Text(
-                        text = "默认关闭：映射到已有账户时不动它现在的期初，" +
-                            "对应期初行会跳过并计入报告；新建账户则用导出的期初值。",
+                        text = when (st.openingPolicy) {
+                            FireflyOpeningPolicy.KEEP ->
+                                "保持（默认）：完全不动已有账户的期初，FF3 期初行计入跳过报告；" +
+                                    "新建账户仍用导出值。"
+                            FireflyOpeningPolicy.OVERWRITE ->
+                                "覆盖：把 FF3 期初写入 initialBalanceCents。已有流水的账户会" +
+                                    "整体平移历史余额、已对账余额也会变；改名映射同样生效。"
+                            FireflyOpeningPolicy.ADJUST ->
+                                "差额调整：不改写历史起点，按「FF3 期初 − 当前期初」走既有" +
+                                    "调整机制；最终余额与覆盖一致，但已对账余额不变。" +
+                                    "第二次导入不会重复累加。"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = LedgerColors.Neutral
                     )
@@ -182,7 +211,7 @@ fun FireflyImportScreen(
                             )
                         }
                         items(st.accounts) { choice ->
-                            FireflyAccountRow(choice, state.accounts) {
+                            FireflyAccountRow(choice, state.accounts, st.openingBySource) {
                                 vm.updateFireflyAccount(it)
                             }
                         }
@@ -194,7 +223,7 @@ fun FireflyImportScreen(
                             )
                         }
                         items(st.categories) { choice ->
-                            FireflyCategoryRow(choice) {
+                            FireflyCategoryRow(choice, state.categories) {
                                 vm.updateFireflyCategory(it)
                             }
                         }
@@ -333,6 +362,7 @@ private fun FireflyResultView(
 private fun FireflyAccountRow(
     choice: FireflyAccountChoice,
     existing: List<AccountEntity>,
+    openingBySource: Map<String, Long>,
     onChange: (FireflyAccountChoice) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -351,6 +381,25 @@ private fun FireflyAccountRow(
                 style = MaterialTheme.typography.labelSmall,
                 color = LedgerColors.Neutral
             )
+            // 第 74 批：把「空记录 / 有记录」判断所需的两值直接摆出来，
+            // 免得使用者在覆盖期初前还要去资产页翻当前期初。
+            if (!choice.isNew) {
+                val mapped = existing.firstOrNull {
+                    !it.isArchived && it.name == choice.targetName &&
+                        (choice.targetCardLast4 == null ||
+                            it.cardLast4 == choice.targetCardLast4)
+                }
+                if (mapped != null) {
+                    val ff3 = openingBySource[choice.sourceName]
+                    Text(
+                        text = "当前期初 ¥" + formatCents(mapped.initialBalanceCents) +
+                            " · FF3 期初 " +
+                            (ff3?.let { "¥" + formatCents(it) } ?: "无（不动）"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LedgerColors.Neutral
+                    )
+                }
+            }
         }
         Box {
             TextButton(onClick = { expanded = true }) { Text("选择") }
@@ -393,9 +442,11 @@ private fun FireflyAccountRow(
 @Composable
 private fun FireflyCategoryRow(
     choice: FireflyCategoryChoice,
+    categories: List<CategoryEntity>,
     onChange: (FireflyCategoryChoice) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
     val label = choice.root + if (choice.child.isBlank()) "" else " / " + choice.child
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -409,20 +460,34 @@ private fun FireflyCategoryRow(
             Text(
                 text = when {
                     choice.skip -> "不设分类"
-                    choice.targetRoot.isBlank() -> "按原名自动新建"
-                    else -> "复用一级 · " + choice.targetRoot
+                    choice.targetCategoryId != null ->
+                        "映射到 · " + choice.targetDisplayName
+                    else -> "按原名自动新建"
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = LedgerColors.Neutral
             )
         }
+        // 第 74 批（Q1A）：分类本身一律走全量只读选择器
+        //（搜索 + 左分组导航 + 右彩色图标网格），MUST NOT 用下拉框逐个列分类。
+        TextButton(onClick = { showPicker = true }) { Text("选择分类") }
         Box {
-            TextButton(onClick = { expanded = true }) { Text("选择") }
+            IconButton(onClick = { expanded = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "更多映射方式")
+            }
+            // 这个下拉里**只有两个动作**，不含任何分类项。
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 DropdownMenuItem(
                     text = { Text("按原名自动新建") },
                     onClick = {
-                        onChange(choice.copy(targetRoot = "", skip = false))
+                        onChange(
+                            choice.copy(
+                                targetCategoryId = null,
+                                targetDisplayName = "",
+                                targetRoot = "",
+                                skip = false
+                            )
+                        )
                         expanded = false
                     }
                 )
@@ -435,5 +500,32 @@ private fun FireflyCategoryRow(
                 )
             }
         }
+    }
+
+    if (showPicker) {
+        CategorySelectDialog(
+            categories = categories,
+            // FF3 的 EXPENSE / INCOME 各自建树，选择器 MUST 按同类型过滤，
+            // 免得把支出流水映射到收入分类。
+            type = try {
+                RecordType.valueOf(choice.type)
+            } catch (e: IllegalArgumentException) {
+                null
+            },
+            selectedId = choice.targetCategoryId,
+            allowAll = false,
+            title = "映射「" + label + "」到分类",
+            onSelect = { c ->
+                onChange(
+                    choice.copy(
+                        targetCategoryId = c.categoryId,
+                        targetDisplayName = c.displayLabel,
+                        targetRoot = "",
+                        skip = false
+                    )
+                )
+            },
+            onDismiss = { showPicker = false }
+        )
     }
 }

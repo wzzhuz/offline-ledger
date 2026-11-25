@@ -91,20 +91,31 @@ data class FireflyAccountChoice(
     val targetCardLast4: String? = null
 )
 
-/** 分类映射：targetRoot 为空表示按 FF3 原名自动新建；skip 表示不设分类。 */
+/**
+ * 分类映射。第 74 批（Q1A）：使用者要求「分类用分类选择器，不要下拉框一个个分类选」，
+ * 因此新增 `targetCategoryId` —— 由只读全量选择器按 **id** 精确回填，
+ * 可指向一级或二级；`targetDisplayName` 仅用于预览行回显（「餐饮 / 早餐」）。
+ * `targetRoot` 保留为旧「按名称复用一级」路径的兼容字段，UI 不再写入；
+ * `targetCategoryId == null && !skip` 时仍走「按 FF3 原名自动新建」。
+ */
 data class FireflyCategoryChoice(
     val key: String,
     val root: String,
     val child: String,
     val type: String,
     val targetRoot: String,
-    val skip: Boolean = false
+    val skip: Boolean = false,
+    val targetCategoryId: Long? = null,
+    val targetDisplayName: String = ""
 )
+
+/** 第 74 批（Q2A）：已有账户期初由布尔开关升级为三态策略。 */
+enum class FireflyOpeningPolicy { KEEP, OVERWRITE, ADJUST }
 
 data class FireflyMapping(
     val accounts: Map<String, FireflyAccountChoice>,
     val categories: Map<String, FireflyCategoryChoice>,
-    val overwriteOpeningForExisting: Boolean = false
+    val openingPolicy: FireflyOpeningPolicy = FireflyOpeningPolicy.KEEP
 )
 
 data class FireflyImportOutcome(

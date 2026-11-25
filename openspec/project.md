@@ -1265,7 +1265,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 归档 CI `45582635089` completed success（19 步，docs-only）；
   复核数据见 `openspec/归档报告.md` §7。
 
-### 归档后待办：Firefly III 导入两条问题（仅核查，未动代码）
+### 归档后待办：Firefly III 导入两条问题（历史，第 74 批已修）
 
 - ① 分类映射下拉只有「按原名自动新建 / 不设分类」；
   数据模型 `FireflyCategoryChoice.targetRoot` 其实支持「复用一级」，
@@ -1275,4 +1275,35 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   （默认关闭 → 跳过）；开关开启时还有一个隐蔽前置条件
   `targetName == name`，改名映射会静默不覆盖。
   详见本轮分析回复，方案待使用者拍板。
+
+## 第 74 批：Firefly III 映射补全（change `refine-firefly-mapping`，v0.2.53）
+
+- **触发**：第 73 批归档后核查出两条 Firefly 导入问题 + 使用者
+  Q1A / Q2A / Q3A / Q4A，追加硬约束「分类用分类选择器，不要下拉框一个个分类选」。
+- **① 分类（Q1A）**：复用零改动的 `CategorySelectDialog`
+  （搜索 + 左分组导航 + 右 4 列彩色网格、按 `RecordType` 过滤），
+  按 `CategorySelectChoice.categoryId` **按 id** 写入
+  `FireflyCategoryChoice.targetCategoryId` / `targetDisplayName`；
+  可映射预制或已有的一级 / 二级。`⋯` 下拉只留两个动作，不含任何分类。
+  `importFirefly` 按 id 命中后 MUST NOT 再按名字建/复用或挂新子类；
+  类型不一致 / 目标不存在报错整批回滚。同名一级自动预填也改按 id。
+- **② 期初（Q2A）**：`FireflyMapping` 布尔开关 →
+  `FireflyOpeningPolicy { KEEP, OVERWRITE, ADJUST }`，默认 `KEEP`。
+  `ADJUST` 不改 `initialBalanceCents`，按 `FF3期初 − 当前期初` 走
+  `BalanceAdjustmentEntity(source = FIREFLY_OPENING)`，
+  终值与覆盖一致但历史起点不变；插入前查同账户同 source 调整做幂等，
+  防第二次导入重复累加。
+- **③ 暗条件（Q3A）**：删掉 `targetName == name`，改名映射同样生效，
+  预览页明示覆盖会平移历史余额。
+- **④ 预览**：`FireflyImportState` 加 `openingBySource`（与 repository 同口径），
+  账户行显示「当前期初 ¥X · FF3 期初 ¥Y / 无（不动）」，不加新 DAO 查询。
+- **零升表**：映射模型只在内存，`AccountEntity` / `CategoryEntity` /
+  所有 DAO / `version = 7` / `Migrations.ALL` / 备份 DTO /
+  CSV 复合匹配键 / FF3 幂等键全不动 → **v0.2.52 直接覆盖安装**。
+- **验证**：新建 change 四件套（2 条 ADDED / 15 Scenario），
+  新增第 9 个静态脚本 `check_firefly_mapping.py`；
+  `docs/FireflyIII导入说明.md` 同步三态与选择器口径，
+  并把末尾过时的 `version = 2` 订正为现行 `version = 7`。
+- 4 个已归档 change 与其余 6 个进行中 change 未动；
+  `refine-firefly-mapping` 仍待使用者明确说「可以归档」。
 

@@ -15,6 +15,9 @@ import com.zwz.offlineledger.core.DataRefreshBus
 import com.zwz.offlineledger.backup.csv.FireflyAccountChoice
 import com.zwz.offlineledger.backup.csv.FireflyCategoryChoice
 import com.zwz.offlineledger.backup.csv.FireflyCsvCodec
+import com.zwz.offlineledger.engine.Cents
+import com.zwz.offlineledger.backup.csv.FireflyKind
+import com.zwz.offlineledger.backup.csv.FireflyOpeningPolicy
 import com.zwz.offlineledger.backup.csv.FireflyImportOutcome
 import com.zwz.offlineledger.backup.csv.FireflyMapping
 import com.zwz.offlineledger.backup.csv.FireflyPlan
@@ -58,7 +61,10 @@ data class FireflyImportState(
     val plan: FireflyPlan,
     val accounts: List<FireflyAccountChoice>,
     val categories: List<FireflyCategoryChoice>,
-    val overwriteOpening: Boolean = false
+    /** 第 74 批：已有账户期初策略（默认保持），取代原布尔开关。 */
+    val openingPolicy: FireflyOpeningPolicy = FireflyOpeningPolicy.KEEP,
+    /** FF3 期初按源账户名累加（分），与 repository 同一口径，供预览行回显。 */
+    val openingBySource: Map<String, Long> = emptyMap()
 )
 
 data class SettingsState(
@@ -473,6 +479,9 @@ class SettingsViewModel(
                     )
                 }
                 val categoryChoices = plan.categoryKeys.map { ck ->
+                    // 第 74 批：同名一级自动预填也改成按 id（不再是按名字），
+                    // 使用者可在预览页点「选择分类」用全量选择器改到任意
+                    // 已有/预制一级或二级分类。
                     val rootHit = existingCategories.firstOrNull {
                         it.level == 0 && it.type.name == ck.type && it.name == ck.root
                     }
@@ -481,13 +490,27 @@ class SettingsViewModel(
                         root = ck.root,
                         child = ck.child,
                         type = ck.type,
-                        targetRoot = rootHit?.name ?: "",
-                        skip = false
+                        targetRoot = "",
+                        skip = false,
+                        targetCategoryId = rootHit?.id,
+                        targetDisplayName = rootHit?.name ?: ""
                     )
+                }
+                // 与 repository 的 openingBySource 完全同源：OPENING 行按源名累加分。
+                val openingBySource = withContext(Dispatchers.Default) {
+                    val m = HashMap<String, Long>()
+                    plan.entries.filter { it.kind == FireflyKind.OPENING }.forEach { e ->
+                        val c = Cents.fromYuan(e.amountYuan).value
+                        m[e.accountName] = (m[e.accountName] ?: 0L) + c
+                    }
+                    m.toMap()
                 }
                 _state.update { st -> st.copy(
                     busy = false,
-                    firefly = FireflyImportState(plan, accountChoices, categoryChoices)
+                    firefly = FireflyImportState(
+                        plan, accountChoices, categoryChoices,
+                        openingBySource = openingBySource
+                    )
                 ) }
             } catch (e: Exception) {
                 _state.update { st -> st.copy(
@@ -520,9 +543,9 @@ class SettingsViewModel(
         ) }
     }
 
-    fun setFireflyOverwriteOpening(value: Boolean) {
+    fun setFireflyOpeningPolicy(value: FireflyOpeningPolicy) {
         val cur = _state.value.firefly ?: return
-        _state.update { st -> st.copy(firefly = cur.copy(overwriteOpening = value)) }
+        _state.update { st -> st.copy(firefly = cur.copy(openingPolicy = value)) }
     }
 
     fun cancelFireflyImport() {
@@ -545,7 +568,7 @@ class SettingsViewModel(
         val mapping = FireflyMapping(
             accounts = cur.accounts.associateBy { it.sourceName },
             categories = cur.categories.associateBy { it.key },
-            overwriteOpeningForExisting = cur.overwriteOpening
+            openingPolicy = cur.openingPolicy
         )
         val totalRows = cur.plan.recordCount + cur.plan.openingCount + cur.plan.skippedCount
         viewModelScope.launch {

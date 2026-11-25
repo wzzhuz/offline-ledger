@@ -44,6 +44,7 @@ import com.zwz.offlineledger.backup.csv.resolveAccount
 import com.zwz.offlineledger.backup.csv.CsvRow
 import com.zwz.offlineledger.backup.csv.FireflyKind
 import com.zwz.offlineledger.backup.csv.FireflyMapping
+import com.zwz.offlineledger.backup.csv.FireflyOpeningPolicy
 import com.zwz.offlineledger.backup.csv.FireflyPlan
 import com.zwz.offlineledger.backup.csv.FireflyImportOutcome
 import com.zwz.offlineledger.core.accountLabel
@@ -923,7 +924,8 @@ class LedgerRepository @Inject constructor(
      * 单事务：按需新建账户 / 两级分类 -> 批量写流水 -> 末尾重算余额。
      * 第 23 批：幂等改由 records(importSource, sourceId) 复合唯一索引保证，
      * 不再依赖备注前缀；备注里的 ff3:<journal_id> 仅作人类可读线索。
-     * 映射到已有账户时默认不覆盖其期初余额，需显式授权才改。
+     * 第 74 批：映射到已有账户时期初改为三态策略（保持 / 覆盖 / 差额调整），
+     * 并修掉「改名映射静默不覆盖」的 `targetName == name` 暗条件。
      */
     suspend fun importFirefly(
         plan: FireflyPlan,
@@ -957,11 +959,37 @@ class LedgerRepository @Inject constructor(
                 accountIds[name] = hit.id
                 val opening = openingBySource[name]
                 if (opening != null) {
-                    if (mapping.overwriteOpeningForExisting && targetName == name) {
-                        accountDao.update(hit.copy(initialBalanceCents = opening))
-                        openingsApplied++
-                    } else {
-                        openingsSkipped++
+                    when (mapping.openingPolicy) {
+                        FireflyOpeningPolicy.KEEP -> openingsSkipped++
+                        FireflyOpeningPolicy.OVERWRITE -> {
+                            // Q3A：不再要求 targetName == name，改名映射同样生效。
+                            // 注意这会重写余额真相源，已有流水的账户全部历史余额平移。
+                            accountDao.update(hit.copy(initialBalanceCents = opening))
+                            openingsApplied++
+                        }
+                        FireflyOpeningPolicy.ADJUST -> {
+                            // Q2A「差额调整」：不动 initialBalanceCents（历史起点保持），
+                            // 走既有调整机制把「FF3 期初 - 当前期初」补进去。
+                            // 末尾 rebuildAllBalancesInternal() 会把 adjustments 计入。
+                            // 幂等：同一账户已有 FIREFLY_OPENING 调整时不再插第二条，
+                            // 否则第二次导入同一份文件会把差额重复累加。
+                            val already = adjustmentDao.allActive().any {
+                                it.accountId == hit.id && it.source == "FIREFLY_OPENING"
+                            }
+                            val delta = opening - hit.initialBalanceCents
+                            if (!already && delta != 0L) {
+                                adjustmentDao.insert(
+                                    BalanceAdjustmentEntity(
+                                        accountId = hit.id,
+                                        deltaCents = delta,
+                                        memo = "Firefly III 期初差额调整",
+                                        source = "FIREFLY_OPENING",
+                                        createdAt = System.currentTimeMillis()
+                                    )
+                                )
+                            }
+                            openingsApplied++
+                        }
                     }
                 }
             } else {
@@ -1002,6 +1030,29 @@ class LedgerRepository @Inject constructor(
             val choice = mapping.categories[ck.key()]
             if (choice != null && choice.skip) return@forEach
             val type = RecordType.valueOf(ck.type)
+            // 第 74 批（Q1A）：使用者通过全量分类选择器按 id 精确映射到
+            // 已有/预制分类（可一级可二级）。命中后直接用该 id，
+            // MUST NOT 再按名字新建/复用，也 MUST NOT 把 FF3 的二级名挂成新子类。
+            val selectedId = choice?.targetCategoryId
+            if (selectedId != null) {
+                val hit = existingCategories.firstOrNull {
+                    it.id == selectedId && !it.isArchived
+                } ?: throw IllegalArgumentException(
+                    "分类映射目标不存在：" + (choice?.targetDisplayName ?: selectedId)
+                )
+                require(hit.type == type) {
+                    "分类映射类型不一致：「" + hit.name + "」不是 " + type
+                }
+                val rootId = if (hit.level == 0) hit.id else (hit.parentId ?: hit.id)
+                // second 为 null 表示「只选一级」，与既有写流水
+                // `pair?.second ?: pair?.first` 的语义完全兼容。
+                categoryIds[ck.key()] = Pair(
+                    rootId,
+                    if (hit.level == 1) hit.id else null
+                )
+                return@forEach
+            }
+            // 未选已有分类 → 保留「按原名自动新建 / 同名一级自动复用」旧路径。
             val rootName = choice?.targetRoot?.takeIf { it.isNotBlank() } ?: ck.root
             val rootKey = ck.type + "|" + rootName
             val resolvedRoot: CategoryEntity =
