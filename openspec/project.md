@@ -1324,3 +1324,28 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 4 个已归档 change 与其余 6 个进行中 change 未动；
   `refine-firefly-mapping` 仍待使用者明确说「可以归档」。
 
+## 第 75 批：账单多标签（change `add-record-tags`，阶段 0 对齐）
+
+- **触发**：「预制分类加利息 / 转账给老婆怎么分类」→ 核查答「利息已预制在
+  `收入 → 理财收益 → 利息`（id 33001）」、转账无分类字段；
+  使用者追问标签与多标签是不是同类 App 标配。
+- **核查**：一羽 v4.3.0 起支持 `#tag`（CSV 多标签逗号分隔、最多 8 个），
+  Firefly III 把 tags 与 budgets / categories 并列且支持一笔多标签；
+  「快捷标签写进备注靠搜索」是伪标签。分类互斥、标签交叉，
+  多标签合计会超过总支出 → 标签维度 MUST NOT 硬算百分比。
+- **五项对齐（使用者「按你拟的」全放行）**：Q1A 关联表多标签
+  (`tags` + `record_tags`)；Q2A 全链路含 Firefly tags 落标签、统计标签维度、
+  备份/CSV/Firefly/回收站四条往返；Q3A 独立标签管理页 + 预置
+  「给老婆 / 家用 / 旅行」；Q4A `version = 8`、`Migrations.ALL` 仍空、
+  **覆盖安装开库失败，必须先导出备份再卸载重装**；Q5A 利息不动、
+  预制分类清单逐字段零改动。
+- **规格**：新建 change `add-record-tags`，7 个文件，
+  **9 条 Requirement（6 ADDED + 3 MODIFIED / 27 Scenario）**；
+  3 条 MODIFIED 整块替换基线过时条文（`version SHALL 为 1 / 5 / 2` → 8）。
+  新增第 10 个静态脚本 `check_record_tags.py`。
+- **状态**：四件套与脚本落本地、10 个静态检查全 PASS、
+  标题与 273 条基线零冲突；**停在推送门禁**，未推远端、未改 App 代码、
+  `version` 仍是 7、包仍是 v0.2.53。
+- 7 个进行中 change 与 4 个已归档 change 未动；
+  `refine-firefly-mapping` 仍待使用者明确说「可以归档」。
+
