@@ -1307,3 +1307,20 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 4 个已归档 change 与其余 6 个进行中 change 未动；
   `refine-firefly-mapping` 仍待使用者明确说「可以归档」。
 
+### 第 74 批实测（v0.2.53 出包）
+
+- 四件套 + 实现 `644546b906de`（13 文件 / blob 590）；首轮 push CI
+  `45586904827` 挂在 `Unresolved reference 'Cents'` —— 包名误写
+  `engine.Cents`，实际 `core.money.Cents`。日志 403，临时给 `build.yml`
+  加日志回写 comment 诊断两次（第一次被 `--stacktrace` 淹没），
+  用完**逐字节恢复官方原版**、总 blob 回到 590 无残留。
+  两条诊断 comment 删除返回 404（PAT 权限不足），挂在中间 commit 上。
+- 修复 `ab7d9f78d20a` → push CI `45588221397` **success**（19 步）；
+  出包 CI `45589137394` success（28 步无染绿）。
+- tag `v0.2.53` → `ab7d9f78d20a`；Release 附件
+  `offline-ledger-v0.2.53-release-ab7d9f78.apk`
+  （3463448 B，SHA256 `55b983cabeb26070eeeb597a3f2e3b6fe500589b98f30b86ec931f79c2502ee7`），`state=uploaded` + `digest` 与 notes 一致。
+- artifacts 3 个、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
+- 4 个已归档 change 与其余 6 个进行中 change 未动；
+  `refine-firefly-mapping` 仍待使用者明确说「可以归档」。
+
