@@ -31,7 +31,8 @@ class ExtraAmountRoundTripTest {
         val text = String(bytes, Charsets.UTF_8).removePrefix("\uFEFF")
         assertTrue(text.startsWith(CsvCodec.HEADER.joinToString(",")))
         assertTrue(text.contains("29.99"))
-        assertEquals(15, CsvCodec.HEADER.size)
+        // 第 75 批：HEADER 末尾追加 tags，15 → 16 列。
+        assertEquals(16, CsvCodec.HEADER.size)
         val back = CsvCodec.parseImport(bytes)
         assertTrue(back.errors.isEmpty())
         assertEquals("29.99", back.rows.single().discountYuan)
@@ -40,8 +41,9 @@ class ExtraAmountRoundTripTest {
     }
 
     @Test
-    fun `02 老 13 列 CSV 缺两列按空串兼容`() {
-        val oldHeader = CsvCodec.HEADER.dropLast(2)
+    fun `02 老 13 列 CSV 缺三列按空串兼容`() {
+        // 第 75 批：末尾新增 tags，老 13 列需 dropLast(3) 去掉 discount/fee/tags。
+        val oldHeader = CsvCodec.HEADER.dropLast(3)
         val cells = listOf(
             "2026-11-13", "EXPENSE", "470.01", "微信", "餐饮", "食材",
             "午餐", "CNY", "", "", "", "", ""
@@ -52,6 +54,7 @@ class ExtraAmountRoundTripTest {
         assertTrue(back.errors.isEmpty())
         assertEquals("", back.rows.single().discountYuan)
         assertEquals("", back.rows.single().feeYuan)
+        assertEquals("", back.rows.single().tags)
     }
 
     @Test
