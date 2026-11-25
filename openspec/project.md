@@ -1262,7 +1262,8 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   并新增断言主 spec 已含第 72 批径向折点措辞；8 个静态检查全 PASS。
 - **零代码 / 零资源 / 零规格语义变化，不出新包**：v0.2.52 仍是最新安装包，
   tag / Release / digest 不变。§8 第 45–72 批真机待验项整体继承，归档不是验收。
-- 复核数据见 `openspec/归档报告.md` §7。
+- 归档 CI `45582635089` completed success（19 步，docs-only）；
+  复核数据见 `openspec/归档报告.md` §7。
 
 ### 归档后待办：Firefly III 导入两条问题（仅核查，未动代码）
 
