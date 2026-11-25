@@ -127,7 +127,7 @@ fun RecordDetailPage(
                 DetailLine("交易对方", row.counterparty.takeIf { it.isNotBlank() } ?: "—")
                 DetailLine("描述", row.description.takeIf { it.isNotBlank() } ?: "—")
                 DetailLine("备注", row.note.takeIf { it.isNotBlank() } ?: "—")
-                if (row.tagNames.isNotBlank()) {
+                if (row.tagNames.orEmpty().isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
                     TagChips(row.tagNames)
                 }
