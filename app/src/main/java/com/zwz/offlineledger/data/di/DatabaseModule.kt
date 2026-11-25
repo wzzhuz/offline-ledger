@@ -7,6 +7,7 @@ import com.zwz.offlineledger.data.local.AppDatabase
 import com.zwz.offlineledger.data.local.Migrations
 import com.zwz.offlineledger.data.local.SeedCallback
 import com.zwz.offlineledger.data.local.dao.AccountDao
+import com.zwz.offlineledger.data.local.dao.TagDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.BudgetDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
@@ -60,4 +61,6 @@ object DatabaseModule {
     @Provides fun provideRecurringRuleDao(db: AppDatabase): RecurringRuleDao = db.recurringRuleDao()
     @Provides fun provideBudgetDao(db: AppDatabase): BudgetDao = db.budgetDao()
     @Provides fun provideCounterpartyAliasDao(db: AppDatabase): CounterpartyAliasDao = db.counterpartyAliasDao()
+    /** 第 75 批：LedgerEntryPoint.tagDao() 与标签管理页共用此绑定。 */
+    @Provides fun provideTagDao(db: AppDatabase): TagDao = db.tagDao()
 }

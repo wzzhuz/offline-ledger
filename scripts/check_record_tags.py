@@ -78,6 +78,9 @@ def main():
         if k not in dto: errs.append("BackupPayload 缺: " + k)
     trash = read("app/src/main/java/com/zwz/offlineledger/data/local/entity/TrashEntryEntity.kt")
     if 'name = "tagNames"' not in trash: errs.append("TrashEntryEntity 缺 tagNames")
+    dim = read("app/src/main/java/com/zwz/offlineledger/data/di/DatabaseModule.kt")
+    if "fun provideTagDao(db: AppDatabase): TagDao" not in dim:
+        errs.append("DatabaseModule 缺 TagDao 的 Hilt @Provides 绑定（Dagger/MissingBinding）")
     seed = read("app/src/main/java/com/zwz/offlineledger/data/local/SeedCallback.kt")
     for k in ["给老婆", "家用", "旅行"]:
         if k not in seed: errs.append("SeedCallback 缺预置标签: " + k)
