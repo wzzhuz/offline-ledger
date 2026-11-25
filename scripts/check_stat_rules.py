@@ -43,6 +43,7 @@ def main() -> int:
                    'monthlyTrendForCurrency', 'dailyTotalsForCurrency',
                    'rootTotalsForCurrency', 'categoryTotalsForCurrency',
                    'subcategoryTotalsUnderRootForCurrency', 'drillDownRowsForCurrency',
+                   'drillDownRowsForRootCurrency',
                    'settlementByRootForCurrency', 'settlementByCategoryForCurrency',
                    'settlementTotalForCurrency',
                    # 第 13 批：洞察只读聚合，同样必须带唯一口径

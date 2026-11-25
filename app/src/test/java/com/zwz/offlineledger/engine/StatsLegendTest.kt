@@ -65,4 +65,20 @@ class StatsLegendTest {
         assertEquals("19.41%", StatsLegend.percentText(paid, total))
         assertEquals(10_000L, paid + discount)
     }
+
+    @Test
+    fun `08 灰色长条宽度与金额成正比`() {
+        val rows = StatsLegend.rows(slices, total)
+        val maxPercent = rows.maxOf { it.percent }
+        assertEquals(StatsLegend.percent(22_300L, total), maxPercent, 0.0001f)
+        assertTrue(rows.last().percent < rows.first().percent)
+    }
+
+    @Test
+    fun `09 折叠只读卡口径按维度自身合计`() {
+        // OtherRankCard 的灰条按该维度 Top5 自身合计换算，
+        // MUST NOT 借用净支出（分类占比卡的分母）。
+        val otherTotal = listOf(9_500L, 5_800L, 4_500L).sum()
+        assertEquals("47.98%", StatsLegend.percentText(9_500L, otherTotal.toLong()))
+    }
 }

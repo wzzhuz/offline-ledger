@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""第 68 批：统计页合体卡 / 彩色图标范围 / 零回归静态校验。
+"""第 69 批：统计页修订的静态校验（撤回蓝底/混卡/跨Tab + 全局配色 + 页内 sheet）。
 
-纯文本校验，不依赖 Android SDK / Gradle。重点防止「合并两张卡时顺手删掉
-下钻契约四层」与「彩色图标越界到记一笔 / 明细 / 账户详情」（活文档 §7.12 / §2.6）。
+纯文本校验，不依赖 Android SDK / Gradle。重点防止：
+1) 第 68 批跑偏的三处又以别的形式回来；
+2) 删跨 Tab 回调时漏改 LedgerApp；
+3) Q4B 新 SQL 漏唯一口径 / LIMIT；
+4) Q5B 改主题时顺手改掉红绿语义或反转开关。
 """
 import pathlib
 import sys
@@ -21,96 +24,113 @@ def main():
     errors = []
     stats = read("ui/stats/StatsScreen.kt")
     donut = read("ui/charts/DonutChart.kt")
+    sheet = read("ui/stats/DrillDownDialog.kt")
+    theme = read("ui/theme/LedgerTheme.kt")
+    ledger = read("ui/LedgerApp.kt")
+    dao = read("data/local/dao/RecordDao.kt")
     vm = read("ui/stats/StatsViewModel.kt")
     db = read("data/local/AppDatabase.kt")
     mig = read("data/local/Migrations.kt")
-    dao = read("data/local/dao/RecordDao.kt")
 
-    # 1. 合体：不再有独立排行卡，只有一个合体卡
-    if "RankInsightCard" in stats:
-        errors.append("StatsScreen 仍引用独立 RankInsightCard（应合为一张卡）")
-    if "CategoryInsightCard(" not in stats:
-        errors.append("StatsScreen 缺合体卡 CategoryInsightCard 调用")
-    if "DonutInsightCard(" in stats:
-        errors.append("StatsScreen 仍调用旧 DonutInsightCard")
+    # 1. 撤回蓝底 / 双 Tab
+    for key in ("StatsHeader(", "TabRow(", '"分析"', '"概览"', "statsTab"):
+        if key in stats:
+            errors.append("StatsScreen 仍残留第 68 批蓝底/双Tab: " + key)
+    if 'Text(text = "统计"' not in stats:
+        errors.append("StatsScreen 缺白底「统计」标题")
+    if "PeriodSwitcher(state, vm)" not in stats or "CurrencySwitcher(state, vm)" not in stats:
+        errors.append("StatsScreen 缺既有周期 / 币种切换")
 
-    # 2. 蓝底身份区 + 双 Tab
-    for key in ("StatsHeader(", "TabRow(", "CategoryHeaderBlue", '"分析"', '"概览"'):
+    # 2. 分类占比卡只做分类 + 左上角单标签
+    for key in ("CategoryShareCard(", "OtherRankCard(", '"按大类 ⇄"', '"按小类 ⇄"',
+                '"收款方 ⇄"', '"账户 ⇄"', "分类管理 ›", "合计不一致"):
         if key not in stats:
-            errors.append("StatsScreen 缺蓝底/双 Tab 要素: " + key)
-    if "statsTab == 0" not in stats or "statsTab == 1" not in stats:
-        # 概览判断目前用 == 0 分支，允许只有一处；至少要有 Tab 分流
-        if "statsTab" not in stats:
-            errors.append("StatsScreen 缺 Tab 分流状态")
+            errors.append("StatsScreen 缺第 69 批要素: " + key)
+    for key in ("CategoryInsightCard", "RankInsightCard", "RankDim",
+                "expandableIds", "onChildClick"):
+        if key in stats or key in donut:
+            errors.append("仍残留三维度混卡 / ⌄展开: " + key)
+    if "OtherDim" not in stats:
+        errors.append("缺 OtherDim 维度枚举")
 
-    # 3. 下钻契约四层：扇区 / 图例整行 / 三维度 / 二级展开子项
-    for key in ("onOpenCategoryInDetail", "onOpenCounterpartyInDetail",
-                "onOpenAccountInDetail", "state.drillRange", "state.currencyCode",
-                "onChildClick", "expandedChildren", "onExpandToggle"):
-        if key not in stats:
-            errors.append("合体卡下钻契约缺: " + key)
-    if "分类管理 ›" not in stats:
-        errors.append("合体卡丢了「分类管理 ›」短跳转")
-    if "合计不一致" not in stats:
-        errors.append("合计一致性警告未置顶保留")
+    # 3. 默认折叠 + 只读
+    if "var expanded by rememberSaveable { mutableStateOf(false) }" not in stats:
+        errors.append("收款方/账户卡不是默认折叠")
+    if "只读展示" not in stats:
+        errors.append("收款方/账户卡未标注只读")
 
-    # 4. 一羽式图例 + 彩色图标（Q2A）
-    for key in ("CategoryGlyph(", "CategoryIcon(", "StatsLegend.rows",
-                "StatsLegend.percentText", "percentText"):
+    # 4. 灰色长条（Q2A）
+    for key in ("0xFFEDEFF5", "CategoryHeaderBlue.copy(alpha = 0.75f)", "fillMaxWidth(row.percent)"):
         if key not in donut:
-            errors.append("DonutChart 缺一羽式图例要素: " + key)
+            errors.append("DonutChart 缺灰条: " + key)
     if "heightIn(min = 44.dp)" not in donut:
         errors.append("图例整行触摸区未保持 >=40dp")
-    # 禁用项：只查 import 与真实调用，注释里提到名字不算（基线原文也写着禁用理由）。
-    for key in (
-        "import androidx.compose.foundation.layout.FlowRow",
-        "import androidx.compose.ui.text.TextMeasurer",
-        "import androidx.compose.foundation.layout.BoxWithConstraints",
-    ):
-        if key in donut:
-            errors.append("DonutChart 引入实验性/版本相关 API: " + key)
-    if "drawText(" in donut or "TextMeasurer(" in donut:
-        errors.append("DonutChart 引入 Canvas 文本测量")
 
-    # 5. 彩色图标范围：只允许分类管理三页 / 两个选择器 / 统计占比图例
-    # 只检查**调用点**（`CategoryGlyph(`），注释里提到名字不算。
-    # 放行：目录定义文件、分类管理三页（列表 / 排序灰阶）、两个全量选择器、
-    # 第 68 批统计占比图例。记一笔 / 明细 / 账户详情 MUST 零引用。
-    allowed = {
-        "ui/components/CategoryIconCatalog.kt",
-        "ui/settings/CategoryManagerDialog.kt",
-        "ui/settings/CategorySortScreen.kt",
-        "ui/components/CategorySelectSheet.kt",
-        "ui/settings/CategoryPickerScreen.kt",
-        "ui/charts/DonutChart.kt",
-    }
-    forbidden = {
-        "ui/record/RecordEditorDialog.kt",
-        "ui/detail/DetailScreen.kt",
-        "ui/detail/RecordDetailPage.kt",
-        "ui/assets/AssetsScreen.kt",
-    }
-    for f in sorted(SRC.rglob("*.kt")):
-        rel = str(f.relative_to(SRC))
-        text = f.read_text(encoding="utf-8")
-        if "CategoryGlyph(" in text and rel not in allowed:
-            errors.append("彩色图标越界到: " + rel)
-        if rel in forbidden and "CategoryGlyph(" in text:
-            errors.append("记一笔/明细/账户详情出现彩色图标调用: " + rel)
+    # 5. Q4B 页内底部 sheet + 明细行样式
+    for key in ("ModalBottomSheet", "StatsDrillSheet", "ExperimentalMaterial3Api",
+                "DrillRecordRow", "accountLabel", "signedAmount",
+                "TextDecoration.LineThrough", "优惠", "手续费"):
+        if key not in sheet:
+            errors.append("StatsDrillSheet 缺明细行要素: " + key)
+    for key in ("DrillDownDialog(", '"查看该大类全部流水 ›"', 'Text("明细")'):
+        if key in sheet:
+            errors.append("sheet 仍残留跨 Tab 出口: " + key)
+    if "state.drillCategoryId != null" not in stats or "StatsDrillSheet(state" not in stats:
+        errors.append("StatsScreen 未接页内 sheet")
 
-    # 6. 零回归：统计口径 / 聚合 / 版本
+    # 6. Q6A 彻底解耦
+    for key in ("onOpenCategoryInDetail", "onOpenCounterpartyInDetail",
+                "onOpenAccountInDetail"):
+        if key in ledger:
+            errors.append("LedgerApp 仍传跨 Tab 回调: " + key)
+    if "detailVm.filterBy" in ledger:
+        errors.append("LedgerApp 仍向明细 VM 注入统计筛选")
+    if "StatsScreen(" not in ledger or "refreshTick = refreshTick" not in ledger:
+        errors.append("LedgerApp StatsScreen 调用形态异常")
+
+    # 7. Q4B DAO 投影与 SQL 口径
+    for key in ("fromAccountLast4", "toAccountLast4", "discountCents", "feeCents",
+                "categoryColorHex", "counterparty", "description", "timestamp"):
+        if ("val " + key) not in dao:
+            errors.append("DrillRow 缺字段: " + key)
+    if "drillDownRowsForRootCurrency" not in dao:
+        errors.append("缺按大类下钻 SQL")
+    for fn in ("drillDownRows", "drillDownRowsForCurrency", "drillDownRowsForRootCurrency"):
+        i = dao.find("fun " + fn)
+        if i < 0:
+            errors.append("缺下钻查询 " + fn)
+            continue
+        q = dao[dao.rfind("@Query", 0, i):i]
+        if "excludeFromStats = 0" not in q or "LIMIT :limit" not in q:
+            errors.append("下钻查询丢唯一口径或 LIMIT: " + fn)
+    if "openSliceRows" not in vm:
+        errors.append("StatsViewModel 缺 openSliceRows")
+
+    # 8. Q5B 全局清新配色 + 红绿语义零改动
+    for key in ("0xFFF4F6FB", "0xFFFFFFFF", "0xFFEEF1F8", "0xFF1F2430",
+                "0xFFDDE2EE", "0xFF5B7CFA", "surfaceContainerLow = Color"):
+        if key not in theme:
+            errors.append("LedgerTheme 缺清新配色槽位: " + key)
+    for key in ("applyReverseColors", "ExpenseRed = GREEN", "IncomeGreen = RED"):
+        if key not in theme:
+            errors.append("红绿语义 / 反转开关被改动: " + key)
+    if "0xFFC62828" not in theme or "0xFF2E7D32" not in theme:
+        errors.append("红绿基础色被改动")
+
+    # 9. 零回归
     if "ChartData.netSlices" not in vm or "SUM(amountCents)" not in dao:
         errors.append("统计口径或既有聚合 SQL 被改动")
     if "version = 7" not in db:
         errors.append("AppDatabase.version 不再是 7（本批零改表）")
     if "emptyArray()" not in mig:
         errors.append("Migrations.ALL 不再为空")
-    if "colorHex" not in donut:
-        # DonutChart 本就不直接读 colorHex，只确认扇区色板来源
-        if "ChartData.chartArgb" not in donut:
-            errors.append("扇区色板未沿用 ChartData.chartArgb")
+    for key in ("import androidx.compose.foundation.layout.FlowRow",
+                "import androidx.compose.ui.text.TextMeasurer",
+                "import androidx.compose.foundation.layout.BoxWithConstraints"):
+        if key in donut:
+            errors.append("DonutChart 引入实验性 API: " + key)
 
-    # 7. 6 条 MODIFIED 标题必须命中基线（整块替换锚点）
+    # 10. 8 条 MODIFIED 标题命中基线（整块替换锚点）
     titles = [
         "统计页落地月年切换与三种图表",
         "分类占比卡提供分类管理短跳转",
@@ -118,6 +138,8 @@ def main():
         "环形图支持一级与二级切换并落地三级下钻",
         "分类图标不做字符串映射",
         "分类管理彩色图标目录与缺项兜底",
+        "三级下钻路径",
+        "下钻明细复用组合筛选且不全量加载",
     ]
     base_text = "\n".join(f.read_text(encoding="utf-8") for f in BASE.rglob("spec.md"))
     delta_text = "\n".join(f.read_text(encoding="utf-8") for f in DELTA.rglob("spec.md"))
@@ -126,13 +148,15 @@ def main():
             errors.append("MODIFIED 标题未命中基线: " + t)
         if "### Requirement: " + t not in delta_text:
             errors.append("delta 缺 MODIFIED: " + t)
+    if "统计页蓝底身份区与分析概览双 Tab" in delta_text:
+        errors.append("第 68 批蓝底 ADDED 未删除")
 
     if errors:
         for e in errors:
             print("  FAIL", e)
         print(f"check_stats_merge: {len(errors)} 项失败")
         return 1
-    print("check_stats_merge: PASS (合体卡 / 双 Tab / 下钻四层 / 图例范围 / 零回归 / 6 MODIFIED)")
+    print("check_stats_merge: PASS (撤回蓝底/混卡/跨Tab / 只分类 / 灰条 / 折叠只读卡 / 页内 sheet / 全局配色 / 零改表 / 8 MODIFIED)")
     return 0
 
 

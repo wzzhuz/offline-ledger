@@ -1,158 +1,212 @@
-# 设计：统计页一羽式重排（第 68 批）
+# 设计：统计页一羽式重排（第 68 批 → 第 69 批修订）
 
-## 1. 现状核查（以代码为准，不照抄参考图当现状）
+> **本文件已按第 69 批逐段撤回第 68 批的三处跑偏判断。**
+> 第 68 批 design 里「蓝底身份区 + 双 Tab」「分类 / 收款方 / 账户合体卡」
+> 「三个维度共用下钻跳明细 Tab」三节整体作废，以本文件为准。
 
-- `StatsScreen.kt`：白底 `headlineMedium「统计」` + `PeriodSwitcher` +
-  `CurrencySwitcher`；`InsightSummaryCard` / `TrendCard` / `DonutInsightCard` /
-  `RankInsightCard` 四张独立 `Card` 依次排列。
-- `DonutChart.kt`：原生 Canvas `drawArc` 环 + 两列纯文字图例（名称 + 金额），
-  无百分比、无图标、无笔数；图例整行可点 ≥40dp（第 27 批）。
-- `ChartData.ChartSlice`：`id / name / colorHex / cents`，**无 count**。
-- `StatsViewModel`：`rootSlices / childSlices` 来自
-  `expenseByRootForCurrency` / `expenseByCategoryForCurrency` 等既有只读聚合，
-  经 `ChartData.netSlices` 扣 SETTLEMENT；`catItems` 的 `count` 恒为 0。
-  收款方 / 账户排行的 `RankItem` 带 `cnt`，但那是另一套 Top5 查询。
-- 一羽图 2/3 是**单卡内**「环 + 外部引导线百分比 + 下方图例列表（彩色图标 /
-  名称 / 百分比 / ¥金额 / 笔数）」，不是两张卡，也不是互斥切换 chip。
-- 一羽「大类 餐饮 ¥268(4条)」=「小类 餐饮 ¥223(3条) + 外卖 ¥45(1条)」，
-  分母同为净支出 ¥510 —— 与本项目「分类支出占比按净支出计算」同口径。
-  所以本批**只动 UI**。
+## 1. 第 68 批错在哪（先认账，再改）
 
-## 2. Q1A：合体方案
-
-新增单卡 `CategoryInsightCard`，删除独立 `RankInsightCard` 的挂载：
-
-```
-┌ 分类占比                              分类管理 › ┐
-│ [分类][收款方][账户]        （按大类][按小类] 仅分类维度） │
-│            ┌── 净支出 ──┐                       │
-│            │  ¥510.00  │   ← 环，中心统一写净支出   │
-│            └───────────┘                       │
-│  🍴 餐饮    43.73%   ¥223.00                  │
-│  🚗 交通    18.63%    ¥95.00                  │
-│  🧴 日用品  17.45%    ¥89.00                  │
-│  🛒 购物    11.37%    ¥58.00                  │
-│  🛵 外卖     8.82%    ¥45.00                  │
-└──────────────────────────────────────────────┘
-```
-
-- **环**：分类维度沿用 `rootSlices` / `childSlices`；收款方 / 账户维度把
-  `topCounterparties` / `topAccounts` 转成 `ChartSlice`（`id` 用 RankRow.id，
-  色板仍走 `ChartData.chartArgb(id, index)`），中心改为该维度标题而非「净支出」，
-  避免把 Top5 合计误读成全账净支出。
-- **图例列表**：`sectors` 顺序 = 金额降序（既有 `ChartData.sectors` 保序），
-  每行整行可点 ≥40dp，共用 `onSectorClick` → 按维度分派到既有三类下钻回调。
-  百分比 = `cents / total`，纯整数分算 Float 只进显示，不回写金额。
-- **分类维度二级展开**：复用 `state.rankChildren`，一级行右侧「⌄」展开二级，
-  二级行直接调 `onOpenCategoryInDetail(id, false, ...)`。
-- **分类管理短跳转**仍在标题右侧；合计一致性警告仍在 `StatsScreen` 顶层。
-
-**下钻契约四层（§7.12）逐项保住**：扇区点击、图例整行点击、排行各维度、
-展开子项，全部走 `state.drillRange` + `state.currencyCode`；
-`onOpenCategories` 不变；`StatsDrillRange` 零改动。
-
-### 2.1 撤回 §7.3 的旧结论
-
-活文档 §7.3 把第 13 批「用 `InsightMode` 把排行与环形合并到一张洞察卡、
-互斥切换 chip」与使用者「查看统计页就不应该在一屏里硬塞」绑定，
-写成「合并 = 一屏硬塞」。**本批撤回这条外推**：一羽式是同卡上下排布、
-环与图例同时可见、允许纵向滚动；第 13 批被推翻的是「二选一切换 + 压一屏」，
-不是「同一张卡承载一个结论」。§7.50 追加订正说明。
-
-### 2.2 明确未做
-
-- 图例「(N条)」：分类维度 `ChartSlice` 无 count，新增分类笔数聚合会撞基线
-  「既有聚合 SQL 不改」，本批不显示笔数，不伪造。
-- 环外悬浮百分比文字：`DonutChart` 文件头禁用 `DrawScope.drawText` /
-  `TextMeasurer`，悬浮定位需 `BoxWithConstraints` + `onSizeChanged`，
-  本批改由图例列表承载百分比，环保持原生 `drawArc`，不画孤立引导线。
-
-## 3. Q2A：彩色图标范围再放宽一次
-
-- 统计占比图例的分类维度用既有 `CategoryGlyph(name, iconName = "", colorHex = "",
-  grayscale = false, size = 32, categoryId = id)`；`iconName` 为空时按预置 id
-  回查 `CategoryIconKeys`，覆盖安装兜底自动生效，零写库。
-- 目录缺项 / 自定义分类回退 `CategoryIcon` 中性圆 + 中文首字。
-- 收款方 / 账户维度没有分类图标，仍用中性圆 + 首字（非「分类标识」）。
-- `colorHex` 与 `ChartData.chartArgb` 扇区色板**一字不动**：图标 tint 走
-  `CategoryIconTints`，扇区色走按 id 稳定分配的低饱和色板，两套管径分离。
-- 需 MODIFIED 的 3 条基线：`reporting-ui`「分类全量选择器采用分组 chips
-  且不用下拉框」、`category-stats`「分类图标不做字符串映射」、
-  「分类管理彩色图标目录与缺项兜底」，把「统计页 SHALL 中性圆」逐处改为
-  「统计页分类占比图例 SHALL 彩色 Tabler，其余页面仍中性圆」。
-
-## 4. Q3A：统计页内其余改动
-
-### 4.1 蓝底 TopBar + 分析 / 概览 Tab
-
-- `StatsScreen` 顶部改蓝底 `Box`（复用 `CategoryHeaderBlue = 0xFF5B7CFA`，
-  不新造颜色），左侧「统计」+ 周期标签，右侧周期左右箭头与「ⓘ 口径」入口。
-- 「分析 / 概览」两个**真实 Tab**：分析 = 小结 + 趋势 + 合体卡 +（年度）资产卡；
-  概览 = 小结 + 合体卡（不重复趋势）。一羽「概览」页未提供截图，
-  按「精简版分析」等价实现，design 如实登记，非 1:1。
-- `PeriodSwitcher`（月度 / 年度 / 多年）与 `CurrencySwitcher` 保留，
-  移到蓝底区下方紧凑行，零功能改动。
-
-### 4.2 小结卡进度条化
-
-收入 / 支出 / 结余三行对齐；支出行下加红色 `MiniBar`，
-宽度 = `totalExpense / max(totalIncome, totalExpense)`（纯显示换算，不回写金额）；
-保留「怎么算？」、日均、已报销 / 净支出、预算条。
-
-### 4.3 趋势卡气泡与四项摘要
-
-- 点选汇总从纯文字改为蓝色圆角 `Surface` 气泡（图下随选更新，
-  MUST NOT 用 AlertDialog 遮挡图表）。
-- 卡底四项摘要：**笔数（本周期总流水）/ 日均 / 单日最高 / 峰值日**，
-  全部由 `state.recordCount` / `state.averageCents` / `state.daily` 派生，
-  零新增 DAO。一羽按收入 / 支出分列笔数，我们只有总笔数，
-  如实标注「本周期流水笔数（含收入），不新增聚合 SQL」。
-- 既有常驻点数值、竖向引导线、横屏 `ChartFullscreenActivity` 零改动。
-
-## 5. Q1A 规格改法：6 条 MODIFIED 整块替换
-
-| spec | Requirement 标题 | 改什么 |
+| 第 68 批做法 | 使用者反馈 | 第 69 批 |
 |---|---|---|
-| reporting-ui | 统计页落地月年切换与三种图表 | 卡片顺序改为「蓝底 TopBar → 小结 → 趋势 → **占比与排行合体卡** →（年度）资产卡」；撤回「两张卡 MUST NOT 合并 / MUST NOT 为一屏合并」 |
-| reporting-ui | 分类占比卡提供分类管理短跳转 | 「MUST NOT 让两类卡片合并」改为「合体卡 SHALL 保留本入口」 |
-| reporting-ui | 分类全量选择器采用分组 chips 且不用下拉框 | 「统计页 SHALL 中性圆」改为「统计占比图例 SHALL 彩色 Tabler」 |
-| category-stats | 环形图支持一级与二级切换并落地三级下钻 | 「排行卡与占比卡 MUST NOT 合并、三维度只在排行卡内部切换」改为「合体卡内维度切换」 |
-| category-stats | 分类图标不做字符串映射 | Scenario「彩色图标只进分类选择组件」扩到统计占比图例 |
-| category-stats | 分类管理彩色图标目录与缺项兜底 | Scenario「统计页仍是中性圆」改为「统计占比图例彩色」 |
+| 新增 `StatsHeader` 蓝底 +「分析 / 概览」双 Tab | 「上面的月份之类切换我们已经有了，还支持月度/年度/多年，新增蓝底那块是多余的」 | **整块删除** `StatsHeader` 与 `statsTab`，回到白底 `headlineMedium「统计」` + 既有 `PeriodSwitcher` / `CurrencySwitcher` |
+| 分类 / 收款方 / 账户三维度 chip 全塞进一张 `CategoryInsightCard` | 「这两个不是分类，混在一起不清晰」 | 分类占比卡**只做分类**；收款方 / 账户退回独立默认折叠卡 |
+| 一级行「⌄」内联展开二级 + 点扇区 `navigate("detail")` | 「要看小类直接左上角切换小类」「最开始意图是参考明细页的方式进行展示，不用直接跳转明细页」 | 删「⌄」；左上角「大类 ⇄ / 小类 ⇄」；点行弹**底部 sheet** 按明细行渲染，三个跨 Tab 回调全删 |
 
-另 2 条 ADDED：蓝底 TopBar 与双 Tab、合体卡一羽式图例列表。
-每条 ≥1 Scenario、含 RFC2119 关键词，标题与既有 284 条零冲突。
+**方法论订正**（活文档 §7.51）：第 68 批撤回 §7.3「合并=一屏硬塞」的外推是
+对的，但随即又犯了一次同类错——把「一羽有蓝顶栏 / 有分类聚合页 / 有 Tab」
+当成「我们也要加」，而没有核对我们已有的周期切换能力。借鉴竞品 MUST 先清点
+「我们已有什么」，再决定「借什么」，MUST NOT 把对方有而我们没有的控件当成
+待办清单。
 
-## 6. 风险与缓解
+## 2. 现状核查（代码事实）
+
+- `StatsScreen.kt`：第 68 批后是 `StatsHeader`（蓝底 + TabRow）+ 小结 /
+  趋势 / `CategoryInsightCard`（三维度）/ 资产四卡。
+- `DonutChart.kt`：原生 Canvas `drawArc` + 一羽式图例列表
+  （`CategoryGlyph` 彩色图标 / 名称 / 百分比 / ¥金额），`StatsLegend` 纯 JVM。
+- `StatsViewModel`：`rootSlices` / `childSlices` / `topCounterparties` /
+  `topAccounts` / `rankChildren` / `drillRows` 全在，
+  `openRoot` / `openCategory` / `closeDrill` 与带 `LIMIT 100` 的
+  `drillDownRowsForCurrency` 完整保留 —— **第 28 批改跳明细 Tab 后没人调用，
+  但组件和 SQL 都还在**，Q4B 直接复用，不重写数据层。
+- `DrillDownDialog.kt`：老的居中 `Dialog`，行是「日期 · 分类 + 备注 + 金额」，
+  且带两个「去明细」按钮（正是 Q6A 要删的耦合出口）。
+- `RecordDao.DrillRow`：只有 `id / type / amountCents / localDate / note /
+  categoryName` 六列，缺账户名、卡号、描述、收款方、附加金额、时间。
+- `RecordRowCard`（`DetailScreen.kt` L550）：方向箭头圆 + 描述/收款方主标题 +
+  「分类 · 收款方 · 备注」副行 + `accountLabel` 带卡号 + 划线原价与优惠标签。
+- `LedgerTheme.kt`：只设 `primary = LedgerColors.Primary`（深绿 `0xFF1B5E20`）
+  / `secondary`，其余全走 M3 默认 `lightColorScheme` → `Card` 落在
+  `surfaceContainerLow`，就是「灰不拉几」的根因。全 App 23 个文件含
+  `Card` / `.background`。
+
+## 3. Q1A + Q2A：分类占比卡（只做分类）
+
+```
+┌ [按大类 ⇄]                              分类管理 › ┐
+│            ┌── 净支出 ──┐                        │
+│            │  ¥510.00  │    ← 环，中心统一净支出    │
+│            └───────────┘                        │
+│ 🍴 餐饮                    43.73%   ¥223.00    │
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░  (灰色长条)         │
+│ 🚗 交通                    18.63%    ¥95.00    │
+│ ▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░                  │
+│ ...                                            │
+└───────────────────────────────────────────────┘
+```
+
+- **左上角单个标签**：显示当前口径「按大类 ⇄」/「按小类 ⇄」（一羽图 2/3
+  就是「小类 ⇌」「大类 ⇌」），点一下 `vm.setSliceLevel` 来回切。
+  MUST NOT 再有两枚 FilterChip，MUST NOT 有一级「⌄」展开。
+- **环**：分类维度沿用 `rootSlices` / `childSlices`，
+  中心统一「净支出 ¥X」，不再有 Top5 冒充净支出的分支。
+- **图例列表**：`sectors` 顺序 = 金额降序，每行整行可点 ≥40dp，
+  含彩色 `CategoryGlyph`（缺项回退中性圆）、名称、百分比、`¥金额`、
+  **灰色长条**（Q2A：浅灰轨道 `#EDEFF5` + 低饱和蓝 `#5B7CFA` 填充，
+  宽度 = `StatsLegend.percent`，纯显示换算不回写金额）。
+  百分比 / 金额 / 灰条三者 SHALL 同源于 `row.percent`。
+- **点行**：打开页内底部 sheet（见 §5），MUST NOT `navigate("detail")`。
+- 「分类管理 ›」仍在标题右侧；合计一致性警告仍在 `StatsScreen` 顶层。
+
+## 4. Q3A：收款方 / 账户独立卡、默认折叠
+
+`OtherRankCard` 一张卡，默认 `collapsed = true`，标题行 = 左上角单个
+「收款方 ⇄ 账户」标签 + 右侧「展开 / 收起」。展开后列出 Top5：
+中性圆 + 首字 / 名称（账户带卡号，沿用 `accountBaseLabel`）/ ¥金额 /
+灰色长条。**只读展示，无下钻、无跳转**（Q6A 彻底解耦；一羽也没在排行里
+给收款方做跳转）。两个维度共用同一份 `state.topCounterparties` /
+`state.topAccounts`，零新增 DAO。
+
+## 5. Q4B + Q6A：底部 sheet 按明细行渲染，删跨 Tab
+
+### 5.1 数据层（动 DAO 投影，如实登记）
+
+`RecordDao.DrillRow` 扩为明细行所需字段，**全部带默认值**，
+旧调用点零改动即可编译：
+
+```
+id, type, amountCents, timestamp, localDate, note, categoryName,
+categoryColorHex, counterparty, description,
+fromAccountName, fromAccountLast4, toAccountName, toAccountLast4,
+discountCents, feeCents
+```
+
+两条既有 `@Query` 扩 `LEFT JOIN accounts fa/ta` 并 SELECT 新列，
+**`type IN ('EXPENSE','INCOME') AND excludeFromStats = 0` 唯一口径与
+`LIMIT :limit` 一字不动**；新增一条同口径的
+`drillDownRowsForRootCurrency`（`WHERE r.rootCategoryId = :rootId`），
+供「按大类」点一级时查该大类下全部流水。
+`check_stat_rules.py` 的 marker 清单加这一条，确保它也带唯一口径。
+
+`StatsViewModel.openSliceRows(categoryId, isRoot, displayName)`：
+按 `isRoot` 选上面两条查询之一，`LIMIT 100`，填 `drillRows` +
+`drillCategoryId` + `drillCategoryName`。`openRoot` / `openCategory` /
+`backToChildren` / `closeDrill` 保留（不删别处可能引用），
+但 UI 不再调用 `openRoot` 的二级构成弹窗。
+
+### 5.2 UI 层
+
+`DrillDownDialog.kt` 保留文件路径，内容改为
+`@OptIn(ExperimentalMaterial3Api::class) fun StatsDrillSheet(...)`：
+`ModalBottomSheet` + `LazyColumn`，每行**逐项对齐 `RecordRowCard`**——
+方向箭头圆（←/→/⇄/↩）、描述→收款方→分类的主标题、
+「分类 · 收款方 · 备注」副行、`accountLabel` 带卡号的账户名、
+红/绿金额、划线原价 + 蓝/灰「优惠 / 手续费」标签、
+`MonthRange.dateLabel(localDate)` 日期。
+标题「{分类名} · 流水」，副标题「最多 100 条，按日期倒序」。
+**删掉**旧弹窗里「查看该大类全部流水 ›」「明细」两个跨 Tab 按钮。
+
+### 5.3 解耦（Q6A）
+
+`StatsScreen` 签名删 `onOpenCategoryInDetail` /
+`onOpenCounterpartyInDetail` / `onOpenAccountInDetail`，只留
+`onOpenCategories`；`LedgerApp` 删三块 `detailVm.filterBy* +
+navigate("detail")` lambda。`DetailViewModel` 的三个方法**保留不删**
+（`detail-filter-and-transfer-edit` / `detail-scope-and-record-page`
+两个活跃 change 正在改明细侧，不碰它们），但统计侧不再注入状态，
+§7.26 / §7.29 / §7.30 那套「来自统计」chip / 双周期源 / 默认值扩散
+不再被触发。
+
+需 MODIFIED 的基线：`category-stats`「三级下钻路径」与
+「下钻明细复用组合筛选且不全量加载」——落点从「跳明细 Tab +
+组合筛选 chip」改为「页内 sheet + 带 LIMIT 的既有 SQL」，
+不是删能力，是换承载且顺手消除耦合。
+
+## 6. Q5B：全局清新配色（改动面最大，如实登记）
+
+使用者明确选 B（全 App 一起变），不做局部 `StatsPalette`。
+
+`LedgerTheme.kt` 的 `lightColorScheme` 补齐一羽式浅色体系：
+
+| 槽位 | 值 | 作用 |
+|---|---|---|
+| `background` / `surfaceContainer*` | `#F4F6FB` / `#FFFFFF` | 页面浅蓝灰底、卡片纯白 |
+| `surface` / `surfaceVariant` | `#FFFFFF` / `#EEF1F8` | 明细页背景、次级块 |
+| `onSurface` / `onSurfaceVariant` | `#1F2430` / `#6B7280` | 柔和深灰蓝，不用纯黑 |
+| `outlineVariant` | `#DDE2EE` | 分割线 |
+| `primary` / `onPrimary` | `#5B7CFA` / 白 | 与 `CategoryHeaderBlue` 同系，Tab / 按钮 / 进度 |
+
+`LedgerColors.Primary` 同步改为 `#5B7CFA` 保持单一真相源。
+`ExpenseRed`（红 = 支出）/ `IncomeGreen`（绿 = 收入）与
+`applyReverseColors` 反转开关 **一字不动**；`CategoryHeaderBlue` 常量不动。
+`AssetsScreen` / 分类管理三页等显式 `Color(0xFFF5F6FA)` / `Color.White`
+硬编码与新体系同色系，无需逐个改。
+
+**风险如实登记**：全 23 个含 `Card` / `.background` 的文件观感都会变，
+`DetailScreen` 的 `surfaceVariant.copy(alpha=0.45f)`、
+`FilterSheet` 的 `outlineVariant` 都会跟着变浅。
+本批只改色值、不改任何布局 / 手势 / 数据；CI 全绿不替代全 App 观感真机验。
+记一笔 / 分类管理 / 资产页三处已有的蓝底身份区与新 primary 同系，不会撞色。
+
+## 7. 规格改法：10 条 MODIFIED 整块替换 + 4 条 ADDED
+
+| spec | Requirement | 第 69 批改什么 |
+|---|---|---|
+| reporting-ui | 统计页落地月年切换与三种图表 | 删蓝底/双 Tab；卡片层级改「白底标题 → 小结 → 趋势 → 分类占比 → 收款方账户折叠卡 →（年度）资产」 |
+| reporting-ui | 分类占比卡提供分类管理短跳转 | 「合体卡」改「分类占比卡」，入口保留 |
+| reporting-ui | 分类全量选择器采用分组 chips 且不用下拉框 | 措辞「合体卡」→「分类占比卡」，统计图例彩色口径不变 |
+| category-stats | 环形图支持一级与二级切换并落地三级下钻 | 删三维度收进合体卡 / 一级⌄展开；改左上角单标签 + 页内 sheet |
+| category-stats | 分类图标不做字符串映射 | 措辞同步，彩色图例口径不变 |
+| category-stats | 分类管理彩色图标目录与缺项兜底 | 措辞同步，彩色图例口径不变 |
+| category-stats | 三级下钻路径 | 落点从跳明细 Tab 改页内 sheet |
+| category-stats | 下钻明细复用组合筛选且不全量加载 | 删「跳明细 Tab + 组合筛选 chip + Activity 作用域」，改「页内 sheet + 既有 LIMIT SQL」 |
+| reporting-ui | 图表点数值常驻显示 | 不动（保留） |
+| category-stats | 分类支出占比按净支出计算 | 不动（保留） |
+
+> 后两条本可直接不动，但「统计页落地月年切换…」整块替换会覆盖卡片层级描述，
+> 为避免与「两张卡 MUST NOT 合并」历史措辞并存，一并列为 MODIFIED 锚点复核。
+> 实际 delta 里按最小必要原则只写前 8 条（后两条仅在静态检查里断言未被改动）。
+
+ADDED 4 条：分类占比卡一羽式图例（含灰条）、收款方账户默认折叠只读卡、
+分类流水页内底部 sheet、全局清新配色。
+**删除**第 68 批 ADDED「统计页蓝底身份区与分析概览双 Tab」。
+
+## 8. 风险与缓解
 
 | 风险 | 缓解 |
 |---|---|
-| 合卡顺手删下钻（§7.12） | 逐项对照四层契约；新增 `check_stats_merge.py` 静态断言三类回调与展开子项仍在 |
-| 收款方 / 账户维度环合计 ≠ 净支出被误读 | 中心标题按维度变化，不写「净支出」；色板仍按 id 稳定 |
-| 彩色图标越界到记一笔 | 只在合体卡图例调 `CategoryGlyph`；静态脚本断言其余页面零引用 |
-| 蓝底 TopBar 遮挡周期切换 | 周期 / 币种 switcher 移到蓝底下独立紧凑行，真机待验 |
-| Compose 编译 | 只用基础 API（Box/Column/Row/Canvas/Modifier），不引实验性 API；CI 兜底 |
+| 删跨 Tab 回调漏改某处 | 静态脚本断言 `LedgerApp` 无 `filterBy*` + `StatsScreen` 签名只剩 `onOpenCategories` |
+| Q4B 新 SQL 漏唯一口径或 LIMIT | `check_stat_rules.py` 加 marker；SQL 照抄既有 `drillDownRowsForCurrency` 改 WHERE |
+| Room 投影列名不匹配 | `DrillRow` 新字段全带默认值；两条 SQL 都补齐列；CI 编译兜底 |
+| `ModalBottomSheet` 实验性 API | `@OptIn(ExperimentalMaterial3Api::class)`，BOM 2026.06 已含 |
+| Q5B 全 App 变色翻车 | 只改色值不改布局；红绿语义与反转开关不动；§8 新增全 App 观感待验 |
+| 合卡/拆卡又丢警告或短跳转 | 静态脚本断言「合计不一致」与「分类管理 ›」仍在 |
 | 覆盖安装 | `version = 7` 不变、`Migrations.ALL` 空不变，零改表 |
 
-## 7. 与活跃 change 的交叉
-
-- `detail-filter-and-transfer-edit`：不动统计下钻携带查看周期的实现。
-- `detail-scope-and-record-page`：不动明细侧周期收敛。
-- `add-discount-and-fee`：统计仍 `SUM(amountCents)` 按实付，附加金额不进统计。
-- `ff3-description-field` / `record-category-picker-and-root-select` /
-  `restructure-preset-categories`：本批不碰筛选规则、选择器、预置清单。
-
-## 8. 落盘清单
+## 9. 落盘清单
 
 | 层 | 文件 |
 |---|---|
+| 主题 | `ui/theme/LedgerTheme.kt` |
+| DAO | `data/local/dao/RecordDao.kt`（`DrillRow` + 3 条查询） |
+| VM | `ui/stats/StatsViewModel.kt`（新增 `openSliceRows`） |
 | UI 主体 | `ui/stats/StatsScreen.kt` |
-| 环形图例 | `ui/charts/DonutChart.kt` |
-| 版本 | `app/build.gradle.kts` → 0.2.48 |
-| 静态检查 | `scripts/check_stats_merge.py`（新增） |
-| 单测 | `app/src/test/.../StatsLegendTest.kt`（新增，纯 JVM） |
-| 四件套 | 本目录 7 个文件 |
-| 文档 | 活文档 §7.50、`openspec/project.md` 第 68 批 |
+| 图例 | `ui/charts/DonutChart.kt` |
+| 页内 sheet | `ui/stats/DrillDownDialog.kt`（内容重写为 `StatsDrillSheet`） |
+| 解耦 | `ui/LedgerApp.kt` |
+| 版本 | `app/build.gradle.kts` → 0.2.49 |
+| 静态检查 | `scripts/check_stat_rules.py` / `check_stats_merge.py`（重写） |
+| 文档 | 活文档 §7.51、`openspec/project.md` 第 69 批 |
 
-`StatsViewModel` / `ChartData` / `RecordDao` / `InsightData` **零改动**：
-全部复用既有 state 字段与聚合结果。
+`ChartData` / `InsightData` / `StatsDrillRange` / `StatsLegend` /
+`RecordEntity` / `AppDatabase` **零改动**。

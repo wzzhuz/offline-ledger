@@ -1,48 +1,61 @@
-# 任务：统计页参考一羽记账优化（第 68 批 / v0.2.48）
+# 任务：统计页参考一羽（第 68 批 → 第 69 批修订 / v0.2.49）
 
-- [x] 1.1 核查远端 HEAD（`56142c4d`）、`StatsScreen` / `StatsViewModel` /
-      `DonutChart` / `ChartData` / `InsightData` 与基线 3+3 条 Requirement 原文
-- [x] 1.2 对照 5 张截图，区分一羽「单卡同排」与第 13 批「互斥切换 chip」
-- [x] 1.3 五项对齐 + 9 条验收 + 分级判定（新建 change）；使用者回「按你拟的」
-      = Q1A Q2A Q3A Q4A
-- [x] 1.4 推四件套 + 全部实现 `0303ee3c`（13 文件 / blob 585），
-      逐 blob tree + content 双校验 PASS
-- [x] 2.1 `DonutChart` 增 `legendRows` 一羽式图例：彩色图标 / 名称 / 百分比 /
-      金额，整行可点 ≥40dp，共用 `onSectorClick`
-- [x] 2.2 保留原生 Canvas `drawArc` 扇区与中心文字；中心标签支持按维度切换
-- [x] 2.3 不引 `DrawScope.drawText` / `TextMeasurer` / `FlowRow` /
-      `BoxWithConstraints`（基线禁用）
-- [x] 3.1 `StatsScreen` 蓝底 `Box` TopBar（复用 `CategoryHeaderBlue`）+ 月份 +
-      周期箭头 + 口径入口
-- [x] 3.2 「分析 / 概览」两个真实 Tab：分析=全部卡片，概览=小结+合体卡
-- [x] 3.3 `PeriodSwitcher` / `CurrencySwitcher` 移到蓝底下紧凑行，零功能改动
-- [x] 3.4 小结卡三行对齐 + 支出红进度条；保留怎么算 / 日均 / 净支出 / 预算
-- [x] 3.5 趋势卡点选汇总改蓝色圆角气泡；补笔数 / 日均 / 单日最高 / 峰值日
-      四项摘要（全部由既有 state 派生，零新增 DAO）
-- [x] 4.1 新增 `CategoryInsightCard` 合体卡；移除 `RankInsightCard` 挂载
-- [x] 4.2 维度 chip「分类 / 收款方 / 账户」；分类维度保留按大类 / 按小类
-- [x] 4.3 环：分类用 `rootSlices/childSlices`，其他维度用 Top5 转 `ChartSlice`，
-      中心按维度换标题（不写「净支出」）
-- [x] 4.4 图例列表：分类维度 `CategoryGlyph(size=32, categoryId=id)`，
-      其他维度中性圆 + 首字；缺项回退中性圆
-- [x] 4.5 下钻四层契约保住：扇区 / 图例整行 / 三维度 / 二级展开子项全接
-      `state.drillRange` + 既有回调；「分类管理 ›」仍在标题右侧
-- [x] 4.6 合计一致性警告仍置顶，MUST NOT 为美观收掉
-- [x] 5.1 `colorHex`、`ChartData.chartArgb`、`StatsViewModel`、`RecordDao`、
-      `InsightData`、`StatsDrillRange`、`version = 7` 全部零改动
-- [x] 5.2 6 条 MODIFIED 整块替换 + 2 条 ADDED，标题命中基线、零冲突
-- [x] 5.3 活文档 §7.50 撤回「合并=一屏硬塞」外推并登记 Q2A 放行；
-      `project.md` 第 68 批
-- [x] 5.4 新增 `scripts/check_stats_merge.py` 与 `StatsLegendTest` 纯 JVM 单测
-- [x] 5.5 版本号 0.2.48
-- [x] 6.1 八个静态检查全 PASS；push CI `45539031571` 一次全绿（无诊断）
-- [x] 6.2 触发与轮询拆成独立调用，出包 CI `45539747274` success /
-      tag `v0.2.48` / SHA256 `e5b14617679a6b0e97862145d95ec56ec60acec62d3b2e744f007457e7f4ab48`
-- [x] 6.3 实测回填（活文档 §7.50 与 project.md）；正式归档校验仍保持 `[ ]`
-- [ ] 7.1 蓝底 TopBar 不遮挡周期 / 币种切换，两个 Tab 真实可切
-- [ ] 7.2 合体卡 5 行图例百分比与金额和环一致、整行可点、二级展开可跳明细
-- [ ] 7.3 收款方 / 账户维度中心标题不误导为净支出
-- [ ] 7.4 彩色图标只在统计占比图例，记一笔 / 明细 / 账户详情零回归
-- [ ] 7.5 趋势气泡与四项摘要不遮挡图表、单日最高取数正确
-- [ ] 7.6 覆盖安装（v0.2.47 → v0.2.48）数据不丢、不升表
-- [ ] 7.7 §8 第 45–67 批既有真机待验项整体继承
+- [x] 1.1 核查 `RecordRowCard` 明细行、`DrillRow` 六列投影、
+      带 LIMIT 的两条下钻 SQL、`LedgerTheme` 默认灰卡根因、
+      `LedgerApp` 三块跨 Tab lambda、23 个含 Card/background 的文件
+- [x] 1.2 认账第 68 批三处跑偏（蓝底双 Tab / 三维度混卡 / 跳明细 Tab），
+      按 5 条反馈重做对齐；使用者 Q1A Q2A Q3A Q4B Q5B Q6A + 验收按我拟的
+- [ ] 1.3 推四件套修订 + 全部实现，逐 blob 双校验（Q4A 一次做完出包）
+- [ ] 2.1 删 `StatsHeader`、`statsTab`、`TabRow`、蓝底 import；
+      回到白底「统计」+ 既有 PeriodSwitcher / CurrencySwitcher
+- [ ] 2.2 `StatsScreen` 签名删三个跨 Tab 回调，只留 `onOpenCategories`
+- [ ] 2.3 `LedgerApp` 删三块 `detailVm.filterBy* + navigate("detail")`；
+      `DetailViewModel` 方法保留不删
+- [ ] 3.1 `CategoryInsightCard` → `CategoryShareCard`：只分类，
+      左上角单个「按大类 ⇄ / 按小类 ⇄」标签（点一下切换）
+- [ ] 3.2 删三维度 chip、删一级「⌄」展开、删 Top5 冒充净支出分支；
+      环中心统一「净支出 ¥X」
+- [ ] 3.3 `DonutChart` 图例每行加灰色长条（浅灰轨道 + 低饱和蓝填充，
+      宽度 = percent），删 `expandableIds` / `expandedChildren` /
+      `onExpandToggle` / `onChildClick` 参数
+- [ ] 3.4 「分类管理 ›」与合计一致性警告置顶保留
+- [ ] 4.1 新增 `OtherRankCard`：默认折叠，左上角「收款方 ⇄ 账户」单标签，
+      展开列 Top5（中性圆 / 名称带卡号 / ¥金额 / 灰条），只读不跳转
+- [ ] 5.1 `RecordDao.DrillRow` 扩 10 个带默认值字段
+      （timestamp / categoryColorHex / counterparty / description /
+       from-to 账户名与卡号 / discount / fee）
+- [ ] 5.2 两条既有下钻 SQL 扩 LEFT JOIN accounts 并 SELECT 新列，
+      唯一口径与 `LIMIT :limit` 一字不动；新增
+      `drillDownRowsForRootCurrency`（`rootCategoryId = :rootId`）
+- [ ] 5.3 `check_stat_rules.py` marker 加新查询
+- [ ] 5.4 `StatsViewModel.openSliceRows(categoryId, isRoot, displayName)`
+      按口径选查询，LIMIT 100，填 drillRows
+- [ ] 5.5 `DrillDownDialog.kt` 重写为 `StatsDrillSheet`
+      （ModalBottomSheet + LazyColumn，行逐项对齐 RecordRowCard：
+      方向箭头 / 主标题 / 副行 / accountLabel 带卡号 / 金额 /
+      划线原价与优惠标签 / 日期），删两个「去明细」按钮
+- [ ] 5.6 点扇区 / 图例行 → `openSliceRows` → sheet；
+      `drillCategoryId != null` 为唯一显示条件
+- [ ] 6.1 `LedgerTheme.lightColorScheme` 补齐浅蓝灰底 / 纯白卡 /
+      柔和深灰蓝文字 / 清新蓝 primary；`LedgerColors.Primary` 同步
+- [ ] 6.2 `ExpenseRed` / `IncomeGreen` / `applyReverseColors` /
+      `CategoryHeaderBlue` 全部零改动
+- [ ] 6.3 如实登记全 23 个文件观感变化，§8 新增全 App 观感待验
+- [ ] 7.1 删第 68 批 ADDED「蓝底身份区与双 Tab」；
+      重写 8 条 MODIFIED + 4 条 ADDED，标题命中基线、零冲突
+- [ ] 7.2 活文档 §7.51 登记第 69 批撤回与方法论订正；
+      `project.md` 第 69 批
+- [ ] 7.3 重写 `check_stats_merge.py` 断言新方案
+      （无蓝底 / 无跨 Tab / 折叠卡 / 灰条 / 全局主题 / SQL 口径）
+- [ ] 7.4 版本号 0.2.49
+- [ ] 8.1 八个静态检查全 PASS；push CI 全绿
+- [ ] 8.2 触发与轮询拆独立调用，出 v0.2.49 包
+- [ ] 8.3 实测回填；归档校验保持 `[ ]`
+- [ ] 9.1 无蓝底块、无「分析 / 概览」Tab，月度/年度/多年切换完好
+- [ ] 9.2 左上角单标签切换大类/小类，无下拉箭头、无三维度 chip
+- [ ] 9.3 图例灰条长度与百分比一致、五行金额合计 = 净支出
+- [ ] 9.4 收款方/账户卡默认折叠、展开后 Top5 正确、只读
+- [ ] 9.5 点分类弹底部 sheet 按明细行样式展示、不切 Tab、最多 100 条
+- [ ] 9.6 全 App 白卡浅蓝灰底观感、红绿语义不变、反转开关正常
+- [ ] 9.7 覆盖安装（v0.2.48 → v0.2.49）数据不丢、不升表
+- [ ] 9.8 §8 第 45–68 批既有真机待验项整体继承

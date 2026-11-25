@@ -166,6 +166,29 @@ class StatsViewModel(
         }
     }
 
+    /**
+     * 第 69 批（Q4B + Q6A）：分类占比卡点扇区 / 图例的**唯一**页内下钻。
+     * 按大类走 rootCategoryId 查该大类全部流水，按小类走 categoryId；
+     * 两条 SQL 都带 LIMIT 100 与唯一口径，MUST NOT 跳明细 Tab、
+     * MUST NOT 向 DetailViewModel 注入状态、MUST NOT 全量加载。
+     */
+    fun openSliceRows(categoryId: Long, isRoot: Boolean, displayName: String) {
+        val s = _state.value
+        val (from, to) = range(s)
+        viewModelScope.launch {
+            val rows = if (isRoot) {
+                recordDao.drillDownRowsForRootCurrency(from, to, categoryId, 100, s.currencyCode)
+            } else {
+                recordDao.drillDownRowsForCurrency(from, to, categoryId, 100, s.currencyCode)
+            }
+            _state.value = _state.value.copy(
+                drillRootId = null, drillChildren = emptyList(),
+                drillCategoryId = categoryId, drillCategoryName = displayName,
+                drillRows = rows
+            )
+        }
+    }
+
     fun backToChildren() {
         _state.value = _state.value.copy(drillCategoryId = null, drillRows = emptyList())
     }

@@ -175,21 +175,12 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                 AccountQuickSortScreen(onBack = { goBack() })
             }
             composable("stats") {
+                // 第 69 批 Q6A：三个跨 Tab 回调全删，统计页不再向明细 VM 注入状态；
+                // 分类流水改由统计页内底部 sheet 展示（StatsDrillSheet）。
+                // DetailViewModel 的 filterBy* 方法保留，供明细侧两个进行中 change 使用。
                 StatsScreen(
                     refreshTick = refreshTick,
-                    onOpenCategories = { navController.navigate("categories") },
-                    onOpenCategoryInDetail = { id, isRoot, r, cc, name ->
-                        detailVm.filterByCategory(id, isRoot, r, cc, name)
-                        navController.navigate("detail") { launchSingleTop = true }
-                    },
-                    onOpenCounterpartyInDetail = { name, r, cc ->
-                        detailVm.filterByCounterparty(name, r, cc)
-                        navController.navigate("detail") { launchSingleTop = true }
-                    },
-                    onOpenAccountInDetail = { id, name, r, cc ->
-                        detailVm.filterByAccount(id, name, r, cc)
-                        navController.navigate("detail") { launchSingleTop = true }
-                    }
+                    onOpenCategories = { navController.navigate("categories") }
                 )
             }
             composable("settings") {

@@ -30,7 +30,13 @@ object LedgerColors {
         private set(value) { _incomeGreen.value = value }
 
     val Neutral = Color(0xFF616161)
-    val Primary = Color(0xFF1B5E20)
+    /**
+     * 第 69 批（Q5B）：与 `CategoryHeaderBlue` 同系的清新蓝。
+     * 原先深绿 `0xFF1B5E20` 让 M3 默认灰色卡面更显沉闷；
+     * 全局改浅色体系后 primary 同步，保持单一真相源。
+     * ExpenseRed / IncomeGreen 与反转开关一字不动。
+     */
+    val Primary = Color(0xFF5B7CFA)
 
     /** MainActivity.onCreate 调一次；偏好变化时也应再调。 */
     fun applyReverseColors(reversed: Boolean) {
@@ -51,7 +57,23 @@ fun LedgerTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = LedgerColors.Primary,
-            secondary = LedgerColors.IncomeGreen
+            onPrimary = Color.White,
+            secondary = LedgerColors.IncomeGreen,
+            // 第 69 批：一羽式清新浅色体系。页面浅蓝灰底 + 纯白卡片，
+            // 不再落 M3 默认 surfaceContainerLow 的灰面。只改色值，
+            // 不动任何布局 / 手势 / 数据；红绿语义色与反转开关不受影响。
+            background = Color(0xFFF4F6FB),
+            onBackground = Color(0xFF1F2430),
+            surface = Color(0xFFFFFFFF),
+            onSurface = Color(0xFF1F2430),
+            surfaceVariant = Color(0xFFEEF1F8),
+            onSurfaceVariant = Color(0xFF6B7280),
+            surfaceContainerLowest = Color(0xFFFFFFFF),
+            surfaceContainerLow = Color(0xFFFFFFFF),
+            surfaceContainer = Color(0xFFFBFBFE),
+            surfaceContainerHigh = Color(0xFFF6F8FD),
+            surfaceContainerHighest = Color(0xFFF1F4FA),
+            outlineVariant = Color(0xFFDDE2EE)
         ),
         content = content
     )

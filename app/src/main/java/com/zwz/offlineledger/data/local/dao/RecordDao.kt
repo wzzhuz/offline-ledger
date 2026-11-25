@@ -64,14 +64,31 @@ data class AccountRecordRow(
     val categoryColorHex: String?
 )
 
-/** 统计页下钻明细行：带唯一统计口径，LIMIT 由 SQL 限定。 */
+/**
+ * 统计页下钻明细行：带唯一统计口径，LIMIT 由 SQL 限定。
+ *
+ * 第 69 批（Q4B）：扩为「按明细页 RecordRowCard 行样式渲染」所需字段，
+ * 一次 LEFT JOIN categories + accounts 取回，MUST NOT 渲染时逐行查库。
+ * 新增字段**全部带默认值**，旧调用点与旧 SQL 零改动可编译。
+ * 账户名与卡号仍走 `accountLabel` 单一组合出口（第 62/63 批契约）。
+ */
 data class DrillRow(
     val id: Long,
     val type: String,
     val amountCents: Long,
     val localDate: Int,
     val note: String,
-    val categoryName: String?
+    val categoryName: String?,
+    val categoryColorHex: String? = null,
+    val timestamp: Long = 0L,
+    val counterparty: String = "",
+    val description: String = "",
+    val fromAccountName: String? = null,
+    val fromAccountLast4: String? = null,
+    val toAccountName: String? = null,
+    val toAccountLast4: String? = null,
+    val discountCents: Long? = null,
+    val feeCents: Long? = null
 )
 
 /**
@@ -398,9 +415,17 @@ interface RecordDao {
     @Query(
         """
         SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents,
-               r.localDate AS localDate, r.note AS note, c.name AS categoryName
+               r.localDate AS localDate, r.note AS note,
+               r.timestamp AS timestamp, r.counterparty AS counterparty,
+               r.description AS description,
+               r.discountCents AS discountCents, r.feeCents AS feeCents,
+               c.name AS categoryName, c.colorHex AS categoryColorHex,
+               fa.name AS fromAccountName, fa.cardLast4 AS fromAccountLast4,
+               ta.name AS toAccountName, ta.cardLast4 AS toAccountLast4
           FROM records r
           LEFT JOIN categories c ON r.categoryId = c.id
+          LEFT JOIN accounts fa ON r.fromAccountId = fa.id
+          LEFT JOIN accounts ta ON r.toAccountId = ta.id
          WHERE r.categoryId = :categoryId
            AND r.yearMonth BETWEEN :fromYm AND :toYm
            AND r.type IN ('EXPENSE', 'INCOME') AND r.excludeFromStats = 0
@@ -465,8 +490,13 @@ interface RecordDao {
     @Query("SELECT categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'EXPENSE' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND rootCategoryId = :rootId AND currencyCode = :currencyCode GROUP BY categoryId ORDER BY totalCents DESC")
     suspend fun subcategoryTotalsUnderRootForCurrency(fromYm: Int, toYm: Int, rootId: Long, currencyCode: String): List<CategoryTotalRow>
 
-    @Query("SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents, r.localDate AS localDate, r.note AS note, c.name AS categoryName, c.colorHex AS categoryColorHex FROM records r LEFT JOIN categories c ON r.categoryId = c.id WHERE r.type IN ('EXPENSE','INCOME') AND r.excludeFromStats = 0 AND r.yearMonth BETWEEN :fromYm AND :toYm AND r.categoryId = :categoryId AND r.currencyCode = :currencyCode ORDER BY r.localDate DESC, r.id DESC LIMIT :limit")
+    /** 第 69 批：按小类下钻，一次 LEFT JOIN 取回明细行所需全部字段。 */
+    @Query("SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents, r.localDate AS localDate, r.note AS note, r.timestamp AS timestamp, r.counterparty AS counterparty, r.description AS description, r.discountCents AS discountCents, r.feeCents AS feeCents, c.name AS categoryName, c.colorHex AS categoryColorHex, fa.name AS fromAccountName, fa.cardLast4 AS fromAccountLast4, ta.name AS toAccountName, ta.cardLast4 AS toAccountLast4 FROM records r LEFT JOIN categories c ON r.categoryId = c.id LEFT JOIN accounts fa ON r.fromAccountId = fa.id LEFT JOIN accounts ta ON r.toAccountId = ta.id WHERE r.type IN ('EXPENSE','INCOME') AND r.excludeFromStats = 0 AND r.yearMonth BETWEEN :fromYm AND :toYm AND r.categoryId = :categoryId AND r.currencyCode = :currencyCode ORDER BY r.localDate DESC, r.id DESC LIMIT :limit")
     suspend fun drillDownRowsForCurrency(fromYm: Int, toYm: Int, categoryId: Long, limit: Int, currencyCode: String): List<DrillRow>
+
+    /** 第 69 批：按大类下钻（该大类下全部二级流水），口径与 LIMIT 同上。 */
+    @Query("SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents, r.localDate AS localDate, r.note AS note, r.timestamp AS timestamp, r.counterparty AS counterparty, r.description AS description, r.discountCents AS discountCents, r.feeCents AS feeCents, c.name AS categoryName, c.colorHex AS categoryColorHex, fa.name AS fromAccountName, fa.cardLast4 AS fromAccountLast4, ta.name AS toAccountName, ta.cardLast4 AS toAccountLast4 FROM records r LEFT JOIN categories c ON r.categoryId = c.id LEFT JOIN accounts fa ON r.fromAccountId = fa.id LEFT JOIN accounts ta ON r.toAccountId = ta.id WHERE r.type IN ('EXPENSE','INCOME') AND r.excludeFromStats = 0 AND r.yearMonth BETWEEN :fromYm AND :toYm AND r.rootCategoryId = :rootId AND r.currencyCode = :currencyCode ORDER BY r.localDate DESC, r.id DESC LIMIT :limit")
+    suspend fun drillDownRowsForRootCurrency(fromYm: Int, toYm: Int, rootId: Long, limit: Int, currencyCode: String): List<DrillRow>
 
     @Query("SELECT rootCategoryId AS categoryId, SUM(amountCents) AS totalCents FROM records WHERE type = 'SETTLEMENT' AND excludeFromStats = 0 AND yearMonth BETWEEN :fromYm AND :toYm AND currencyCode = :currencyCode GROUP BY rootCategoryId")
     suspend fun settlementByRootForCurrency(fromYm: Int, toYm: Int, currencyCode: String): List<CategoryTotalRow>

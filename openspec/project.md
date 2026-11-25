@@ -1064,3 +1064,47 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
   仍待使用者明确说「可以归档」。
 
+## 第 69 批：撤回第 68 批跑偏三处（change `polish-stats-like-yiyu` 修订，v0.2.49）
+
+- **触发**：v0.2.48 真机「改完更丑了，理解存在偏差」+ 5 条纠正；
+  Q1A Q2A Q3A **Q4B Q5B** Q6A + 验收按我拟的 + 直接做完出包。
+- **撤回**：①蓝底 `StatsHeader` +「分析 / 概览」双 Tab 整块删除，
+  回白底「统计」+ 既有月度 / 年度 / 多年 + 币种切换；
+  ②分类 / 收款方 / 账户三维度混卡拆开；③一级「⌄」展开与
+  三个 `navigate("detail")` 跨 Tab 回调全删。
+  §7.51 追加方法论订正：借鉴竞品 MUST 先清点「我们已有什么」，
+  MUST NOT 把对方有而我们没有的控件当成待办清单（本系列第四次同类外推）。
+- **Q1A/Q2A**：分类占比卡只做分类，左上角单个「按大类 ⇄ / 按小类 ⇄」标签；
+  环中心统一「净支出 ¥X」；图例每行彩色图标 + 名称 + 百分比 + ¥金额 +
+  **灰色长条**（浅灰轨道 + 低饱和蓝，宽度 = 占比），承担 TopN。
+- **Q3A**：收款方 / 账户退回独立**默认折叠只读卡**，左上角单个
+  「收款方 ⇄ 账户」标签，展开列 Top5（中性圆 / 带卡号名称 / 金额 / 同款灰条），
+  不跳 Tab、不写明细筛选。
+- **Q4B**：`DrillRow` 扩 10 个带默认值字段，两条既有下钻 SQL 加
+  `LEFT JOIN accounts` 且唯一口径与 `LIMIT :limit` 一字不动，
+  新增同口径 `drillDownRowsForRootCurrency`；
+  `StatsViewModel.openSliceRows(categoryId, isRoot, name)`；
+  `DrillDownDialog.kt` 内容重写为 `StatsDrillSheet`（`ModalBottomSheet`），
+  每行逐项对齐明细页 `RecordRowCard`（方向箭头 / 主标题 / 副行 /
+  `accountLabel` 带卡号 / 红绿金额 / 划线原价与优惠标签 / 日期），
+  删两个「去明细」按钮。复用第 28 批后一直闲置的组件，不重写数据层。
+- **Q5B**：全局 M3 主题补浅蓝灰底 `F4F6FB` / 纯白卡 / 柔和深灰蓝文字 /
+  清新蓝 `primary = 5B7CFA`（`LedgerColors.Primary` 同步）；
+  红绿语义色与反转开关零改动；全 23 个含 Card / background 的文件观感变化
+  如实登记并列真机待验。
+- **Q6A**：`StatsScreen` 签名只剩 `onOpenCategories`，`LedgerApp` 删三块
+  `detailVm.filterBy* + navigate("detail")`；`DetailViewModel` 三方法保留不删
+  （两个活跃 change 正在改明细侧）。§7.26/§7.29/§7.30 那套跨 Tab 契约
+  不再被统计侧触发。
+- **口径零改动**：`ChartData` / `InsightData` / `StatsDrillRange` /
+  `StatsLegend` / `RecordEntity` / `AppDatabase version = 7` /
+  既有 6 条收支聚合 SQL 全部不动；零改表 → **v0.2.48 直接覆盖安装**。
+- **验证**：8 个静态检查全 PASS（重写 `check_stats_merge.py` 断言撤回三处、
+  只分类、灰条、折叠只读卡、页内 sheet、全局配色、零改表、8 条 MODIFIED）；
+  `check_stat_rules.py` marker 加新查询；`StatsLegendTest` 补 2 条共 9 条。
+  spec delta **8 MODIFIED + 4 ADDED = 12 条 / 42 Scenario**，
+  每条 ≥1 Scenario、含 RFC2119、标题唯一，8 条 MODIFIED 全部命中基线，
+  ADDED 与既有 284 条零冲突；删掉第 68 批 ADDED「蓝底身份区与双 Tab」。
+- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
+  其余 6 个进行中 change 与 3 个已归档 change 未动。
+
