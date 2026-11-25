@@ -62,56 +62,7 @@ jobs:
       # assembleDebug 只编译主源码，不碰 src/test。
       # 必须单独跑一次 test，否则测试文件写错了也照样「编译通过」。
       - name: 运行单元测试
-        run: |
-          set -o pipefail
-          gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/unit74.log
-
-      - name: 临时诊断：回写单测失败详情
-        if: failure()
-        run: |
-          python3 - <<'PY'
-          import os, json, urllib.request, pathlib
-          out = []
-          log = pathlib.Path('/tmp/unit74.log')
-          if log.exists():
-              txt = log.read_text(errors='replace')
-              errs = [l for l in txt.splitlines()
-                      if l.startswith('e: ') or l.startswith('w: ')
-                      or 'error:' in l.lower() or 'What went wrong' in l
-                      or 'Compilation error' in l or 'FAILURE:' in l]
-              out.append('### 编译错误行')
-              out.append('```')
-              out.append('\n'.join(errs[:120]))
-              out.append('```')
-              out.append('### gradle 日志开头')
-              out.append('```')
-              out.append(txt[:6000])
-              out.append('```')
-          for f in sorted(pathlib.Path('app/build/test-results').rglob('*.xml')):
-              t = f.read_text(errors='replace')
-              if '<failure' in t or '<error' in t:
-                  out.append('### ' + str(f))
-                  out.append('```')
-                  out.append(t[:8000])
-                  out.append('```')
-          if not out:
-              out.append('未捕获到日志或 XML')
-          body = '\n'.join(out)[:60000]
-          req = urllib.request.Request(
-              'https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] +
-              '/commits/' + os.environ['GITHUB_SHA'] + '/comments',
-              headers={
-                  'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
-                  'Accept': 'application/vnd.github+json',
-                  'User-Agent': 'diag74',
-                  'Content-Type': 'application/json'
-              },
-              method='POST', data=json.dumps({'body': body}).encode())
-          with urllib.request.urlopen(req, timeout=30) as x:
-              print('comment HTTP', x.status)
-          PY
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: 编译 Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon
