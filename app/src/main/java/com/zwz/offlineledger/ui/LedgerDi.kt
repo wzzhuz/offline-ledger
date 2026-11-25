@@ -11,6 +11,7 @@ import com.zwz.offlineledger.data.local.dao.CategoryDao
 import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
 import com.zwz.offlineledger.data.local.dao.TemplateDao
+import com.zwz.offlineledger.data.local.dao.TagDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
 import com.zwz.offlineledger.data.repository.LedgerRepository
 import dagger.hilt.EntryPoint
@@ -35,6 +36,7 @@ interface LedgerEntryPoint {
     fun templateDao(): TemplateDao
     fun recurringRuleDao(): RecurringRuleDao
     fun budgetDao(): BudgetDao
+    fun tagDao(): TagDao
 }
 
 object LedgerDi {

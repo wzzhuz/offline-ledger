@@ -38,6 +38,10 @@ fun SettingsScreen(onOpen: (String) -> Unit) {
             summary = "分类 / 模板 / 预算 / 回收站 / 健康自检"
         ) { onOpen("ledger") }
         SettingGroupCard(
+            title = "标签管理",
+            summary = "多标签 / 改名 / 归档 · 分类一笔一个，标签一笔多个"
+        ) { onOpen("tags") }
+        SettingGroupCard(
             title = "数据与备份",
             summary = "加密备份 / CSV 明文导出 / 账单导入 / Firefly III 迁移"
         ) { onOpen("backup") }

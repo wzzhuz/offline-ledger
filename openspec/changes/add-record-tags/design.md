@@ -53,8 +53,11 @@ trash.tagNames TEXT   -- 删除时的标签名快照，逗号分隔；恢复时�
   新建时 `insertRecord` 已返回 `Long`，无需改签名。多选弹层复用
   「搜索 + 左分组导航 + 右网格」的心智，但**不复用** `CategorySelectDialog`
   （它是按收支类型过滤、按 id 映射分类的契约，标签是全账本级、按名匹配）。
-- **筛选**：`FilterValues` / `RecordFilter` 加 `tagIds: List<Long>`，
-  `RecordDao.pagedFiltered` 用 `EXISTS (SELECT 1 FROM record_tags rt WHERE rt.recordId = r.id AND rt.tagId IN (:tagIds))`。
+- **筛选**：`FilterValues` / `RecordFilter` 加 `tagName: String?`（**实现偏差**：原写
+  `tagIds: List<Long>`，落地改为按标签名精确单选，避免 Room 集合参数空集展开成
+  `IN ()` 语法错误、也少改一处 PagingSource 参数），
+  `RecordDao.pagedFiltered` 用 `EXISTS (... t.name = :tagName)` 并加
+  `COALESCE((SELECT GROUP_CONCAT(...)), '') AS tagNames` 投影供列表 chips。
   MUST NOT 用 `LIKE`、MUST NOT 改既有聚合 SQL。
 - **显示**：`RecordRow` 加 `tagNames: String`（SQL 用 `GROUP_CONCAT` 子查询或应用层批量取），
   明细行与详情页渲染 chips；统计页下钻 sheet 同款。
@@ -77,7 +80,7 @@ trash.tagNames TEXT   -- 删除时的标签名快照，逗号分隔；恢复时�
 - `ff3-description-field`：正在扩筛选/规则字段目录 → 本批只加 `tagIds`，
   MUST NOT 改它的字段描述映射。
 - `detail-filter-and-transfer-edit` / `detail-scope-and-record-page`：正在改明细筛选默认值，
-  `applyFilter` 只追加 `tagIds` 一行 copy，保留它们的 `periodDisplayName` / `resolveAllMonths` 语义。
+  `applyFilter` 只追加 `tagName` 一行 copy，保留它们的 `periodDisplayName` / `resolveAllMonths` 语义。
 - `record-category-picker-and-root-select`：分类选择器仍在改；标签弹层独立实现，不复用不阻塞。
 - `restructure-preset-categories`：预制分类清单由它负责；本批逐字段零改动（Q5A 利息不动）。
 

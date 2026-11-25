@@ -52,6 +52,7 @@ import com.zwz.offlineledger.ui.settings.PreferenceSettingsScreen
 import com.zwz.offlineledger.ui.settings.SecuritySettingsScreen
 import com.zwz.offlineledger.ui.settings.SettingsScreen
 import com.zwz.offlineledger.ui.settings.SnapshotSettingsScreen
+import com.zwz.offlineledger.ui.settings.TagManagerScreen
 import com.zwz.offlineledger.ui.bulk.RuleListScreen
 import com.zwz.offlineledger.ui.stats.StatsScreen
 import com.zwz.offlineledger.ui.templates.TemplateManagerScreen
@@ -242,6 +243,8 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
             }
             composable("templates") { TemplateManagerScreen(onBack = { goBack() }) }
             composable("budgets") { BudgetManagerScreen(onBack = { goBack() }) }
+            // 第 75 批：独立标签管理页，二级页隐藏底栏。
+            composable("tags") { TagManagerScreen(onBack = { goBack() }) }
         }
     }
 

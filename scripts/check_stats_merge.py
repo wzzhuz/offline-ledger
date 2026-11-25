@@ -8,6 +8,7 @@
 4) Q5B 改主题时顺手改掉红绿语义或反转开关。
 """
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -182,8 +183,10 @@ def main():
     # 9. 零回归
     if "ChartData.netSlices" not in vm or "SUM(amountCents)" not in dao:
         errors.append("统计口径或既有聚合 SQL 被改动")
-    if "version = 7" not in db:
-        errors.append("AppDatabase.version 不再是 7（本批零改表）")
+    # 第 69-74 批零改表锁 7；第 75 批升 8 为预期，不再硬编码单一值。
+    m = re.search(r"version = (\d+)", db)
+    if not m or int(m.group(1)) not in (7, 8):
+        errors.append("AppDatabase.version 应为 7 或 8（第75批升表）")
     if "emptyArray()" not in mig:
         errors.append("Migrations.ALL 不再为空")
     for key in ("import androidx.compose.foundation.layout.FlowRow",

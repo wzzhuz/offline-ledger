@@ -5,6 +5,7 @@
 与「附加字段从 Entity 到 UI 一路不丢」，避免只改一半导致账实不符。
 """
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -64,8 +65,10 @@ def main():
         errors.append("CsvRow.duplicateKey() 被改动，会破坏导入去重与复合匹配")
 
     # 3. 升表口径
-    if "version = 7" not in db:
-        errors.append("AppDatabase.version 未升到 7")
+    # 第 67 批升 7；第 75 批新增 tags / record_tags 升 8 为预期。
+    m = re.search(r"version = (\d+)", db)
+    if not m or int(m.group(1)) not in (7, 8):
+        errors.append("AppDatabase.version 应为 7（第67批）或 8（第75批）")
     if "emptyArray()" not in migrations:
         errors.append("Migrations.ALL 不再为空，与「测试数据不考虑迁移」口径冲突")
 

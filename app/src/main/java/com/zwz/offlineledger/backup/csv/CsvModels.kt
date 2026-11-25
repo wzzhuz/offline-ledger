@@ -33,7 +33,9 @@ data class CsvRow(
      * MUST NOT 参与 duplicateKey()，否则同一笔账会被当成新流水。
      */
     val discountYuan: String = "",
-    val feeYuan: String = ""
+    val feeYuan: String = "",
+    /** 第 75 批：逗号分隔的标签名，导出必带、导入缺列按空串兼容。 */
+    val tags: String = ""
 ) {
     /**
      * 导入去重键 = 账户 + 金额 + 日期 + 备注。

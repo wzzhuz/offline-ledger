@@ -18,7 +18,7 @@ object CsvCodec {
         "date", "type", "amount", "account",
         "categoryRoot", "category", "note", "currencyCode", "counterparty",
         "importSource", "sourceId", "description", "cardLast4",
-        "discount", "fee"
+        "discount", "fee", "tags"
     )
 
     private val BOM = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
@@ -34,7 +34,7 @@ object CsvCodec {
                 r.date, r.type, r.amountYuan, r.accountName,
                 r.categoryRoot, r.category, r.note, r.currencyCode, r.counterparty,
                 r.importSource, r.sourceId, r.description, r.cardLast4,
-                r.discountYuan, r.feeYuan
+                r.discountYuan, r.feeYuan, r.tags
             )
             sb.append(cells.joinToString(",") { escape(it) }).append("\r\n")
         }
@@ -57,7 +57,7 @@ object CsvCodec {
         val idx = HEADER.associateWith { name -> header.indexOf(name.trim()) }
         // 后三列都是可选列：旧版导出的 8~9 列文件不应因缺它们而整份拒绝。
         val optional = setOf("counterparty", "importSource", "sourceId", "description",
-            "cardLast4", "discount", "fee")
+            "cardLast4", "discount", "fee", "tags")
         val missing = idx.filter { it.value < 0 }.keys.toList().filter { it !in optional }
         if (missing.isNotEmpty()) {
             return CsvParseResult(emptyList(), listOf("表头缺少列：" + missing.joinToString(", ")))
@@ -86,6 +86,7 @@ object CsvCodec {
             val cardLast4 = get("cardLast4")
             val discount = get("discount")
             val fee = get("fee")
+            val tags = get("tags")
 
             val lineErrors = mutableListOf<String>()
             if (!DATE_RE.matches(date) || !validDate(date)) lineErrors += "日期非法（应为 YYYY-MM-DD）"
@@ -109,7 +110,7 @@ object CsvCodec {
                     note = note, currencyCode = cc, counterparty = counterparty,
                     importSource = importSource, sourceId = sourceId,
                     description = description, cardLast4 = cardLast4,
-                    discountYuan = discount, feeYuan = fee
+                    discountYuan = discount, feeYuan = fee, tags = tags
                 )
             } else {
                 errors += "第 $lineNo 行：" + lineErrors.joinToString("、")
@@ -147,7 +148,7 @@ object CsvCodec {
             .map { it.trim() }
         val required = HEADER.filter {
             it !in setOf("counterparty", "importSource", "sourceId", "description",
-                "cardLast4", "discount", "fee")
+                "cardLast4", "discount", "fee", "tags")
         }
         return if (required.all { it in head }) CsvFormat.OWN else CsvFormat.OTHER
     }
@@ -174,7 +175,7 @@ object CsvCodec {
         val header = raw.first()
         val idx = HEADER.associateWith { name -> header.indexOf(name.trim()) }
         val optional = setOf("counterparty", "importSource", "sourceId", "description",
-            "cardLast4", "discount", "fee")
+            "cardLast4", "discount", "fee", "tags")
         val missing = idx.filter { it.value < 0 }.keys.toList().filter { it !in optional }
         if (missing.isNotEmpty()) {
             return CsvParseResult(emptyList(), listOf("表头缺少列：" + missing.joinToString(", ")))
@@ -228,7 +229,8 @@ object CsvCodec {
                 counterparty = get("counterparty"),
                 importSource = get("importSource"), sourceId = get("sourceId"),
                 description = get("description"), cardLast4 = get("cardLast4"),
-                discountYuan = get("discount"), feeYuan = get("fee")
+                discountYuan = get("discount"), feeYuan = get("fee"),
+                tags = get("tags")
             )
         }
         if (rows.isEmpty() && errors.isEmpty() && notices.isEmpty()) {

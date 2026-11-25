@@ -30,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -143,6 +144,7 @@ fun StatsScreen(
             )
             CategoryShareCard(state = state, vm = vm, onOpenCategories = onOpenCategories)
             OtherRankCard(state = state, dim = otherDim, onDim = { otherDim = it })
+            TagRankCard(state = state, refreshTick = refreshTick)
             if (state.mode == StatsMode.YEAR) {
                 AssetCard(
                     state = state,
@@ -1001,5 +1003,65 @@ private fun SwitchLevelIcon() {
         // 下 ←：只画下半个箭头尖
         drawLine(c, Offset(x2, yd), Offset(x1, yd), sw)
         drawLine(c, Offset(x1 + tip, yd + tip), Offset(x1, yd), sw)
+    }
+}
+
+/**
+ * 第 75 批：标签统计维度。多标签是交叉关系，合计会超过总支出，
+ * 所以这里 MUST NOT 算百分比，只给命中金额 / 笔数 / 相对条形。
+ * 与分类占比卡彼此独立，切换标签 MUST NOT 影响扇区数字。
+ */
+@Composable
+private fun TagRankCard(state: StatsUiState, refreshTick: Int) {
+    val context = LocalContext.current
+    val dao = remember {
+        com.zwz.offlineledger.ui.LedgerDi.entryPoint(context).tagDao()
+    }
+    val (fromYm, toYm) = when (state.mode) {
+        StatsMode.MONTH -> state.yearMonth to state.yearMonth
+        StatsMode.YEAR -> state.year * 100 + 1 to state.year * 100 + 12
+        StatsMode.MULTI_YEAR -> 0 to 999999
+    }
+    val rows by produceState(
+        initialValue = emptyList<com.zwz.offlineledger.data.local.dao.TagStatRow>(),
+        dao, fromYm, toYm, state.currencyCode, refreshTick
+    ) {
+        value = runCatching { dao.tagStats(fromYm, toYm, state.currencyCode) }
+            .getOrDefault(emptyList())
+    }
+    if (rows.isEmpty()) return
+    val maxCents = rows.maxOf { it.hitCents ?: 0L }.coerceAtLeast(1L)
+    StatsCard {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(text = "标签", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = "一笔可含多个标签，合计可能大于总支出；这里只给命中金额与笔数，不算百分比。",
+                style = MaterialTheme.typography.bodySmall,
+                color = LedgerColors.Neutral
+            )
+            rows.forEach { r ->
+                Text(
+                    text = "#" + r.name + "  " + formatCents(r.hitCents) +
+                        "  ·  " + (r.hitCount ?: 0) + " 笔",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(((r.hitCents ?: 0L).toFloat() / maxCents.toFloat()).coerceIn(0.02f, 1f))
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(CategoryHeaderBlue)
+                    )
+                }
+            }
+        }
     }
 }

@@ -28,6 +28,7 @@ import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.accountLabel
 import com.zwz.offlineledger.data.local.dao.RecordRow
+import com.zwz.offlineledger.ui.components.TagChips
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.components.amountColor
 import com.zwz.offlineledger.ui.components.signedAmount
@@ -126,6 +127,10 @@ fun RecordDetailPage(
                 DetailLine("交易对方", row.counterparty.takeIf { it.isNotBlank() } ?: "—")
                 DetailLine("描述", row.description.takeIf { it.isNotBlank() } ?: "—")
                 DetailLine("备注", row.note.takeIf { it.isNotBlank() } ?: "—")
+                if (row.tagNames.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    TagChips(row.tagNames)
+                }
                 DetailLine("不计入收支", if (row.excludeFromStats) "是" else "否")
                 if (row.importSource.isNotBlank()) {
                     DetailLine(

@@ -41,6 +41,8 @@ data class EditorState(
     val extraExpr: String = "",
     /** 仅转账：true=转账优惠（落库为负 fee），false=手续费（正 fee）。 */
     val extraAsDiscount: Boolean = false,
+    /** 第 75 批：一笔可挂多个标签，按名存储、保存时整体替换关联。 */
+    val tagNames: List<String> = emptyList(),
     val excludeFromStats: Boolean = false,
     val loaded: Boolean = false
 )
@@ -138,6 +140,7 @@ class RecordEditorViewModel(
                             else -> ""
                         },
                         extraAsDiscount = (r.feeCents ?: 0L) < 0L,
+                        tagNames = repository.tagNames(recordId),
                         excludeFromStats = r.excludeFromStats,
                         loaded = true
                     )
@@ -254,6 +257,11 @@ class RecordEditorViewModel(
     }
 
     /** 第 43 批：描述独立于对方与备注，编辑态与列表主标题共用。 */
+    /** 第 75 批：多选标签回填。 */
+    fun setTags(names: List<String>) {
+        _state.value = _state.value.copy(tagNames = names.distinct().take(8))
+    }
+
     fun setDescription(v: String) {
         _state.value = _state.value.copy(description = v)
     }
@@ -413,9 +421,11 @@ class RecordEditorViewModel(
         )
         return try {
             if (editingId == null) {
-                repository.insertRecord(entity)
+                val newId = repository.insertRecord(entity)
+                repository.setRecordTags(newId, s.tagNames)
             } else {
                 repository.updateRecord(entity)
+                repository.setRecordTags(editingId!!, s.tagNames)
             }
             null
         } catch (e: Exception) {

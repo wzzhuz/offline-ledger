@@ -99,6 +99,7 @@ fun FilterSheet(
     }
     var noteText by remember { mutableStateOf(initial.noteQuery ?: "") }
     var descText by remember { mutableStateOf(initial.descriptionQuery ?: "") }
+    var tagText by remember { mutableStateOf(initial.tagName ?: "") }
     var partyText by remember { mutableStateOf(initial.counterpartyQuery ?: "") }
     var type by remember { mutableStateOf(initial.type) }
     var accountId by remember { mutableStateOf(initial.accountId) }
@@ -296,6 +297,15 @@ fun FilterSheet(
                     modifier = Modifier.fillMaxWidth(),
                     trailingIcon = clearIcon(descText) { descText = "" }
                 )
+                // 第 75 批：按标签名精确筛选（EXISTS 子查询，MUST NOT 用 LIKE）。
+                OutlinedTextField(
+                    value = tagText,
+                    onValueChange = { tagText = it },
+                    placeholder = { Text("标签名（精确，如：家用）") },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                )
                 ThinLine()
 
                 Row(
@@ -320,6 +330,7 @@ fun FilterSheet(
                                     currencyCode = currencyCode,
                                     counterpartyQuery = partyText.takeIf { it.isNotBlank() },
                                     descriptionQuery = descText.takeIf { it.isNotBlank() },
+                                    tagName = tagText.trim().takeIf { it.isNotBlank() },
                                     categoryDisplayName = displayName,
                                     counterpartyDisplayName =
                                         partyText.takeIf { it.isNotBlank() },

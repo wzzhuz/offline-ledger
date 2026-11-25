@@ -3,6 +3,7 @@ package com.zwz.offlineledger.ui.detail
 import com.zwz.offlineledger.data.display.CategoryDisplay
 import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import com.zwz.offlineledger.core.accountLabel
+import com.zwz.offlineledger.ui.components.TagChips
 import com.zwz.offlineledger.data.paging.DetailGranularity
 
 import androidx.activity.compose.BackHandler
@@ -649,6 +650,8 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
                 color = LedgerColors.Neutral,
                 maxLines = 2
             )
+            // 第 75 批：标签 chips，与详情页共用同一份渲染。
+            TagChips(row.tagNames)
         }
         // 第 67 批：带附加金额时给划线原价与小标签，主金额仍是实付真相源。
         val d = row.discountCents

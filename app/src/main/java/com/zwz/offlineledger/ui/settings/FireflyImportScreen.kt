@@ -122,7 +122,8 @@ fun FireflyImportScreen(
                         modifier = Modifier.padding(top = 8.dp)
                     )
                     Text(
-                        text = "不会导入：规则、订阅、附件、存钱罐、标签系统与预算；" +
+                        text = "标签会按逗号拆分落成账单标签；" +
+                            "不会导入：规则、订阅、附件、存钱罐与预算；" +
                             "外币按主币种落账不折算；Reconciliation 行单独报告不计入。",
                         style = MaterialTheme.typography.bodySmall,
                         color = LedgerColors.Neutral,

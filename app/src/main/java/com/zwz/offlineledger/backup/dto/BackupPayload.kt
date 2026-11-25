@@ -48,7 +48,19 @@ data class BackupRecord(
     val description: String = "",
     /** 第 67 批：附加金额；带默认值让旧备份仍可解析。 */
     val discountCents: Long? = null,
-    val feeCents: Long? = null
+    val feeCents: Long? = null,
+    /** 第 75 批：标签名列表；旧备份缺键解析为空列表。 */
+    val tagNames: List<String> = emptyList()
+)
+
+/** 第 75 批：标签定义随加密备份往返。 */
+@Serializable
+data class BackupTag(
+    val id: Long,
+    val name: String,
+    val sortOrder: Int = 0,
+    val isArchived: Boolean = false,
+    val createdAt: Long = 0L
 )
 
 @Serializable
@@ -90,7 +102,9 @@ data class BackupPayload(
     /** 第 34 批：默认空列表，旧备份缺失该键时解析成空，不会破坏兼容。 */
     val counterpartyAliases: List<BackupAlias> = emptyList(),
     /** 第 36 批：旧备份缺此键时解析为空列表，规则不会凭空出现。 */
-    val ruleGroups: List<BackupRuleGroup> = emptyList()
+    val ruleGroups: List<BackupRuleGroup> = emptyList(),
+    /** 第 75 批：标签定义；旧备份缺键按空列表兼容。 */
+    val tags: List<BackupTag> = emptyList()
 )
 
 /** 顶层信封。BackupEnvelope 的四项头部字段一个字不改。 */
@@ -112,6 +126,8 @@ data class LedgerSnapshot(
     val budgets: List<BackupBudget> = emptyList(),
     val counterpartyAliases: List<BackupAlias> = emptyList(),
     val ruleGroups: List<BackupRuleGroup> = emptyList(),
+    /** 第 75 批：标签定义；缺键按空列表兼容。 */
+    val tags: List<BackupTag> = emptyList(),
     val exportedAtEpochMilli: Long = 0L,
     val currencyCode: String = "HKD",
     val schemaVersion: Int = BackupSchema.CURRENT

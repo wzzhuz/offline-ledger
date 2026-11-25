@@ -55,6 +55,8 @@ data class FilterValues(
     val counterpartyQuery: String? = null,
     /** 第 43 批：描述模糊匹配，与 pagedFiltered 参数一一对应。 */
     val descriptionQuery: String? = null,
+    /** 第 75 批：按标签名精确筛选。 */
+    val tagName: String? = null,
     /** 第 28 批：三条只读展示名按维度独立，不进 SQL、不进 activeCount()。 */
     val categoryDisplayName: String? = null,
     val counterpartyDisplayName: String? = null,
@@ -219,6 +221,7 @@ class DetailViewModel(
             currencyCode = v.currencyCode,
             counterpartyQuery = v.counterpartyQuery,
             descriptionQuery = v.descriptionQuery,
+            tagName = v.tagName,
             categoryDisplayName = v.categoryDisplayName,
             counterpartyDisplayName = v.counterpartyDisplayName,
             accountDisplayName = v.accountDisplayName,

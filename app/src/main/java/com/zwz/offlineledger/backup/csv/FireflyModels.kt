@@ -55,7 +55,9 @@ data class FireflyEntry(
     val note: String,
     /** 第 43 批：FF3 description 独立带出，MUST NOT 并入 note。 */
     val description: String = "",
-    val skipReason: String = ""
+    val skipReason: String = "",
+    /** 第 75 批：FF3 tags 列原样透传，导入时落成标签而非拼进备注。 */
+    val tags: String = ""
 )
 
 /** FF3 的「一级-二级」分类键，按收支类型分开建树，避免同名跨类型冲突。 */

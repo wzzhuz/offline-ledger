@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.zwz.offlineledger.data.local.dao.AccountDao
+import com.zwz.offlineledger.data.local.dao.TagDao
 import com.zwz.offlineledger.data.local.dao.BalanceAdjustmentDao
 import com.zwz.offlineledger.data.local.dao.BudgetDao
 import com.zwz.offlineledger.data.local.dao.CategoryDao
@@ -18,6 +19,8 @@ import com.zwz.offlineledger.data.local.entity.BalanceAdjustmentEntity
 import com.zwz.offlineledger.data.local.entity.BudgetEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.CounterpartyAliasEntity
+import com.zwz.offlineledger.data.local.entity.RecordTagCrossRef
+import com.zwz.offlineledger.data.local.entity.TagEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
 import com.zwz.offlineledger.data.local.entity.RuleEntity
 import com.zwz.offlineledger.data.local.entity.RuleGroupEntity
@@ -26,6 +29,10 @@ import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
 
 /**
+ * 第 75 批：version 升到 8（新增 tags / record_tags，trash 加 tagNames）。
+ * 仍不注册 Migration，Migrations.ALL 保持 emptyArray()，
+ * 测试数据 MUST 卸载重装；装之前先导出。
+ *
  * 第 67 批：version 升到 7（records / trash 增加 discountCents / feeCents）。
  * 仍不注册 Migration，Migrations.ALL 保持 emptyArray()，
  * 测试数据 MUST 卸载重装；装之前先导出。
@@ -60,9 +67,11 @@ import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
         BudgetEntity::class,
         CounterpartyAliasEntity::class,
         RuleGroupEntity::class,
-        RuleEntity::class
+        RuleEntity::class,
+        TagEntity::class,
+        RecordTagCrossRef::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -77,6 +86,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun counterpartyAliasDao(): CounterpartyAliasDao
     abstract fun ruleDao(): RuleDao
+    abstract fun tagDao(): TagDao
 
     companion object {
         const val DATABASE_NAME = "offline_ledger.db"

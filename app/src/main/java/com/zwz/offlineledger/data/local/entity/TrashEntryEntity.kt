@@ -40,5 +40,7 @@ data class TrashEntryEntity(
     /** 第 23 批：与 records.importSource 同步。 */
     @ColumnInfo(name = "importSource") val importSource: String? = null,
     @ColumnInfo(name = "sourceId") val sourceId: String? = null,
+    /** 第 75 批：删除瞬间的标签名快照（逗号分隔）；恢复时按名重新绑定。 */
+    @ColumnInfo(name = "tagNames", defaultValue = "''") val tagNames: String = "",
     @ColumnInfo(name = "deletedAt") val deletedAt: Long = 0L
 )

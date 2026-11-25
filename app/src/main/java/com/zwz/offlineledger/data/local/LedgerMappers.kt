@@ -22,7 +22,7 @@ import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
 import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.engine.RecurringSchedule
 
-fun RecordEntity.toTrash(deletedAt: Long): TrashEntryEntity = TrashEntryEntity(
+fun RecordEntity.toTrash(deletedAt: Long, tagNames: String = ""): TrashEntryEntity = TrashEntryEntity(
     originalId = id, type = type, amountCents = amountCents,
     categoryId = categoryId, rootCategoryId = rootCategoryId,
     fromAccountId = fromAccountId, toAccountId = toAccountId,
@@ -31,7 +31,8 @@ fun RecordEntity.toTrash(deletedAt: Long): TrashEntryEntity = TrashEntryEntity(
     linkedRecordId = linkedRecordId, currencyCode = currencyCode,
     counterparty = counterparty, importSource = importSource,
     description = description, sourceId = sourceId,
-    discountCents = discountCents, feeCents = feeCents, deletedAt = deletedAt
+    discountCents = discountCents, feeCents = feeCents,
+    tagNames = tagNames, deletedAt = deletedAt
 )
 
 fun TrashEntryEntity.toRecord(): RecordEntity = RecordEntity(

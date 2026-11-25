@@ -50,7 +50,9 @@ data class RecordRow(
     val toAccountLast4: String? = null,
     /** 第 67 批：附加金额；明细行画划线原价与「优惠 X」标签用。 */
     val discountCents: Long? = null,
-    val feeCents: Long? = null
+    val feeCents: Long? = null,
+    /** 第 75 批：逗号分隔的标签名快照，UI 侧用 splitTagNames 渲染 chips。 */
+    val tagNames: String? = null
 )
 
 /** 账户详情专属流水行。 */
@@ -123,6 +125,7 @@ data class DailyTotalRow(
 
 /** 阶段 6c-2：CSV 导出的 SQL 源行，名称由 JOIN 取出，不 inflate Entity。 */
 data class CsvSourceRow(
+    val id: Long,
     val type: String,
     val amountCents: Long,
     val localDate: Int,
@@ -229,6 +232,9 @@ interface RecordDao {
                COALESCE(r.sourceId, '') AS sourceId,
                COALESCE(r.description, '') AS description,
                r.discountCents AS discountCents, r.feeCents AS feeCents,
+               COALESCE((SELECT GROUP_CONCAT(t.name, ',') FROM record_tags rt
+                          JOIN tags t ON t.id = rt.tagId
+                         WHERE rt.recordId = r.id), '') AS tagNames,
                c.name AS categoryName, c.colorHex AS categoryColorHex,
                fa.name AS fromAccountName, ta.name AS toAccountName,
                fa.cardLast4 AS fromAccountLast4, ta.cardLast4 AS toAccountLast4
@@ -251,6 +257,10 @@ interface RecordDao {
                 OR COALESCE(r.counterparty, '') LIKE '%' || :counterpartyQuery || '%')
            AND (:descriptionQuery IS NULL
                 OR COALESCE(r.description, '') LIKE '%' || :descriptionQuery || '%')
+           AND (:tagName IS NULL
+                OR EXISTS (SELECT 1 FROM record_tags rt
+                            JOIN tags t ON t.id = rt.tagId
+                           WHERE rt.recordId = r.id AND t.name = :tagName))
          ORDER BY r.localDate DESC, r.id DESC
          LIMIT :limit OFFSET :offset
         """
@@ -260,6 +270,7 @@ interface RecordDao {
         rootCategoryId: Long?, categoryId: Long?, minAmount: Long?,
         maxAmount: Long?, noteQuery: String?, currencyCode: String?,
         counterpartyQuery: String?, descriptionQuery: String?,
+        tagName: String?,
         limit: Int, offset: Int
     ): List<RecordRow>
 
@@ -513,7 +524,7 @@ interface RecordDao {
     // ---------------------------------------------------------------
     @Query(
         """
-        SELECT r.type AS type, r.amountCents AS amountCents,
+        SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents,
                r.localDate AS localDate, COALESCE(r.note, '') AS note,
                r.currencyCode AS currencyCode,
                COALESCE(r.counterparty, '') AS counterparty,

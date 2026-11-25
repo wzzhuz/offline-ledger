@@ -77,8 +77,10 @@ def main():
         errors.append("LedgerRepository 漏 import FireflyOpeningPolicy")
 
     # 4. 零升表 / 零改既有选择器
-    if "version = 7" not in db:
-        errors.append("AppDatabase.version 不再是 7（本批 MUST NOT 升表）")
+    # 第 74 批零改表锁 7；第 75 批升 8 为预期。
+    m = re.search(r"version = (\d+)", db)
+    if not m or int(m.group(1)) not in (7, 8):
+        errors.append("AppDatabase.version 应为 7 或 8（第75批升表）")
     picker = (SRC / "ui/components/CategorySelectSheet.kt").read_text()
     if "columns = 4" not in picker or "allowAll" not in picker:
         errors.append("CategorySelectDialog 被改动（本批 MUST 零改动复用）")

@@ -3,6 +3,7 @@ package com.zwz.offlineledger.data.repository
 import com.zwz.offlineledger.data.local.CounterpartyNormalizer
 import androidx.room.withTransaction
 import com.zwz.offlineledger.backup.dto.BackupFile
+import com.zwz.offlineledger.backup.dto.BackupTag
 import com.zwz.offlineledger.backup.dto.LedgerSnapshot
 import com.zwz.offlineledger.data.local.AppDatabase
 import com.zwz.offlineledger.data.local.SeedData
@@ -20,6 +21,8 @@ import com.zwz.offlineledger.data.local.entity.BalanceAdjustmentEntity
 import com.zwz.offlineledger.data.local.entity.BudgetEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.RecordEntity
+import com.zwz.offlineledger.data.local.entity.RecordTagCrossRef
+import com.zwz.offlineledger.data.local.entity.TagEntity
 import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
 import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.local.toDto
@@ -50,6 +53,8 @@ import com.zwz.offlineledger.backup.csv.FireflyImportOutcome
 import com.zwz.offlineledger.core.accountLabel
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.currency.LedgerCurrency
+import com.zwz.offlineledger.core.joinTagNames
+import com.zwz.offlineledger.core.splitTagNames
 import com.zwz.offlineledger.core.time.LedgerClock
 import com.zwz.offlineledger.engine.CategoryTree
 import com.zwz.offlineledger.engine.LedgerEngine
@@ -90,6 +95,33 @@ class LedgerRepository @Inject constructor(
 ) {
     fun observeNetWorth(): Flow<Long> = accountDao.observeNetWorth()
 
+    /**
+     * 第 75 批：标签绑定的唯一实现。记一笔 / CSV / Firefly / 备份 / 回收站
+     * MUST 全部走这里：按名复用或新建标签，再整体替换关联。
+     * 本方法不带事务，供已处在 withTransaction 内的调用点复用。
+     */
+    private suspend fun bindTags(recordId: Long, names: List<String>) {
+        val dao = db.tagDao()
+        dao.clearForRecord(recordId)
+        val cleaned = names.map { it.trim() }
+            .filter { it.isNotEmpty() && !it.contains(',') }
+            .distinct().take(8)
+        val ids = cleaned.map { n ->
+            dao.idByName(n) ?: dao.insertTag(TagEntity(name = n))
+        }
+        if (ids.isNotEmpty()) {
+            dao.insertRefs(ids.map { RecordTagCrossRef(recordId, it) })
+        }
+    }
+
+    /** 供记一笔保存后调用（独立事务）。 */
+    suspend fun setRecordTags(recordId: Long, names: List<String>) =
+        db.withTransaction { bindTags(recordId, names) }
+
+    /** 供编辑态回填（只读）。 */
+    suspend fun tagNames(recordId: Long): List<String> =
+        db.tagDao().namesForRecord(recordId)
+
     suspend fun insertRecord(record: RecordEntity): Long = db.withTransaction {
         val id = recordDao.insert(withResolvedRoot(record))
         rebuildAllBalancesInternal()
@@ -126,7 +158,9 @@ class LedgerRepository @Inject constructor(
     /** 删除 = 从 records 移入 trash，然后重算。 */
     suspend fun deleteRecord(id: Long) = db.withTransaction {
         val record = recordDao.byId(id) ?: return@withTransaction
-        trashDao.insert(record.toTrash(System.currentTimeMillis()))
+        // 级联删除会清掉 record_tags，所以先把标签名快照写进 trash。
+        val snapshot = joinTagNames(db.tagDao().namesForRecord(id))
+        trashDao.insert(record.toTrash(System.currentTimeMillis(), snapshot))
         recordDao.deleteById(id)
         rebuildAllBalancesInternal()
     }
@@ -135,6 +169,7 @@ class LedgerRepository @Inject constructor(
     suspend fun restoreRecord(originalId: Long) = db.withTransaction {
         val trash = trashDao.byOriginalId(originalId) ?: return@withTransaction
         recordDao.insert(trash.toRecord())
+        bindTags(originalId, splitTagNames(trash.tagNames))
         trashDao.deleteByOriginalId(originalId)
         rebuildAllBalancesInternal()
     }
@@ -178,7 +213,9 @@ class LedgerRepository @Inject constructor(
     suspend fun exportSnapshot(): LedgerSnapshot = LedgerSnapshot(
         accounts = accountDao.all().map { it.toDto() },
         categories = categoryDao.all().map { it.toDto() },
-        records = recordDao.all().map { it.toDto() },
+        records = recordDao.all().map {
+            it.toDto().copy(tagNames = db.tagDao().namesForRecord(it.id))
+        },
         balanceAdjustments = adjustmentDao.all().map { it.toDto() },
         templates = templateDao.all().map { it.toDto() },
         recurringRules = ruleDao.all().map { it.toDto() },
@@ -188,6 +225,9 @@ class LedgerRepository @Inject constructor(
                 pattern = it.pattern, shortName = it.shortName
             )
         },
+        tags = db.tagDao().all().map { t ->
+                BackupTag(t.id, t.name, t.sortOrder, t.isArchived, t.createdAt)
+            },
         ruleGroups = db.ruleDao().groups().map { g ->
             com.zwz.offlineledger.backup.dto.BackupRuleGroup(
                 id = g.id, name = g.name, enabled = g.enabled, sortOrder = g.sortOrder,
@@ -212,7 +252,8 @@ class LedgerRepository @Inject constructor(
                 discountCents = it.discountCents, feeCents = it.feeCents,
                 counterparty = it.counterparty,
                 importSource = it.importSource,
-                sourceId = it.sourceId
+                sourceId = it.sourceId,
+                tagNames = splitTagNames(it.tagNames)
             )
         },
         exportedAtEpochMilli = System.currentTimeMillis(),
@@ -242,17 +283,28 @@ class LedgerRepository @Inject constructor(
         ruleDao.clear()
         budgetDao.clear()
         aliasDao.clear()
+        handle.execSQL("DELETE FROM record_tags")
+        handle.execSQL("DELETE FROM tags")
         db.ruleDao().clearDefinitions()
         db.ruleDao().clearGroups()
         categoryDao.clear()
         accountDao.clear()
 
+        file.payload.tags.forEach { t ->
+            db.tagDao().insertTag(
+                TagEntity(t.id, t.name, t.sortOrder, t.isArchived, t.createdAt)
+            )
+        }
         file.payload.accounts.forEach { accountDao.insert(it.toEntity()) }
         val orderedCategories = file.payload.categories
             .map { it.toEntity() }
             .sortedBy { if (it.parentId == null) 0 else 1 }
         orderedCategories.forEach { categoryDao.insert(it) }
-        file.payload.records.forEach { recordDao.insert(it.toEntity()) }
+        file.payload.records.forEach { r ->
+            val entity = r.toEntity()
+            recordDao.insert(entity)
+            bindTags(entity.id, r.tagNames)
+        }
         file.payload.balanceAdjustments.forEach { adjustmentDao.insert(it.toEntity()) }
         // v1 备份缺这两个键时已被解析成空列表，覆盖导入会清空现有模板 / 规则，
         // 与「全量替换」语义一致（见 backup-restore delta）。
@@ -282,7 +334,12 @@ class LedgerRepository @Inject constructor(
             }
         }
         file.payload.trash.forEach {
-            trashDao.insert(it.toEntity().toTrash(System.currentTimeMillis()))
+            trashDao.insert(
+                it.toEntity().toTrash(
+                    System.currentTimeMillis(),
+                    joinTagNames(it.tagNames)
+                )
+            )
         }
 
         val fkCursor = handle.query("PRAGMA foreign_key_check")
@@ -701,7 +758,8 @@ class LedgerRepository @Inject constructor(
             } ?: "",
             feeYuan = r.feeCents?.let {
                 java.math.BigDecimal.valueOf(it, 2).toPlainString()
-            } ?: ""
+            } ?: "",
+            tags = joinTagNames(db.tagDao().namesForRecord(r.id))
         )
     }
 
@@ -823,7 +881,8 @@ class LedgerRepository @Inject constructor(
                 feeCents = row.feeYuan.takeIf { it.isNotBlank() }
                     ?.let { Cents.fromYuan(it).value }
             )
-            recordDao.insert(withResolvedRoot(entity))
+            val newId = recordDao.insert(withResolvedRoot(entity))
+            bindTags(newId, splitTagNames(row.tags))
             written++
         }
         rebuildAllBalancesInternal()
@@ -909,7 +968,8 @@ class LedgerRepository @Inject constructor(
                 feeCents = row.feeYuan.takeIf { it.isNotBlank() }
                     ?.let { Cents.fromYuan(it).value }
             )
-            recordDao.insert(withResolvedRoot(entity))
+            val newId = recordDao.insert(withResolvedRoot(entity))
+            bindTags(newId, splitTagNames(row.tags))
             written++
         }
         rebuildAllBalancesInternal()
@@ -1141,7 +1201,8 @@ class LedgerRepository @Inject constructor(
                 importSource = "FIREFLY_III",
                 sourceId = e.journalId
             )
-            recordDao.insert(withResolvedRoot(entity))
+            val newId = recordDao.insert(withResolvedRoot(entity))
+            bindTags(newId, splitTagNames(e.tags))
             written++
         }
         rebuildAllBalancesInternal()

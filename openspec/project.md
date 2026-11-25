@@ -1349,3 +1349,15 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 7 个进行中 change 与 4 个已归档 change 未动；
   `refine-firefly-mapping` 仍待使用者明确说「可以归档」。
 
+### 第 75 批实现回填（v0.2.54）
+
+四件套推 `01fe4e2a6b54` 后完成编码：新增 `TagEntity` / `RecordTagCrossRef` /
+`TagDao` / `TagNames` / `TagPickerDialog` / `TagManagerScreen` / `TagChips`，
+改 22 个既有文件（AppDatabase / SeedCallback / Trash / Mappers / Repository /
+备份 DTO / CSV / Firefly / RecordDao / RecordFilter / PagingSource /
+DetailViewModel / FilterSheet / Editor VM + Dialog / DetailScreen /
+RecordDetailPage / StatsScreen / LedgerApp / LedgerDi / SettingsScreen /
+FireflyImportScreen）。`version = 8`、版本号 `0.2.54`、`Migrations.ALL` 仍空。
+实现偏差两处已在 design 登记：筛选改单值 `tagName`、筛选面板用输入框而非 chips。
+预制分类清单逐字段零改动。10 个静态检查全 PASS。
+

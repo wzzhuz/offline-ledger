@@ -110,6 +110,7 @@ fun RecordEditorDialog(
     var errorText by remember { mutableStateOf<String?>(null) }
     var showMore by remember { mutableStateOf(false) }
     var showAllCategories by remember { mutableStateOf(false) }
+    var showTagPicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -168,6 +169,17 @@ fun RecordEditorDialog(
                         onToday = { vm.setToday() }
                     )
                     FormDivider()
+
+                    // 第 75 批：标签一行，转账也能挂（转账本无分类）。
+                    FormRow("标签", onRowClick = { showTagPicker = true }) {
+                        Text(
+                            text = if (state.tagNames.isEmpty()) "未设置 · 点此添加"
+                            else state.tagNames.joinToString(" ") { "#$it" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
                     if (state.type != RecordType.TRANSFER) {
                         FormRow("分类", onRowClick = { showAllCategories = true }) {
@@ -371,6 +383,14 @@ fun RecordEditorDialog(
             zonedTime.hour, zonedTime.minute, true
         ).show()
     }
+    if (showTagPicker) {
+        TagPickerDialog(
+            selected = state.tagNames,
+            onConfirm = { vm.setTags(it); showTagPicker = false },
+            onDismiss = { showTagPicker = false }
+        )
+    }
+
     if (showAllCategories) {
         AllCategoriesDialog(
             categories = categories,

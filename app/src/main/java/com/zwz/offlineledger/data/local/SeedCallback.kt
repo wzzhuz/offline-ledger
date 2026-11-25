@@ -20,5 +20,13 @@ class SeedCallback(private val context: Context) : RoomDatabase.Callback() {
                 .getOrElse { SeedData.allInsertStatements() }
         }
         statements.forEach { db.execSQL(it) }
+        // 第 75 批：预置标签只在 onCreate（全新库）种入。
+        // 使用者归档过的标签 MUST NOT 在下次启动被复活 —— onCreate 不重复执行即保证。
+        listOf("给老婆", "家用", "旅行").forEachIndexed { i, name ->
+            db.execSQL(
+                "INSERT OR IGNORE INTO tags (name, sortOrder, isArchived, createdAt) " +
+                    "VALUES ('" + name + "', " + (i + 1) + ", 0, 0)"
+            )
+        }
     }
 }
