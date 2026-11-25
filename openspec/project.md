@@ -1232,3 +1232,15 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
   其余 6 个进行中 change 与 3 个已归档 change 未动。
 
+### 第 72 批实测（v0.2.52 出包）
+
+- 实现 `41178b770198`（10 文件 / blob 585），**一次成包**，无诊断 / 修复 commit。
+- push CI `45566149432` **success**（19 步）、出包 CI `45566884630` success（28 步无染绿）；
+  `build.yml` 全程零改动。
+- tag `v0.2.52` → `41178b770198`；Release 附件
+  `offline-ledger-v0.2.52-release-41178b77.apk`
+  （3463448 B，SHA256 `45f4a2fdfbd4f91d3620d5af81e280e3ba757e879a29a9ab521ffe45e2a57c47`），`state=uploaded` + `digest` 与 notes 一致。
+- artifacts 3 个、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
+- 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
+  仍待使用者明确说「可以归档」。
+
