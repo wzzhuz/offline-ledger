@@ -62,7 +62,47 @@ jobs:
       # assembleDebug 只编译主源码，不碰 src/test。
       # 必须单独跑一次 test，否则测试文件写错了也照样「编译通过」。
       - name: 运行单元测试
-        run: gradle testDebugUnitTest --stacktrace --no-daemon
+        run: |
+          set -o pipefail
+          gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/unit74.log
+
+      - name: 临时诊断：回写单测失败详情
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import os, json, urllib.request, pathlib
+          out = []
+          log = pathlib.Path('/tmp/unit74.log')
+          if log.exists():
+              out.append('### gradle testDebugUnitTest 尾部')
+              out.append('```')
+              out.append(log.read_text(errors='replace')[-14000:])
+              out.append('```')
+          for f in sorted(pathlib.Path('app/build/test-results').rglob('*.xml')):
+              t = f.read_text(errors='replace')
+              if '<failure' in t or '<error' in t:
+                  out.append('### ' + str(f))
+                  out.append('```')
+                  out.append(t[:8000])
+                  out.append('```')
+          if not out:
+              out.append('未捕获到日志或 XML')
+          body = '\n'.join(out)[:60000]
+          req = urllib.request.Request(
+              'https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] +
+              '/commits/' + os.environ['GITHUB_SHA'] + '/comments',
+              headers={
+                  'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                  'Accept': 'application/vnd.github+json',
+                  'User-Agent': 'diag74',
+                  'Content-Type': 'application/json'
+              },
+              method='POST', data=json.dumps({'body': body}).encode())
+          with urllib.request.urlopen(req, timeout=30) as x:
+              print('comment HTTP', x.status)
+          PY
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 编译 Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon
