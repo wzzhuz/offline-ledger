@@ -1361,3 +1361,13 @@ FireflyImportScreen）。`version = 8`、版本号 `0.2.54`、`Migrations.ALL` �
 实现偏差两处已在 design 登记：筛选改单值 `tagName`、筛选面板用输入框而非 chips。
 预制分类清单逐字段零改动。10 个静态检查全 PASS。
 
+### 第 75 批交付实测（v0.2.54）
+
+push CI `45644673082`、出包 CI `45646127262` 双全绿，tag `v0.2.54 → fda2826a9053`。
+APK `offline-ledger-v0.2.54-release-fda2826a.apk` / 3,496,216 B /
+SHA256 `b3df463720d39f9d46a5b90ade25de84fed404a66ac0b82b365e1023c8010e46`，
+Release body 已追加「version 8 覆盖安装不适用、先导出再卸载重装」警示。
+三轮 CI 失败根因：可空 `formatCents`、漏 Hilt `provideTagDao`、单测 HEADER 15→16 断言；
+均已修复并加静态断言 / 新增 `TagRoundTripTest` 8 场景。
+`build.yml` 逐字节恢复、诊断 comment 删除返回 204。
+

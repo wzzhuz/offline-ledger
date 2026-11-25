@@ -32,7 +32,7 @@
 - [x] 3.4 `TagDao.tagStats` + 统计页标签卡（不给百分比 + 明示口径）
 - [x] 3.5 `TagManagerScreen` + `composable("tags")` + 设置页入口 + ViewModel CRUD
 
-## 阶段 4：验证与交付（CI / 出包待回填）
+## 阶段 4：验证与交付（已完成）
 
 - [x] 4.1 10 个静态检查全 PASS、双 CI 全绿
 - [x] 4.2 版本号 → `0.2.54`，出包，tag / Release / digest 核对
@@ -49,3 +49,13 @@
 - [ ] 5.7 **`version 8` 覆盖安装确实开库失败**；卸载重装 + 导入备份后数据完整
 - [ ] 5.8 分类仍互斥、转账仍无分类、预制分类逐字段零回归
 - [ ] 5.9 §8 第 45–74 批既有真机待验项整体继承
+
+## 实测结果（2026-11-25）
+
+- push CI `45644673082` 全绿；出包 CI `45646127262` 全绿；tag `v0.2.54 → fda2826a9053`
+- APK `offline-ledger-v0.2.54-release-fda2826a.apk` / 3,496,216 B /
+  SHA256 `b3df463720d39f9d46a5b90ade25de84fed404a66ac0b82b365e1023c8010e46`
+- 三轮失败：可空 `formatCents` / 漏 Hilt `provideTagDao` / 单测 HEADER 15→16 与 `dropLast(2)`
+- 诊断 `build.yml` 逐字节恢复、comment 删除 204；Release body 追加升表警示
+- §8 真机待验项全部保持 `[ ]`（尤其 5.7 覆盖安装开库失败 + 卸载重装后导入备份完整）
+
