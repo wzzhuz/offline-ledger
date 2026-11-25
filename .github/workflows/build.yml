@@ -74,9 +74,18 @@ jobs:
           out = []
           log = pathlib.Path('/tmp/unit74.log')
           if log.exists():
-              out.append('### gradle testDebugUnitTest 尾部')
+              txt = log.read_text(errors='replace')
+              errs = [l for l in txt.splitlines()
+                      if l.startswith('e: ') or l.startswith('w: ')
+                      or 'error:' in l.lower() or 'What went wrong' in l
+                      or 'Compilation error' in l or 'FAILURE:' in l]
+              out.append('### 编译错误行')
               out.append('```')
-              out.append(log.read_text(errors='replace')[-14000:])
+              out.append('\n'.join(errs[:120]))
+              out.append('```')
+              out.append('### gradle 日志开头')
+              out.append('```')
+              out.append(txt[:6000])
               out.append('```')
           for f in sorted(pathlib.Path('app/build/test-results').rglob('*.xml')):
               t = f.read_text(errors='replace')
