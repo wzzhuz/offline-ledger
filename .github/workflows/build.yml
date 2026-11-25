@@ -76,7 +76,14 @@ jobs:
           python3 - <<'PY'
           import os, json, urllib.request
           p = '/tmp/ci_unit.log'
-          t = open(p, errors='replace').read()[-14000:] if os.path.exists(p) else 'no log file'
+          raw = open(p, errors='replace').read() if os.path.exists(p) else 'no log file'
+          # --stacktrace 会把 e: 错误行挤出尾部，先滤掉 Gradle / Kotlin 堆栈
+          keep = [l for l in raw.splitlines()
+                  if not l.lstrip().startswith('at ')
+                  and 'org.gradle.internal' not in l
+                  and 'kotlin.gradle' not in l
+                  and 'DefaultBuildOperation' not in l]
+          t = '\n'.join(keep)[-28000:]
           body = json.dumps({'body': '```\n' + t + '\n```'}).encode()
           url = 'https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/comments'
           req = urllib.request.Request(url, data=body, method='POST', headers={
