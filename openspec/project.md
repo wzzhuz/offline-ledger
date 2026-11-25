@@ -1051,3 +1051,16 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - `add-discount-and-fee` 与其余 5 个进行中 change 未动；本 change 仍需使用者
   明确说「可以归档」。
 
+### 第 68 批实测（v0.2.48 出包）
+
+- 代码/四件套/文档 `0303ee3cbcf7`（13 文件，总 blob 585，parent `56142c4d`）；
+  推送前 8 静态检查全绿、6 MODIFIED 全部命中基线。
+- push CI `45539031571` **一次全绿**、无诊断无修复；出包 CI `45539747274` 全绿
+  （28 步、无染绿）；tag `v0.2.48` → `0303ee3c`。
+- Release 附件 `offline-ledger-v0.2.48-release-0303ee3c.apk`
+  （3422028 B，SHA256 `e5b14617679a6b0e97862145d95ec56ec60acec62d3b2e744f007457e7f4ab48`），`state=uploaded` + `digest` 与 notes 一致。
+- artifacts 3 个、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
+- 触发与轮询拆分生效，单次 dispatch、无重复发布。
+- 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
+  仍待使用者明确说「可以归档」。
+
