@@ -623,6 +623,7 @@ interface RecordDao {
     @Query("SELECT categoryId AS categoryId, COUNT(*) AS cnt FROM records WHERE type IN ('EXPENSE','INCOME') AND excludeFromStats = 0 AND categoryId IS NOT NULL GROUP BY categoryId")
     suspend fun insightCategoryCounts(): List<InsightCountRow>
 
-    @Query("SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents, r.localDate AS localDate, r.note AS note, c.name AS categoryName FROM records r LEFT JOIN categories c ON r.categoryId = c.id WHERE r.type IN ('EXPENSE','INCOME') AND r.excludeFromStats = 0 AND (r.categoryId = :categoryId OR r.rootCategoryId = :categoryId) ORDER BY r.localDate DESC, r.id DESC LIMIT :limit")
+    /** 第 69 批：DrillRow 扩字段后，Room 要求非空列 MUST 出现在结果里，补齐投影。 */
+    @Query("SELECT r.id AS id, r.type AS type, r.amountCents AS amountCents, r.localDate AS localDate, r.note AS note, r.timestamp AS timestamp, r.counterparty AS counterparty, r.description AS description, r.discountCents AS discountCents, r.feeCents AS feeCents, c.name AS categoryName, c.colorHex AS categoryColorHex, fa.name AS fromAccountName, fa.cardLast4 AS fromAccountLast4, ta.name AS toAccountName, ta.cardLast4 AS toAccountLast4 FROM records r LEFT JOIN categories c ON r.categoryId = c.id LEFT JOIN accounts fa ON r.fromAccountId = fa.id LEFT JOIN accounts ta ON r.toAccountId = ta.id WHERE r.type IN ('EXPENSE','INCOME') AND r.excludeFromStats = 0 AND (r.categoryId = :categoryId OR r.rootCategoryId = :categoryId) ORDER BY r.localDate DESC, r.id DESC LIMIT :limit")
     suspend fun insightCategoryDetailRows(categoryId: Long, limit: Int): List<DrillRow>
 }
