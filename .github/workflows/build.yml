@@ -79,7 +79,8 @@ jobs:
           python3 - <<'PY'
           import json, os, urllib.request
           log = open('/tmp/unit70.log', errors='replace').read() if os.path.exists('/tmp/unit70.log') else '(no log)'
-          body = 'DIAG70\n```\n' + log[-24000:] + '\n```'
+          errs = [l for l in log.splitlines() if any(k in l for k in ('e: ', 'error:', '.kt:', 'FAILURE', 'What went wrong', 'Compilation error', 'Unresolved'))]
+          body = 'DIAG70B\n```\nERRORS\n' + '\n'.join(errs[:100]) + '\n---HEAD---\n' + log[:9000] + '\n```'
           repo = os.environ['GITHUB_REPOSITORY']; sha = os.environ['GITHUB_SHA']
           req = urllib.request.Request(
               'https://api.github.com/repos/%s/commits/%s/comments' % (repo, sha),
