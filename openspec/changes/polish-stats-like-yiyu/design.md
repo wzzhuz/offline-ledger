@@ -210,3 +210,105 @@ ADDED 4 条：分类占比卡一羽式图例（含灰条）、收款方账户默
 
 `ChartData` / `InsightData` / `StatsDrillRange` / `StatsLegend` /
 `RecordEntity` / `AppDatabase` **零改动**。
+
+---
+
+## 10. 第 70 批修订：分类图三条观感优化
+
+> 本节只改分类占比卡的呈现与全局色值；第 69 批的撤回结论、Q6A 解耦、
+> 页内 sheet、折叠只读卡全部保留。
+
+### 10.1 标题：文本与图标分离
+
+第 69 批 Q1A 做成「`FilterChip` 里写『按大类 ⇄』」——文字和切换符号挤在一个
+chip 里，既不像一羽也不简洁。一羽图 1/2/3 是 `▌大类 ⇌` / `▌小类 ⇌`：
+**蓝色竖条 + 粗体纯文本 + 旁边一个独立的 ⇄ 图标**。本批照此拆成三件套：
+
+```
+Row {
+  Box(3dp × 16dp, CategoryHeaderBlue, 2dp 圆角)      // 竖条
+  Text("大类" / "小类", titleMedium, Bold)            // 纯文本，无 ⇄
+  IconButton(size 32dp) { SwitchLevelIcon() }         // 独立图标按钮
+}
+```
+
+`SwitchLevelIcon` 是 `Canvas` 自绘的两条反向箭头（上→ / 下←），
+零新增 Gradle 依赖、零 drawable 资源、零 `Icons.*` 版本风险。
+右上角「分类管理 ›」保留。**截图里那个粉色「支出 ⇌」按钮不加**：
+使用者没提，而且第 68 批刚因为「把对方有的控件全搬过来」返工过一次，
+这次严格只做列出的三条。同理，截图里的蓝底 TopBar /「分析 / 概览」Tab
+也不加回——那是第 69 批明确删掉的。
+
+### 10.2 配色：找到「灰不拉几」的真正根因
+
+第 69 批把 `lightColorScheme` 补齐了，但真机仍觉得「主体不突出、边界不清晰」。
+核查发现两层原因：
+
+1. `background = F4F6FB` 太浅且偏蓝，与白卡对比不足 →
+   改**中性浅灰** `F2F3F7`，与项目既有 `CategoryManagerDialog` /
+   `AssetsScreen` 的 `F2F3F7` / `F5F6FA` 同系，不新造一套灰。
+   `surfaceContainer*` 全部收成纯白 / 近白，`surfaceVariant` / `outlineVariant`
+   同步去掉蓝味。`MainActivity` 已有全屏 `Surface`，`background` 确实生效，
+   不是「没包 Surface」的问题。
+2. **M3 `Card` 默认带 1.dp `tonalElevation`**，会把 `containerColor`
+   与 primary 混合，纯白被染成淡蓝灰 —— 这才是「灰卡」的根因。
+   本批新增统计页统一出口 `StatsCard`：
+   `colors = CardDefaults.cardColors(containerColor = Color.White)` +
+   `elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)` +
+   `RoundedCornerShape(16.dp)`，7 处 `Card(` 全量替换。
+   靠「中性灰底 + 纯白卡 + vertical 8dp gap + 圆角」形成清晰边界，
+   MUST NOT 新增阴影 / 描边（基线「明细页极简网格」禁用）。
+
+`ExpenseRed` / `IncomeGreen` / `applyReverseColors` / `CategoryHeaderBlue`
+一字不动。全 23 个含 Card / background 的文件观感变化继续如实登记。
+
+### 10.3 环外指示线：撤回两次「明确未做」，但不碰禁用 API
+
+第 68/69 批两次把「环外悬浮百分比」列为**明确未做**，理由是
+`DonutChart` 文件头禁用 `DrawScope.drawText` / `TextMeasurer`。
+当时我把 `BoxWithConstraints` 也一并归为「版本相关 API」而回避，
+其实是把「不想做定位计算」写成了「能力不允许」——
+**第三次同类外推**（§7.37 / §7.50 / §7.51 之后）。使用者这轮明确要指示线，
+本批撤回那条结论，用完全合规的方式实现：
+
+```
+var boxSize by remember { mutableStateOf(IntSize.Zero) }
+Box(Modifier.height(250.dp).onSizeChanged { boxSize = it }) {
+    // ① guides：Composable 层按 boxSize 算，Canvas 与 Text 共用
+    //    mid = startAngle + sweepAngle/2；按 cos(mid) 分左右
+    //    p1 = 环外缘点；p2 = 沿角再出 14dp；endX = 左右边缘 6dp
+    //    同侧按 y 排序、间隔 <22dp 时下推，避免叠线
+    // ② Canvas：drawArc 画环 + drawLine 斜线/水平线 + drawCircle 端点
+    // ③ 普通 Text：align(TopStart/TopEnd) + absoluteOffset { IntOffset(...) }
+    //    直接用 g.y 定位，颜色 = 扇区色，文案「名称 百分比」
+}
+```
+
+- 环半径 `min(cx,cy) * 0.78f` → `0.60f`，给左右各约 90dp 文字留空间；
+  `thickness` 与 pointerInput 命中半径同步取 `0.60f`，MUST NOT 出现
+  「画得小、点得大」或反之。
+- 折线末端 y 用**去重叠后**的 `g.y`，线与文字严格对齐。
+- 空态 `sectors.isEmpty()` → `guides` 为空，只画灰环、不画线。
+- `guides` 在 Composable 层算完再传给 Canvas，**MUST NOT 在 DrawScope 内
+  回写 state**（会引发重组循环）。
+
+用到的全是基础 API：`onSizeChanged` / `absoluteOffset` / `drawLine` /
+`drawCircle`。零 `drawText`、零 `TextMeasurer`、零 `FlowRow`、零实验性注解。
+
+### 10.4 明确未动
+
+图例灰条结构、收款方 / 账户折叠卡的「收款方 ⇄ / 账户 ⇄」标签
+（使用者说的是「分类图」，不越界改别的卡）、页内 sheet 行样式、
+页内下钻 SQL、统计口径、`version = 7`、`Migrations.ALL`、零 `INTERNET`。
+
+### 10.5 落盘清单（第 70 批）
+
+| 层 | 文件 |
+|---|---|
+| 环 + 指示线 | `ui/charts/DonutChart.kt` |
+| 标题 + 卡片出口 | `ui/stats/StatsScreen.kt` |
+| 全局色值 | `ui/theme/LedgerTheme.kt` |
+| 版本 | `app/build.gradle.kts` → 0.2.50 |
+| 静态检查 | `scripts/check_stats_merge.py` |
+| 四件套 | 本目录（proposal / design / tasks + 两份 delta spec） |
+| 文档 | 活文档 §7.52、`openspec/project.md` 第 70 批 |

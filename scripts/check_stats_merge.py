@@ -41,17 +41,27 @@ def main():
     if "PeriodSwitcher(state, vm)" not in stats or "CurrencySwitcher(state, vm)" not in stats:
         errors.append("StatsScreen 缺既有周期 / 币种切换")
 
-    # 2. 分类占比卡只做分类 + 左上角单标签
-    for key in ("CategoryShareCard(", "OtherRankCard(", '"按大类 ⇄"', '"按小类 ⇄"',
-                '"收款方 ⇄"', '"账户 ⇄"', "分类管理 ›", "合计不一致"):
+    # 2. 分类占比卡只做分类 + 第 70 批「文本 + 独立图标」标题
+    for key in ("CategoryShareCard(", "OtherRankCard(", '"大类"', '"小类"',
+                "SwitchLevelIcon()", "StatsCard {", '"收款方 ⇄"', '"账户 ⇄"',
+                "分类管理 ›", "合计不一致"):
         if key not in stats:
-            errors.append("StatsScreen 缺第 69 批要素: " + key)
+            errors.append("StatsScreen 缺第 69/70 批要素: " + key)
+    # 第 70 批：文本里 MUST NOT 再带 ⇄、MUST NOT 出现支出切换按钮或蓝底 Tab。
+    for key in ('"按大类 ⇄"', '"按小类 ⇄"', '"支出 ⇌"', '"分析"', '"概览"',
+                "StatsHeader(", "TabRow("):
+        if key in stats:
+            errors.append("第 70 批不加回项残留: " + key)
     for key in ("CategoryInsightCard", "RankInsightCard", "RankDim",
                 "expandableIds", "onChildClick"):
         if key in stats or key in donut:
             errors.append("仍残留三维度混卡 / ⌄展开: " + key)
     if "OtherDim" not in stats:
         errors.append("缺 OtherDim 维度枚举")
+    if "CardDefaults.cardElevation(defaultElevation = 0.dp)" not in stats:
+        errors.append("StatsCard 未把 M3 tonalElevation 归零")
+    if "CardDefaults.cardColors(containerColor = Color.White)" not in stats:
+        errors.append("StatsCard 未显式纯白")
 
     # 3. 默认折叠 + 只读
     if "var expanded by rememberSaveable { mutableStateOf(false) }" not in stats:
@@ -59,12 +69,28 @@ def main():
     if "只读展示" not in stats:
         errors.append("收款方/账户卡未标注只读")
 
-    # 4. 灰色长条（Q2A）
+    # 4. 灰色长条（Q2A）+ 第 70 批环外指示线
     for key in ("0xFFEDEFF5", "CategoryHeaderBlue.copy(alpha = 0.75f)", "fillMaxWidth(row.percent)"):
         if key not in donut:
             errors.append("DonutChart 缺灰条: " + key)
     if "heightIn(min = 44.dp)" not in donut:
         errors.append("图例整行触摸区未保持 >=40dp")
+    for key in ("onSizeChanged", "GuideLine(", "drawLine(", "drawCircle(",
+                "absoluteOffset", "StatsLegend.percentText", "endX", "0.60f"):
+        if key not in donut:
+            errors.append("DonutChart 缺指示线要素: " + key)
+    # 只查 import 与真实调用：注释里写「零 drawText / TextMeasurer」不算。
+    for key in ("import androidx.compose.ui.text.TextMeasurer",
+                "import androidx.compose.foundation.layout.FlowRow",
+                "import androidx.compose.foundation.layout.BoxWithConstraints"):
+        if key in donut:
+            errors.append("DonutChart 引入禁用 import: " + key)
+    for key in ("drawText(", "TextMeasurer(", "FlowRow(", "BoxWithConstraints("):
+        if key in donut:
+            errors.append("DonutChart 用了禁用文本测量/实验性 API: " + key)
+    # 命中半径 MUST 与绘制半径同源
+    if donut.count("0.60f") < 2:
+        errors.append("绘制半径与点击命中半径未同源")
 
     # 5. Q4B 页内底部 sheet + 明细行样式
     for key in ("ModalBottomSheet", "StatsDrillSheet", "ExperimentalMaterial3Api",
@@ -106,9 +132,9 @@ def main():
     if "openSliceRows" not in vm:
         errors.append("StatsViewModel 缺 openSliceRows")
 
-    # 8. Q5B 全局清新配色 + 红绿语义零改动
-    for key in ("0xFFF4F6FB", "0xFFFFFFFF", "0xFFEEF1F8", "0xFF1F2430",
-                "0xFFDDE2EE", "0xFF5B7CFA", "surfaceContainerLow = Color"):
+    # 8. Q5B + 第 70 批中性灰底 / 纯白卡 + 红绿语义零改动
+    for key in ("0xFFF2F3F7", "0xFFFFFFFF", "0xFFE9EBF1", "0xFF1F2430",
+                "0xFFE2E4EB", "0xFF5B7CFA", "surfaceContainerLow = Color"):
         if key not in theme:
             errors.append("LedgerTheme 缺清新配色槽位: " + key)
     for key in ("applyReverseColors", "ExpenseRed = GREEN", "IncomeGreen = RED"):
@@ -156,7 +182,7 @@ def main():
             print("  FAIL", e)
         print(f"check_stats_merge: {len(errors)} 项失败")
         return 1
-    print("check_stats_merge: PASS (撤回蓝底/混卡/跨Tab / 只分类 / 灰条 / 折叠只读卡 / 页内 sheet / 全局配色 / 零改表 / 8 MODIFIED)")
+    print("check_stats_merge: PASS (第70批 文本+独立图标 / 灰底纯白零elevation / 环外指示线 / 撤回蓝底混卡跨Tab / 页内sheet / 零改表 / 8 MODIFIED)")
     return 0
 
 

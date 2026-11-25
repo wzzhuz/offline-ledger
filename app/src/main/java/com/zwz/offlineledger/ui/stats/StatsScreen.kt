@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.ui.stats
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,12 +10,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,6 +51,7 @@ import com.zwz.offlineledger.ui.components.formatCents
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import com.zwz.offlineledger.ui.components.CategoryHeaderBlue
 
 /** 第 69 批：收款方 / 账户折叠卡的两个维度；分类已独占占比卡。 */
@@ -104,7 +109,7 @@ fun StatsScreen(
 
         val check = state.totalsCheck
         if (check != null && !check.consistent) {
-            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            StatsCard {
                 Text(
                     text = "⚠ 合计不一致：一级 " + formatCents(check.rootCents) +
                         " / 二级 " + formatCents(check.childCents) +
@@ -218,7 +223,7 @@ fun StatsScreen(
 /* ------------------------------------------------------------------ */
 @Composable
 private fun InsightSummaryCard(state: StatsUiState, onAverage: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    StatsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             val period = when (state.mode) {
                 StatsMode.MONTH -> MonthRange.label(state.yearMonth)
@@ -367,23 +372,45 @@ private fun CategoryShareCard(
         vm.openSliceRows(id, isRoot, sl.name)
     }
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    StatsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Q1A：左上角单个「按大类 ⇄ / 按小类 ⇄」标签，点一下来回切。
-                FilterChip(
-                    selected = false,
-                    onClick = {
-                        vm.setSliceLevel(
-                            if (isRoot) SliceLevel.CHILD else SliceLevel.ROOT
-                        )
-                    },
-                    label = { Text(if (isRoot) "按大类 ⇄" else "按小类 ⇄") }
-                )
+                // 第 70 批：一羽式「蓝色竖条 + 纯文本口径 + 独立切换图标」。
+                // 文本只写「大类 / 小类」，切换交给旁边单独的图标按钮，
+                // MUST NOT 把 ⇄ 拼进 chip 文本，也 MUST NOT 加「支出 ⇌」按钮。
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 3.dp, height = 16.dp)
+                            .background(
+                                CategoryHeaderBlue,
+                                RoundedCornerShape(2.dp)
+                            )
+                    )
+                    Text(
+                        text = if (isRoot) "大类" else "小类",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                    IconButton(
+                        onClick = {
+                            vm.setSliceLevel(
+                                if (isRoot) SliceLevel.CHILD else SliceLevel.ROOT
+                            )
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        SwitchLevelIcon()
+                    }
+                }
                 TextButton(onClick = onOpenCategories) {
                     Text("分类管理 ›", style = MaterialTheme.typography.labelSmall)
                 }
@@ -419,7 +446,7 @@ private fun OtherRankCard(
         OtherDim.COUNTERPARTY -> state.topCounterparties
         OtherDim.ACCOUNT -> state.topAccounts
     }
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    StatsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -522,7 +549,7 @@ private fun TrendCard(
     onPoint: (Int, StatsMode) -> Unit,
     yLabels: (Long) -> List<String>
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    StatsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = when (state.mode) {
@@ -729,7 +756,7 @@ private fun AssetCard(
     onPoint: (Int) -> Unit,
     yLabels: (Long) -> List<String>
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    StatsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "资产余额趋势（" + state.currencyCode + "）",
@@ -773,7 +800,7 @@ private fun AssetCard(
 /* ------------------------------------------------------------------ */
 @Composable
 private fun EmptyInsight(state: StatsUiState, vm: StatsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    StatsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("本周期还没有流水", style = MaterialTheme.typography.titleSmall)
             Text(
@@ -918,3 +945,48 @@ private fun ChartZoomButton(
 }
 
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/* ⑦ 第 70 批：纯白卡片 + 独立口径切换图标                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 第 70 批：统计页卡片统一出口。
+ *
+ * M3 `Card` 默认带 1.dp tonalElevation，会把纯白容器染成淡蓝灰，
+ * 这正是「灰不拉几、边界糊」的根因。显式 `containerColor = Color.White`
+ * + `defaultElevation = 0.dp` 后，白卡与中性灰页面底形成清晰边界；
+ * 不新增阴影 / 描边（基线禁用卡片堆叠与阴影）。
+ */
+@Composable
+private fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        content = content
+    )
+}
+
+/** 自绘的 ⇄ 小图标：两条反向箭头，零新增依赖 / 零资源 / 零实验性 API。 */
+@Composable
+private fun SwitchLevelIcon() {
+    Canvas(modifier = Modifier.size(20.dp)) {
+        val w = size.width
+        val h = size.height
+        val c = CategoryHeaderBlue
+        val sw = 2f
+        val x1 = 2.dp.toPx()
+        val x2 = w - 4.dp.toPx()
+        val tip = 9.dp.toPx()
+        // 上箭头 →
+        drawLine(c, Offset(x1, h * 0.33f), Offset(x2, h * 0.33f), sw)
+        drawLine(c, Offset(x2 - tip, h * 0.20f), Offset(x2, h * 0.33f), sw)
+        drawLine(c, Offset(x2 - tip, h * 0.46f), Offset(x2, h * 0.33f), sw)
+        // 下箭头 ←
+        drawLine(c, Offset(w - x1, h * 0.67f), Offset(4.dp.toPx(), h * 0.67f), sw)
+        drawLine(c, Offset(4.dp.toPx() + tip, h * 0.54f), Offset(4.dp.toPx(), h * 0.67f), sw)
+        drawLine(c, Offset(4.dp.toPx() + tip, h * 0.80f), Offset(4.dp.toPx(), h * 0.67f), sw)
+    }
+}

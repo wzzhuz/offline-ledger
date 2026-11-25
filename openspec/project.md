@@ -1126,3 +1126,29 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
   仍待使用者明确说「可以归档」。
 
+## 第 70 批：分类图三条观感优化（change `polish-stats-like-yiyu` 再修订，v0.2.50）
+
+- **触发**：3 张一羽真机分类占比截图 + 三条反馈；沿用已授权工作模式直接做完出包。
+- **① 标题**：左上角改「蓝色竖条 + 粗体纯文本『大类』/『小类』 +
+  **独立自绘 ⇄ 图标按钮**」，删 `FilterChip` 口径标签；
+  **不加**截图右上「支出 ⇌」按钮、**不加回**蓝底 TopBar /「分析 / 概览」Tab。
+- **② 配色根因**：`background` 从 `F4F6FB`（太浅偏蓝）改**中性浅灰** `F2F3F7`；
+  新增 `StatsCard` 统一出口显式纯白 + **零 M3 tonalElevation** + 16dp 圆角，
+  统计页 7 处 `Card(` 全量替换 —— M3 `Card` 默认 1.dp elevation 会把纯白染成
+  淡蓝灰，这才是「主体不突出、边界糊」的根因。靠灰底/白卡/gap/圆角形成边界，
+  不新增阴影或描边；`ExpenseRed` / `IncomeGreen` / 反转开关零改动。
+- **③ 环外指示线**：撤回第 68/69 批两次「明确未做」；
+  Canvas `drawLine`/`drawCircle` 画斜引线 + 水平折线 + 端点圆点，
+  普通 `Text` + `onSizeChanged` + `absoluteOffset` 标「名称 百分比」，
+  同色、同侧去重叠。零 `drawText` / `TextMeasurer` / `FlowRow` / 实验性 API。
+  环半径 `0.78→0.60f`、图高 `210→250dp`，点击命中与绘制同源。
+- **口径零改动**：`StatsViewModel` / `ChartData` / `RecordDao` / `InsightData` /
+  `StatsLegend` / `StatsDrillRange` / `version = 7` 全部不动；
+  图例灰条、折叠只读卡标签、页内 sheet 下钻、合计警告置顶全保留 →
+  **v0.2.49 直接覆盖安装**。
+- **验证**：delta 12 条 / 45 Scenario（2 条 ADDED 重写 + 1 条 MODIFIED 措辞），
+  8 条 MODIFIED 命中基线、ADDED 与既有 284 条零冲突；
+  八个静态检查全 PASS（新增断言新三要素与「不加回」项）。
+- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
+  其余 6 个进行中 change 与 3 个已归档 change 未动。
+

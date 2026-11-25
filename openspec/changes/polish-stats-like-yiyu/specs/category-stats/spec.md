@@ -2,51 +2,59 @@
 
 ### Requirement: 环形图支持一级与二级切换并落地三级下钻
 
-统计页分类占比卡 SHALL 提供「按大类 / 按小类」切换，一级口径 SHALL 走
+统计页分类占比卡 SHALL 提供「大类 / 小类」切换，一级口径 SHALL 走
 `GROUP BY rootCategoryId`，二级口径 SHALL 走 `GROUP BY categoryId`，
 两者 SHALL 按金额降序展示占比与具体金额。
-**第 69 批改法**：切换 SHALL 由卡片**左上角单个「按大类 ⇄ / 按小类 ⇄」标签**
-承载，点一下来回切，MUST NOT 用两枚 FilterChip，
-MUST NOT 在「按大类」口径下提供一级行「⌄」内联展开二级
-（要看小类 MUST 直接切左上角标签）。
+**第 70 批改法**：卡片左上角 SHALL 为「蓝色竖条 + **纯文本**『大类』/『小类』
++ **独立的可点切换图标**」三部分；文本 MUST 只写口径名，
+MUST NOT 把 ⇄ 拼进文本或 FilterChip 里，切换 MUST 由旁边单独的图标按钮承担
+（一羽真机图 1/2/3 的 `▌大类 ⇌` / `▌小类 ⇌`）。
+MUST NOT 新增右上「支出 ⇌」类按钮（使用者未要求，且第 69 批已因加戏返工）。
+MUST NOT 用两枚 FilterChip，MUST NOT 在「大类」口径下提供一级行「⌄」内联展开二级
+（要看小类 MUST 直接点切换图标）。
 分类占比卡 SHALL 只承载分类维度，收款方 / 账户 MUST 拆回独立默认折叠卡，
 MUST NOT 混进本卡、MUST NOT 用维度 chip 在本卡内切换。
 环形图与图例列表 SHALL 在这张卡内同时可见、共享同一份净支出切片数据，
-MUST NOT 出现两个不一致的合计；MUST NOT 用互斥切换 chip 让两者二选一，
-也 MUST NOT 回到第 13 批那种「为一屏塞下而合并折叠」的取巧。
-排行 SHALL 由图例列表承担，每一条 SHALL 由带唯一统计口径的只读 SQL 聚合得出，
-MUST NOT 在 Kotlin 里对已加载分页数据分组。
+MUST NOT 出现两个不一致的合计；MUST NOT 用互斥切换 chip 让两者二选一。
+排行 SHALL 由图例列表承担，每一条 SHALL 由带唯一统计口径的只读 SQL 聚合得出。
 点击一级扇区 / 图例行 SHALL 按 `rootCategoryId` 查该大类下全部流水，
 点击二级扇区 / 图例行 SHALL 按 `categoryId` 查该分类流水，
-两者 SHALL 以**统计页内底部 sheet**（见本 change ADDED）按明细页行样式展示，
-MUST NOT 跳明细 Tab、MUST NOT 向 `DetailViewModel` 注入状态、
-MUST NOT 回到「弹窗里列流水 + 去明细按钮」的老路径。
+两者 SHALL 以**统计页内底部 sheet** 按明细页行样式展示，
+MUST NOT 跳明细 Tab、MUST NOT 向 `DetailViewModel` 注入状态。
 扇区点击与图例整行点击（触摸区 ≥40dp）SHALL 共用同一个回调；
 「分类管理 ›」入口 SHALL 保留。
-环中心 SHALL 统一写「净支出 ¥X」，MUST NOT 出现 Top5 合计冒充净支出的分支。
+环中心 SHALL 统一写「净支出 ¥X」。
+**第 70 批新增**：环形图 SHALL 为每个扇区绘制环外指示线（见本 change ADDED），
+从扇区外缘引出斜线 + 水平折线 + 端点小圆点，末端标注「分类名 百分比」，
+颜色 SHALL 与该扇区一致，同侧标签 MUST 上下错开避免重叠。
 既有 6 条收支聚合 SQL、`ChartData.netSlices`、`colorHex` 与
 「分类支出占比按净支出计算」MUST NOT 改动。
 
-#### Scenario: 左上角切换口径
+#### Scenario: 文本与图标分离
 
-- **GIVEN** 分类占比卡停在「按大类 ⇄」
-- **WHEN** 点该标签
-- **THEN** 切到「按小类 ⇄」，环与图例列表按 `categoryId` 聚合
+- **GIVEN** 分类占比卡停在「大类」
+- **WHEN** 查看左上角
+- **THEN** 显示蓝色竖条 + 粗体「大类」文本 + 旁边一个独立的 ⇄ 图标按钮
+- **AND** 文本里没有 ⇄、没有 chip 边框、没有右上「支出 ⇌」按钮
+
+#### Scenario: 点图标切口径
+
+- **WHEN** 点那个独立图标
+- **THEN** 切到「小类」，环与图例列表按 `categoryId` 聚合
 - **AND** 合计与一级口径相等，卡片内没有第二枚口径 chip、没有「⌄」
 
 #### Scenario: 点一级看该大类流水
 
-- **GIVEN** 「按大类」口径下「餐饮」为最大扇区
+- **GIVEN** 「大类」口径下「餐饮」为最大扇区
 - **WHEN** 点「餐饮」扇区或图例行
 - **THEN** 统计页内弹出底部 sheet，按 `rootCategoryId` 显示该大类全部流水
-- **AND** 不切换 Tab、不写明细筛选、不出现「去明细」按钮
+- **AND** 不切换 Tab、不写明细筛选
 
-#### Scenario: 点二级看该分类流水
+#### Scenario: 指示线标注每个扇区
 
-- **GIVEN** 「按小类」口径
-- **WHEN** 点「食材」图例行
-- **THEN** 底部 sheet 按 `categoryId` 显示该分类流水
-- **AND** 走参数化 SQL 与 LIMIT，不全量加载
+- **WHEN** 环上有 4 个扇区
+- **THEN** 每个扇区都有一条同色指示线，末端写「名称 百分比」
+- **AND** 同一侧的标签上下错开，不与环重叠
 
 #### Scenario: 三维度不混卡
 
@@ -209,36 +217,55 @@ MUST NOT 渲染时逐行查库（O(n²)）。
 
 ## ADDED Requirements
 
-### Requirement: 分类占比卡采用一羽式图例列表与灰色长条
+### Requirement: 分类占比卡采用一羽式图例列表、灰色长条与环外指示线
 
 统计页 SHALL 用**单张**「分类占比」卡同时承载环形图与分类排行，
 MUST NOT 再挂载独立的「分类排行」卡，也 MUST NOT 把收款方 / 账户混进本卡。
-卡片左上角 SHALL 只有一个「按大类 ⇄ / 按小类 ⇄」标签（点一下切换），
-标题右侧 SHALL 保留「分类管理 ›」；MUST NOT 出现两枚口径 chip、
-维度 chip、一级行「⌄」或「收起 / 排一级」类按钮。
-环与图例列表 SHALL 同时可见，允许纵向滚动，MUST NOT 用互斥切换 chip 二选一。
+卡片左上角 SHALL 为「蓝色竖条 + 纯文本『大类』/『小类』 + 独立切换图标按钮」，
+标题右侧 SHALL 保留「分类管理 ›」；MUST NOT 出现 FilterChip 式口径标签、
+维度 chip、一级行「⌄」或右上「支出 ⇌」按钮。
+环与图例列表 SHALL 同时可见，允许纵向滚动。
 环中心 SHALL 统一写「净支出 ¥X」，由 `state.netExpenseCents` 提供。
+**第 70 批新增（撤回第 68/69 批两次「明确未做」）**：SHALL 为每个扇区绘制
+**环外指示线**：从扇区外缘按中点角引出斜线，再折成水平线到卡片左 / 右边缘，
+端点画小圆点，末端用普通 Compose `Text` 标注「分类名 百分比」，
+颜色 SHALL 与扇区一致；同侧标签 SHALL 按 y 排序并下推错开，
+MUST NOT 互相重叠、MUST NOT 盖住环。
+实现 SHALL 用 Canvas `drawLine` / `drawCircle` + `Modifier.onSizeChanged`
+量尺寸 + 普通 `Text` 的 `absoluteOffset` 叠加，
+**MUST NOT** 使用 `DrawScope.drawText` / `TextMeasurer` / `FlowRow` /
+实验性 API，MUST NOT 在 `DrawScope` 内回写 state。
+环半径 SHALL 留出左右文字空间（本批取 `min(cx,cy) * 0.60f`），
+扇区点击命中判定 MUST 与绘制半径同源。
 图例列表每行 SHALL 含：分类彩色图标（或中性圆 + 首字兜底）、名称、
 百分比、¥金额，以及**灰色长条**——浅灰轨道 `0xFFEDEFF5` +
-低饱和 `0xFF5B7CFA` 填充，宽度 SHALL 等于该行占比，
-MUST NOT 回写金额或参与统计。
+低饱和 `0xFF5B7CFA` 填充，宽度 SHALL 等于该行占比。
 整行 SHALL 可点且触摸区 ≥40dp，点击 SHALL 与对应扇区共用同一个
-页内 sheet 下钻回调。图例行 SHALL 按金额降序排列，与环形扇区顺序一致，
-MUST NOT 出现两个不一致的合计。
-百分比 SHALL 由整数分 `cents / total` 换算，结果只进显示，
-SHALL 复用纯 JVM `StatsLegend`，MUST NOT 在 Compose 里写第二套换算。
+页内 sheet 下钻回调。图例行 SHALL 按金额降序排列，与环形扇区顺序一致。
+百分比 SHALL 复用纯 JVM `StatsLegend`，MUST NOT 在 Compose 里写第二套换算。
 **明确不做**：图例「(N条)」笔数（分类维度 `ChartSlice` 无 count，
-新增分类笔数聚合会撞「既有聚合 SQL 不改」）；
-环外悬浮百分比文字（`DonutChart` 禁用 `DrawScope.drawText` / `TextMeasurer`）。
-两者 MUST NOT 伪造数据或假装已实现。
+新增分类笔数聚合会撞「既有聚合 SQL 不改」）。两者 MUST NOT 伪造数据。
 
 #### Scenario: 一羽式图例五行
 
 - **GIVEN** 净支出 510.00，餐饮 223.00 / 交通 95.00 / 日用品 89.00 /
-  购物 58.00 / 外卖 45.00（按小类）
+  购物 58.00 / 外卖 45.00（小类）
 - **WHEN** 查看占比卡
 - **THEN** 环与五行图例同屏可见，每行显示图标 / 名称 / 百分比 / ¥金额 / 灰色长条
 - **AND** 餐饮百分比为 43.73%、灰条最长，五行金额合计等于中心净支出
+
+#### Scenario: 指示线与扇区同色
+
+- **GIVEN** 「餐饮 43.73%」为右侧最大扇区
+- **WHEN** 查看环
+- **THEN** 右侧有一条与餐饮扇区同色的指示线，末端写「餐饮 43.73%」
+- **AND** 左侧其余扇区各有自己的指示线，上下错开不重叠
+
+#### Scenario: 不用文本测量 API
+
+- **WHEN** 检查 `DonutChart.kt` 实现
+- **THEN** 没有 `drawText(` / `TextMeasurer` / `FlowRow` import 或调用
+- **AND** 标签是普通 Compose `Text`，尺寸来自 `onSizeChanged`
 
 #### Scenario: 灰条长度与占比一致
 
@@ -254,13 +281,12 @@ SHALL 复用纯 JVM `StatsLegend`，MUST NOT 在 Compose 里写第二套换算�
 
 - **WHEN** 查看图例列表
 - **THEN** 不出现「(N条)」字样
-- **AND** `RecordDao` 既有聚合 SQL 零改动
 
 #### Scenario: 无支出
 
 - **GIVEN** 本周期无支出切片
 - **WHEN** 查看占比卡
-- **THEN** 环显示空态、图例显示「本期没有支出记录」，无崩溃
+- **THEN** 环显示空态、无指示线、图例显示「本期没有支出记录」，无崩溃
 
 ### Requirement: 分类流水页内底部 sheet 按明细行渲染
 

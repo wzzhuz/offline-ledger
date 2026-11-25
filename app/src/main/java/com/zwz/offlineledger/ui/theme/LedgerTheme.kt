@@ -59,21 +59,24 @@ fun LedgerTheme(content: @Composable () -> Unit) {
             primary = LedgerColors.Primary,
             onPrimary = Color.White,
             secondary = LedgerColors.IncomeGreen,
-            // 第 69 批：一羽式清新浅色体系。页面浅蓝灰底 + 纯白卡片，
-            // 不再落 M3 默认 surfaceContainerLow 的灰面。只改色值，
-            // 不动任何布局 / 手势 / 数据；红绿语义色与反转开关不受影响。
-            background = Color(0xFFF4F6FB),
+            // 第 70 批：按一羽图三把「浅蓝灰」改成**中性浅灰**，
+            // 让纯白卡片真正跳出来、卡片之间边界清晰。
+            // 第 69 批的 F4F6FB 太浅且偏蓝，与白卡对比不足；
+            // 这里与项目既有 CategoryManagerDialog / AssetsScreen 的
+            // F2F3F7 / F5F6FA 同系，保持全 App 一套灰。
+            // 只改色值，不动布局 / 手势 / 数据；红绿语义与反转开关不受影响。
+            background = Color(0xFFF2F3F7),
             onBackground = Color(0xFF1F2430),
             surface = Color(0xFFFFFFFF),
             onSurface = Color(0xFF1F2430),
-            surfaceVariant = Color(0xFFEEF1F8),
+            surfaceVariant = Color(0xFFE9EBF1),
             onSurfaceVariant = Color(0xFF6B7280),
             surfaceContainerLowest = Color(0xFFFFFFFF),
             surfaceContainerLow = Color(0xFFFFFFFF),
-            surfaceContainer = Color(0xFFFBFBFE),
-            surfaceContainerHigh = Color(0xFFF6F8FD),
-            surfaceContainerHighest = Color(0xFFF1F4FA),
-            outlineVariant = Color(0xFFDDE2EE)
+            surfaceContainer = Color(0xFFFFFFFF),
+            surfaceContainerHigh = Color(0xFFFAFAFC),
+            surfaceContainerHighest = Color(0xFFF5F6F9),
+            outlineVariant = Color(0xFFE2E4EB)
         ),
         content = content
     )

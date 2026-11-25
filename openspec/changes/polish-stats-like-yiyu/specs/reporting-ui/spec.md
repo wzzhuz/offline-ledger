@@ -99,36 +99,47 @@ MUST NOT 因统计页放行彩色图标而改变。
 
 ## ADDED Requirements
 
-### Requirement: 统计页采用一羽式全局清新配色
+### Requirement: 统计页采用一羽式中性灰底与纯白卡片
 
 系统 SHALL 在 `LedgerTheme` 的 `lightColorScheme` 中提供一羽式浅色体系：
-页面背景 SHALL 为浅蓝灰 `0xFFF4F6FB`，卡片 / `surface` / `surfaceContainer*`
-SHALL 为纯白 `0xFFFFFFFF`，`surfaceVariant` SHALL 为 `0xFFEEF1F8`，
+页面背景 SHALL 为**中性浅灰** `0xFFF2F3F7`（第 69 批的 `0xFFF4F6FB`
+太浅且偏蓝，与白卡对比不足，第 70 批按真机图三改中性灰），
+`surface` 与全部 `surfaceContainer*` SHALL 为纯白 `0xFFFFFFFF`
+或近白 `0xFFFAFAFC`，`surfaceVariant` SHALL 为 `0xFFE9EBF1`，
 `onSurface` SHALL 为柔和深灰蓝 `0xFF1F2430`，
-`outlineVariant` SHALL 为 `0xFFDDE2EE`，
+`outlineVariant` SHALL 为 `0xFFE2E4EB`，
 `primary` SHALL 为清新蓝 `0xFF5B7CFA` 且与 `CategoryHeaderBlue` 同系。
 `LedgerColors.Primary` SHALL 同步为该值以保持单一真相源。
+统计页每张卡片 SHALL 走统一 `StatsCard` 出口：
+显式 `CardDefaults.cardColors(containerColor = Color.White)` +
+`CardDefaults.cardElevation(defaultElevation = 0.dp)` +
+`RoundedCornerShape(16.dp)`。
+**M3 `Card` 默认 1.dp tonalElevation 会把纯白染成淡蓝灰，
+这是「主体不突出、卡片边界糊」的根因，MUST 显式归零。**
+SHALL 靠「中性灰底 + 纯白卡 + 卡片间距 + 圆角」形成清晰边界，
+MUST NOT 新增阴影、MUST NOT 新增描边、MUST NOT 用卡片堆叠
+（基线「明细页极简网格」要求）。
 `ExpenseRed`（红 = 支出）/ `IncomeGreen`（绿 = 收入）语义色与
 `applyReverseColors` 反转开关 MUST NOT 改动；`colorHex` MUST NOT 被改写。
 配色改动 SHALL 只改色值，MUST NOT 改任何布局 / 手势 / 数据 / 聚合 SQL。
 第 69 批使用者选 Q5B（全 App 一起变），全 23 个含 `Card` / `.background`
-的文件观感都会变化，MUST 如实登记并列入真机待验，MUST NOT 假装零回归。
+的文件观感都会变化，MUST 如实登记并列入真机待验。
 
-#### Scenario: 白卡浅蓝灰底
+#### Scenario: 灰底白卡边界清晰
 
-- **WHEN** 打开统计页或任意其它页面
-- **THEN** 卡片为纯白、页面底为浅蓝灰，不再出现 M3 默认灰色卡面
-- **AND** 支出仍为红、收入仍为绿
+- **WHEN** 打开统计页
+- **THEN** 页面底为中性浅灰、每张卡片为纯白圆角块，卡片之间间隙与边界清晰可辨
+- **AND** 不再出现 M3 默认 tonalElevation 染出的淡蓝灰卡面
 
-#### Scenario: 反转开关不受影响
+#### Scenario: 红绿语义不变
 
 - **GIVEN** 使用者开启「配色反转」
 - **WHEN** 查看任意金额
-- **THEN** 红绿语义按既有开关互换，浅色体系本身不变
+- **THEN** 红绿语义按既有开关互换，浅灰 / 纯白体系本身不变
 
 #### Scenario: 全 App 观感待验
 
-- **WHEN** 第 69 批出包后装机
+- **WHEN** 第 70 批出包后装机
 - **THEN** 记一笔 / 明细 / 资产 / 分类管理 / 设置各页观感 MUST 由真机逐页确认
 - **AND** CI 全绿不替代观感验收
 
