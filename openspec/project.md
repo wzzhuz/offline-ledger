@@ -631,7 +631,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **共享只读选择器**：新增 `ui/components/CategorySelectSheet.kt` 的 `CategorySelectDialog`（顶部搜索 + 左一级分组导航 + 右 5 列彩色图标格），无名称输入、无「继续添加」/ 保存按钮、无写库路径；记一笔 `AllCategoriesDialog` 与筛选 `PickRow("分类")` 接入同一组件，`CategoryPickerScreen` 零改动。停用项可选带角标、归档项不进、搜索跨组平铺、二级 label 经 `CategoryDisplay`，点选即刻关闭。
 - **口径再放宽一次**：彩色 Tabler 图标扩到两个全量选择器；记一笔快捷栏 / 明细列表行 / 账户详情 / 统计页仍中性圆 + 首字，`colorHex` 一字不动。筛选层级区分由 `r:` / `c:` 字符串前缀改为 `CategorySelectChoice.level` 显式字段，spec / design / tasks 三处表述已同步回写，不留矛盾文本。
 - **零改表 / 零回归**：`AppDatabase.version = 5`、`default_categories.json`、`colorHex`、三处 DAO 投影、备份整表替换一律未动；零新增 Gradle 依赖；`defaultVersionName` → `0.2.37`，v0.2.36 可直接覆盖安装。
-- **CI 全绿不替代真机**：活文档 §8 第 56 批新增 13 项真机待验（两态折叠与互不干涉、拖拽手感与让位、draft 不丢、无闪烁、白卡限高与滚动边界、360dp 窄屏、两处选择器同组件、彩色与中性圆并存观感、停用项兜底与回填、原分类选择页零回归、覆盖安装 / 全新安装、记一笔零回归），§8 既有项整体继承。归档仍需使用者明确说「可以归档」。
+- **CI 全绿不替代真机**：活文档 §8 第 56 批新增 13 项真机待验（两态折叠与互不干涉、拖拽手感与让位、draft 不丢、无闪烁、白卡限高与滚动边界、360dp 窄屏、两处选择器同组件、彩色与中性圆并存观感、停用项兜底与回填、原分类选择页零回归、覆盖安装 / 全新安装、记一笔零回归），§8 既有项整体继承。归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ### 第 56 批实测（v0.2.37 出包）
 
@@ -643,7 +643,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **一处如实登记**：本批 Actions artifacts 仍为 0（三个上传步骤 outcome=failure 被
   `continue-on-error` 染绿，「制品上传失败告警」步骤实际执行可反证），`mapping.txt`
   未随制品留存；Release 附件与 tag 不受影响，按 §7.33/§7.35 只认 Release assets。
-  坚果云落盘因 job logs 403 无法确认，不写成已上传。归档仍需使用者明确说「可以归档」。
+  坚果云落盘因 job logs 403 无法确认，不写成已上传。归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 57 批（v0.2.38）：排序页整格拖动 + 选择器裸名显示
 
@@ -652,7 +652,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **排序页**：一级 / 二级**整格**挂拖动手柄，删掉所有「≡」小手柄；一级短按展开与长按拖动共享 `MutableInteractionSource`。Q1A：二级态静态一级格 `detectTapGestures(onLongPress)` 长按即自动收起二级区，删「收起，排一级」按钮（左上返回键、再点已选中一级格仍可收起）。末行不足 5 列补 `weight(1f)` 空占位。Q2A：删白卡小字、顶部冻结说明、一级态两行引导、底部拖动提示，只留分组标题与「保存 / 放弃」；白卡底色 `0xFFEAF0FF`、二级格白底。
 - **选择器 Q3A**：`CategorySelectChoice` 拆 `tileName`（网格 / 搜索结果显示裸名）与 `displayLabel`（回填筛选 `displayName` 仍经 `CategoryDisplay` 拼父级）；第 29 批四处共用显示名契约零改动，`CategoryDisplay` / `CategoryPickerScreen` 零改动。
 - **零改表 / 零回归**：`AppDatabase.version = 5`、`default_categories.json`、`colorHex`、三处 DAO 投影、备份整表替换未动；零新增 Gradle 依赖；`defaultVersionName` → `0.2.38`，v0.2.37 直接覆盖安装。
-- **CI 全绿不替代真机**：活文档 §8 第 57 批新增 6.24–6.28 五项真机待验（尤其删光提示后的可发现性、整格短按/长按共存手感），既有项整体继承。归档仍需使用者明确说「可以归档」。
+- **CI 全绿不替代真机**：活文档 §8 第 57 批新增 6.24–6.28 五项真机待验（尤其删光提示后的可发现性、整格短按/长按共存手感），既有项整体继承。归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ### 第 57 批实测（v0.2.38 出包）
 
@@ -663,7 +663,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   API `state=uploaded` + `digest` 与 notes 一致。debug.keystore 签名，v0.2.37 可直接覆盖安装。
 - **正向差异**：本批 Actions artifacts **3 个**（release / mapping / metrics），全步骤无染绿，
   `mapping.txt` 随制品留存；v0.2.37 那次为 0。坚果云落盘因 job logs 403 无法确认。
-- 归档仍需使用者明确说「可以归档」。
+- 归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 58 批（v0.2.39）：选择器 5→4 列 + 左右分区收窄
 
@@ -673,7 +673,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **依据**：第 1 轮 design「风险与缓解」表早已登记「窄屏 5 列图标过小 → 降为 4 列」，代码未落地，本批补齐；原「分类选择」页 `CategoryPickerScreen` 本来就是 `columns = 4`。
 - **范围锁定**：只改一份只读组件（5 处数值）。分类管理列表页 `columns = 5`、排序页两套 `GridCells.Fixed(5)`、`CategoryIconGrid` / `CategoryTileCell` 格高与行距（三页共用，2B 明确不含紧凑格高）、`CategoryDisplay`、记一笔快捷栏、明细列表行、统计页、`colorHex`、`default_categories.json`、`AppDatabase.version = 5` 全部零改动；零新增 Gradle 依赖；`defaultVersionName` → `0.2.39`，v0.2.38 直接覆盖安装。
 - **边界**：7 字长名（赡养·代缴水电）在 57dp 下仍单行省略，MUST NOT 换行撑高格子；跨组搜索同名二级归属缺失仍沿用 Q3A 口径。
-- **CI 全绿不替代真机**：活文档 §8 第 58 批新增 6.29 待验，既有项整体继承。归档仍需使用者明确说「可以归档」。
+- **CI 全绿不替代真机**：活文档 §8 第 58 批新增 6.29 待验，既有项整体继承。归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ### 第 58 批实测（v0.2.39 出包）
 
@@ -686,7 +686,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **操作偏差**：dispatch 因工具层 502 被重放两次，第二个 run `45316726495` 排队 pending 时主动 cancel（202 →
   `completed cancelled`），未产生第二次 tag 重建或 Release 覆盖；资产 digest 单一。
   教训：204 空响应的触发请求超时后 MUST 先查 runs 列表再决定是否补发，MUST NOT 直接重发。
-- 归档仍需使用者明确说「可以归档」。
+- 归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 59 批（v0.2.40）：资产账户列表 + 新建账户页借鉴一羽
 
@@ -697,7 +697,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **Q3A 模板 sheet**：新增只读 `AccountTemplateSheet`（按 `group` 分组 + 2 列图标格 + 「自定义名称」入口 + 纯 `onPick` 回填），取代主表单 chips；基线「快捷账户模板替代预制账户行」整块 MODIFIED，语义全保留。不引入 IconFont 在线 PNG（需 `project.md` 显式授权联网，本批不申请）/ 字母索引 / 银行 logo。
 - **硬约束兼容**：`reporting-ui` 按币种分组且移除单一净资产总数、账户行纯行不用 Card、4 Tab 不变、`money-precision` 口径、无 `INTERNET` 权限、零表结构变更，逐条核对见 design.md。
 - **零回归**：`AssetsViewModel` / `AccountEntity` / `AccountTemplates` / `LedgerApp` / `EditAccountDialog` / 记一笔 / 明细 / 统计 / 分类 / 对账零改动；零新增依赖；`defaultVersionName` → `0.2.40`，v0.2.39 直接覆盖安装。
-- **CI 全绿不替代真机**：§8 第 59 批新增 6.30–6.34 待验，既有项整体继承。归档仍需使用者明确说「可以归档」。
+- **CI 全绿不替代真机**：§8 第 59 批新增 6.30–6.34 待验，既有项整体继承。归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ### 第 59 批实测（v0.2.40 出包）
 
@@ -711,7 +711,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   第二个 run `45329992971` pending 时主动 cancel（202 → `completed cancelled`），
   未产生第二次发布；资产 digest 单一。教训升级：触发与轮询 MUST 拆成独立调用，
   脚本内幂等不足以抵抗整体重放。
-- 归档仍需使用者明确说「可以归档」。
+- 归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 60 批（v0.2.41）：账户排序拆分、模板正规化与回归修复
 
@@ -724,7 +724,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **Q7**：按使用者判断执行（用 Logo 指示账户归属、IconFont 来源），不再劝阻。本批只落地可插拔机制：`AccountIconCatalog` 编译期 `when(iconKey)` + `else` 回退中性圆首字 + `assets/NOTICE` 逐项登记模板。**资源目录为空，包里无 logo**；判断与公开权利声明的差异如实登记、由使用者决策并承担，不写成「无风险」结论。
 - **升表口径**：使用者明确不考虑迁移 → `Migrations.ALL` 保持 `emptyArray()`、`MigrationContractTest` 零改动；但 `version = 6`、`SeedData` INSERT 补两列常量、备份 DTO 加带默认值字段并补齐 Mappers 仍 SHALL 做。测试期卸载重装、装前导出。
 - **零回归**：`moveAccount` / `commitAccountOrderAll` / `AccountQuickCandidates.select` / `Migrations.ALL` / 4 Tab / 记一笔快捷语义 / 零新增依赖 / `INTERNET` 权限全部不动。
-- **CI 全绿不替代真机**：§8 第 60 批新增待验，既有项整体继承；覆盖安装数据不丢不在验收范围。归档仍需使用者明确说「可以归档」。
+- **CI 全绿不替代真机**：§8 第 60 批新增待验，既有项整体继承；覆盖安装数据不丢不在验收范围。归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ### 第 60 批实测（v0.2.41 出包）
 
@@ -736,7 +736,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   job logs 403，落盘无法独立确认。
 - **触发与轮询拆分生效**：dispatch 204 只注册 1 个 run，无重复、无 cancel、无二次发布。
 - **Q7 资源未进包**，三页回退中性圆；`assets/` 无任何品牌图形。
-- 归档仍需使用者明确说「可以归档」。
+- 归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 61 批（v0.2.42）：记一笔卡号显示、图标密度、卡种可编辑
 
@@ -769,7 +769,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   SHA256 `64307618f015c75b919f2d05fbf8420830ffad6738282e4a1535c6544bc9e37f`），`state=uploaded` + `digest` 与 notes 一致。
 - artifacts 3 个、无染绿、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
 - **轮询超时只查状态、不重发触发**：新 run 仍只有 1 个，无重复发布。
-- Q7 资源未进包；归档仍需使用者明确说「可以归档」。
+- Q7 资源未进包；归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 62 批（v0.2.43）：账户显示名全量排查
 
@@ -800,7 +800,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   SHA256 `9030571bce9549bb13699e82344e4ae05566558437e84e7cf3c22204ef4b4ebc`），`state=uploaded` + `digest` 与 notes 一致。
 - artifacts 3 个、无染绿、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
 - 触发与轮询拆分 + 超时只查状态生效，无重复发布。
-- Q7 资源未进包；归档仍需使用者明确说「可以归档」。
+- Q7 资源未进包；归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 63 批（v0.2.44）：CSV 导出带卡号 + 导入 `(name, cardLast4)` 复合匹配
 
@@ -841,7 +841,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   comment）用完即撤销；两条诊断 comment 因 PAT 权限 404 未能删除，
   挂在中间 commit 上、不影响交付物。
 - artifacts 3 个、无染绿、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
-- Q7 资源未进包；归档仍需使用者明确说「可以归档」。
+- Q7 资源未进包；归档仍需使用者明确说「可以归档」（历史，第 66 批已归档）。
 
 ## 第 64 批（v0.2.45）：账户品牌图标补齐 + 资源来源调研
 
@@ -1016,7 +1016,8 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   坚果云落盘 job logs 403 无法确认。
 - 触发与轮询拆分生效，单次 dispatch、无重复发布。
 - 三个已归档 change 与 5 个进行中 change 未动；`add-discount-and-fee`
-  仍待使用者明确说「可以归档」。
+  仍待使用者明确说「可以归档」（仍为进行中；第 73 批只归档了
+  `polish-stats-like-yiyu`，未包含本 change）。
 
 ## 第 68 批：统计页参考一羽记账（change `polish-stats-like-yiyu`，v0.2.48）
 
@@ -1049,7 +1050,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **零回归**：CSV 复合匹配、账户显示名、两套排序、48 条模板、银行纯徽记、
   第 67 批优惠 / 手续费全链路、零改表 → **v0.2.47 直接覆盖安装**。
 - `add-discount-and-fee` 与其余 5 个进行中 change 未动；本 change 仍需使用者
-  明确说「可以归档」。
+  明确说「可以归档」（历史，第 73 批已归档）。
 
 ### 第 68 批实测（v0.2.48 出包）
 
@@ -1062,7 +1063,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - artifacts 3 个、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
 - 触发与轮询拆分生效，单次 dispatch、无重复发布。
 - 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
-  仍待使用者明确说「可以归档」。
+  仍待使用者明确说「可以归档」（历史，第 73 批已归档）。
 
 ## 第 69 批：撤回第 68 批跑偏三处（change `polish-stats-like-yiyu` 修订，v0.2.49）
 
@@ -1105,8 +1106,9 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   spec delta **8 MODIFIED + 4 ADDED = 12 条 / 42 Scenario**，
   每条 ≥1 Scenario、含 RFC2119、标题唯一，8 条 MODIFIED 全部命中基线，
   ADDED 与既有 284 条零冲突；删掉第 68 批 ADDED「蓝底身份区与双 Tab」。
-- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
-  其余 6 个进行中 change 与 3 个已归档 change 未动。
+- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」
+  （历史，第 73 批已归档）；其余 6 个进行中 change 与 3 个已归档 change 未动
+  （历史时点状态）。
 
 ### 第 69 批实测（v0.2.49 出包）
 
@@ -1124,7 +1126,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   挂在中间 commit 上，内容仅 CI 日志，如实登记。
 - 触发与轮询拆分生效，单次 dispatch、无重复发布。
 - 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
-  仍待使用者明确说「可以归档」。
+  仍待使用者明确说「可以归档」（历史，第 73 批已归档）。
 
 ## 第 70 批：分类图三条观感优化（change `polish-stats-like-yiyu` 再修订，v0.2.50）
 
@@ -1149,8 +1151,9 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
 - **验证**：delta 12 条 / 45 Scenario（2 条 ADDED 重写 + 1 条 MODIFIED 措辞），
   8 条 MODIFIED 命中基线、ADDED 与既有 284 条零冲突；
   八个静态检查全 PASS（新增断言新三要素与「不加回」项）。
-- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
-  其余 6 个进行中 change 与 3 个已归档 change 未动。
+- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」
+  （历史，第 73 批已归档）；其余 6 个进行中 change 与 3 个已归档 change 未动
+  （历史时点状态）。
 
 ### 第 70 批实测（v0.2.50 出包）
 
@@ -1166,7 +1169,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   两个诊断 comment 删除 404（PAT 权限不足），挂在中间 commit 上，如实登记。
 - 触发与轮询拆分生效，单次 dispatch、无重复发布。
 - 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
-  仍待使用者明确说「可以归档」。
+  仍待使用者明确说「可以归档」（历史，第 73 批已归档）。
 
 ## 第 71 批：半箭头切换图标 + 指示线不交错（change `polish-stats-like-yiyu` 再修订，v0.2.51）
 
@@ -1191,8 +1194,9 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   8 条 MODIFIED 命中基线、ADDED 与既有 284 条零冲突；
   八个静态检查全 PASS（新增半箭头 4 条 drawLine、严格水平段、保序、
   动态容量、`var y`/`p2` 残留列为 FAIL）。
-- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
-  其余 6 个进行中 change 与 3 个已归档 change 未动。
+- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」
+  （历史，第 73 批已归档）；其余 6 个进行中 change 与 3 个已归档 change 未动
+  （历史时点状态）。
 
 ### 第 71 批实测（v0.2.51 出包）
 
@@ -1204,7 +1208,7 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   （3463448 B，SHA256 `13989c874dccfb4316423950a0871be6ab2f01065a32f6b68cd5720c1c04b482`），`state=uploaded` + `digest` 与 notes 一致。
 - artifacts 3 个、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
 - 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
-  仍待使用者明确说「可以归档」。
+  仍待使用者明确说「可以归档」（历史，第 73 批已归档）。
 
 ## 第 72 批：径向折点 + 小细淡切换图标（change `polish-stats-like-yiyu` 再修订，v0.2.52）
 
@@ -1229,8 +1233,9 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   8 条 MODIFIED 命中基线、ADDED 与既有 284 条零冲突；
   八个静态检查全 PASS（新增径向折点、`minAdjacent`、`dropLast(1)` 断言，
   并把 `kneeX` / 高度 capacity / y 下推残留列为 FAIL）。
-- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」；
-  其余 6 个进行中 change 与 3 个已归档 change 未动。
+- `polish-stats-like-yiyu` 仍待使用者明确说「可以归档」
+  （历史，第 73 批已归档）；其余 6 个进行中 change 与 3 个已归档 change 未动
+  （历史时点状态）。
 
 ### 第 72 批实测（v0.2.52 出包）
 
@@ -1242,5 +1247,31 @@ GitHub Actions 存储与 Packages 共用账号级额度；`dayscounter` 一个�
   （3463448 B，SHA256 `45f4a2fdfbd4f91d3620d5af81e280e3ba757e879a29a9ab521ffe45e2a57c47`），`state=uploaded` + `digest` 与 notes 一致。
 - artifacts 3 个、`mapping.txt` 留存；坚果云落盘 job logs 403 无法确认。
 - 三个已归档 change 与 6 个进行中 change 未动；`polish-stats-like-yiyu`
-  仍待使用者明确说「可以归档」。
+  仍待使用者明确说「可以归档」（历史，第 73 批已归档）。
+
+## 第 73 批：`polish-stats-like-yiyu` 归档（2026-11-25）
+
+- 使用者明确「可以归档」。只归档 `polish-stats-like-yiyu`（第 68–72 批，
+  统计页参考一羽的 5 轮修订）；**其余 6 个进行中 change 未动**。
+- **12 条 delta（8 MODIFIED + 4 ADDED）/ 51 Scenario** 全部折叠进主 spec：
+  8 条按标题整块替换、4 条按标题追加，零缺失、零冲突。
+  主 spec **269 → 273 条 Requirement / 525 → 551 个 Scenario**，
+  标题唯一、每条 ≥1 Scenario + RFC2119。
+- 四件套移入 `openspec/changes/archive/2026-11-25-polish-stats-like-yiyu/`。
+- `check_stats_merge.py` 适配归档后状态（活跃目录优先、否则读归档副本），
+  并新增断言主 spec 已含第 72 批径向折点措辞；8 个静态检查全 PASS。
+- **零代码 / 零资源 / 零规格语义变化，不出新包**：v0.2.52 仍是最新安装包，
+  tag / Release / digest 不变。§8 第 45–72 批真机待验项整体继承，归档不是验收。
+- 复核数据见 `openspec/归档报告.md` §7。
+
+### 归档后待办：Firefly III 导入两条问题（仅核查，未动代码）
+
+- ① 分类映射下拉只有「按原名自动新建 / 不设分类」；
+  数据模型 `FireflyCategoryChoice.targetRoot` 其实支持「复用一级」，
+  `SettingsViewModel` 也只在同名一级分类时自动预填，使用者无法主动选
+  预制或已有分类，也无法把 FF3 二级映射到已有二级分类。
+- ② 账户映射到已有账户时，期初由 `overwriteOpeningForExisting` 开关控制
+  （默认关闭 → 跳过）；开关开启时还有一个隐蔽前置条件
+  `targetName == name`，改名映射会静默不覆盖。
+  详见本轮分析回复，方案待使用者拍板。
 

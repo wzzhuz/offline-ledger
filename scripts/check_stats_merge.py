@@ -13,7 +13,11 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "app/src/main/java/com/zwz/offlineledger"
 BASE = ROOT / "openspec/specs"
-DELTA = ROOT / "openspec/changes/polish-stats-like-yiyu/specs"
+# 第 73 批归档后 change 目录已移入 archive；优先活跃目录，
+# 否则读归档副本，保证同一套断言在归档前后都能跑。
+_ACTIVE = ROOT / "openspec/changes/polish-stats-like-yiyu/specs"
+_ARCHIVED = ROOT / "openspec/changes/archive/2026-11-25-polish-stats-like-yiyu/specs"
+DELTA = _ACTIVE if _ACTIVE.exists() else _ARCHIVED
 
 
 def read(p):
@@ -188,7 +192,8 @@ def main():
         if key in donut:
             errors.append("DonutChart 引入实验性 API: " + key)
 
-    # 10. 8 条 MODIFIED 标题命中基线（整块替换锚点）
+    # 10. 8 条 MODIFIED 标题命中主 spec（归档后已整块折叠），
+    #     且归档副本仍在；顺带锁住第 72 批径向折点已进主 spec。
     titles = [
         "统计页落地月年切换与三种图表",
         "分类占比卡提供分类管理短跳转",
@@ -208,13 +213,19 @@ def main():
             errors.append("delta 缺 MODIFIED: " + t)
     if "统计页蓝底身份区与分析概览双 Tab" in delta_text:
         errors.append("第 68 批蓝底 ADDED 未删除")
+    if not DELTA.exists():
+        errors.append("归档副本与活跃 delta 都不存在")
+    for key in ("### Requirement: 分类占比卡采用一羽式图例列表、灰色长条与环外指示线",
+                "径向折点", "最小相邻间隔", "14dp", "1.2f"):
+        if key not in base_text:
+            errors.append("主 spec 缺第 72 批折叠后的规格措辞: " + key)
 
     if errors:
         for e in errors:
             print("  FAIL", e)
         print(f"check_stats_merge: {len(errors)} 项失败")
         return 1
-    print("check_stats_merge: PASS (第72批 径向折点不汇聚 / 相邻间隔判据 / 小细淡半箭头 / 第70-71批全部 / 零改表 / 8 MODIFIED)")
+    print("check_stats_merge: PASS (第73批归档后 主spec已折叠 / 第72批 径向折点 / 小细淡半箭头 / 零改表 / 8 MODIFIED)")
     return 0
 
 
