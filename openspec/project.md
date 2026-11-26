@@ -1387,3 +1387,12 @@ SHA256 `be0372ea1add27df08814ed2f609f37ff0349ca5df56767db5336884dfb92340`。
 零改表 → v0.2.54 可直接覆盖安装。一次成包、无诊断 commit、`build.yml` 无临时改动。
 新增 `FilterChipClearTest` 10 场景与 `check_filter_chips.py`；11 个静态检查全 PASS。
 
+### 第 77 批（v0.2.56）
+
+新建 change `rethink-record-entry-layout`（7 MODIFIED + 3 ADDED / 20 Scenario）。
+记一笔首屏分层：唯一「更多 ›」+ `MorePanel` 收纳模板/标签/优惠/备注/不计入/联想；
+账户与模板改单按钮 + 既有全量弹层；对方与描述改无边框内联；分类快捷栏保留。
+Q4B 全 App 上 API 31+ 动态色（可一行回退）+ edge-to-edge（根 safeDrawingPadding、
+Scaffold insets=0、记一笔 Dialog 单独避让）。零改表 → 覆盖安装。
+新增静态脚本 `check_record_layout.py`；动态色与一羽静态板并存的「两套蓝」代价已登记。
+

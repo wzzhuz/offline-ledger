@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.padding
@@ -118,6 +119,7 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             // 第 4 批：二级页隐藏底栏，进入设置子页时更像「点开了一页」。
             if (currentRoute in MAIN_ROUTES) {

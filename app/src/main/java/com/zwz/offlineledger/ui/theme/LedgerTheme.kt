@@ -1,10 +1,13 @@
 package com.zwz.offlineledger.ui.theme
 
+import android.os.Build
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * 中文记账语境：红 = 支出 / 赤字，绿 = 收入。
@@ -52,10 +55,25 @@ object LedgerColors {
     fun isReversed(): Boolean = ExpenseRed == GREEN
 }
 
+/**
+ * 第 77 批（Q4B）：API 31+ 启用系统动态色，API ≤ 30 回退静态板。
+ * dynamicColor = false 一行即可完整回到第 70 批「浅灰底 / 纯白卡 / 清新蓝」，
+ * 不需要改第二处（动态色会覆盖一羽配色，保留低成本回退路径）。
+ *
+ * 已知代价（design 已登记）：LedgerColors.Primary 是 object 常量、被 80+ 处
+ * composition 外直接引用，不会随 colorScheme.primary 变化 → 允许出现两套蓝，
+ * 真机待验，MUST NOT 写成「已完全统一」。红绿语义与反转开关不受影响。
+ */
 @Composable
-fun LedgerTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = lightColorScheme(
+fun LedgerTheme(
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    val useDynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val scheme = if (useDynamic) {
+        dynamicLightColorScheme(LocalContext.current)
+    } else {
+        lightColorScheme(
             primary = LedgerColors.Primary,
             onPrimary = Color.White,
             secondary = LedgerColors.IncomeGreen,
@@ -77,7 +95,10 @@ fun LedgerTheme(content: @Composable () -> Unit) {
             surfaceContainerHigh = Color(0xFFFAFAFC),
             surfaceContainerHighest = Color(0xFFF5F6F9),
             outlineVariant = Color(0xFFE2E4EB)
-        ),
+        )
+    }
+    MaterialTheme(
+        colorScheme = scheme,
         content = content
     )
 }

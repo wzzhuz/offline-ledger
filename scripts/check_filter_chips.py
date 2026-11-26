@@ -86,7 +86,8 @@ def main():
     test = ROOT / "app/src/test/java/com/zwz/offlineledger/data/FilterChipClearTest.kt"
     if not test.is_file(): errs.append("缺 clearField 纯 JVM 单测")
     gradle = read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.55"' not in gradle: errs.append("版本号未升 0.2.55")
+    m = re.search(r'defaultVersionName = "0\.2\.(\d+)"', gradle)
+    if not m or int(m.group(1)) < 55: errs.append("版本号应 >= 0.2.55")
     wf = read(".github/workflows/build.yml")
     if "check_filter_chips.py" not in wf: errs.append("build.yml 未挂静态脚本")
     for path, key in [("docs/页面优化经验与避坑指南.md", "§7.58"),

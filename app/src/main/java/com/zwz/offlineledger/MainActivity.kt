@@ -3,7 +3,9 @@ package com.zwz.offlineledger
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -12,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -43,6 +46,10 @@ class MainActivity : FragmentActivity() {
         // 第 13 批：隐藏金额偏好冷启动即生效，直到用户手动关闭。
         AmountMask.hidden = prefs.hideAmounts
         applyFlagSecure(prefs.flagSecureEnabled)
+        // 第 77 批（Q4B）：背景铺到系统栏下，可点内容由下方 safeDrawingPadding 避开。
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
         setContent {
             LedgerTheme {
@@ -60,14 +67,18 @@ class MainActivity : FragmentActivity() {
                 }
 
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    if (unlocked) {
-                        LedgerApp(startWithRecordEntry = startWithRecordEntry)
-                    } else {
-                        AppLockScreen(
-                            prefs = prefs,
-                            onUnlocked = { unlocked = true },
-                            onPrefsChanged = { applyFlagSecure(prefs.flagSecureEnabled) }
-                        )
+                    // 一处覆盖全 App：Scaffold 的 contentWindowInsets 已置 0，
+                    // MUST NOT 再叠加一次（design 决策 5）。
+                    Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+                        if (unlocked) {
+                            LedgerApp(startWithRecordEntry = startWithRecordEntry)
+                        } else {
+                            AppLockScreen(
+                                prefs = prefs,
+                                onUnlocked = { unlocked = true },
+                                onPrefsChanged = { applyFlagSecure(prefs.flagSecureEnabled) }
+                            )
+                        }
                     }
                 }
             }
