@@ -1571,3 +1571,11 @@ version 仍 9）。每格沿用第 82 批 44dp `AccountIconBox` + 次要小字�
 4 Tab、分类快捷栏、转账两卡、聚合 SQL、CSV/Firefly 往返、备份 DTO 零改动。
 `check_record_layout.py` 同步断言目标并加 14 条第 83 批校验，
 12 个静态检查全 PASS。本批**没有升表**，可直接覆盖 v0.2.61。
+**归档与合并实测**：实现 `3acc8ad8`，push CI `45831228592` 全绿。
+首次出包 run `45832141371` 在「创建 tag 并发布 Release」step `exit 128`
+（GitHub 侧瞬时 git push 故障，前 19 步全绿、tag/release 均 404，未改任何代码），
+原样重跑 run `45833836043` 全绿，坚果云 job step `success`。
+Release `v0.2.62` 产物 3,513,300 B / SHA256 `300ab0f9…`。
+归档时 delta 真的合并回 `reporting-ui`（3 MODIFIED + 2 ADDED）与
+`privacy-security`（1 ADDED），逐块比对正文一致；12 个静态检查全 PASS。
+试验分支相对 `main` 零落后，fast-forward 合并。
