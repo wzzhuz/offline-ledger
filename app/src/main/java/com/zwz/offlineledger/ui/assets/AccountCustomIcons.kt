@@ -51,8 +51,10 @@ object AccountCustomIcons {
 
         // 先取边界，超大图按 2 的幂降采样，避免 decode 全图 OOM。
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            ?: error("读不到所选文件，请重新选择")
+        // inJustDecodeBounds=true 时 decodeStream 必定返回 null，
+        // MUST NOT 把它的返回值当成「流是否打开成功」来判断。
+        val probe = resolver.openInputStream(uri) ?: error("读不到所选文件，请重新选择")
+        probe.use { BitmapFactory.decodeStream(it, null, bounds) }
         require(bounds.outWidth > 0 && bounds.outHeight > 0) { "不是有效的 PNG 图片" }
         val maxSide = maxOf(bounds.outWidth, bounds.outHeight)
         require(maxSide <= 8192) { "图片过大（最长边 $maxSide），请用 1024 以内的图标 PNG" }
