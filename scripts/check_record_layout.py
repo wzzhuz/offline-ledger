@@ -77,6 +77,14 @@ def main():
         if k in rec:e.append("第 81 批残留: "+k)
     if rec.count("ClearFieldIcon(")<5:
         e.append("一键清空出口未覆盖四处输入框（含定义应 >=5 处）")
+
+    # 归档后：第 81 批 delta 的每条 Requirement 必须已合并回主 spec（§4.2）。
+    a81 = sorted(ROOT.glob(
+        "openspec/changes/archive/*polish-transfer-accounts-and-clear-fields*/specs/*/spec.md"))
+    for f in a81:
+        for m in re.finditer(r"^### Requirement: (.+)$", f.read_text(), re.M):
+            if m.group(1).strip() not in base:
+                e.append("第 81 批 delta 未合并: "+m.group(1).strip())
     if "listOf(\n            accountLabel to onAccount" not in rec:
         e.append("收支态 5 枚 chips 的账户入口被误删")
 

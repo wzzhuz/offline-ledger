@@ -24,3 +24,18 @@
 ## 实测（归档时回填）
 
 见文件末尾「第 81 批实测」。真机待验项全部保持 `[ ]`，见活文档 §7.64。
+
+## 第 81 批实测（归档时回填）
+
+- 实现 commit `ac217e94`；push CI `45807437321` 全绿、出包 CI `45807462243` 全绿
+- **坚果云恢复**：本次 `workflow_dispatch` 只传 `create_release` /
+  `upload_nutstore=true`，其余走 workflow 默认；run `45807462243` 的
+  「上传到坚果云」job step 结论 **success**（v0.2.57–59 连续三次为 skipped）
+- Release `v0.2.60`：`offline-ledger-v0.2.60-release-ac217e94.apk` /
+  3,512,600 B / SHA256 `2fbce018d913cf40166ec3784a0102a4eb6a4dc4404ddf090157afda99e2527a`
+- 归档目录 `openspec/changes/archive/2026-11-26-polish-transfer-accounts-and-clear-fields/`
+- delta：`reporting-ui` 5 MODIFIED + 1 ADDED，归档后逐块比对正文**全部一致**
+- `check_record_layout.py` / `check_workflow_syntax.py` 归档态断言全 PASS
+  （新增「第 81 批 delta 必须已合并」「坚果云默认值必须为 true」两条可执行检查）
+- 既有 Requirement 标题一律不改；零改表 → v0.2.59 直接覆盖安装
+- 真机待验项全部保持 `[ ]`，见活文档 §7.64；CI 全绿不替代观感验收

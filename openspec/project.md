@@ -1504,3 +1504,10 @@ skipped，根因是本会话每次 `workflow_dispatch` 全量覆盖 inputs 时�
 `"upload_nutstore":"false"`。v0.2.56 及之前均 success。
 本批 dispatch 恢复为 `true`，并在 `check_workflow_syntax.py` 加两条断言
 （默认值必须为 true、步骤必须绑定该 input）作为可执行防范。
+
+**归档与合并实测**：实现 commit `ac217e94`（push CI `45807437321` / 出包 CI
+`45807462243` 双全绿，坚果云 job step `success`），Release `v0.2.60` 产物
+3,512,600 B / SHA256 `2fbce018…`。归档时 delta 真的合并回
+`openspec/specs/reporting-ui/spec.md`（5 MODIFIED + 1 ADDED），逐块比对正文一致；
+12 个静态检查全 PASS。试验分支 `feature/transfer-account-cards` 相对 `main`
+零落后，按 fast-forward 合并，不产生 merge commit。
