@@ -278,7 +278,7 @@ private fun CategoryManagerTopBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(CategoryHeaderBlue)
+            .background(LedgerColors.CardSurface)
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -286,25 +286,25 @@ private fun CategoryManagerTopBar(
                 Icon(
                     Icons.Filled.KeyboardArrowLeft,
                     contentDescription = "返回",
-                    tint = Color.White
+                    tint = LedgerColors.OnSurface
                 )
             }
             Text(
                 text = title,
-                color = Color.White,
+                color = LedgerColors.OnSurface,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f)
             )
             if (showTabs) {
-                TextButton(onClick = onSort) { Text("排序", color = Color.White) }
+                TextButton(onClick = onSort) { Text("排序", color = LedgerColors.OnSurface) }
             }
             if (onAdd != null) {
                 IconButton(onClick = onAdd) {
-                    Icon(Icons.Filled.Add, contentDescription = "新增分类", tint = Color.White)
+                    Icon(Icons.Filled.Add, contentDescription = "新增分类", tint = LedgerColors.OnSurface)
                 }
             }
             IconButton(onClick = onHelp) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "更多", tint = Color.White)
+                Icon(Icons.Filled.MoreVert, contentDescription = "更多", tint = LedgerColors.OnSurface)
             }
         }
         if (showTabs) {
@@ -313,7 +313,7 @@ private fun CategoryManagerTopBar(
                     val selected = catType == t
                     Text(
                         text = typeLabel(t),
-                        color = Color.White,
+                        color = if (selected) LedgerColors.OnSurface else LedgerColors.Neutral,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                         modifier = Modifier
@@ -367,7 +367,7 @@ private fun CategoryBottomBar(
             onClick = onAdd,
             containerColor = CategoryHeaderBlue
         ) {
-            Icon(Icons.Filled.Add, contentDescription = "新增分类", tint = Color.White)
+            Icon(Icons.Filled.Add, contentDescription = "新增分类", tint = LedgerColors.OnPrimary)
         }
     }
 }

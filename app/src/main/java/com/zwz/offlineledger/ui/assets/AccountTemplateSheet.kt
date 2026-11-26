@@ -58,7 +58,7 @@ fun AccountTemplateSheet(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .heightIn(max = 560.dp)
-                .background(LedgerColors.Surface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(LedgerColors.CardSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

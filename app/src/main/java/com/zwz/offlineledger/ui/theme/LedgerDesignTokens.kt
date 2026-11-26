@@ -21,8 +21,9 @@ object LedgerShapes {
 }
 
 object LedgerSpacing {
-    /** 卡片之间的间距。StatsCard 用 vertical 6.dp 上下各半，等效 12.dp。 */
-    val CardGap = 12.dp
+    /** 卡片之间的间距。第 79 批真机反馈：12dp 在浅色下边界仍偏糊，
+     * 回到第 70 批已验证的 16dp（StatsCard 用 vertical 8.dp 上下各半）。 */
+    val CardGap = 16.dp
 
     /** 卡片内边距统一值；记一笔表单行仍用 16×8，不套用本值。 */
     val CardPadding = 16.dp

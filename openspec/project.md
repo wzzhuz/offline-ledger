@@ -1418,3 +1418,16 @@ SHA256 `58f5cf237e806adcaf15b060c0eb2c1f48fcd20e29b58f900873fbace455ec83`。
 CompositionLocal 替换语义色、缩放动画。零改表、零新增依赖、零 permission 变化。
 既有 `reporting-ui` Requirement 一字未动，故本批不 MODIFIED 主 spec。
 静态脚本断言随版本与主题机制同步更新（`check_record_layout.py` / `check_stats_merge.py`）。
+
+### 第 79 批（v0.2.58）：v0.2.57 真机反馈修复
+
+两条反馈均源于第 78 批自身：① 统计卡容器改读 `scheme.surface` 后与 Scaffold 的
+`scheme.background` 在动态浅色下同色 → 卡片分界消失；② 6 处整块蓝底顶栏在新动态主色下更突兀。
+修复：`LedgerColors` 拆出 `Background` / `CardSurface` / `OnSurface` 三个独立语义；
+`dynamicWithNeutralSurface()` 让动态浅色只借用强调色，中性槽位套回第 70 批静态值；
+统计卡容器固定纯白、间距回 16dp；6 处顶栏与资产页身份区改中性白卡 + `onSurface` 文字，
+主色只保留小面积点缀（小竖条 / 进度条 / FAB / 选中态 12% 底）。
+
+**范围不变**：分割线、纯行网格、4 Tab、彩色图标范围、记一笔首屏、零改表、
+零新增依赖、零 permission 变化；`reporting-ui` 既有 Requirement 一字未动。
+仍为试验分支，待真机验证后再决定是否折叠进主 spec 与合并 main。

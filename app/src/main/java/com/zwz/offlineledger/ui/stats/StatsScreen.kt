@@ -668,7 +668,7 @@ private fun TrendCard(
                     modifier = Modifier
                         .padding(top = 6.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(CategoryHeaderBlue)
+                        .background(LedgerColors.Primary.copy(alpha = 0.12f))
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
@@ -677,7 +677,7 @@ private fun TrendCard(
                             " · 支出 " + formatCents(exp) +
                             " · 净结余 " + formatCents(inc - exp) + " 元",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White
+                        color = LedgerColors.OnSurface
                     )
                 }
                 Row {
@@ -963,16 +963,16 @@ private fun ChartZoomButton(
  *
  * M3 `Card` 默认带 1.dp tonalElevation，会把纯白容器染成淡蓝灰，
  * 这正是「灰不拉几、边界糊」的根因。显式容器色（第 78 批改读
- * `LedgerColors.Surface`，浅色纯白 / 深色 #1E2025）+ `defaultElevation = 0.dp`
+ * `LedgerColors.CardSurface`，浅色纯白 / 深色 #1E2025）+ `defaultElevation = 0.dp`
  * 后，卡片与页面底形成清晰边界；
  * 不新增阴影 / 描边（基线禁用卡片堆叠与阴影）。
  */
 @Composable
 private fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         shape = LedgerShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = LedgerColors.Surface),
+        colors = CardDefaults.cardColors(containerColor = LedgerColors.CardSurface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         content = content
     )

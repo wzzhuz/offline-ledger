@@ -107,7 +107,7 @@ fun CategoryPickerScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(CategoryHeaderBlue)
+                .background(LedgerColors.CardSurface)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -115,12 +115,12 @@ fun CategoryPickerScreen(
                 Icon(
                     Icons.Filled.KeyboardArrowLeft,
                     contentDescription = "返回",
-                    tint = Color.White
+                    tint = LedgerColors.OnSurface
                 )
             }
             Text(
                 text = title,
-                color = Color.White,
+                color = LedgerColors.OnSurface,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

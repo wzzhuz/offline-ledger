@@ -70,7 +70,7 @@ def main():
     db=read("app/src/main/java/com/zwz/offlineledger/data/local/AppDatabase.kt")
     if "version = 8," not in db:e.append("零改表口径被破坏")
     gd=read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.57"' not in gd:e.append("版本号未升 0.2.57")
+    if 'defaultVersionName = "0.2.58"' not in gd:e.append("版本号未升 0.2.58")
     wf=read(".github/workflows/build.yml")
     if "check_record_layout.py" not in wf:e.append("build.yml 未挂脚本")
     man=read("app/src/main/AndroidManifest.xml")

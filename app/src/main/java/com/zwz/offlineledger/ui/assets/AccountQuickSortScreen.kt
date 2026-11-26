@@ -101,12 +101,12 @@ fun AccountQuickSortScreen(onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(LedgerColors.SurfaceVariant)
+            .background(LedgerColors.Background)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(CategoryHeaderBlue)
+                .background(LedgerColors.CardSurface)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -114,19 +114,19 @@ fun AccountQuickSortScreen(onBack: () -> Unit) {
                 Icon(
                     Icons.Filled.KeyboardArrowLeft,
                     contentDescription = "返回",
-                    tint = Color.White
+                    tint = LedgerColors.OnSurface
                 )
             }
             Text(
                 text = "全部账户排序",
                 style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
+                color = LedgerColors.OnSurface,
                 modifier = Modifier.weight(1f)
             )
             TextButton(onClick = {
                 vm.commitQuickOrderAll(reorder.ids)
                 onBack()
-            }) { Text("保存", color = Color.White) }
+            }) { Text("保存", color = LedgerColors.OnSurface) }
         }
 
         Text(
@@ -204,7 +204,7 @@ private fun QuickSortRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .background(LedgerColors.Surface, RoundedCornerShape(12.dp))
+                .background(LedgerColors.CardSurface, RoundedCornerShape(12.dp))
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

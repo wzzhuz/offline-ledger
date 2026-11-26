@@ -318,32 +318,32 @@ private fun AssetHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(CategoryHeaderBlue, RoundedCornerShape(16.dp))
+            .background(LedgerColors.CardSurface, RoundedCornerShape(16.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("资产账户", style = MaterialTheme.typography.titleLarge, color = Color.White)
+            Text("资产账户", style = MaterialTheme.typography.titleLarge, color = LedgerColors.OnSurface)
             Spacer(Modifier.width(8.dp))
             Text(
                 text = "（" + state.accounts.count { !it.isArchived } + "）",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.85f)
+                color = LedgerColors.OnSurface.copy(alpha = 0.72f)
             )
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onToggleArchived) {
                 Text(
                     text = if (state.showArchived) "隐藏已归档" else "含已归档",
-                    color = Color.White
+                    color = LedgerColors.OnSurface
                 )
             }
-            TextButton(onClick = onAdd) { Text("+ 新增", color = Color.White) }
+            TextButton(onClick = onAdd) { Text("+ 新增", color = LedgerColors.OnSurface) }
         }
         Spacer(Modifier.height(6.dp))
         if (state.groups.isEmpty()) {
             Text(
                 text = "还没有账户",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.9f)
+                color = LedgerColors.OnSurface.copy(alpha = 0.72f)
             )
         } else {
             state.groups.forEach { g ->
@@ -357,12 +357,12 @@ private fun AssetHeader(
                         Text(
                             text = g.currencyCode + " · 净资产",
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color.White
+                            color = LedgerColors.OnSurface
                         )
                         Text(
                             text = formatCents(g.netCents) + " " + g.currencyCode,
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color.White
+                            color = LedgerColors.OnSurface
                         )
                     }
                     Row(
@@ -372,15 +372,15 @@ private fun AssetHeader(
                         Text(
                             text = "资产 +" + formatCents(g.assetsCents),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f)
+                            color = LedgerColors.OnSurface.copy(alpha = 0.72f)
                         )
                         // Q1A：负债恢复红字 + 负号。CurrencyGroup.liabilitiesCents
                         // 仍是 displayTotals 给的正绝对值，负号纯展示、不参与运算；
-                        // 蓝底上取高对比浅红，语义与 ExpenseRed 同系。
+                        // 白卡底上直接用语义支出红，深色下自动为柔和珊瑚红。
                         Text(
                             text = "负债 -" + formatCents(g.liabilitiesCents),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFFFCDD2)
+                            color = LedgerColors.ExpenseRed
                         )
                     }
                 }
@@ -392,7 +392,7 @@ private fun AssetHeader(
             horizontalArrangement = Arrangement.End
         ) {
             TextButton(onClick = onOpenQuickSort) {
-                Text("记一笔优先排序 ›", color = Color.White)
+                Text("记一笔优先排序 ›", color = LedgerColors.OnSurface)
             }
         }
     }
@@ -596,14 +596,14 @@ private fun AddAccountDialog(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = LedgerColors.Surface
+            color = LedgerColors.Background
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(CategoryHeaderBlue)
+                            .background(LedgerColors.CardSurface)
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -611,16 +611,16 @@ private fun AddAccountDialog(
                             Icon(
                                 Icons.Filled.KeyboardArrowLeft,
                                 contentDescription = "返回",
-                                tint = Color.White
+                                tint = LedgerColors.OnSurface
                             )
                         }
                         Text(
                             text = "添加资产账户",
                             style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
+                            color = LedgerColors.OnSurface,
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(onClick = save) { Text("保存", color = Color.White) }
+                        TextButton(onClick = save) { Text("保存", color = LedgerColors.OnSurface) }
                     }
 
                     Column(
@@ -634,7 +634,7 @@ private fun AddAccountDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(LedgerColors.Surface, RoundedCornerShape(16.dp))
+                                .background(LedgerColors.CardSurface, RoundedCornerShape(16.dp))
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {

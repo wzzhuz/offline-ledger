@@ -131,7 +131,7 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(CategoryHeaderBlue)
+                .background(LedgerColors.CardSurface)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -142,16 +142,16 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                 Icon(
                     Icons.Filled.KeyboardArrowLeft,
                     contentDescription = "返回",
-                    tint = Color.White
+                    tint = LedgerColors.OnSurface
                 )
             }
             Text(
                 text = if (expandedRootId == null) "分类排序 · 一级" else "分类排序 · 二级",
-                color = Color.White,
+                color = LedgerColors.OnSurface,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f)
             )
-            TextButton(onClick = { save() }) { Text("保存", color = Color.White) }
+            TextButton(onClick = { save() }) { Text("保存", color = LedgerColors.OnSurface) }
         }
 
         Column(
@@ -322,7 +322,7 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                                         modifier = Modifier
                                                             .fillMaxWidth()
                                                             .background(
-                                                                LedgerColors.Surface,
+                                                                LedgerColors.CardSurface,
                                                                 RoundedCornerShape(8.dp)
                                                             )
                                                             .then(dragModifier)
@@ -422,7 +422,7 @@ private fun StaticRootCell(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                if (chosen) CategoryHeaderBlue else LedgerColors.SurfaceVariant,
+                if (chosen) LedgerColors.Primary.copy(alpha = 0.12f) else LedgerColors.SurfaceVariant,
                 RoundedCornerShape(12.dp)
             )
             .pointerInput(Unit) {
@@ -445,7 +445,7 @@ private fun StaticRootCell(
         Text(
             text = root.name,
             style = MaterialTheme.typography.bodySmall,
-            color = if (chosen) Color.White else LedgerColors.Neutral,
+            color = if (chosen) LedgerColors.Primary else LedgerColors.Neutral,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
