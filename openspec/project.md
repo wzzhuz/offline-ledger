@@ -1613,3 +1613,11 @@ Release `v0.2.62` 产物 3,513,300 B / SHA256 `300ab0f9…`。
 `BottomPickerSheet`、`TemplateQuickPick`、`CategorySelectDialog` 一字不动，
 4 Tab / 转账两卡 / 聚合 SQL / CSV/Firefly 往返 / 备份 DTO 零改动。
 **可直接覆盖 v0.2.62。**
+**归档与合并实测**：实现 `b487d596`，push CI `45842501760` 一次全绿
+（`ModalBottomSheet` + `LazyColumn` 两项版本风险均通过），
+出包 run `45843267868` 一次全绿、坚果云 job step `success`
+（dispatch 前已按第 83 批登记确认无残留 tag / Release）。
+Release `v0.2.63` 产物 3,513,300 B / SHA256 `29d33076…`。
+归档时 delta 真的合并回 `reporting-ui`（8 MODIFIED + 1 ADDED），
+9 块正文逐块比对一致、12 个静态检查全 PASS；试验分支零落后，
+fast-forward 合并 `main`。

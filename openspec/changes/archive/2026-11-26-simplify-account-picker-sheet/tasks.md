@@ -28,3 +28,33 @@
 ## 实测（归档时回填）
 
 见文件末尾「第 84 批实测」。真机待验项全部保持 `[ ]`，见活文档 §7.67。
+
+## 第 84 批实测（归档时回填）
+
+- 实现 + 四件套 commit `b487d596`；归档 commit 见下
+- push CI `45842501760` **一次全绿**（12 静态检查 + 单测 + Debug + Release
+  lintVital）。重点验证的两个版本风险均通过：
+  `ModalBottomSheet(containerColor = …)` 与
+  `LazyColumn + items(List<List<AccountSlot>>)` 在 BOM 2026.06.00 /
+  Kotlin 2.3.21 下编译正常，无需回退或补 `sheetState`
+- 出包 run `45843267868` **一次全绿**（未重演第 83 批的瞬时 `exit 128`）：
+  创建 tag step success、坚果云 job step **success**。
+  dispatch 前按第 83 批登记的检查确认
+  `git/ref/tags/v0.2.63` 与 `releases/tags/v0.2.63` 均 404，无半成品残留
+- Release `v0.2.63`：`offline-ledger-v0.2.63-release-b487d596.apk` /
+  3,513,300 B / SHA256
+  `29d330765605a6179dd5112d4f92748cf89925f7249794d98524ad960b1cc1c4`；
+  tag `v0.2.63` → `b487d596`（实现 commit，出包早于归档，与前几批一致）
+- delta：`reporting-ui` **8 MODIFIED + 1 ADDED**，归档后逐块比对 9 块正文
+  **全部一致**，Requirement 总数 78 → 79；既有 Requirement 标题一律未改
+- 主 spec 残留「账户搜索」字样 3 处，逐行核对均为第 84 批修订说明里的
+  **历史引述**（「删除『账户搜索 SHALL…』」「账户搜索框已下线」「账户搜索框整体下线」），
+  非仍在生效的要求
+- 归档态 12 个静态检查全 PASS；`check_record_layout.py` 的
+  「第 84 批 delta 必须已合并」归档态校验命中 archive 并通过
+- `release.yml` / `build.yml` 逐字节未改；`CategorySelectDialog`、
+  `BottomPickerSheet`、`TemplateQuickPick`、`FilterSheet`、`LedgerPrefs`、
+  `AppDatabase`、`AndroidManifest.xml` 全部一字未动
+- **零改表**：version 仍 9、`Migrations.ALL` 仍空、备份 DTO 零改动，
+  **可直接覆盖 v0.2.62**
+- 真机待验项全部保持 `[ ]`，见活文档 §7.67；CI 全绿不替代观感验收
