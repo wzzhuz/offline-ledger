@@ -85,6 +85,12 @@ def main():
         for m in re.finditer(r"^### Requirement: (.+)$", f.read_text(), re.M):
             if m.group(1).strip() not in base:
                 e.append("第 81 批 delta 未合并: "+m.group(1).strip())
+    a82 = sorted(ROOT.glob(
+        "openspec/changes/archive/*account-icon-ref-and-weighted-chips*/specs/*/spec.md"))
+    for f in a82:
+        for m in re.finditer(r"^### Requirement: (.+)$", f.read_text(), re.M):
+            if m.group(1).strip() not in base:
+                e.append("第 82 批 delta 未合并: "+m.group(1).strip())
 
     # ---- 第 82 批：非等宽 chips / 账户图标接回 / 本机导入 / 升表 9 ----
     for k in ["EntryChip(accountLabel, 2.2f", 'EntryChip("模板", 0.9f',

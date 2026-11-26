@@ -34,3 +34,31 @@
 
 见文件末尾「第 82 批实测」。真机待验项全部保持 `[ ]`，见活文档 §7.65。
 **本批 MUST 卸载重装，不能覆盖 v0.2.60。**
+
+## 第 82 批实测（归档时回填）
+
+- 实现 commit `3cc82d04`；诊断 commit `5e7ddff`；修复 commit `c2c1e852`
+- **首轮失败复盘**：push CI `45817702062` 与出包 CI `45817729783` 均失败于
+  `compileDebugKotlin`：`AssetsScreen.kt:950 Unresolved reference 'size'`
+  （预置图标网格用了 `Modifier.size(30.dp)` 但文件没有
+  `import androidx.compose.foundation.layout.size`）。
+  日志域名被出口策略拦截，改用临时 `::error::` workflow 命令把编译错误转成
+  check-run annotation，经 `api.github.com/check-runs/{id}/annotations` 读到，
+  定位后补 import 并**还原 build.yml**（最终 workflow 与 v0.2.60 逐字节一致）。
+  两个中间 commit 留在试验分支历史，最终状态无诊断代码。
+  顺带修掉 `AccountCustomIcons` 一处运行期 bug：`inJustDecodeBounds=true` 时
+  `decodeStream` 必返回 null，原 `?: error(...)` 会让每次导入都失败，
+  改为先确认输入流能打开。
+- 修复后 push CI `45819220312` 全绿；出包 CI `45820077404` 全绿
+- **坚果云**：dispatch 只传 `create_release` / `upload_nutstore=true`，
+  run `45820077404` 的「上传到坚果云」job step 结论 **success**
+- Release `v0.2.61`：`offline-ledger-v0.2.61-release-c2c1e852.apk` /
+  3,513,304 B / SHA256 `2ace5477f5e3fe670cc876422cda7de561c4b69e2b0481d64d1a21c80cf095ea`
+- 归档目录 `openspec/changes/archive/2026-11-26-account-icon-ref-and-weighted-chips/`
+- delta：`reporting-ui` 4 MODIFIED + 2 ADDED、`privacy-security` 1 ADDED，
+  归档后逐块比对正文**全部一致**
+- 6 个静态脚本升表锁统一收到 9 / (7,8,9)；`check_record_layout.py` 加
+  12 条第 82 批断言 + 归档态「delta 必须已合并」；12 个静态检查全 PASS
+- 既有 Requirement 标题一律不改；`Migrations.ALL` 保持空数组
+- **version 9 且无 Migration ⇒ MUST 卸载重装**，覆盖 v0.2.60 会开库失败
+- 真机待验项全部保持 `[ ]`，见活文档 §7.65；CI 全绿不替代观感验收

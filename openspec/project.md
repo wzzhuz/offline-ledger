@@ -1540,3 +1540,10 @@ skipped，根因是本会话每次 `workflow_dispatch` 全量覆盖 inputs 时�
 SVG 解析库；4 Tab、分类快捷栏、联想条、聚合 SQL、CSV/Firefly 往返零改动。
 `assets/NOTICE` 新增 [D] 段区分「本机导入」与「随包分发」授权口径。
 6 个静态脚本的升表锁统一收到 9，12 个静态检查全 PASS。
+**归档与合并实测**：实现 `3cc82d04` → 诊断 `5e7ddff` → 修复 `c2c1e852`
+（首轮 CI 编译报错 `AssetsScreen.kt` 缺 `size` import，已补并还原临时诊断
+workflow）；push CI `45819220312` / 出包 CI `45820077404` 双全绿，
+坚果云 job step `success`。Release `v0.2.61` 产物 3,513,304 B /
+SHA256 `2ace5477…`。归档时 delta 真的合并回 `reporting-ui`
+（4 MODIFIED + 2 ADDED）与 `privacy-security`（1 ADDED），逐块比对正文一致；
+12 个静态检查全 PASS。试验分支相对 `main` 零落后，fast-forward 合并。
