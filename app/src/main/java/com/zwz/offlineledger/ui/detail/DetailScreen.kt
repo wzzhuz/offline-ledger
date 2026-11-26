@@ -5,10 +5,16 @@ import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import com.zwz.offlineledger.core.accountLabel
 import com.zwz.offlineledger.ui.components.TagChips
 import com.zwz.offlineledger.data.paging.DetailGranularity
+import com.zwz.offlineledger.data.paging.FilterField
+import com.zwz.offlineledger.data.paging.RecordFilter
+import com.zwz.offlineledger.data.local.entity.AccountEntity
+import com.zwz.offlineledger.data.local.entity.CategoryEntity
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +35,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -170,40 +177,28 @@ fun DetailScreen(
                     onPickMonth = { showMonthPicker = true },
                     onFilter = { showFilter = true }
                 )
-                // 第 28 批：三条只读展示名按维度独立读取，MUST NOT 共用一个字段，
-                // 否则按收款方跳转时「分类」行会串味显示收款方名。
-                val drillLabel = when {
-                    filter.categoryId != null || filter.rootCategoryId != null ->
-                        "分类筛选：" + (filter.categoryDisplayName ?: run {
-                            val cid = filter.categoryId ?: filter.rootCategoryId
-                            val c = cid?.let { id -> categories.firstOrNull { it.id == id } }
-                            if (c == null) "分类" else {
-                                val parent = c.parentId?.let { pid ->
-                                    categories.firstOrNull { it.id == pid }?.name
-                                }
-                                CategoryDisplay.resolve(parent, c.name)
-                            }
-                        })
-                    filter.counterpartyQuery != null ->
-                        "交易对方包含：" +
-                            (filter.counterpartyDisplayName ?: filter.counterpartyQuery)
-                    filter.accountId != null ->
-                        "账户：" + (filter.accountDisplayName ?: (
-                            accounts.firstOrNull { it.id == filter.accountId }
-                                ?.let { accountBaseLabel(it) } ?: "账户"
-                        ))
-                    else -> null
-                }
-                if (drillLabel != null) {
+                // 第 76 批：撤回互斥三选一 drillLabel，所有生效条件统一出 chip，
+                // 每枚独立 ✕ 只清自己；点文字区打开筛选面板。
+                val chips = buildFilterChips(filter, accounts, categories)
+                if (chips.isNotEmpty()) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FilterChip(
-                            selected = true,
-                            onClick = { vm.clearFilter() },
-                            label = { Text(drillLabel + "  ✕") }
-                        )
+                        chips.forEach { c ->
+                            FilterConditionChip(
+                                label = c.label,
+                                onOpen = { showFilter = true },
+                                onClear = { vm.clearFilterField(c.field) }
+                            )
+                        }
+                        TextButton(onClick = { vm.clearFilter() }) {
+                            Text("清空", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
 
@@ -698,4 +693,114 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
     ListDivider(Modifier.padding(horizontal = 16.dp))
 }
 
+/**
+ * 第 76 批：筛选条件 chips 的单一派生出口。
+ * 覆盖全部 activeCount() 条件 + 来自统计的只读周期名，MUST NOT 回到互斥 when。
+ */
+private data class FilterChipInfo(val field: FilterField, val label: String)
 
+private fun buildFilterChips(
+    filter: RecordFilter,
+    accounts: List<AccountEntity>,
+    categories: List<CategoryEntity>
+): List<FilterChipInfo> {
+    val out = mutableListOf<FilterChipInfo>()
+    filter.type?.let {
+        out += FilterChipInfo(
+            FilterField.TYPE,
+            "类型：" + when (it) {
+                "EXPENSE" -> "支出"
+                "INCOME" -> "收入"
+                "TRANSFER" -> "转账"
+                else -> it
+            }
+        )
+    }
+    if (filter.rootCategoryId != null || filter.categoryId != null) {
+        val name = filter.categoryDisplayName ?: run {
+            val cid = filter.categoryId ?: filter.rootCategoryId
+            val c = cid?.let { id -> categories.firstOrNull { it.id == id } }
+            if (c == null) "分类" else {
+                val parent = c.parentId?.let { pid ->
+                    categories.firstOrNull { it.id == pid }?.name
+                }
+                CategoryDisplay.resolve(parent, c.name)
+            }
+        }
+        out += FilterChipInfo(FilterField.CATEGORY, "分类：$name")
+    }
+    filter.accountId?.let { id ->
+        val name = filter.accountDisplayName
+            ?: accounts.firstOrNull { it.id == id }?.let { accountBaseLabel(it) }
+            ?: "账户"
+        out += FilterChipInfo(FilterField.ACCOUNT, "账户：$name")
+    }
+    if (filter.minAmountCents != null || filter.maxAmountCents != null) {
+        val lo = filter.minAmountCents?.let { Cents(it).toYuanString() } ?: "不限"
+        val hi = filter.maxAmountCents?.let { Cents(it).toYuanString() } ?: "不限"
+        out += FilterChipInfo(FilterField.AMOUNT, "金额：$lo ~ $hi 元")
+    }
+    filter.currencyCode?.let { out += FilterChipInfo(FilterField.CURRENCY, "币种：$it") }
+    filter.noteQuery?.let { out += FilterChipInfo(FilterField.NOTE, "备注含：$it") }
+    filter.descriptionQuery?.let {
+        out += FilterChipInfo(FilterField.DESCRIPTION, "描述含：$it")
+    }
+    filter.counterpartyQuery?.let {
+        out += FilterChipInfo(
+            FilterField.COUNTERPARTY,
+            "对方含：" + (filter.counterpartyDisplayName ?: it)
+        )
+    }
+    filter.tagName?.let { out += FilterChipInfo(FilterField.TAG, "标签：#$it") }
+    if (filter.fromDate != null || filter.toDate != null) {
+        val lo = filter.fromDate?.let { MonthRange.dateLabel(it) } ?: "不限"
+        val hi = filter.toDate?.let { MonthRange.dateLabel(it) } ?: "不限"
+        out += FilterChipInfo(FilterField.RANGE, "时间：$lo ~ $hi")
+    }
+    filter.periodDisplayName?.let {
+        out += FilterChipInfo(FilterField.PERIOD, "时间：$it（来自统计）")
+    }
+    return out
+}
+
+/**
+ * 自定义小圆角 chip：点文字区打开筛选面板，内层 ✕ 的 clickable 消费事件，
+ * 只清自己。M3 FilterChip 的 trailingIcon 会冒泡到整枚 onClick，故不用。
+ */
+@Composable
+private fun FilterConditionChip(
+    label: String,
+    onOpen: () -> Unit,
+    onClear: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.heightIn(min = 30.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clickable(onClick = onOpen)
+                .padding(start = 10.dp, end = 2.dp, top = 3.dp, bottom = 3.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 1
+            )
+            Box(
+                modifier = Modifier.size(24.dp).clickable(onClick = onClear),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "清除该筛选条件",
+                    modifier = Modifier.size(13.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}

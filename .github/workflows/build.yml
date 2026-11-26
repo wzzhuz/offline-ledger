@@ -46,6 +46,7 @@ jobs:
           python3 scripts/check_stat_rules.py
           python3 scripts/check_workflow_syntax.py
           python3 scripts/check_record_tags.py
+          python3 scripts/check_filter_chips.py
 
       - name: 校验固定签名密钥存在
         run: |

@@ -11,6 +11,15 @@ import com.zwz.offlineledger.core.time.MonthRange
 /** 第 45 批：无筛选时的默认视图粒度。月 = 只看当前月，年 = 只看当前年。 */
 enum class DetailGranularity { MONTH, YEAR }
 
+/**
+ * 第 76 批：筛选条件字段标识。UI 侧 chips 的独立 ✕ 只传这个枚举，
+ * MUST NOT 在 Composable 里各自 copy() 拼字段。
+ */
+enum class FilterField {
+    TYPE, CATEGORY, ACCOUNT, AMOUNT, CURRENCY,
+    NOTE, DESCRIPTION, COUNTERPARTY, TAG, RANGE, PERIOD
+}
+
 data class RecordFilter(
     val yearMonth: Int,
     val revision: Int = 0,
@@ -149,7 +158,7 @@ data class RecordFilter(
     fun activeCount(): Int = listOf(
         fromDate, toDate, accountId, type, rootCategoryId,
         categoryId, minAmountCents, maxAmountCents, noteQuery, currencyCode,
-        counterpartyQuery, descriptionQuery
+        counterpartyQuery, descriptionQuery, tagName
     ).count { it != null }
 
     fun bumped(): RecordFilter = copy(revision = revision + 1)
@@ -179,6 +188,38 @@ data class RecordFilter(
     }
 
     /** 第 48 批：清空筛选 MUST 真正回到默认当前月窄视图，而非留下下钻月份。 */
+    /**
+     * 第 76 批：清除单个筛选条件的**唯一**联动出口。
+     * 三条只读展示名、复合字段（分类 / 时间范围）必须一并清，
+     * 否则会残留「只按一级过滤」「跨月暗条件」这类隐式筛选。
+     * 清完按 resolveAllMonths() 同一口径重算 allMonths 并递增 revision。
+     */
+    fun clearField(field: FilterField): RecordFilter {
+        val next = when (field) {
+            FilterField.TYPE -> copy(type = null)
+            FilterField.CATEGORY -> copy(
+                rootCategoryId = null, categoryId = null, categoryDisplayName = null
+            )
+            FilterField.ACCOUNT -> copy(accountId = null, accountDisplayName = null)
+            FilterField.AMOUNT -> copy(minAmountCents = null, maxAmountCents = null)
+            FilterField.CURRENCY -> copy(currencyCode = null)
+            FilterField.NOTE -> copy(noteQuery = null)
+            FilterField.DESCRIPTION -> copy(descriptionQuery = null)
+            FilterField.COUNTERPARTY -> copy(
+                counterpartyQuery = null, counterpartyDisplayName = null
+            )
+            FilterField.TAG -> copy(tagName = null)
+            FilterField.RANGE -> copy(
+                fromDate = null, toDate = null, periodDisplayName = null
+            )
+            FilterField.PERIOD -> copy(periodDisplayName = null)
+        }
+        val hasRange = next.fromDate != null || next.toDate != null
+        val all = if (hasRange) next.allMonths
+        else next.activeCount() > 0 || next.periodDisplayName != null
+        return next.copy(allMonths = all, revision = revision + 1)
+    }
+
     fun cleared(): RecordFilter = currentMonth().copy(revision = revision + 1)
 
     companion object {

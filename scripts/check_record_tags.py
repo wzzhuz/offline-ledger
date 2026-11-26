@@ -113,8 +113,10 @@ def main():
 
     # 7. 版本与文档
     gradle = read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.54"' not in gradle:
-        errs.append("版本号未升到 0.2.54")
+    # 第 75 批 0.2.54；第 76 批起继续前进，不再硬编码单一版本。
+    m = re.search(r'defaultVersionName = "0\.2\.(\d+)"', gradle)
+    if not m or int(m.group(1)) < 54:
+        errs.append("版本号应 >= 0.2.54")
     for path, key in [("docs/页面优化经验与避坑指南.md", "§7.57"),
                       ("openspec/project.md", "第 75 批")]:
         if key not in read(path): errs.append("文档未登记: " + path)

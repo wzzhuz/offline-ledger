@@ -1371,3 +1371,11 @@ Release body 已追加「version 8 覆盖安装不适用、先导出再卸载重
 均已修复并加静态断言 / 新增 `TagRoundTripTest` 8 场景。
 `build.yml` 逐字节恢复、诊断 comment 删除返回 204。
 
+### 第 76 批（v0.2.55）
+
+新建 change `refine-tag-filter-chips`（1 MODIFIED + 3 ADDED / 10 Scenario）。
+明细行标签轻量行内标记、筛选面板标签改整行选择器、顶部所有生效筛选条件统一为可独立清除的 chips；
+`RecordFilter` 加 `FilterField` / `clearField()` 单一联动出口，`activeCount()` 补 `tagName`（顺带修真 bug）。
+零改表（`version = 8` 不变）→ 覆盖安装。新增 `FilterChipClearTest` 10 个纯 JVM 场景、
+静态脚本 `check_filter_chips.py`。预制分类、四条标签往返、统计口径全部零改动。
+

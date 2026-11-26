@@ -36,10 +36,12 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +51,7 @@ import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.time.MonthRange
 import com.zwz.offlineledger.core.time.YearMonthMath
 import com.zwz.offlineledger.ui.components.YearMonthPickerDialog
+import com.zwz.offlineledger.ui.LedgerDi
 import com.zwz.offlineledger.ui.components.CategorySelectDialog
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
@@ -123,6 +126,19 @@ fun FilterSheet(
 
     var picker by remember { mutableStateOf<String?>(null) }
     var dateTarget by remember { mutableStateOf<Int?>(null) }
+
+    // 第 76 批：标签选项与账户/分类/币种一样走整行 picker。
+    // 面板内 produceState 直查 TagDao，不扩 FilterSheet 构造参数
+    // （detail-filter-and-transfer-edit / detail-scope-and-record-page 正在改明细侧）。
+    val context = LocalContext.current
+    val tagDao = remember { LedgerDi.entryPoint(context).tagDao() }
+    val tagOptions by produceState(
+        initialValue = listOf<Pair<String, String?>>("全部标签" to null), tagDao
+    ) {
+        value = listOf<Pair<String, String?>>("全部标签" to null) +
+            runCatching { tagDao.active() }.getOrDefault(emptyList())
+                .map { it.name to it.name }
+    }
 
     val typeOptions = listOf<Pair<String, String?>>(
         "全部" to null, "支出" to "EXPENSE",
@@ -297,15 +313,10 @@ fun FilterSheet(
                     modifier = Modifier.fillMaxWidth(),
                     trailingIcon = clearIcon(descText) { descText = "" }
                 )
-                // 第 75 批：按标签名精确筛选（EXISTS 子查询，MUST NOT 用 LIKE）。
-                OutlinedTextField(
-                    value = tagText,
-                    onValueChange = { tagText = it },
-                    placeholder = { Text("标签名（精确，如：家用）") },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                )
+                // 第 76 批：标签不再手输，与账户/分类/币种同一套整行 picker。
+                PickRow("标签", displayLabel(tagOptions, tagText.takeIf { it.isNotBlank() })) {
+                    picker = "tag"
+                }
                 ThinLine()
 
                 Row(
@@ -420,6 +431,9 @@ fun FilterSheet(
     } else {
         picker?.let { kind ->
             val spec = when (kind) {
+                "tag" -> PickerData("标签", tagOptions, tagText.takeIf { it.isNotBlank() }) { v ->
+                    tagText = v.orEmpty()
+                }
                 "account" -> PickerData("账户", accountOptions, accountId?.toString()) { v ->
                     accountId = v?.toLongOrNull()
                 }

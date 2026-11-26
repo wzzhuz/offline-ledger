@@ -129,7 +129,7 @@ fun RecordDetailPage(
                 DetailLine("备注", row.note.takeIf { it.isNotBlank() } ?: "—")
                 if (row.tagNames.orEmpty().isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
-                    TagChips(row.tagNames)
+                    TagChips(row.tagNames, limit = Int.MAX_VALUE)
                 }
                 DetailLine("不计入收支", if (row.excludeFromStats) "是" else "否")
                 if (row.importSource.isNotBlank()) {

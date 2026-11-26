@@ -14,6 +14,7 @@ import com.zwz.offlineledger.data.local.dao.RecordRow
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.paging.RecordFilter
+import com.zwz.offlineledger.data.paging.FilterField
 import com.zwz.offlineledger.data.paging.DetailGranularity
 import com.zwz.offlineledger.data.paging.RecordPagingSource
 import com.zwz.offlineledger.data.model.RecordType
@@ -294,6 +295,11 @@ class DetailViewModel(
     }
 
     /** 第 48 批：清空筛选 MUST 回默认当前月并触发重查，不能留下下钻的 10 月。 */
+    /** 第 76 批：chip 的独立 ✕ 只清自己，联动逻辑全在 RecordFilter.clearField()。 */
+    fun clearFilterField(field: FilterField) {
+        _filter.value = _filter.value.clearField(field)
+    }
+
     fun clearFilter() {
         _filter.value = _filter.value.cleared()
         _anchorMonth.value = null
