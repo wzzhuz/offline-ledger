@@ -1379,3 +1379,11 @@ Release body 已追加「version 8 覆盖安装不适用、先导出再卸载重
 零改表（`version = 8` 不变）→ 覆盖安装。新增 `FilterChipClearTest` 10 个纯 JVM 场景、
 静态脚本 `check_filter_chips.py`。预制分类、四条标签往返、统计口径全部零改动。
 
+### 第 76 批交付实测（v0.2.55）
+
+push CI `45741381026`、出包 CI `45741996379` 双全绿，tag `v0.2.55 → 403818878a8c`。
+APK `offline-ledger-v0.2.55-release-40381887.apk` / 3,496,212 B /
+SHA256 `be0372ea1add27df08814ed2f609f37ff0349ca5df56767db5336884dfb92340`。
+零改表 → v0.2.54 可直接覆盖安装。一次成包、无诊断 commit、`build.yml` 无临时改动。
+新增 `FilterChipClearTest` 10 场景与 `check_filter_chips.py`；11 个静态检查全 PASS。
+
