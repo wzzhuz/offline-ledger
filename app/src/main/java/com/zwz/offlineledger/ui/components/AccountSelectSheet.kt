@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -146,6 +147,20 @@ fun AccountSelectDialog(
         ?.let { accountBaseLabel(it) } ?: noneLabel
 
     /**
+     * 第 85 批（修 bug）：**必须**显式跳过半屏态。
+     * `ModalBottomSheet` 默认 sheetState 是 Hidden / PartiallyExpanded / Expanded
+     * 三态，打开先停半屏：上滑到 Expanded 后下滑只回 PartiallyExpanded（不关闭），
+     * 系统返回手势同样只回半屏；再叠加内部 `LazyColumn` 在 nested scroll 里
+     * 抢下滑事件，真机表现就是「一上一下」拉扯、收不起来。
+     * `skipPartiallyExpanded = true` 去掉中间档：打开即全展开，
+     * 列表到顶后下滑直接 dismiss、系统返回直接 dismiss。
+     * 第 84 批 design 决策 1「不传自定义 sheetState」的结论被真机推翻，
+     * 已在活文档 §7.67 回填更正；MUST NOT 再退回默认三态。
+     * 沿用框架自带状态，MUST NOT 手写 NestedScrollConnection（§7.7 手势坑）。
+     */
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    /**
      * 第 84 批：使用者明确选 B（`ModalBottomSheet`）。
      * 清点更正：`ModalBottomSheet` **不是全仓禁令**——统计页
      * `DrillDownDialog.kt` 自第 69 批起就在用，且已写进 `category-stats` 主 spec、
@@ -154,9 +169,12 @@ fun AccountSelectDialog(
      * 这两个文件本批一字不动，其禁令继续有效。
      * sheet 自带 scrim 点击 / 下滑 / 系统返回三种关闭路径，故第 84 批删叉号后
      * MUST NOT 再自己补遮罩 clickable（会与 sheet 的 scrim 抢事件）。
+     * **第 85 批更正**：「自带下滑 / 系统返回关闭」只在跳过半屏态后成立，
+     * 必须传下面这个 `sheetState`，否则三条路径里有两条会退回半屏。
      */
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = LedgerColors.CardSurface
     ) {
         LazyColumn(

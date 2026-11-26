@@ -125,7 +125,9 @@ def main():
                   "allowNone","noneLabel","rememberAccountPickerLayout",
                   "ModalBottomSheet(","ExperimentalMaterial3Api","LayoutGridGlyph",
                   "AccountSlot.None","Icons.Filled.List","cardLast4",
-                  "LazyColumn(","chunked(2)"]:
+                  "LazyColumn(","chunked(2)",
+                  "rememberModalBottomSheetState(","skipPartiallyExpanded = true",
+                  "sheetState = sheetState"]:
             if k not in a:e.append("AccountSelectSheet 缺: "+k)
         for k in ["FilterChip(","OutlinedTextField(","Icons.Filled.Close",
                   "清空账户搜索","搜索账户名","DialogProperties"]:
@@ -153,6 +155,10 @@ def main():
         for m in re.finditer(r"^### Requirement: (.+)$", f.read_text(), re.M):
             if m.group(1).strip() not in base:
                 e.append("第 84 批 delta 未合并: "+m.group(1).strip())
+    # ---- 第 85 批（修 bug）：跳过半屏态 + 系统返回直接关闭 ----
+    spec_txt=read("openspec/specs/reporting-ui/spec.md")
+    for k in ["skipPartiallyExpanded = true","第 85 批修订","系统返回直接关闭"]:
+        if k not in spec_txt:e.append("主 spec 未登记第 85 批修订: "+k)
     if "EntryChip(accountLabel, 2.2f" not in rec:
         e.append("收支态账户 chip 未获最宽权重 / 入口被误删")
 
@@ -164,7 +170,7 @@ def main():
     db=read("app/src/main/java/com/zwz/offlineledger/data/local/AppDatabase.kt")
     if "version = 9," not in db:e.append("第 82 批升表口径被破坏（version 必须为 9）")
     gd=read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.63"' not in gd:e.append("版本号未升 0.2.63")
+    if 'defaultVersionName = "0.2.64"' not in gd:e.append("版本号未升 0.2.64")
     wf=read(".github/workflows/build.yml")
     if "check_record_layout.py" not in wf:e.append("build.yml 未挂脚本")
     man=read("app/src/main/AndroidManifest.xml")

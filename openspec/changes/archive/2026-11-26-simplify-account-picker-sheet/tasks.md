@@ -58,3 +58,19 @@
 - **零改表**：version 仍 9、`Migrations.ALL` 仍空、备份 DTO 零改动，
   **可直接覆盖 v0.2.62**
 - 真机待验项全部保持 `[ ]`，见活文档 §7.67；CI 全绿不替代观感验收
+
+## 第 85 批实测（修 bug，非新 change）
+
+- 真机反馈两条：①「上滑展开之后再下滑收不起来，页面卡着一上一下」；
+  ②「全屏展开下系统返回手势是回到半屏、不是关闭」。
+  两条同一个根因：默认 `sheetState` 的 `PartiallyExpanded` 中间态。
+- 按 `my-app-workflow` 步骤 1「修 bug（恢复原本行为）→ 不需要建 change，
+  直接做」执行，**未新建 change 四件套**；
+  按「改完代码不更新 spec」禁令同步了主 spec / 脚本 / 文档。
+- 代码：`AccountSelectSheet.kt` 加
+  `rememberModalBottomSheetState(skipPartiallyExpanded = true)` 并传给
+  `ModalBottomSheet(sheetState = …)`；4 个调用点零改动。
+- 版本号 0.2.63 → 0.2.64；`check_record_layout.py` 加 3 条必检串 +
+  主 spec 第 85 批修订字样校验；12 个静态检查全 PASS。
+- 上方 §7.67 的两条真机待验项（下滑手势与 `LazyColumn` 嵌套滚动、
+  sheet 嵌 Dialog 的关闭路径）至此有结论，见活文档 §7.67 回填。

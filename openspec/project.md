@@ -1621,3 +1621,34 @@ Release `v0.2.63` 产物 3,513,300 B / SHA256 `29d33076…`。
 归档时 delta 真的合并回 `reporting-ui`（8 MODIFIED + 1 ADDED），
 9 块正文逐块比对一致、12 个静态检查全 PASS；试验分支零落后，
 fast-forward 合并 `main`。
+
+### 第 85 批（v0.2.64）：修 bug — 账户弹层跳过半屏态
+
+真机两条反馈「上滑展开后下滑收不起来、一上一下卡住」、
+「全屏下系统返回只回半屏不关闭」，同一个根因：
+`ModalBottomSheet` 默认三态的 `PartiallyExpanded` 中间态，
+叠加内部 `LazyColumn` 嵌套滚动抢下滑事件。
+
+**修复**：`AccountSelectSheet.kt` 显式
+`rememberModalBottomSheetState(skipPartiallyExpanded = true)`
+并传给 `ModalBottomSheet(sheetState = …)`。
+打开即全展开；列表到顶后下滑直接 dismiss、系统返回直接 dismiss。
+MUST NOT 手写 `NestedScrollConnection`（§7.7）、
+MUST NOT 设 `userScrollEnabled = false`。
+第 84 批 design 决策 1「不传自定义 sheetState」作废，
+归档 design.md 已追加修订注记（保留原文）。
+
+**流程口径更正**：`my-app-workflow` 步骤 1 明确
+「修 bug（恢复原本行为）→ 不需要建 change，直接做」，
+前几轮「已归档就得新开 change」的说法只适用于需求变更。
+本批**未建 change 四件套**，但按「改完代码不更新 spec」禁令
+同步了 `reporting-ui` 主 spec（实现约束 + 2 个回归 Scenario）、
+`check_record_layout.py`（3 条必检串 + 修订字样校验）、
+归档 design/tasks、活文档 §7.67、`project.md` 本段。
+
+**范围**：版本号 0.2.63 → 0.2.64；零改表（version 仍 9）、
+零新增依赖 / drawable / 权限 / `INTERNET`；4 个调用点、
+`BottomPickerSheet`、`TemplateQuickPick`、`CategorySelectDialog`、
+`LedgerPrefs`、`AppDatabase`、Manifest 全部一字未动。
+12 个静态检查全 PASS，**可直接覆盖 v0.2.63**。
+代价：不再有半屏态，弹层一打开即接近全屏。

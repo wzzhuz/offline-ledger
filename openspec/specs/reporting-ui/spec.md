@@ -2374,6 +2374,20 @@ MUST NOT 出现「双布局分段」字样或第二套壳。
 `AccountSelectDialog` SHALL 以
 `ModalBottomSheet`（`@OptIn(ExperimentalMaterial3Api::class)`）为壳，
 `containerColor = LedgerColors.CardSurface`，保留默认 drag handle。
+
+**第 85 批修订（真机回归，修 bug）**：SHALL 传
+`sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)`。
+默认三态 `Hidden / PartiallyExpanded / Expanded` 会让下滑与系统返回
+**只退回半屏而不关闭**，并与内部 `LazyColumn` 的嵌套滚动互相拉扯，
+真机表现为「上滑展开后下滑收不起来、一上一下卡住」。
+去掉中间档后：打开即全展开，列表到顶后下滑直接 dismiss，
+**系统返回手势 SHALL 直接关闭弹层，MUST NOT 回到半屏态**。
+MUST NOT 手写 `NestedScrollConnection`（§7.7 手势坑）、
+MUST NOT 回退默认三态、MUST NOT 给 `LazyColumn` 设
+`userScrollEnabled = false`（会把账户多时的滚动功能改没了）。
+第 84 批 design 决策 1「不传自定义 sheetState」的结论据此作废，
+归档 delta 保持原样作历史快照，本条为当前生效语义。
+
 关闭 SHALL 由组件自带的三条路径承担，MUST NOT 再自定义叉号按钮或遮罩点击层：
 
 - 点遮罩（scrim）
@@ -2408,6 +2422,21 @@ MUST NOT 加图片加载库、MUST NOT 新增 drawable、MUST NOT 声明 `INTERN
 - **THEN** 三次都能关闭弹层且未选中任何账户
 - **WHEN** 再点一张账户
 - **THEN** 写回对应 id 并关闭，MUST NOT 出现「关不掉」或双击才关
+
+#### Scenario: 上滑展开后一次下滑即关闭（第 85 批回归）
+
+- **GIVEN** 账户数量多到弹层内容可滚动
+- **WHEN** 打开弹层、上滑展开到全屏、再从标题栏或 drag handle 向下滑一次
+- **THEN** 弹层直接关闭，MUST NOT 停在半屏态或出现「一上一下」来回弹
+- **WHEN** 列表滚到中间时向下滑
+- **THEN** 先滚动列表，滚到顶部后手势交给 sheet，继续下滑即关闭
+
+#### Scenario: 系统返回直接关闭而非回半屏（第 85 批回归）
+
+- **GIVEN** 弹层处于全展开状态
+- **WHEN** 用系统返回键或侧滑返回手势
+- **THEN** 弹层直接关闭并回到调用页，MUST NOT 先退回半屏再要求第二次返回
+- **AND** 点遮罩、下滑两条路径行为一致
 
 #### Scenario: 顶部只有一行控件
 
