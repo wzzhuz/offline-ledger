@@ -1547,3 +1547,27 @@ workflow）；push CI `45819220312` / 出包 CI `45820077404` 双全绿，
 SHA256 `2ace5477…`。归档时 delta 真的合并回 `reporting-ui`
 （4 MODIFIED + 2 ADDED）与 `privacy-security`（1 ADDED），逐块比对正文一致；
 12 个静态检查全 PASS。试验分支相对 `main` 零落后，fast-forward 合并。
+
+### 第 83 批（v0.2.62）：账户选择器双布局 + 通用选择器收口
+
+真机两条反馈后四项拍板：① 默认「全局排序」；② 分组 = `AccountType` 四组固定序
++ 组内 `sortOrder`、全局 = `quickOrder`，切换后同一卡位置不同属预期；
+③ 布局选择跨启动持久化；④ 复用范围连明细筛选、统计筛选一起换。
+
+**改动**：新增 `ui/components/AccountSelectSheet.kt` 作为账户选择唯一通用出口，
+提供「全局排序 / 按类型分组」两种布局（`AccountPickerLayout`），
+布局存 `LedgerPrefs.accountPickerLayout`（不进 Room / 备份 / Migration，
+version 仍 9）。每格沿用第 82 批 44dp `AccountIconBox` + 次要小字、不显示余额；
+搜索按 `accountBaseLabel`，搜索命中跨组平铺。
+`accountSecondaryLabel` 上提为 `ui.components` public 唯一组合点。
+
+**复用**：记一笔 `AccountPickerSheet` 改薄封装；模板与周期规则表单撤掉全仓最后一
+份 `DropdownSelector`，分类接 `CategorySelectDialog`、转出/转入接
+`AccountSelectDialog` 并补「不指定」；明细筛选 `"account"` 分支换通用选择器
+（统计账户排行下钻走同一份 `FilterSheet`，自动覆盖）。`CategorySelectDialog`
+本体零改动，活跃 change `record-category-picker-and-root-select` 不碰。
+
+**范围**：零改表、零新增依赖、零 `INTERNET`、零运行时权限、零新图标资源；
+4 Tab、分类快捷栏、转账两卡、聚合 SQL、CSV/Firefly 往返、备份 DTO 零改动。
+`check_record_layout.py` 同步断言目标并加 14 条第 83 批校验，
+12 个静态检查全 PASS。本批**没有升表**，可直接覆盖 v0.2.61。

@@ -71,12 +71,13 @@ def main():
 
     # 第 81 批：转账态两卡常驻 + 移除转账账户 chip + 四处一键清空
     for k in ["TransferAccountCards(","TransferAccountCard(","ClearFieldIcon(",
-              "lockTarget","清空描述","清空备注","清空账户搜索"]:
+              "lockTarget","清空描述","清空备注"]:
         if k not in rec:e.append("第 81 批缺: "+k)
     for k in ['"转出/转入"',"账号 chips 转账"]:
         if k in rec:e.append("第 81 批残留: "+k)
-    if rec.count("ClearFieldIcon(")<5:
-        e.append("一键清空出口未覆盖四处输入框（含定义应 >=5 处）")
+    # 第 83 批：账户搜索清空随账户网格下沉到通用组件，rec 内剩 3 处调用 + 定义。
+    if rec.count("ClearFieldIcon(")<4:
+        e.append("一键清空出口未覆盖收款方/描述/备注（含定义应 >=4 处）")
 
     # 归档后：第 81 批 delta 的每条 Requirement 必须已合并回主 spec（§4.2）。
     a81 = sorted(ROOT.glob(
@@ -113,6 +114,33 @@ def main():
     if "AccountCustomIcons.load" not in cat:e.append("AccountIconBox 未接自定义图标")
     notice=read("app/src/main/assets/NOTICE")
     if "本机导入图标" not in notice:e.append("NOTICE 未登记本机导入图标授权口径")
+
+    # ---- 第 83 批：通用账户选择器 / 双布局 / 撤老下拉 ----
+    asel=ROOT/"app/src/main/java/com/zwz/offlineledger/ui/components/AccountSelectSheet.kt"
+    if not asel.is_file():e.append("缺通用 AccountSelectSheet")
+    else:
+        a=asel.read_text()
+        for k in ["AccountPickerLayout","GLOBAL","GROUPED","quickOrder","sortOrder",
+                  "AccountTypeOrder","accountSecondaryLabel","AccountIconBox(",
+                  "allowNone","noneLabel","清空账户搜索","rememberAccountPickerLayout"]:
+            if k not in a:e.append("AccountSelectSheet 缺: "+k)
+        if "Cents(" in a or "balanceCents" in a:e.append("通用账户选择器仍显示余额")
+    prefs=read("app/src/main/java/com/zwz/offlineledger/core/prefs/LedgerPrefs.kt")
+    if "accountPickerLayout" not in prefs:e.append("偏好未持久化账户布局（第83批 3B）")
+    tplm=read("app/src/main/java/com/zwz/offlineledger/ui/templates/TemplateManagerDialog.kt")
+    if "DropdownSelector(" in tplm:e.append("模板/周期仍残留老下拉")
+    for k in ["CategorySelectDialog(","AccountSelectDialog(","SelectorRow(","不指定账户"]:
+        if k not in tplm:e.append("模板/周期缺: "+k)
+    filt=read("app/src/main/java/com/zwz/offlineledger/ui/detail/FilterSheet.kt")
+    if "AccountSelectDialog(" not in filt:e.append("明细/统计账户筛选未换通用选择器")
+    if "AccountPickerSheet(" not in rec:e.append("记一笔账户薄封装被误删")
+    if "AccountSelectDialog(" not in rec:e.append("记一笔账户 sheet 未接通用选择器")
+    a83 = sorted(ROOT.glob(
+        "openspec/changes/archive/*account-picker-layouts-and-shared-selectors*/specs/*/spec.md"))
+    for f in a83:
+        for m in re.finditer(r"^### Requirement: (.+)$", f.read_text(), re.M):
+            if m.group(1).strip() not in base:
+                e.append("第 83 批 delta 未合并: "+m.group(1).strip())
     if "EntryChip(accountLabel, 2.2f" not in rec:
         e.append("收支态账户 chip 未获最宽权重 / 入口被误删")
 
@@ -124,7 +152,7 @@ def main():
     db=read("app/src/main/java/com/zwz/offlineledger/data/local/AppDatabase.kt")
     if "version = 9," not in db:e.append("第 82 批升表口径被破坏（version 必须为 9）")
     gd=read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.61"' not in gd:e.append("版本号未升 0.2.61")
+    if 'defaultVersionName = "0.2.62"' not in gd:e.append("版本号未升 0.2.62")
     wf=read(".github/workflows/build.yml")
     if "check_record_layout.py" not in wf:e.append("build.yml 未挂脚本")
     man=read("app/src/main/AndroidManifest.xml")
@@ -137,6 +165,6 @@ def main():
     if e:
         for x in e:print("  FAIL",x)
         print("check_record_layout: %d 项失败"%len(e));return 1
-    print("check_record_layout: PASS (10 delta / 分层 / chips / 账户图标 / 本机导入 / 升表 9 / 动态色 / edge-to-edge)")
+    print("check_record_layout: PASS (10 delta / 分层 / chips / 通用选择器 / 双布局 / 账户图标 / 升表 9 / 动态色 / edge-to-edge)")
     return 0
 if __name__=="__main__":sys.exit(main())

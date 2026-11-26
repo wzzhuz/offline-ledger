@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,15 +42,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zwz.offlineledger.core.money.Cents
 import com.zwz.offlineledger.core.time.LedgerClock
+import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.local.entity.RecordTemplateEntity
 import com.zwz.offlineledger.data.local.entity.RecurringRuleEntity
 import com.zwz.offlineledger.data.model.Cadence
 import com.zwz.offlineledger.data.model.RecordType
+import com.zwz.offlineledger.ui.components.CategorySelectDialog
+import com.zwz.offlineledger.ui.components.AccountSelectDialog
 import com.zwz.offlineledger.ui.components.ListDivider
 import com.zwz.offlineledger.ui.components.rememberKeyedReorder
 import sh.calvin.reorderable.ReorderableItem
@@ -131,7 +136,7 @@ fun TemplateManagerScreen(onBack: () -> Unit) {
                     isRule = e.isRule,
                     editing = if (e.isRule) null else e.editing,
                     categories = state.categories,
-                    accountNames = state.accounts.map { it.id to it.name },
+                    accounts = state.accounts,
                     onSubmitTemplate = { t ->
                         if (t.id != 0L) vm.updateTemplate(t) else vm.saveTemplate(t)
                         editor = null
@@ -307,7 +312,7 @@ private fun QuickEntryForm(
     isRule: Boolean,
     editing: RecordTemplateEntity?,
     categories: List<CategoryEntity>,
-    accountNames: List<Pair<Long, String>>,
+    accounts: List<AccountEntity>,
     onSubmitTemplate: (RecordTemplateEntity) -> Unit,
     onSubmitRule: (RecurringRuleEntity) -> Unit,
     onCancelEdit: () -> Unit
@@ -328,6 +333,11 @@ private fun QuickEntryForm(
     var cadence by remember(eid) { mutableStateOf(Cadence.MONTHLY) }
     var dayText by remember(eid) { mutableStateOf("1") }
     var error by remember(eid) { mutableStateOf<String?>(null) }
+    // 第 83 批：老 DropdownSelector 全撤，改与记一笔 / 明细筛选同款的
+    // 只读通用选择器（整行 › 入口 + 立即选中 + 可「不指定」）。
+    var showCategory by remember(eid) { mutableStateOf(false) }
+    var showFromAccount by remember(eid) { mutableStateOf(false) }
+    var showToAccount by remember(eid) { mutableStateOf(false) }
 
     val selectedCategory = categories.firstOrNull { it.id == categoryId }
     val rootId = selectedCategory?.let { it.parentId ?: it.id }
@@ -335,17 +345,6 @@ private fun QuickEntryForm(
     // 第三批：下拉只显示与当前收支类型一致、未归档的分类；
     // 一级在前、二级紧跟父级，标签写成「一级 / 二级」。
     val visibleCategories = categories.filter { it.type == type && !it.isArchived }
-    fun rootKey(c: CategoryEntity): Long = if (c.level == 0) c.id else (c.parentId ?: 0L)
-    val orderedCategories = visibleCategories.sortedWith(
-        compareBy<CategoryEntity> { rootKey(it) }.thenBy { it.level }.thenBy { it.sortOrder }
-    )
-    val categoryOptions = orderedCategories.map { c ->
-        val label = if (c.level == 1) {
-            val parent = categories.firstOrNull { it.id == c.parentId }?.name
-            (if (parent.isNullOrBlank()) "" else parent + " / ") + c.name
-        } else c.name
-        c.id to label
-    }
 
     Column {
         ManagerTextField(
@@ -372,24 +371,24 @@ private fun QuickEntryForm(
         }
 
         if (type != RecordType.TRANSFER) {
-            DropdownSelector(
-                label = "分类：" + (selectedCategory?.name ?: "未选"),
-                options = categoryOptions,
-                onSelect = { categoryId = it }
+            SelectorRow(
+                label = "分类",
+                value = selectedCategory?.name ?: "不指定",
+                onClick = { showCategory = true }
             )
         }
         if (type != RecordType.INCOME) {
-            DropdownSelector(
-                label = "转出账户（可留空）：" + accountName(accountNames, fromAccountId),
-                options = accountNames,
-                onSelect = { fromAccountId = it }
+            SelectorRow(
+                label = "转出账户",
+                value = accountName(accounts, fromAccountId),
+                onClick = { showFromAccount = true }
             )
         }
         if (type != RecordType.EXPENSE) {
-            DropdownSelector(
-                label = "转入账户（可留空）：" + accountName(accountNames, toAccountId),
-                options = accountNames,
-                onSelect = { toAccountId = it }
+            SelectorRow(
+                label = "转入账户",
+                value = accountName(accounts, toAccountId),
+                onClick = { showToAccount = true }
             )
         }
 
@@ -426,6 +425,41 @@ private fun QuickEntryForm(
                 placeholder = if (cadence == Cadence.MONTHLY) "每月几号（1-31）"
                 else "每周几（1=周一..7=周日）",
                 keyboardType = KeyboardType.Number
+            )
+        }
+
+        if (showCategory) {
+            CategorySelectDialog(
+                categories = categories,
+                type = type,
+                selectedId = categoryId,
+                // allowAll 复用为「不指定分类」：模板与规则的分类本就可留空。
+                allowAll = true,
+                title = "分类（可不指定）",
+                onSelect = { choice -> categoryId = choice.categoryId },
+                onDismiss = { showCategory = false }
+            )
+        }
+        if (showFromAccount) {
+            AccountSelectDialog(
+                accounts = accounts,
+                selectedId = fromAccountId,
+                allowNone = true,
+                title = "转出账户（可不指定）",
+                noneLabel = "不指定账户",
+                onSelect = { fromAccountId = it },
+                onDismiss = { showFromAccount = false }
+            )
+        }
+        if (showToAccount) {
+            AccountSelectDialog(
+                accounts = accounts,
+                selectedId = toAccountId,
+                allowNone = true,
+                title = "转入账户（可不指定）",
+                noneLabel = "不指定账户",
+                onSelect = { toAccountId = it },
+                onDismiss = { showToAccount = false }
             )
         }
 
@@ -544,40 +578,27 @@ private fun typeLabel(t: RecordType): String = when (t) {
     RecordType.SETTLEMENT -> "报销 / 退款"
 }
 
-private fun accountName(names: List<Pair<Long, String>>, id: Long?): String =
-    names.firstOrNull { it.first == id }?.second ?: "未选"
+private fun accountName(accounts: List<AccountEntity>, id: Long?): String =
+    accounts.firstOrNull { it.id == id }?.name ?: "不指定"
 
-/** 第 12 批：下拉限高 + 搜索，20+ 分类 / 10+ 账户不再无限下拉。 */
+/** 第 83 批：与分类 / 账户通用选择器配套的整行 › 入口，MUST NOT 再退回下拉框。 */
 @Composable
-private fun DropdownSelector(
-    label: String,
-    options: List<Pair<Long, String>>,
-    onSelect: (Long) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
-    val matched = options.filter { it.second.contains(query, ignoreCase = true) }
-    Box {
-        TextButton(onClick = { expanded = true }) { Text(label, maxLines = 1) }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text("搜索") },
-                textStyle = MaterialTheme.typography.bodyMedium,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).heightIn(min = 40.dp)
-            )
-            Column(
-                modifier = Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())
-            ) {
-                matched.forEach { (id, text) ->
-                    DropdownMenuItem(
-                        text = { Text(text, maxLines = 1) },
-                        onClick = { onSelect(id); expanded = false; query = "" }
-                    )
-                }
-            }
-        }
+private fun SelectorRow(label: String, value: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = LedgerColors.Neutral,
+            modifier = Modifier.width(72.dp)
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = LedgerColors.OnSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Text("›", style = MaterialTheme.typography.bodyMedium, color = LedgerColors.Neutral)
     }
 }

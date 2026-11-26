@@ -53,6 +53,7 @@ import com.zwz.offlineledger.core.time.YearMonthMath
 import com.zwz.offlineledger.ui.components.YearMonthPickerDialog
 import com.zwz.offlineledger.ui.LedgerDi
 import com.zwz.offlineledger.ui.components.CategorySelectDialog
+import com.zwz.offlineledger.ui.components.AccountSelectDialog
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.paging.RecordFilter
@@ -428,14 +429,23 @@ fun FilterSheet(
             },
             onDismiss = { picker = null }
         )
+    } else if (picker == "account") {
+        // 第 83 批：账户筛选改通用选择器（统计账户排行下钻也走同一份面板）。
+        // 「全部账户」= allowNone；归档项仍不进选择器（第 52 批口径）。
+        AccountSelectDialog(
+            accounts = accounts.filter { !it.isArchived },
+            selectedId = accountId,
+            allowNone = true,
+            title = "账户",
+            noneLabel = "全部账户",
+            onSelect = { accountId = it },
+            onDismiss = { picker = null }
+        )
     } else {
         picker?.let { kind ->
             val spec = when (kind) {
                 "tag" -> PickerData("标签", tagOptions, tagText.takeIf { it.isNotBlank() }) { v ->
                     tagText = v.orEmpty()
-                }
-                "account" -> PickerData("账户", accountOptions, accountId?.toString()) { v ->
-                    accountId = v?.toLongOrNull()
                 }
                 "root" -> PickerData("一级分类", rootOptions, rootId?.toString()) { v ->
                     rootId = v?.toLongOrNull()

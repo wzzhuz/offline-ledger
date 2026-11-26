@@ -50,6 +50,17 @@ class LedgerPrefs(context: Context) {
         get() = sp.getLong(KEY_DEFAULT_ACCOUNT_ID, 0L)
         set(value) = sp.edit().putLong(KEY_DEFAULT_ACCOUNT_ID, value).apply()
 
+    /**
+     * 第 83 批：账户选择器布局（"global" 全局排序 / "grouped" 按类型分组）。
+     * 使用者第 3 项拍板 B：跨启动持久化。沿用 SharedPreferences 口径，
+     * 不进 Room / 不进备份 DTO / 不触发 Migration，换设备回退默认全局视图。
+     */
+    var accountPickerLayout: String
+        get() = sp.getString(KEY_ACCOUNT_PICKER_LAYOUT, null)
+            ?.takeIf { it == "global" || it == "grouped" } ?: "global"
+        set(value) = sp.edit()
+            .putString(KEY_ACCOUNT_PICKER_LAYOUT, value).apply()
+
     fun hasPin(): Boolean = sp.getString(KEY_PIN_HASH, null)?.isNotBlank() == true
 
     /**
@@ -102,6 +113,7 @@ class LedgerPrefs(context: Context) {
         private const val KEY_DEFAULT_CURRENCY = "default_currency"
         private const val KEY_DEFAULT_ACCOUNT_ID = "default_account_id"
         private const val KEY_HIDE_AMOUNTS = "hide_amounts"
+        private const val KEY_ACCOUNT_PICKER_LAYOUT = "account_picker_layout"
         const val MAX_THRESHOLD_CENTS = 100_000L // 1000.00 元
     }
 }

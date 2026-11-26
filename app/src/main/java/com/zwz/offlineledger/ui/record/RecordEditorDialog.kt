@@ -74,6 +74,8 @@ import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
 import com.zwz.offlineledger.ui.assets.AccountIconBox
+import com.zwz.offlineledger.ui.components.AccountSelectDialog
+import com.zwz.offlineledger.ui.components.accountSecondaryLabel
 import com.zwz.offlineledger.ui.assets.AccountIconCatalog
 import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import com.zwz.offlineledger.ui.ledgerFactory
@@ -946,13 +948,14 @@ private fun EntryChipBar(
 }
 
 /**
- * 第 82 批：账户 sheet 接回项目既有的 `AccountIconBox`（品牌 / 自定义 44dp + 放大角标），
- * **删掉余额行**（使用者明确「显示余额没必要，不需要抄一羽」）；
- * 卡号后四位与卡种降为次要小字，不用记、一眼可分储/信。
- * 搜索仍走 `accountBaseLabel`（含卡号后缀），沿用既有 setFromAccount / setToAccount。
- * MUST NOT 在 sheet 内新做长按拖拽排序（踩坑清单 §3.1）。
- * 沿用 vm 既有 setFromAccount / setToAccount，零新数据路径。
- * MUST NOT 在 sheet 内新做长按拖拽排序（踩坑清单 §3.1）；排序仍走既有独立页。
+ * 第 83 批：账户 sheet 改为**通用 `AccountSelectDialog` 的薄封装**。
+ * 本文件只保留「回填哪一侧」的职责（转出 / 转入 / 支出 / 收入）与标题，
+ * 版式、双布局切换、搜索、图标、可清空全部下沉到 `ui/components`。
+ * 与分类选择器对称，全仓 MUST NOT 再有第二份账户网格。
+ *
+ * 转账态由首屏两卡点开时 `lockTarget = true`，标题固定「选择转出/转入账户」；
+ * 第 81 批起 sheet 内 MUST NOT 再出现转出/转入分段（卡片已指明目标），
+ * 原 `!lockTarget` 分段分支是死代码，本批移除。
  */
 @Composable
 private fun AccountPickerSheet(
@@ -966,11 +969,7 @@ private fun AccountPickerSheet(
     onTo: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var query by remember { mutableStateOf("") }
-    var target by remember { mutableStateOf(initialTarget) }
-    val shown = accounts.filter {
-        accountBaseLabel(it).contains(query, ignoreCase = true)
-    }
+    val target = initialTarget
     val selectedId = when {
         type == RecordType.TRANSFER && target == 0 -> fromId
         type == RecordType.TRANSFER -> toId
@@ -978,100 +977,27 @@ private fun AccountPickerSheet(
         else -> toId
     }
     val sheetTitle = when {
-        type == RecordType.TRANSFER && lockTarget && initialTarget == 0 -> "选择转出账户"
+        type == RecordType.TRANSFER && lockTarget && target == 0 -> "选择转出账户"
         type == RecordType.TRANSFER && lockTarget -> "选择转入账户"
         else -> "选择账户"
     }
-    BottomPickerSheet(title = sheetTitle, onDismiss = onDismiss) {
-        if (type == RecordType.TRANSFER && !lockTarget) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = target == 0,
-                    onClick = { target = 0 },
-                    label = { Text("转出账户") }
-                )
-                FilterChip(
-                    selected = target == 1,
-                    onClick = { target = 1 },
-                    label = { Text("转入账户") }
-                )
+    AccountSelectDialog(
+        accounts = accounts,
+        selectedId = selectedId,
+        allowNone = false,
+        title = sheetTitle,
+        onSelect = { id ->
+            if (id == null) return@AccountSelectDialog
+            when {
+                type == RecordType.TRANSFER && target == 0 -> onFrom(id)
+                type == RecordType.TRANSFER -> onTo(id)
+                type == RecordType.EXPENSE -> onFrom(id)
+                else -> onTo(id)
             }
-            Spacer(Modifier.height(8.dp))
-        }
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            placeholder = { Text("搜索账户名 / 卡号后四位") },
-            textStyle = MaterialTheme.typography.bodyMedium,
-            singleLine = true,
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    ClearFieldIcon("清空账户搜索") { query = "" }
-                }
-            },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
-        )
-        Spacer(Modifier.height(8.dp))
-        shown.chunked(2).forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                row.forEach { a ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 56.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (a.id == selectedId) LedgerColors.Primary.copy(alpha = 0.12f)
-                                else LedgerColors.SurfaceVariant
-                            )
-                            .clickable {
-                                when {
-                                    type == RecordType.TRANSFER && target == 0 -> onFrom(a.id)
-                                    type == RecordType.TRANSFER -> onTo(a.id)
-                                    type == RecordType.EXPENSE -> onFrom(a.id)
-                                    else -> onTo(a.id)
-                                }
-                                onDismiss()
-                            }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            AccountIconBox(
-                                name = a.name,
-                                cardKind = a.cardKind,
-                                iconKey = AccountIconCatalog.iconKeyFor(a.name),
-                                iconRef = a.iconRef,
-                                size = 44
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    a.name,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = LedgerColors.OnSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    accountSecondaryLabel(a),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = LedgerColors.Neutral,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(8.dp))
-        }
-    }
+            onDismiss()
+        },
+        onDismiss = onDismiss
+    )
 }
 
 /** 备注 + 不计入收支：开关本就与备注同一行，一并搬进 chip 的 sheet。 */
@@ -1240,17 +1166,3 @@ private fun TransferAccountCard(
         Text("›", style = MaterialTheme.typography.labelMedium, color = LedgerColors.Neutral)
     }
 }
-
-/**
- * 第 82 批：账户次要信息唯一组合点 —— 卡号尾号 / 卡种 / 币种。
- * 余额刻意不进这里（使用者明确「显示余额没必要」），
- * 卡种用文字而非 12dp 小角标，保证「储蓄卡 / 信用卡」一眼可分。
- */
-private fun accountSecondaryLabel(a: AccountEntity): String = buildList {
-    a.cardLast4?.takeIf { it.length == 4 }?.let { add("尾号 $it") }
-    when (a.cardKind) {
-        "DEBIT" -> add("储蓄卡")
-        "CREDIT" -> add("信用卡")
-    }
-    add(a.currencyCode)
-}.joinToString(" · ")
