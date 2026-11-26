@@ -192,7 +192,7 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(
-                                            Color(0xFFF2F3F7),
+                                            LedgerColors.SurfaceVariant,
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable(
@@ -291,7 +291,7 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                     .fillMaxWidth()
                                     // 与一级区明显不同的浅蓝灰：靠底色标注二级区，
                                     // MUST NOT 再用小字重复「点按手柄拖动排序」。
-                                    .background(Color(0xFFEAF0FF), RoundedCornerShape(16.dp))
+                                    .background(LedgerColors.Primary.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
                                     .padding(8.dp)
                             ) {
                                 if (children.isEmpty()) {
@@ -322,7 +322,7 @@ fun CategorySortScreen(type: RecordType, onBack: () -> Unit) {
                                                         modifier = Modifier
                                                             .fillMaxWidth()
                                                             .background(
-                                                                Color.White,
+                                                                LedgerColors.Surface,
                                                                 RoundedCornerShape(8.dp)
                                                             )
                                                             .then(dragModifier)
@@ -422,7 +422,7 @@ private fun StaticRootCell(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                if (chosen) CategoryHeaderBlue else Color(0xFFF2F3F7),
+                if (chosen) CategoryHeaderBlue else LedgerColors.SurfaceVariant,
                 RoundedCornerShape(12.dp)
             )
             .pointerInput(Unit) {

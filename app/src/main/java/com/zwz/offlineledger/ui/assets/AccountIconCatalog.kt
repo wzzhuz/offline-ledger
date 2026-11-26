@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.zwz.offlineledger.R
 import com.zwz.offlineledger.data.local.AccountTemplates
 import com.zwz.offlineledger.ui.components.CategoryIcon
+import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /**
  * 第 60 批 Q7 落地机制；**第 64 批补齐实际资源**。
@@ -126,8 +127,9 @@ fun AccountKindBadge(
         else -> null
     }
     if (label != null) {
-        val bg = if (cardKind == "CREDIT") Color(0xFFDCE7FF) else Color(0xFFDFF0E4)
-        val fg = if (cardKind == "CREDIT") Color(0xFF2A4FA0) else Color(0xFF236B36)
+        val bg = if (cardKind == "CREDIT") LedgerColors.Primary.copy(alpha = 0.12f)
+            else LedgerColors.IncomeGreen.copy(alpha = 0.12f)
+        val fg = if (cardKind == "CREDIT") LedgerColors.Primary else LedgerColors.IncomeGreen
         Box(
             modifier = modifier
                 .size(size.dp)

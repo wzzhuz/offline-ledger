@@ -596,7 +596,7 @@ private fun AddAccountDialog(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color(0xFFF5F6FA)
+            color = LedgerColors.Surface
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -634,7 +634,7 @@ private fun AddAccountDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color.White, RoundedCornerShape(16.dp))
+                                .background(LedgerColors.Surface, RoundedCornerShape(16.dp))
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {

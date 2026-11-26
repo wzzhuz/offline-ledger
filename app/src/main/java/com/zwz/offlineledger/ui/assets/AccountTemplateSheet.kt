@@ -58,7 +58,7 @@ fun AccountTemplateSheet(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .heightIn(max = 560.dp)
-                .background(Color.White, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(LedgerColors.Surface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -141,7 +141,7 @@ private fun TemplateTile(
     Row(
         modifier = modifier
             .heightIn(min = 52.dp)
-            .background(Color(0xFFF5F6FA), RoundedCornerShape(12.dp))
+            .background(LedgerColors.SurfaceVariant, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

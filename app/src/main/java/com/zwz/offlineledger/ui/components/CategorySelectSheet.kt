@@ -283,7 +283,7 @@ private fun SelectNavItem(text: String, selected: Boolean, onClick: () -> Unit) 
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                if (selected) Color(0xFFE8EDFF) else Color.Transparent,
+                if (selected) LedgerColors.Primary.copy(alpha = 0.12f) else Color.Transparent,
                 RoundedCornerShape(8.dp)
             )
             .clickable(onClick = onClick)

@@ -1405,3 +1405,16 @@ SHA256 `58f5cf237e806adcaf15b060c0eb2c1f48fcd20e29b58f900873fbace455ec83`。
 新增 `check_record_layout.py`；12 个静态检查全 PASS。出包轮询一次查询层超时，
 短调用独立复查确认 success，未重发触发。
 
+
+### 第 78 批（v0.2.57）：视觉规范适配试验分支
+
+按视觉规范审阅结论落地三项真缺口 + 一套 token，**不推 main、单独分支出 debug 包供真机验证**。
+新增 `ui/theme/LedgerDesignTokens.kt`（LedgerShapes / LedgerSpacing / LedgerType，金额样式统一 `tnum`）；
+`LedgerTheme` 加 `darkTheme`（默认跟随系统）+ 深色静态板，`LedgerColors` 升为可观察调色板并在
+`SideEffect` 同步当前 ColorScheme；`CategoryHeaderBlue` 改读可观察主色以收敛第 77 批登记的两套蓝。
+统计页 / 明细 / 交易详情金额接 `LedgerType`；统计卡与 9 处硬编码浅底/白卡改读表面色。
+
+**明确不做**：删分割线、明细与记一笔卡片化、彩色图标扩范围、`Icons.Rounded`、
+CompositionLocal 替换语义色、缩放动画。零改表、零新增依赖、零 permission 变化。
+既有 `reporting-ui` Requirement 一字未动，故本批不 MODIFIED 主 spec。
+静态脚本断言随版本与主题机制同步更新（`check_record_layout.py` / `check_stats_merge.py`）。

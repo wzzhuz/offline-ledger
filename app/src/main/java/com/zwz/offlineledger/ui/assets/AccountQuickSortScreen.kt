@@ -101,7 +101,7 @@ fun AccountQuickSortScreen(onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F6FA))
+            .background(LedgerColors.SurfaceVariant)
     ) {
         Row(
             modifier = Modifier
@@ -204,7 +204,7 @@ private fun QuickSortRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .background(Color.White, RoundedCornerShape(12.dp))
+                .background(LedgerColors.Surface, RoundedCornerShape(12.dp))
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

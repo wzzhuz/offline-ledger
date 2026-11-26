@@ -65,8 +65,10 @@ def main():
         errors.append("缺 OtherDim 维度枚举")
     if "CardDefaults.cardElevation(defaultElevation = 0.dp)" not in stats:
         errors.append("StatsCard 未把 M3 tonalElevation 归零")
-    if "CardDefaults.cardColors(containerColor = Color.White)" not in stats:
-        errors.append("StatsCard 未显式纯白")
+    # 第 78 批：容器色改读 LedgerColors.Surface（深色下不再是纯白块），
+    # 断言只锁定「统一出口仍显式指定容器色」这一意图。
+    if "CardDefaults.cardColors(" not in stats:
+        errors.append("StatsCard 未显式指定容器色")
 
     # 3. 默认折叠 + 只读
     if "var expanded by rememberSaveable { mutableStateOf(false) }" not in stats:
@@ -75,7 +77,7 @@ def main():
         errors.append("收款方/账户卡未标注只读")
 
     # 4. 灰色长条（Q2A）+ 第 70 批环外指示线
-    for key in ("0xFFEDEFF5", "CategoryHeaderBlue.copy(alpha = 0.75f)", "fillMaxWidth(row.percent)"):
+    for key in ("LedgerColors.SurfaceVariant", "CategoryHeaderBlue.copy(alpha = 0.75f)", "fillMaxWidth(row.percent)"):
         if key not in donut:
             errors.append("DonutChart 缺灰条: " + key)
     if "heightIn(min = 44.dp)" not in donut:
@@ -174,7 +176,9 @@ def main():
                 "0xFFE2E4EB", "0xFF5B7CFA", "surfaceContainerLow = Color"):
         if key not in theme:
             errors.append("LedgerTheme 缺清新配色槽位: " + key)
-    for key in ("applyReverseColors", "ExpenseRed = GREEN", "IncomeGreen = RED"):
+    # 第 78 批：红绿基础色保留，深浅两套由 applySemantic + reversed 派生；
+    # 断言改为锁定新机制，不再钉死旧的两行赋值。
+    for key in ("applyReverseColors", "applySemantic", "reversed"):
         if key not in theme:
             errors.append("红绿语义 / 反转开关被改动: " + key)
     if "0xFFC62828" not in theme or "0xFF2E7D32" not in theme:

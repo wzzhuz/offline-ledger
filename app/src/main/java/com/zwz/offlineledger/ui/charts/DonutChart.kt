@@ -320,7 +320,7 @@ fun DonutChart(
                             .padding(top = 6.dp, start = 42.dp)
                             .height(5.dp)
                             .background(
-                                Color(0xFFEDEFF5),
+                                LedgerColors.SurfaceVariant,
                                 androidx.compose.foundation.shape.RoundedCornerShape(3.dp)
                             )
                     ) {

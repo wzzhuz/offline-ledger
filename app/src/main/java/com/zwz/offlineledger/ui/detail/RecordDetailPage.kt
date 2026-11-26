@@ -34,6 +34,7 @@ import com.zwz.offlineledger.ui.components.amountColor
 import com.zwz.offlineledger.ui.components.signedAmount
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import java.time.Instant
+import com.zwz.offlineledger.ui.theme.LedgerType
 
 /**
  * 第 45 批：点击记录直接进只读详情页。
@@ -88,7 +89,7 @@ fun RecordDetailPage(
             ) {
                 Text(
                     text = signedAmount(type, row.amountCents) + " 元",
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = LedgerType.AmountDisplay,
                     color = amountColor(type)
                 )
                 // 第 67 批：附加金额三行只读展示；原价由 amount + discount 推导，

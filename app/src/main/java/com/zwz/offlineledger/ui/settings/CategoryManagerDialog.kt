@@ -346,7 +346,7 @@ private fun CategoryBottomBar(
             modifier = Modifier
                 .weight(1f)
                 .heightIn(min = 48.dp)
-                .background(Color(0xFFF2F3F7), RoundedCornerShape(24.dp))
+                .background(LedgerColors.SurfaceVariant, RoundedCornerShape(24.dp))
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)

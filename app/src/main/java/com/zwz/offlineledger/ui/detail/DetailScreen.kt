@@ -84,6 +84,7 @@ import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.theme.LedgerColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.zwz.offlineledger.ui.theme.LedgerType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -684,7 +685,7 @@ private fun RecordRowCard(row: RecordRow, onClick: () -> Unit) {
             Text(
                 text = signedAmount(type, row.amountCents),
                 color = amountColor(type),
-                style = MaterialTheme.typography.titleSmall,
+                style = LedgerType.AmountRow,
                 textAlign = TextAlign.End,
                 maxLines = 1
             )

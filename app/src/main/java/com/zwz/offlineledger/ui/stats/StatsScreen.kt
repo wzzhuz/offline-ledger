@@ -56,6 +56,8 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import com.zwz.offlineledger.ui.components.CategoryHeaderBlue
+import com.zwz.offlineledger.ui.theme.LedgerShapes
+import com.zwz.offlineledger.ui.theme.LedgerType
 
 /** 第 69 批：收款方 / 账户折叠卡的两个维度；分类已独占占比卡。 */
 private enum class OtherDim { COUNTERPARTY, ACCOUNT }
@@ -241,7 +243,7 @@ private fun InsightSummaryCard(state: StatsUiState, onAverage: () -> Unit) {
             )
             Text(
                 text = formatCents(state.totalExpenseCents) + " 元",
-                style = MaterialTheme.typography.headlineLarge,
+                style = LedgerType.AmountDisplay,
                 color = LedgerColors.ExpenseRed
             )
             Text(
@@ -256,13 +258,13 @@ private fun InsightSummaryCard(state: StatsUiState, onAverage: () -> Unit) {
                 Text(
                     text = "收入 " + formatCents(state.totalIncomeCents),
                     color = LedgerColors.IncomeGreen,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = LedgerType.AmountRow
                 )
                 val balance = state.totalIncomeCents - state.totalExpenseCents
                 Text(
                     text = "结余 " + formatCents(balance),
                     color = if (balance < 0) LedgerColors.ExpenseRed else LedgerColors.IncomeGreen,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = LedgerType.AmountRow
                 )
             }
             // 第 68 批：一羽式支出红进度条，纯显示换算，MUST NOT 回写金额。
@@ -530,7 +532,7 @@ private fun OtherRankRow(row: InsightData.RankRow, ratio: Float) {
                 .padding(top = 6.dp, start = 40.dp)
                 .height(5.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(Color(0xFFEDEFF5))
+                .background(LedgerColors.SurfaceVariant)
         ) {
             Box(
                 modifier = Modifier
@@ -960,16 +962,17 @@ private fun ChartZoomButton(
  * 第 70 批：统计页卡片统一出口。
  *
  * M3 `Card` 默认带 1.dp tonalElevation，会把纯白容器染成淡蓝灰，
- * 这正是「灰不拉几、边界糊」的根因。显式 `containerColor = Color.White`
- * + `defaultElevation = 0.dp` 后，白卡与中性灰页面底形成清晰边界；
+ * 这正是「灰不拉几、边界糊」的根因。显式容器色（第 78 批改读
+ * `LedgerColors.Surface`，浅色纯白 / 深色 #1E2025）+ `defaultElevation = 0.dp`
+ * 后，卡片与页面底形成清晰边界；
  * 不新增阴影 / 描边（基线禁用卡片堆叠与阴影）。
  */
 @Composable
 private fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        shape = LedgerShapes.Card,
+        colors = CardDefaults.cardColors(containerColor = LedgerColors.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         content = content
     )

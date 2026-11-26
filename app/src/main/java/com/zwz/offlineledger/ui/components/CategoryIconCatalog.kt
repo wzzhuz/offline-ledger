@@ -28,8 +28,10 @@ import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.engine.CategoryManagementRules
 import com.zwz.offlineledger.ui.theme.LedgerColors
 
-/** 分类管理三页的蓝底顶栏 / 主按钮共用色，避免三处各写一个蓝。 */
-val CategoryHeaderBlue: Color = Color(0xFF5B7CFA)
+/** 分类管理三页的蓝底顶栏 / 主按钮共用色。
+ * 第 78 批：改为读取可观察主色，动态色 / 深浅切换下不再与 colorScheme.primary 两套蓝。
+ */
+val CategoryHeaderBlue: Color get() = LedgerColors.Primary
 
 /**
  * 第 55 批：分类管理三页图标的**唯一出口**（Tabler Icons outline / MIT）。
