@@ -30,9 +30,14 @@ def main():
     base=set()
     for f in BASE.rglob("spec.md"):
         for m in re.finditer(r"^### Requirement: (.+)$",f.read_text(),re.M):base.add(m.group(1).strip())
+    archived = CH == _ARCHIVED
     for r in rs:
-        if r["s"]=="ADDED" and r["t"] in base:e.append("ADDED 冲突: "+r["t"])
-        if r["s"]=="MODIFIED" and r["t"] not in base:e.append("MODIFIED 未命中基线: "+r["t"])
+        if archived:
+            # 归档后：delta 的每一条（含 ADDED）都必须已合并进 specs。
+            if r["t"] not in base:e.append("归档后 delta 未合并: "+r["t"])
+        else:
+            if r["s"]=="ADDED" and r["t"] in base:e.append("ADDED 冲突: "+r["t"])
+            if r["s"]=="MODIFIED" and r["t"] not in base:e.append("MODIFIED 未命中基线: "+r["t"])
         if r["sc"]<1 or not r["rfc"]:e.append("缺 Scenario/RFC2119: "+r["t"])
     if len(rs)!=12:e.append("应为 12 条 Requirement，实际 %d"%len(rs))
 

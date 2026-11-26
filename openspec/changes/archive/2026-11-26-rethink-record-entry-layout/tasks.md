@@ -49,8 +49,15 @@
 
 ## 第 80 批实测（归档时回填）
 
+- 实现 commit `47c2df67`；push CI `45789627485` 全绿、出包 CI `45789650969` 全绿
+- Release `v0.2.59`：`offline-ledger-v0.2.59-release-47c2df67.apk` /
+  3,512,600 B / SHA256 `c98e30143a90e193541aaac607eaa9349d0d9afd0ef347ab6d663b56e38a4f7e`
 - 归档目录 `openspec/changes/archive/2026-11-26-rethink-record-entry-layout/`
 - 两批共用一份 delta：reporting-ui `7 MODIFIED + 4 ADDED`、
-  privacy-security `1 ADDED`，合计 12 条 Requirement
+  privacy-security `1 ADDED`，合计 12 条 Requirement；
+  归档后逐块比对 delta 与主 spec 正文**全部一致**
 - 既有 Requirement 标题一律不改（归档匹配基准），正文为最终形态
+- 归档态 12 个静态检查全 PASS；`check_record_layout.py` 的 `CH` 回退到
+  archive 路径，并把「ADDED 不得在 base」翻成「归档后 delta 必须已合并」
+- 零改表 → v0.2.58 直接覆盖安装；CI 全绿不替代真机观感验收
 - 真机待验项全部保持 `[ ]`，见活文档 §7.63

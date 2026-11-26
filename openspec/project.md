@@ -1476,3 +1476,10 @@ sheet 改两列网格 + 余额 + 搜索；模板改一羽式底部 sheet，点�
 ADDED 调整为「键盘上方芯片直达」「联想条与输入框同屏」「动态色」「edge-to-edge」，
 并与 privacy-security ADDED 一起合并回 `openspec/specs/`。
 归档目录 `openspec/changes/archive/2026-11-26-rethink-record-entry-layout/`。
+
+**归档与合并实测**：实现 commit `47c2df67`（push CI `45789627485` / 出包 CI
+`45789650969` 双全绿，Release `v0.2.59`）；随后按 `AGENTS.md` §5 把 delta 合并回
+`openspec/specs/reporting-ui/spec.md`（7 MODIFIED + 4 ADDED）与
+`openspec/specs/privacy-security/spec.md`（1 ADDED），change 移入 archive，
+12 个静态检查全 PASS，逐块比对正文一致。试验分支 `feature/record-entry-chip-bar`
+相对 `main` 零落后，按 fast-forward 合并，不产生 merge commit。
