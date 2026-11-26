@@ -1529,7 +1529,8 @@ MUST NOT 因统计页放行彩色图标而改变。
 
 ### Requirement: 资产页蓝底身份区与分组头部强化
 
-资产页 SHALL 以蓝底顶部身份区承载页面标题、账户数与「含已归档」/「+ 新增」入口，
+**第 79 批归档修订**：本条标题沿用历史名称以便 MODIFIED 匹配，实际形态已改为中性卡片。
+资产页 SHALL 以中性卡片顶部身份区承载页面标题、账户数与「含已归档」/「+ 新增」入口，
 并在身份区内**按 `currencyCode` 逐组**展示资产 / 负债 / 净资产。
 MUST NOT 把 `state.groups` 汇总成一个跨币种的单一「净资产」总数，
 MUST NOT 因借鉴一羽记账截图而违反基线「资产页按币种分组且移除单一净资产总数」。
@@ -1541,7 +1542,7 @@ MUST NOT 显示按 `AccountType` 聚合的跨币种金额。
 #### Scenario: 两币种账户不出现虚假总数
 
 - **GIVEN** 一个 HKD 账户与一个 CNY 账户
-- **WHEN** 打开资产页查看蓝底身份区
+- **WHEN** 打开资产页查看顶部身份区
 - **THEN** 出现 HKD / CNY 两组各自的资产 / 负债 / 净资产
 - **AND** 页面不出现把两币种加在一起的单一净资产数额
 
@@ -1587,7 +1588,7 @@ MUST NOT 再显示三道横线「≡」小手柄；`rememberKeyedReorder`、
 ### Requirement: 新建账户页采用近全屏紧凑表单
 
 新增账户 SHALL 由 `AlertDialog` 小弹窗改为近全屏 `Dialog`
-（`usePlatformDefaultWidth = false`）：蓝底 TopBar「← 添加资产账户 / 保存」、
+（`usePlatformDefaultWidth = false`）：中性卡片 TopBar「← 添加资产账户 / 保存」、
 分组小竖条、「图标 + 账户名称」紧凑白底小卡、底部大保存按钮。
 表单字段与顺序 SHALL 保持不变（账户名称 / 卡号后四位 / 账户类型 /
 期初余额 / 信用额度），`onConfirm` 签名与 `AssetsViewModel.addAccount` SHALL 零改动；
@@ -1613,9 +1614,9 @@ MUST NOT 新增 Navigation 路由或改变 4 Tab 结构。
 
 ### Requirement: 资产页逐币种净资产标签与负债红字负数
 
-资产页蓝底身份区 SHALL 按 `currencyCode` **逐组**渲染，
+资产页中性卡片顶部身份区 SHALL 按 `currencyCode` **逐组**渲染，
 每组 SHALL 把原「X 小计」标为「**净资产**」，
-SHALL 以常规色显示「资产 +X」、以**红色系高对比浅红**（蓝底取 `0xFFFFCDD2`，与 `ExpenseRed` 同系）显示「负债 -X」
+SHALL 以常规色显示「资产 +X」、以语义 `LedgerColors.ExpenseRed`（深色下自动为柔和珊瑚红 `0xFFF0A6A0`）显示「负债 -X」
 （负号为纯展示文本，`CurrencyGroup.liabilitiesCents` 仍为绝对值、
 MUST NOT 参与任何运算）。
 账户行负余额 SHALL 继续以红字负数显示，MUST NOT 被本批改掉。
@@ -1625,7 +1626,7 @@ MUST NOT 违反基线「资产页按币种分组且移除单一净资产总数�
 #### Scenario: 两币种各自净资产
 
 - **GIVEN** 一个 HKD 账户与一个 CNY 账户，其中 CNY 有一笔信用负债欠款
-- **WHEN** 打开资产页查看蓝底区
+- **WHEN** 打开资产页查看顶部身份区
 - **THEN** 出现 HKD / CNY 两组各自的「净资产」，CNY 组负债为红字负号
 - **AND** 页面不出现把两币种加在一起的单一净资产数额
 
@@ -1687,7 +1688,7 @@ MUST NOT 再取 `sortOrder` 的全局前 4。
 ### Requirement: 全部账户排序独立页
 
 系统 SHALL 提供独立「全部账户排序」页（NavHost 路由 `account-quick-sort`），
-入口 SHALL 在资产页蓝底身份区固定可见，MUST NOT 新增第 5 个底部 Tab。
+入口 SHALL 在资产页中性卡片顶部身份区固定可见，MUST NOT 新增第 5 个底部 Tab。
 该页 SHALL 以单一 `LazyColumn` 展示**全部未归档账户、不分类型**，
 SHALL 复用 `sh.calvin.reorderable:reorderable:3.1.0` 与
 `rememberKeyedReorder`，MUST NOT 自写 `Modifier.pointerInput`；
@@ -1807,12 +1808,15 @@ MUST NOT 再用 `firstOrNull { it.name == ... }` 静默命中同名第一张卡�
 或近白 `0xFFFAFAFC`，`surfaceVariant` SHALL 为 `0xFFE9EBF1`，
 `onSurface` SHALL 为柔和深灰蓝 `0xFF1F2430`，
 `outlineVariant` SHALL 为 `0xFFE2E4EB`，
-`primary` SHALL 为清新蓝 `0xFF5B7CFA` 且与 `CategoryHeaderBlue` 同系。
-`LedgerColors.Primary` SHALL 同步为该值以保持单一真相源。
+`primary` SHALL 为清新蓝 `0xFF5B7CFA`。
+**第 79 批归档修订**：API 31+ 动态浅色 SHALL 由 `dynamicWithNeutralSurface()`
+只借用动态强调色，上述中性槽位 MUST 套回本静态板的值，
+MUST NOT 让 `scheme.background` 与卡片容器同色。
+`CategoryHeaderBlue` SHALL 读 `LedgerColors.Primary` 以保持单一真相源。
 统计页每张卡片 SHALL 走统一 `StatsCard` 出口：
-显式 `CardDefaults.cardColors(containerColor = Color.White)` +
-`CardDefaults.cardElevation(defaultElevation = 0.dp)` +
-`RoundedCornerShape(16.dp)`。
+显式 `CardDefaults.cardColors(containerColor = LedgerColors.CardSurface)` +
+`CardDefaults.cardElevation(defaultElevation = 0.dp)` + `LedgerShapes.Card`（16.dp）。
+卡片间距 SHALL 为 `LedgerSpacing.CardGap = 16.dp`，MUST NOT 收到 12dp。
 **M3 `Card` 默认 1.dp tonalElevation 会把纯白染成淡蓝灰，
 这是「主体不突出、卡片边界糊」的根因，MUST 显式归零。**
 SHALL 靠「中性灰底 + 纯白卡 + 卡片间距 + 圆角」形成清晰边界，
@@ -1829,6 +1833,13 @@ MUST NOT 新增阴影、MUST NOT 新增描边、MUST NOT 用卡片堆叠
 - **WHEN** 打开统计页
 - **THEN** 页面底为中性浅灰、每张卡片为纯白圆角块，卡片之间间隙与边界清晰可辨
 - **AND** 不再出现 M3 默认 tonalElevation 染出的淡蓝灰卡面
+
+#### Scenario: 动态浅色下卡片边界不糊
+
+- **GIVEN** API 31+ 设备启用系统动态色
+- **WHEN** 打开统计页
+- **THEN** 卡片容器读固定的 `LedgerColors.CardSurface`，与页面中性灰底边界清晰
+- **AND** MUST NOT 出现第 78 批「卡片与底同色」的回归
 
 #### Scenario: 红绿语义不变
 
@@ -1872,3 +1883,101 @@ MUST NOT 混进分类占比卡。
 
 - **WHEN** 点展开列表里的任意一行
 - **THEN** 不切换 Tab、不写入明细筛选，页面保持统计页
+
+---
+
+### Requirement: 全局主题支持深浅模式且语义色全程可读
+
+系统 SHALL 在 `LedgerTheme` 提供 `darkTheme` 参数，默认 SHALL 为 `isSystemInDarkTheme()`。
+深色 SHALL 走本项目静态 `darkColorScheme`（背景 `0xFF121417`、卡片 `0xFF1E2025`），
+MUST NOT 走系统动态深色、MUST NOT 使用纯黑或纯白。
+浅色动态色 SHALL 由 `dynamicWithNeutralSurface()` 只借用 primary / secondary /
+tertiary 及其容器色，中性槽位（background / surface / surfaceVariant /
+surfaceContainer* / outlineVariant）MUST 套回第 70 批静态值，
+MUST NOT 让页面底与卡片容器同色（这是「卡片边界糊」的根因）。
+`LedgerColors` SHALL 以可观察状态持有 ExpenseRed / IncomeGreen / Neutral / Primary /
+OnPrimary / Background / CardSurface / OnSurface / SurfaceVariant / OutlineVariant，
+由 `LedgerTheme` 在一次 `SideEffect` 里同步；MUST NOT 用 CompositionLocal 重写
+237 处引用（Canvas draw scope 与普通函数在非 Composable 上下文 SHALL 仍能读到）。
+深色下 ExpenseRed / IncomeGreen SHALL 换成同语义的柔和珊瑚红 `0xFFF0A6A0` /
+柔和绿 `0xFF9CCFA6`，`applyReverseColors` 反转开关在深浅切换后 MUST 仍生效。
+MUST NOT 改动红绿语义、MUST NOT 引入新依赖或新权限。
+
+#### Scenario: 系统切到深色
+
+- **GIVEN** 使用者在系统设置切到深色
+- **WHEN** 冷启动 App 并逐页查看明细 / 资产 / 统计 / 设置
+- **THEN** 页面底为深灰蓝、卡片为略亮深灰蓝、文字为浅色，无残留纯白块
+- **AND** 红绿金额仍可辨，配色反转开关状态不丢失
+
+#### Scenario: 动态浅色下卡片边界
+
+- **GIVEN** API 31+ 设备启用系统动态色且壁纸色调明显
+- **WHEN** 打开统计页
+- **THEN** 页面底仍是中性微灰、卡片仍是纯白，二者边界清晰可辨
+- **AND** 强调色随壁纸变化，中性底不随壁纸漂
+
+**理由**：第 78 批把卡片容器改成读 `scheme.surface` 后，与 `Scaffold` 的
+`scheme.background` 在动态浅色下同色，真机反馈「分界不明显」。第 79 批拆开
+「页面底 / 卡片面 / 次级底」三种语义后恢复，理由写入此处以免再次合并。
+
+---
+
+### Requirement: 金额文本统一等宽数字与四级排版
+
+所有面向使用者的金额文本 SHALL 经 `LedgerType` 的金额样式渲染，
+MUST 开启 `fontFeatureSettings = "tnum"` 等宽数字特性：
+`AmountDisplay`（32sp Bold）SHALL 用于大额总览（统计页总支出、交易详情主金额），
+`AmountRow`（16sp SemiBold）SHALL 用于单笔金额（明细行、收入 / 结余行），
+`Title`（15sp Medium）与 `Caption`（12sp Normal）SHALL 分别为主标题与次要备注层级。
+金额列表 SHALL 保持右对齐，MUST NOT 因 `+` / `-` / 小数点 / 千分位字形宽度跳动。
+MUST NOT 逐个 `TextStyle` 散写字号，MUST NOT 改动既有固定列宽与网格结构。
+
+#### Scenario: 明细列表金额对齐
+
+- **GIVEN** 明细页连续多笔金额位数与正负号不同
+- **WHEN** 上下滚动查看金额列
+- **THEN** 各金额右对齐、小数点与末位对齐，不随字形宽度左右跳动
+
+#### Scenario: 字体不支持 tnum 时
+
+- **GIVEN** 设备字体未提供 OpenType `tnum` 特性
+- **WHEN** 渲染金额文本
+- **THEN** 页面不崩溃、金额完整可读，该项 MUST 列入真机待验而非写成「必然生效」
+
+**理由**：金额对齐是记账 App 的高频可读性需求；`tnum` 依赖字体特性，
+故只保证样式出口统一，不承诺所有 OEM 字体必然生效。
+
+---
+
+### Requirement: 视觉设计 token 与表面色语义分离
+
+系统 SHALL 提供 `ui/theme/LedgerDesignTokens.kt` 作为视觉常量单一真相源：
+`LedgerShapes.Card`（16.dp 圆角）、`LedgerShapes.Icon`（12.dp）、
+`LedgerSpacing.CardGap`（16.dp）、`LedgerSpacing.CardPadding`（16.dp）、
+`LedgerType`（金额四级排版）。
+表面色 SHALL 拆成三个独立语义出口，MUST NOT 再用一个 `Surface` 包打天下：
+`Background`（页面 / 全屏底）、`CardSurface`（卡片 / 顶栏 / 弹层，浅色纯白 /
+深色 `0xFF1E2025`，刻意固定不随动态色漂）、`OnSurface`（卡片上的文字图标）。
+顶栏与资产页身份区 SHALL 用中性卡片承载，MUST NOT 使用整块高饱和蓝底；
+主色 SHALL 只作小面积点缀（分组小竖条、进度条填充、FAB、选中态 12% 透明底、
+切换图标、选中文字），MUST NOT 因中性化把主色整体删除。
+统计页卡片 SHALL 走统一 `StatsCard` 出口，`CardGap` SHALL 为 16.dp，
+MUST NOT 为降噪把间距收到 12dp 以下导致边界糊。
+
+#### Scenario: 顶栏风格一致
+
+- **GIVEN** 依次打开资产页、新建账户页、全部账户排序页、分类管理 / 选择 / 排序页
+- **WHEN** 查看各页顶部区域
+- **THEN** 均为中性卡片 + `OnSurface` 文字，无突兀整块蓝底
+- **AND** 主色仍出现在分组小竖条 / 进度条 / FAB 等小面积位置
+
+#### Scenario: 卡片间距回归
+
+- **GIVEN** 统计页有小结卡、趋势卡、分类占比卡等多张卡
+- **WHEN** 滚动浏览
+- **THEN** 卡片之间 16dp 间隙，边界清晰，MUST NOT 回到 12dp 的糊边界
+
+**理由**：第 78 批把固定 `Color.White` 换成 `scheme.surface`、把间距收到 12dp，
+两条真机反馈（分界糊、蓝底突兀）都由「语义合并 + 数值收紧」引入。
+拆开语义与回到已验证数值，比继续调色更可靠。

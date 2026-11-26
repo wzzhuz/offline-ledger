@@ -1416,7 +1416,9 @@ SHA256 `58f5cf237e806adcaf15b060c0eb2c1f48fcd20e29b58f900873fbace455ec83`。
 
 **明确不做**：删分割线、明细与记一笔卡片化、彩色图标扩范围、`Icons.Rounded`、
 CompositionLocal 替换语义色、缩放动画。零改表、零新增依赖、零 permission 变化。
-既有 `reporting-ui` Requirement 一字未动，故本批不 MODIFIED 主 spec。
+既有 Requirement 的行为语义（分割线 / 纯行网格 / 4 Tab / 彩色图标范围 / 零改表）未删改；
+归档时按 `AGENTS.md` §5 对 7 条被行为改动影响的 Requirement 做 MODIFIED、新增 3 条 ADDED，
+见 `openspec/changes/archive/2026-11-26-add-visual-theme-tokens/`。
 静态脚本断言随版本与主题机制同步更新（`check_record_layout.py` / `check_stats_merge.py`）。
 
 ### 第 79 批（v0.2.58）：v0.2.57 真机反馈修复
@@ -1429,5 +1431,24 @@ CompositionLocal 替换语义色、缩放动画。零改表、零新增依赖、
 主色只保留小面积点缀（小竖条 / 进度条 / FAB / 选中态 12% 底）。
 
 **范围不变**：分割线、纯行网格、4 Tab、彩色图标范围、记一笔首屏、零改表、
-零新增依赖、零 permission 变化；`reporting-ui` 既有 Requirement 一字未动。
-仍为试验分支，待真机验证后再决定是否折叠进主 spec 与合并 main。
+零新增依赖、零 permission 变化；既有 Requirement 的行为语义未删改，
+归档时按流程做 MODIFIED / ADDED（见 §7.62 归档记录）。
+真机反馈两条已修复并交付复验，change 已归档、试验分支已 fast-forward 合并进 main。
+
+### 第 78 / 79 批归档（2026-11-26）
+
+真机反馈修复后按 `my-app-workflow` 流程归档 change `add-visual-theme-tokens`：
+delta 合并回 `openspec/specs/reporting-ui/spec.md`（ADDED 3 / MODIFIED 5）与
+`openspec/specs/category-stats/spec.md`（MODIFIED 2），change 文件夹移入
+`openspec/changes/archive/2026-11-26-add-visual-theme-tokens/`。
+四件套含 `proposal.md`（五项对齐结论）/ `design.md`（考虑过的其他方案）/
+`tasks.md`（如实标注「实施中途补写，属流程违规」）/ 两份 delta spec。
+
+**流程合规**：第 78 / 79 批当时按「直接改，别走流程」执行，属
+`my-app-workflow/踩坑清单.md` §4.1「跳流程」；归档时补齐四件套与 delta，
+未粉饰为按部就班。归档前修正了 `project.md` 与活文档里
+「既有 Requirement 一字未动 / 不 MODIFIED 主 spec」的过期表述，避免规格腐化（§4.3）。
+
+**合并**：试验分支 `feature/visual-tokens-and-dark-theme` 相对 `main`
+`ahead_by 2 / behind_by 0`，按 fast-forward 合并，`main` 不产生额外 merge commit。
+tag `v0.2.57` / `v0.2.58` 均落在合并后的 main 历史上。
