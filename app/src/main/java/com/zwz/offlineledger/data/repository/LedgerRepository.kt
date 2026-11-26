@@ -414,12 +414,13 @@ class LedgerRepository @Inject constructor(
         initialBalanceCents: Long,
         currencyCode: String,
         cardLast4: String?,
-        cardKind: String?
+        cardKind: String?,
+        iconRef: String? = null
     ) = db.withTransaction {
         require(name.isNotBlank()) { "账户名不能为空" }
         accountDao.updateAccountMeta(
             id, name, includeInTotal, creditLimitCents, sortOrder,
-            initialBalanceCents, currencyCode, cardLast4, cardKind
+            initialBalanceCents, currencyCode, cardLast4, cardKind, iconRef
         )
         rebuildAllBalancesInternal()
     }

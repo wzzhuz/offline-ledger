@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.ui.assets
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -46,9 +49,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -238,10 +243,10 @@ fun AssetsScreen(refreshTick: Int = 0, onOpenQuickSort: () -> Unit = {}) {
         EditAccountDialog(
             account = account,
             onDismiss = { editAccount = null },
-            onConfirm = { name, type, initial, limit, cc, include, last4, cardKind ->
+            onConfirm = { name, type, initial, limit, cc, include, last4, cardKind, iconRef ->
                 scope.launch {
                     val err = vm.editAccount(
-                        account, name, type, initial, limit, cc, include, last4, cardKind
+                        account, name, type, initial, limit, cc, include, last4, cardKind, iconRef
                     )
                     if (err == null) { editAccount = null; editError = null } else editError = err
                 }
@@ -484,6 +489,7 @@ private fun AccountCard(
                 name = account.name,
                 cardKind = account.cardKind,
                 iconKey = AccountIconCatalog.iconKeyFor(account.name),
+                iconRef = account.iconRef,
                 size = 36
             )
             Spacer(Modifier.width(10.dp))
@@ -774,7 +780,7 @@ private fun AddAccountDialog(
 private fun EditAccountDialog(
     account: AccountEntity,
     onDismiss: () -> Unit,
-    onConfirm: (String, AccountType, String, String, String, Boolean, String, String?) -> Unit,
+    onConfirm: (String, AccountType, String, String, String, Boolean, String, String?, String?) -> Unit,
     errorText: String?
 ) {
     // 第 60 批 Q3A：旧库 name 可能已含 " (1122)"，初始化时剥掉，
@@ -794,6 +800,19 @@ private fun EditAccountDialog(
     var currency by remember { mutableStateOf(account.currencyCode) }
     var include by remember { mutableStateOf(account.includeInTotal) }
     var expanded by remember { mutableStateOf(false) }
+    // 第 82 批：账户图标关联（预制 / 本机导入 / 自动），随「保存」一次落库。
+    var iconRef by remember { mutableStateOf(account.iconRef) }
+    var showPreset by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        AccountCustomIcons.import(context, uri)
+            .onSuccess { iconRef = it; importError = null; showPreset = false }
+            .onFailure { importError = it.message ?: "导入失败" }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -869,6 +888,87 @@ private fun EditAccountDialog(
                         checked = include, onCheckedChange = { include = it }
                     )
                 }
+                ListDivider()
+                Text(
+                    "账户图标",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AccountIconBox(
+                        name = name,
+                        cardKind = cardKind,
+                        iconKey = AccountIconCatalog.iconKeyFor(name),
+                        iconRef = iconRef,
+                        size = 40
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = { showPreset = !showPreset }) { Text("预置") }
+                    TextButton(onClick = { importLauncher.launch(arrayOf("image/png")) }) {
+                        Text("导入 PNG")
+                    }
+                    TextButton(onClick = {
+                        iconRef = null; showPreset = false; importError = null
+                    }) { Text("自动") }
+                }
+                if (showPreset) {
+                    val keys = remember {
+                        AccountTemplates.ALL.mapNotNull { it.iconKey }.distinct()
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 180.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        keys.chunked(5).forEach { row ->
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                row.forEach { k ->
+                                    val res = AccountIconCatalog.drawableFor(k)
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .heightIn(min = 44.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(
+                                                if (iconRef == "preset:$k")
+                                                    LedgerColors.Primary.copy(alpha = 0.12f)
+                                                else Color.Transparent
+                                            )
+                                            .clickable {
+                                                iconRef = "preset:$k"
+                                                showPreset = false
+                                                importError = null
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (res != null) {
+                                            Icon(
+                                                painter = painterResource(res),
+                                                contentDescription = null,
+                                                tint = Color.Unspecified,
+                                                modifier = Modifier.size(30.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                repeat(5 - row.size) { Spacer(Modifier.weight(1f)) }
+                            }
+                        }
+                    }
+                }
+                importError?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LedgerColors.ExpenseRed
+                    )
+                }
+                Text(
+                    "导入的图标仅保存在本机，不上传、不进备份；请使用透明底 PNG。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral
+                )
                 Text(
                     text = "改期初余额或类型会按流水重新计算余额；改币种只改标签。",
                     style = MaterialTheme.typography.labelSmall,
@@ -879,7 +979,7 @@ private fun EditAccountDialog(
         },
         confirmButton = {
             Button(onClick = {
-                onConfirm(name, type, initial, limit, currency, include, last4, cardKind)
+                onConfirm(name, type, initial, limit, currency, include, last4, cardKind, iconRef)
             }) {
                 Text("保存")
             }

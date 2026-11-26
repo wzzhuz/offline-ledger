@@ -212,6 +212,7 @@ private fun QuickSortRow(
                 name = account.name,
                 cardKind = account.cardKind,
                 iconKey = AccountIconCatalog.iconKeyFor(account.name),
+            iconRef = account.iconRef,
                 size = 36
             )
             Spacer(Modifier.width(10.dp))

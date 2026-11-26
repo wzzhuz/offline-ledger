@@ -150,6 +150,7 @@ private fun TemplateTile(
             name = template.label,
             cardKind = template.cardKind,
             iconKey = template.iconKey,
+            iconRef = template.iconKey?.let { "preset:$it" },
             size = 32
         )
         Spacer(Modifier.width(8.dp))

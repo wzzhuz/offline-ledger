@@ -82,7 +82,7 @@ def main():
     if "IN (:tag" in dao: errs.append("标签筛选 MUST NOT 改成 IN 集合")
 
     db = read("app/src/main/java/com/zwz/offlineledger/data/local/AppDatabase.kt")
-    if "version = 8," not in db: errs.append("零改表口径被破坏（version 必须仍为 8）")
+    if "version = 9," not in db: errs.append("第 82 批 accounts.iconRef 升表口径被破坏（version 必须为 9）")
     test = ROOT / "app/src/test/java/com/zwz/offlineledger/data/FilterChipClearTest.kt"
     if not test.is_file(): errs.append("缺 clearField 纯 JVM 单测")
     gradle = read("app/build.gradle.kts")
@@ -97,7 +97,7 @@ def main():
     if errs:
         for e in errs: print("  FAIL", e)
         print("check_filter_chips: %d 项失败" % len(errs)); return 1
-    print("check_filter_chips: PASS (4 条 delta / 轻量标记 / 标签选择器 / 统一 chips / 零改表 / 文档齐备)")
+    print("check_filter_chips: PASS (4 条 delta / 轻量标记 / 标签选择器 / 统一 chips / 升表 9 / 文档齐备)")
     return 0
 
 if __name__ == "__main__": sys.exit(main())

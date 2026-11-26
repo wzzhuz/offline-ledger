@@ -187,10 +187,10 @@ def main():
     # 9. 零回归
     if "ChartData.netSlices" not in vm or "SUM(amountCents)" not in dao:
         errors.append("统计口径或既有聚合 SQL 被改动")
-    # 第 69-74 批零改表锁 7；第 75 批升 8 为预期，不再硬编码单一值。
+    # 第 69-74 批零改表锁 7；第 75 批升 8；第 82 批 accounts.iconRef 升 9。
     m = re.search(r"version = (\d+)", db)
-    if not m or int(m.group(1)) not in (7, 8):
-        errors.append("AppDatabase.version 应为 7 或 8（第75批升表）")
+    if not m or int(m.group(1)) not in (7, 8, 9):
+        errors.append("AppDatabase.version 应为 7 / 8 / 9（第82批升表为 9）")
     if "emptyArray()" not in mig:
         errors.append("Migrations.ALL 不再为空")
     for key in ("import androidx.compose.foundation.layout.FlowRow",

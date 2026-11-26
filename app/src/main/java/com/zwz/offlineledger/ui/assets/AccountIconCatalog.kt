@@ -8,9 +8,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,8 +85,12 @@ object AccountIconCatalog {
 }
 
 /**
- * 账户图标位：有已登记资源则显示，否则回退中性圆 + 中文首字；
- * 卡种以 12dp 小角标叠在右下角，**不占名称宽度**（Q6A 要求）。
+ * 账户图标位（第 82 批扩 `iconRef`）：
+ * - `null` / `auto` → 沿用既有「按账户名反查 AccountTemplates」自动推断（旧数据零回归）
+ * - `preset:<iconKey>` → 显式关联某个预制品牌图标，改名也 MUST NOT 丢
+ * - `custom:<uuid>` → 使用者本机导入的 PNG，与预制同为 128×128 白圆底位图
+ * 三者都走同一尺寸 / 同一容器 / 同一角标，MUST NOT 出现拼盘感。
+ * 卡种角标按图标尺寸等比放大（§7.65 真机反馈「储/信太小」）。
  */
 @Composable
 fun AccountIconBox(
@@ -92,21 +98,39 @@ fun AccountIconBox(
     cardKind: String?,
     iconKey: String?,
     size: Int = 40,
+    iconRef: String? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val customRef = iconRef?.takeIf { it.startsWith("custom:") }
+    val bitmap = remember(customRef) {
+        customRef?.let { AccountCustomIcons.load(context, it) }
+    }
+    val effectiveKey = when {
+        iconRef == null || iconRef == "auto" -> iconKey
+        iconRef.startsWith("preset:") -> iconRef.removePrefix("preset:")
+        iconRef.startsWith("custom:") -> null
+        else -> iconKey
+    }
+    val badgeSize = (size * 0.4f).toInt().coerceAtLeast(12)
     Box(modifier = modifier.size(size.dp), contentAlignment = Alignment.Center) {
-        val res = AccountIconCatalog.drawableFor(iconKey)
-        if (res != null) {
-            Icon(
+        val res = AccountIconCatalog.drawableFor(effectiveKey)
+        when {
+            bitmap != null -> Icon(
+                bitmap = bitmap,
+                contentDescription = null,
+                tint = Color.Unspecified,
+                modifier = Modifier.size((size - 6).dp)
+            )
+            res != null -> Icon(
                 painter = painterResource(res),
                 contentDescription = null,
                 tint = Color.Unspecified,
                 modifier = Modifier.size((size - 6).dp)
             )
-        } else {
-            CategoryIcon(name = name, colorHex = null, size = size)
+            else -> CategoryIcon(name = name, colorHex = null, size = size)
         }
-        AccountKindBadge(cardKind, Modifier.align(Alignment.BottomEnd))
+        AccountKindBadge(cardKind, Modifier.align(Alignment.BottomEnd), size = badgeSize)
     }
 }
 
@@ -136,11 +160,12 @@ fun AccountKindBadge(
                 .background(bg, CircleShape),
             contentAlignment = Alignment.Center
         ) {
+            val fs = (size * 0.5f).sp
             Text(
                 text = label,
                 color = fg,
-                fontSize = if (size <= 10) 6.sp else 7.sp,
-                lineHeight = if (size <= 10) 6.sp else 7.sp,
+                fontSize = fs,
+                lineHeight = fs,
                 maxLines = 1,
                 style = MaterialTheme.typography.labelSmall
             )

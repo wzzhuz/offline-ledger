@@ -47,12 +47,12 @@ interface AccountDao {
 
     /** 阶段 7：账户编辑支持期初余额与币种；调用方 MUST 在事务末尾重算。
      *  第 60 批：补 cardLast4 / cardKind，修掉「编辑账户改不了卡号信息」。 */
-    @Query("UPDATE accounts SET name = :name, includeInTotal = :includeInTotal, creditLimitCents = :creditLimitCents, sortOrder = :sortOrder, initialBalanceCents = :initialBalanceCents, currencyCode = :currencyCode, cardLast4 = :cardLast4, cardKind = :cardKind WHERE id = :id")
+    @Query("UPDATE accounts SET name = :name, includeInTotal = :includeInTotal, creditLimitCents = :creditLimitCents, sortOrder = :sortOrder, initialBalanceCents = :initialBalanceCents, currencyCode = :currencyCode, cardLast4 = :cardLast4, cardKind = :cardKind, iconRef = :iconRef WHERE id = :id")
     suspend fun updateAccountMeta(
         id: Long, name: String, includeInTotal: Boolean,
         creditLimitCents: Long?, sortOrder: Int,
         initialBalanceCents: Long, currencyCode: String,
-        cardLast4: String?, cardKind: String?
+        cardLast4: String?, cardKind: String?, iconRef: String?
     )
 
     /** 显式批量统一币种：只改标签，不改金额。 */

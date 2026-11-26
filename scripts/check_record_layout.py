@@ -85,8 +85,30 @@ def main():
         for m in re.finditer(r"^### Requirement: (.+)$", f.read_text(), re.M):
             if m.group(1).strip() not in base:
                 e.append("第 81 批 delta 未合并: "+m.group(1).strip())
-    if "listOf(\n            accountLabel to onAccount" not in rec:
-        e.append("收支态 5 枚 chips 的账户入口被误删")
+
+    # ---- 第 82 批：非等宽 chips / 账户图标接回 / 本机导入 / 升表 9 ----
+    for k in ["EntryChip(accountLabel, 2.2f", 'EntryChip("模板", 0.9f',
+              "weight(chip.weight)", "AccountIconBox(", "accountSecondaryLabel("]:
+        if k not in rec:e.append("第 82 批缺: "+k)
+    if "Cents(a.balanceCents)" in rec:e.append("账户选择面板仍显示余额（使用者明确不需要）")
+    if "AccountKindBadge(" in rec:e.append("账户 sheet 仍用 12dp 小角标而非 AccountIconBox")
+    ent=read("app/src/main/java/com/zwz/offlineledger/data/local/entity/AccountEntity.kt")
+    if 'ColumnInfo(name = "iconRef")' not in ent:e.append("accounts 未加 iconRef 列")
+    dao=read("app/src/main/java/com/zwz/offlineledger/data/local/dao/AccountDao.kt")
+    if "iconRef = :iconRef" not in dao:e.append("编辑账户未写回 iconRef")
+    cust=ROOT/"app/src/main/java/com/zwz/offlineledger/ui/assets/AccountCustomIcons.kt"
+    if not cust.is_file():e.append("缺 AccountCustomIcons 本机导入组件")
+    else:
+        c=cust.read_text()
+        for k in ["contentResolver","BitmapFactory","openInputStream","filesDir","透明底"]:
+            if k not in c:e.append("AccountCustomIcons 缺: "+k)
+        if "http://" in c or "https://" in c:e.append("导入组件不得出现网络地址")
+    cat=read("app/src/main/java/com/zwz/offlineledger/ui/assets/AccountIconCatalog.kt")
+    if "AccountCustomIcons.load" not in cat:e.append("AccountIconBox 未接自定义图标")
+    notice=read("app/src/main/assets/NOTICE")
+    if "本机导入图标" not in notice:e.append("NOTICE 未登记本机导入图标授权口径")
+    if "EntryChip(accountLabel, 2.2f" not in rec:
+        e.append("收支态账户 chip 未获最宽权重 / 入口被误删")
 
     tpl=read("app/src/main/java/com/zwz/offlineledger/ui/record/TemplateQuickPick.kt")
     if "TemplatePickerSheet(" not in tpl:e.append("模板未改成一羽式底部 sheet")
@@ -94,9 +116,9 @@ def main():
         e.append("模板 sheet 不得用实验 API 或居中 AlertDialog")
 
     db=read("app/src/main/java/com/zwz/offlineledger/data/local/AppDatabase.kt")
-    if "version = 8," not in db:e.append("零改表口径被破坏")
+    if "version = 9," not in db:e.append("第 82 批升表口径被破坏（version 必须为 9）")
     gd=read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.60"' not in gd:e.append("版本号未升 0.2.60")
+    if 'defaultVersionName = "0.2.61"' not in gd:e.append("版本号未升 0.2.61")
     wf=read(".github/workflows/build.yml")
     if "check_record_layout.py" not in wf:e.append("build.yml 未挂脚本")
     man=read("app/src/main/AndroidManifest.xml")
@@ -109,6 +131,6 @@ def main():
     if e:
         for x in e:print("  FAIL",x)
         print("check_record_layout: %d 项失败"%len(e));return 1
-    print("check_record_layout: PASS (10 delta / 分层 / 单按钮 / 无边框 / 动态色 / edge-to-edge / 零改表)")
+    print("check_record_layout: PASS (10 delta / 分层 / chips / 账户图标 / 本机导入 / 升表 9 / 动态色 / edge-to-edge)")
     return 0
 if __name__=="__main__":sys.exit(main())

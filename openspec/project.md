@@ -1511,3 +1511,32 @@ skipped，根因是本会话每次 `workflow_dispatch` 全量覆盖 inputs 时�
 `openspec/specs/reporting-ui/spec.md`（5 MODIFIED + 1 ADDED），逐块比对正文一致；
 12 个静态检查全 PASS。试验分支 `feature/transfer-account-cards` 相对 `main`
 零落后，按 fast-forward 合并，不产生 merge commit。
+
+### 第 82 批（v0.2.61）：chips 非等宽 / 账户图标接回 / 本机导入
+
+真机反馈三条后，使用者五项拍板：① chips 不等宽（模板 / 标签窄、账户宽，
+模板选中后文字不跟着变，标签只显示数量，窄项调顺序）；② 当前是测试数据、
+**直接卸载重装**（允许升表）；③ 分类自定义图标暂不考虑，后续直接更新版本
+追加 Tabler 预置；④ 导入按推荐（透明底 PNG → 单色剪影）；⑤ 不进备份。
+
+**改动**：`EntryChipBar` 改 `EntryChip(label, weight, hasValue, onClick)` 非等宽，
+收支态 账户→备注→优惠→标签→模板（2.2/1.7/1.3/0.9/0.9），转账 4 枚；
+模板 / 备注 / 优惠固定短标签，标签只显示「标签 / #N」，有值改右上角小圆点，
+完整值进 sheet。账户选择与转账两卡接回既有 `AccountIconBox`（44dp + 放大角标），
+**删掉余额行**，卡号与卡种降为次要小字。
+
+**升表**：`AccountEntity.iconRef` + `AppDatabase.version = 9`，
+`Migrations.ALL` 保持空数组（使用者明确卸载重装，覆盖安装会开库失败）。
+`iconRef` 支持 `null`/`auto` 按名推断、`preset:<key>`、`custom:<uuid>`；
+编辑账户时随保存一次写回。备份 DTO **不扩字段**（不进备份，恢复后回退自动图标）。
+
+**本机导入**：新增 `AccountCustomIcons`，复用既有 SAF + `contentResolver.openInputStream`，
+只收透明底 PNG；裁方 → 单色剪影 → 128×128 白圆底 + 56% 内缩 PNG，
+与第 64 批 26 个预置账户 PNG 同构，写进 `filesDir/account-icons/`。
+账户编辑页提供「预置 / 导入 PNG / 自动」三入口与 26 项预制网格。
+分类按第 3 项**不提供导入入口**，`CategoryIconCatalog` 与 90 个 Tabler 零改动。
+
+**范围**：零新增 Gradle 依赖、零 `INTERNET`、零运行时权限、零 Coil/Glide /
+SVG 解析库；4 Tab、分类快捷栏、联想条、聚合 SQL、CSV/Firefly 往返零改动。
+`assets/NOTICE` 新增 [D] 段区分「本机导入」与「随包分发」授权口径。
+6 个静态脚本的升表锁统一收到 9，12 个静态检查全 PASS。

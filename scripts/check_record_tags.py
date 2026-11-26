@@ -51,7 +51,7 @@ def main():
 
     # 3. 数据模型
     db = read("app/src/main/java/com/zwz/offlineledger/data/local/AppDatabase.kt")
-    for k in ["version = 8,", "TagEntity::class", "RecordTagCrossRef::class", "fun tagDao(): TagDao"]:
+    for k in ["version = 9,", "TagEntity::class", "RecordTagCrossRef::class", "fun tagDao(): TagDao"]:
         if k not in db: errs.append("AppDatabase 缺: " + k)
     for path, keys in [
         ("app/src/main/java/com/zwz/offlineledger/data/local/entity/TagEntity.kt",

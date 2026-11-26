@@ -120,7 +120,8 @@ class AssetsViewModel(
         currencyCode: String,
         includeInTotal: Boolean,
         cardLast4: String,
-        cardKind: String?
+        cardKind: String?,
+        iconRef: String? = null
     ): String? {
         if (name.isBlank()) return "账户名不能为空"
         val initialCents = try {
@@ -146,7 +147,8 @@ class AssetsViewModel(
                 cardLast4 = cardLast4.takeIf {
                     it.length == 4 && it.all { ch -> ch.isDigit() }
                 },
-                cardKind = cardKind
+                cardKind = cardKind,
+                iconRef = iconRef
             )
             if (type != account.type) repository.updateAccountType(account.id, type)
             reload()

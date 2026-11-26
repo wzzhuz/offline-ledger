@@ -71,7 +71,10 @@ import com.zwz.offlineledger.data.local.entity.TrashEntryEntity
         TagEntity::class,
         RecordTagCrossRef::class
     ],
-    version = 8,
+    // 第 82 批：accounts 增 iconRef 列 → version 9。使用者明确当前是测试数据、
+    // 直接卸载重装，故仍不注册 Migration（Migrations.ALL 保持空数组），
+    // 覆盖安装 v0.2.60 会开库失败，MUST 在交付说明写明。
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

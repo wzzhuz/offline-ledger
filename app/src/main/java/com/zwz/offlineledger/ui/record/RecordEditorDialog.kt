@@ -73,7 +73,8 @@ import com.zwz.offlineledger.core.time.YearMonthMath
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.data.model.RecordType
-import com.zwz.offlineledger.ui.assets.AccountKindBadge
+import com.zwz.offlineledger.ui.assets.AccountIconBox
+import com.zwz.offlineledger.ui.assets.AccountIconCatalog
 import com.zwz.offlineledger.ui.assets.accountBaseLabel
 import com.zwz.offlineledger.ui.ledgerFactory
 import com.zwz.offlineledger.ui.components.CategoryIcon
@@ -846,11 +847,27 @@ fun BottomPickerSheet(
 }
 
 /**
- * 键盘上方单行 5 枚 chips：账户 / 模板 / 备注 / 标签 / 优惠或手续费。
- * 「不计入收支」开关并入备注 sheet（它本就与备注同一行），不占第 6 枚。
- * 每枚点击区 ≥ 40dp（项目为这条回摆过三次），字号 labelMedium。
- * 编辑态在 label 上带出旧值摘要，MUST NOT 让旧内容不可见。
+ * 第 82 批：chips 改**非等宽**，按信息量分配宽度，窄项收尾。
+ *
+ * 使用者真机反馈：5 枚 `weight(1f)` 等分时每枚约 64dp，
+ * 「备注·xxx·不计入」被截成只剩「备注」、账户名也只剩前面部分。
+ * 根因是第 80 批把编辑态摘要塞进了 chip 的 label —— chip 是入口，不是展示位。
+ * 本批：模板固定「模板」（选中后 MUST NOT 跟着改名）、标签只显示「标签 / #N」、
+ * 备注固定「备注」、优惠固定「优惠 / 手续费」，有值一律用**右上角小圆点**提示，
+ * 完整值进各自 sheet 查看修改；账户给最大宽度显示完整名称。
+ *
+ * 顺序（收支 5 枚）：账户 → 备注 → 优惠 → 标签 → 模板；
+ * 转账 4 枚：备注 → 手续费 → 标签 → 模板（账户已常驻首屏两卡）。
+ * 左宽右窄、由主到次、两个最窄的收在右端，避免窄项夹在中间把一排切碎。
+ * 每枚仍 ≥40dp 点击区、`labelMedium`、`RoundedCornerShape(12.dp)`。
  */
+private data class EntryChip(
+    val label: String,
+    val weight: Float,
+    val hasValue: Boolean = false,
+    val onClick: () -> Unit
+)
+
 @Composable
 private fun EntryChipBar(
     state: EditorState,
@@ -862,64 +879,78 @@ private fun EntryChipBar(
     onExtra: () -> Unit
 ) {
     val isTransfer = state.type == RecordType.TRANSFER
-    // 第 81 批：转账态账户已常驻首屏两张卡，MUST NOT 再留一枚重复入口。
     val chosenId = if (state.type == RecordType.EXPENSE)
         state.fromAccountId else state.toAccountId
     val accountLabel = accounts.firstOrNull { it.id == chosenId }?.name ?: "无账户"
-    val noteLabel = buildString {
-        append(if (state.note.isBlank()) "备注" else "备注·" + state.note.take(3))
-        if (state.excludeFromStats) append("·不计入")
-    }
     val tagLabel = if (state.tagNames.isEmpty()) "标签" else "#" + state.tagNames.size
     val extraLabel = if (isTransfer) "手续费" else "优惠"
-    val extraChip = if (state.extraExpr.isBlank()) extraLabel
-    else extraLabel + "·" + state.extraExpr.take(4)
-    val chips: List<Pair<String, () -> Unit>> = if (isTransfer) {
-        // 转账态 4 枚：模板 / 备注 / 标签 / 手续费，MUST NOT 出现「转出/转入」chip。
+    val noteMarked = state.note.isNotBlank() || state.excludeFromStats
+    val chips: List<EntryChip> = if (isTransfer) {
         listOf(
-            "模板" to onTemplate,
-            noteLabel to onNote,
-            tagLabel to onTag,
-            extraChip to onExtra
+            EntryChip("备注", 2.0f, noteMarked, onNote),
+            EntryChip(extraLabel, 1.6f, state.extraExpr.isNotBlank(), onExtra),
+            EntryChip(tagLabel, 0.9f, state.tagNames.isNotEmpty(), onTag),
+            EntryChip("模板", 0.9f, false, onTemplate)
         )
     } else {
         listOf(
-            accountLabel to onAccount,
-            "模板" to onTemplate,
-            noteLabel to onNote,
-            tagLabel to onTag,
-            extraChip to onExtra
+            EntryChip(accountLabel, 2.2f, false, onAccount),
+            EntryChip("备注", 1.7f, noteMarked, onNote),
+            EntryChip(extraLabel, 1.3f, state.extraExpr.isNotBlank(), onExtra),
+            EntryChip(tagLabel, 0.9f, state.tagNames.isNotEmpty(), onTag),
+            EntryChip("模板", 0.9f, false, onTemplate)
         )
     }
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        chips.forEach { (label, onClick) ->
+        chips.forEach { chip ->
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(LedgerColors.SurfaceVariant)
-                    .clickable(onClick = onClick)
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                    .weight(chip.weight)
+                    .heightIn(min = 40.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = LedgerColors.OnSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(LedgerColors.SurfaceVariant)
+                        .clickable(onClick = chip.onClick)
+                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = chip.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = LedgerColors.OnSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (chip.hasValue) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 5.dp, end = 5.dp)
+                            .size(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(LedgerColors.Primary)
+                    )
+                }
             }
         }
     }
 }
 
 /**
- * 账户 sheet：一羽式两列网格 + 余额 + 搜索（含卡号后缀），转账态顶部给转出/转入分段。
+ * 第 82 批：账户 sheet 接回项目既有的 `AccountIconBox`（品牌 / 自定义 44dp + 放大角标），
+ * **删掉余额行**（使用者明确「显示余额没必要，不需要抄一羽」）；
+ * 卡号后四位与卡种降为次要小字，不用记、一眼可分储/信。
+ * 搜索仍走 `accountBaseLabel`（含卡号后缀），沿用既有 setFromAccount / setToAccount。
+ * MUST NOT 在 sheet 内新做长按拖拽排序（踩坑清单 §3.1）。
  * 沿用 vm 既有 setFromAccount / setToAccount，零新数据路径。
  * MUST NOT 在 sheet 内新做长按拖拽排序（踩坑清单 §3.1）；排序仍走既有独立页。
  */
@@ -1008,24 +1039,31 @@ private fun AccountPickerSheet(
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                a.cardKind?.let {
-                                    AccountKindBadge(it, size = 12)
-                                    Spacer(Modifier.width(3.dp))
-                                }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AccountIconBox(
+                                name = a.name,
+                                cardKind = a.cardKind,
+                                iconKey = AccountIconCatalog.iconKeyFor(a.name),
+                                iconRef = a.iconRef,
+                                size = 44
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    accountBaseLabel(a),
+                                    a.name,
                                     style = MaterialTheme.typography.labelMedium,
+                                    color = LedgerColors.OnSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    accountSecondaryLabel(a),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = LedgerColors.Neutral,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Text(
-                                Cents(a.balanceCents).toYuanString() + " " + a.currencyCode,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = LedgerColors.Neutral
-                            )
                         }
                     }
                 }
@@ -1140,8 +1178,8 @@ private fun TransferAccountCards(
     onPick: (Int) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        TransferAccountCard("转出账户", "出", accounts, fromId) { onPick(0) }
-        TransferAccountCard("转入账户", "入", accounts, toId) { onPick(1) }
+        TransferAccountCard("转出账户", accounts, fromId) { onPick(0) }
+        TransferAccountCard("转入账户", accounts, toId) { onPick(1) }
     }
     FormDivider()
 }
@@ -1149,7 +1187,6 @@ private fun TransferAccountCards(
 @Composable
 private fun TransferAccountCard(
     tag: String,
-    glyph: String,
     accounts: List<AccountEntity>,
     selectedId: Long?,
     onClick: () -> Unit
@@ -1170,19 +1207,13 @@ private fun TransferAccountCard(
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(LedgerColors.Primary.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                glyph,
-                style = MaterialTheme.typography.titleMedium,
-                color = LedgerColors.Primary
-            )
-        }
+        AccountIconBox(
+            name = a?.name ?: tag,
+            cardKind = a?.cardKind,
+            iconKey = a?.let { AccountIconCatalog.iconKeyFor(it.name) },
+            iconRef = a?.iconRef,
+            size = 44
+        )
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
             Text(
                 tag,
@@ -1198,12 +1229,28 @@ private fun TransferAccountCard(
             )
             a?.let {
                 Text(
-                    Cents(it.balanceCents).toYuanString() + " " + it.currencyCode,
+                    accountSecondaryLabel(it),
                     style = MaterialTheme.typography.labelSmall,
-                    color = LedgerColors.Neutral
+                    color = LedgerColors.Neutral,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
         Text("›", style = MaterialTheme.typography.labelMedium, color = LedgerColors.Neutral)
     }
 }
+
+/**
+ * 第 82 批：账户次要信息唯一组合点 —— 卡号尾号 / 卡种 / 币种。
+ * 余额刻意不进这里（使用者明确「显示余额没必要」），
+ * 卡种用文字而非 12dp 小角标，保证「储蓄卡 / 信用卡」一眼可分。
+ */
+private fun accountSecondaryLabel(a: AccountEntity): String = buildList {
+    a.cardLast4?.takeIf { it.length == 4 }?.let { add("尾号 $it") }
+    when (a.cardKind) {
+        "DEBIT" -> add("储蓄卡")
+        "CREDIT" -> add("信用卡")
+    }
+    add(a.currencyCode)
+}.joinToString(" · ")

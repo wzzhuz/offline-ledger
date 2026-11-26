@@ -65,10 +65,11 @@ def main():
         errors.append("CsvRow.duplicateKey() 被改动，会破坏导入去重与复合匹配")
 
     # 3. 升表口径
-    # 第 67 批升 7；第 75 批新增 tags / record_tags 升 8 为预期。
+    # 第 67 批升 7；第 75 批新增 tags / record_tags 升 8；
+    # 第 82 批 accounts.iconRef 升 9（使用者明确测试数据、卸载重装）。
     m = re.search(r"version = (\d+)", db)
-    if not m or int(m.group(1)) not in (7, 8):
-        errors.append("AppDatabase.version 应为 7（第67批）或 8（第75批）")
+    if not m or int(m.group(1)) not in (7, 8, 9):
+        errors.append("AppDatabase.version 应为 7 / 8 / 9（第82批升表为 9）")
     if "emptyArray()" not in migrations:
         errors.append("Migrations.ALL 不再为空，与「测试数据不考虑迁移」口径冲突")
 

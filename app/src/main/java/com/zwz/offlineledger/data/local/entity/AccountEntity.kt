@@ -34,5 +34,7 @@ data class AccountEntity(
     @ColumnInfo(name = "quickOrder") val quickOrder: Int = 0,
     /** 第 60 批：卡种 DEBIT / CREDIT / null。正规银行全称下同名两卡靠它区分，
      *  UI 用 12dp 小角标表达，MUST NOT 把卡种拼回账户名。 */
-    @ColumnInfo(name = "cardKind") val cardKind: String? = null
+    @ColumnInfo(name = "cardKind") val cardKind: String? = null,
+    /** 第 82 批：账户图标关联。`preset:<iconKey>` / `custom:<uuid>` / null=按名自动推断。 */
+    @ColumnInfo(name = "iconRef") val iconRef: String? = null
 )
