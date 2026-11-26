@@ -1452,3 +1452,27 @@ delta 合并回 `openspec/specs/reporting-ui/spec.md`（ADDED 3 / MODIFIED 5）�
 **合并**：试验分支 `feature/visual-tokens-and-dark-theme` 相对 `main`
 `ahead_by 2 / behind_by 0`，按 fast-forward 合并，`main` 不产生额外 merge commit。
 tag `v0.2.57` / `v0.2.58` 均落在合并后的 main 历史上。
+
+### 第 80 批（v0.2.59）：记一笔 chips 直达 + 与第 77 批 change 一并归档
+
+真机对照一羽记账截图后，使用者确认：A 单行 5 枚 chips / 并进
+`rethink-record-entry-layout` 同一个 change 一起归档 / 收款方联想放回输入框下方。
+
+**改动**：撤掉第 77 批的「更多 › + MorePanel」层；键盘上方固定单行 5 枚 chips
+（账户 / 模板 / 备注 / 标签 / 优惠或手续费），每枚 ≥40dp 点击区、编辑态带旧值摘要；
+「不计入收支」并入备注 sheet。账户从首屏表单行移到 chips（默认账户预填、低频），
+sheet 改两列网格 + 余额 + 搜索；模板改一羽式底部 sheet，点一项预填并关闭，
+从 3～4 次点击压回 2 次。底部 sheet 统一复用 `Dialog + 底部对齐 Surface`，
+不引实验性 API。收款方联想 / 常用回到输入框正下方一条 40dp 内联条，
+仅聚焦或有内容时出现，常用与联想互斥共用一条，ViewModel 零改动。
+
+**范围不变**：分类快捷栏、描述首屏可见、整数分键盘、金额真相源、模板「预填草稿」
+语义、标签关联表、统计口径、备份/CSV/Firefly 往返、零改表（`version = 8`）、
+零新增依赖、零 permission 变化、4 Tab 导航。一羽只借交互，不借报销 / 应付等
+本项目没有的业务字段。
+
+**流程**：本批按 `my-app-workflow` 走阶段 0 对齐（五项结论 + 三项确认）后才动文件，
+与第 77 批 change 合并修订四件套与 delta 后一并归档：7 条 MODIFIED 整块改写最终形态，
+ADDED 调整为「键盘上方芯片直达」「联想条与输入框同屏」「动态色」「edge-to-edge」，
+并与 privacy-security ADDED 一起合并回 `openspec/specs/`。
+归档目录 `openspec/changes/archive/2026-11-26-rethink-record-entry-layout/`。

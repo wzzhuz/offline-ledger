@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""第 77 批：记一笔首屏分层 / 单按钮 / 无边框内联 / 动态色 / edge-to-edge 静态校验。"""
+"""第 77 + 80 批：记一笔 chips 直达 / 底部 sheet / 联想回输入框 / 动态色 / edge-to-edge 静态校验。"""
 import pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-CH = ROOT / "openspec/changes/rethink-record-entry-layout"
+_ACTIVE = ROOT / "openspec/changes/rethink-record-entry-layout"
+_ARCHIVED = ROOT / "openspec/changes/archive/2026-11-26-rethink-record-entry-layout"
+# 第 80 批归档后 change 移入 archive，优先活跃目录、回退归档目录。
+CH = _ACTIVE if (_ACTIVE / "proposal.md").is_file() else _ARCHIVED
 BASE = ROOT / "openspec/specs"
 def read(p): return ROOT.joinpath(p).read_text()
 
@@ -31,7 +34,7 @@ def main():
         if r["s"]=="ADDED" and r["t"] in base:e.append("ADDED 冲突: "+r["t"])
         if r["s"]=="MODIFIED" and r["t"] not in base:e.append("MODIFIED 未命中基线: "+r["t"])
         if r["sc"]<1 or not r["rfc"]:e.append("缺 Scenario/RFC2119: "+r["t"])
-    if len(rs)!=11:e.append("应为 11 条 Requirement，实际 %d"%len(rs))
+    if len(rs)!=12:e.append("应为 12 条 Requirement，实际 %d"%len(rs))
 
     theme=read("app/src/main/java/com/zwz/offlineledger/ui/theme/LedgerTheme.kt")
     for k in ["dynamicColor: Boolean = true","dynamicLightColorScheme","Build.VERSION.SDK_INT",
@@ -48,29 +51,28 @@ def main():
         e.append("Scaffold 未置 contentWindowInsets=0（双重 padding）")
 
     rec=read("app/src/main/java/com/zwz/offlineledger/ui/record/RecordEditorDialog.kt")
-    for k in ["MorePanel(",'"更多 ›"',"statusBarsPadding()","navigationBarsPadding()",
-              "Color.Transparent","showMorePanel"]:
+    # 第 80 批：撤掉「更多」层，低频项由键盘上方单行 5 枚 chips 各自直达底部 sheet。
+    for k in ["EntryChipBar(","BottomPickerSheet(","AccountPickerSheet(","NoteSheet(",
+              "CounterpartySuggestionRow(","TemplatePickerSheet(","onFocusChanged",
+              "statusBarsPadding()","navigationBarsPadding()","Color.Transparent"]:
         if k not in rec:e.append("RecordEditorDialog 缺: "+k)
-    # 首屏不得再各自占入口
-    if "更多（备注 · 不计入收支）" in rec:e.append("旧「更多（备注…）」入口未删")
-    if '"▸ 添加优惠"' in rec:e.append("旧优惠入口未并入 MorePanel")
-    # 分类快捷栏必须保留
+    for k in ["private fun MorePanel(","private fun MoreEntry(","private fun AccountStrip(",
+              '"更多 ›"','"模板 ›"',"showMorePanel"]:
+        if k in rec:e.append("第 80 批残留旧结构: "+k)
+    # 分类快捷栏必须保留（低摩擦优点）
     if "CategoryStrip(" not in rec:e.append("分类快捷栏被误删（低摩擦优点）")
+    # chips 点击区不得低于 40dp
+    if "heightIn(min = 40.dp)" not in rec:e.append("chips / 联想条点击区被压缩到 40dp 以下")
 
     tpl=read("app/src/main/java/com/zwz/offlineledger/ui/record/TemplateQuickPick.kt")
-    if '"模板 ›"' not in tpl:e.append("模板未收敛成单按钮")
-    if "chunked(TEMPLATES_PER_ROW)" in tpl:e.append("模板仍两行铺开")
-
-    acc=read("app/src/main/java/com/zwz/offlineledger/ui/record/RecordEditorDialog.kt")
-    i=acc.find("private fun AccountStrip(")
-    j=acc.find("\n@Composable", i+10)
-    if i>=0 and "AccountQuickRow(" in acc[i:(j if j>i else i+2600)]:
-        e.append("AccountStrip 仍铺快捷 chips")
+    if "TemplatePickerSheet(" not in tpl:e.append("模板未改成一羽式底部 sheet")
+    if "ModalBottomSheet(" in tpl or "AlertDialog(" in tpl:
+        e.append("模板 sheet 不得用实验 API 或居中 AlertDialog")
 
     db=read("app/src/main/java/com/zwz/offlineledger/data/local/AppDatabase.kt")
     if "version = 8," not in db:e.append("零改表口径被破坏")
     gd=read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.58"' not in gd:e.append("版本号未升 0.2.58")
+    if 'defaultVersionName = "0.2.59"' not in gd:e.append("版本号未升 0.2.59")
     wf=read(".github/workflows/build.yml")
     if "check_record_layout.py" not in wf:e.append("build.yml 未挂脚本")
     man=read("app/src/main/AndroidManifest.xml")
