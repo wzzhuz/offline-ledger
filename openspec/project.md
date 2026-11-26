@@ -1396,3 +1396,12 @@ Q4B 全 App 上 API 31+ 动态色（可一行回退）+ edge-to-edge（根 safeD
 Scaffold insets=0、记一笔 Dialog 单独避让）。零改表 → 覆盖安装。
 新增静态脚本 `check_record_layout.py`；动态色与一羽静态板并存的「两套蓝」代价已登记。
 
+### 第 77 批交付实测（v0.2.56）
+
+push CI `45746395557`、出包 CI `45747016651` 双全绿，tag `v0.2.56 → 7e68e83188c2`。
+APK `offline-ledger-v0.2.56-release-7e68e831.apk` / 3,512,596 B /
+SHA256 `58f5cf237e806adcaf15b060c0eb2c1f48fcd20e29b58f900873fbace455ec83`。
+零改表 → 覆盖安装；一次成包、无诊断 commit、`build.yml` 无临时改动。
+新增 `check_record_layout.py`；12 个静态检查全 PASS。出包轮询一次查询层超时，
+短调用独立复查确认 success，未重发触发。
+
