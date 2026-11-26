@@ -1,44 +1,44 @@
 package com.zwz.offlineledger.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.model.AccountType
@@ -50,26 +50,28 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /**
  * 第 83 批：账户选择的**唯一通用出口**，与 `CategorySelectDialog` 对称。
+ * 第 84 批（v0.2.63）：按使用者真机反馈把顶部从 4 行控件压到 1 行——
+ * 两枚 `FilterChip` → 标题栏右侧**一枚轮换图标**；删叉号、删搜索框；
+ * 壳改用 `ModalBottomSheet`（自带点遮罩 / 下滑 / 系统返回关闭）。
  *
- * 复用范围（使用者第 4 项拍板 B）：记一笔账户 chip / 转账两卡 / 模板与周期规则
+ * 复用范围（第 83 批 4B）：记一笔账户 chip / 转账两卡 / 模板与周期规则
  * 表单 / 明细筛选（统计账户排行下钻也走同一份 FilterSheet，故一并覆盖）。
  * 全仓 MUST NOT 再出现第二份账户下拉或第二套账户网格。
  *
- * 两种布局（使用者第 1、2 项）：
+ * 两种布局（第 83 批 1A / 2）：
  * - `GLOBAL`：按 `quickOrder` 全局排序、不分类型、归档沉底 —— 与「全部账户排序」
- *   独立页和记一笔既有候选顺序完全一致，默认视图（1A，零回归）。
+ *   独立页和记一笔既有候选顺序完全一致，默认视图。
  * - `GROUPED`：按 `AccountType` 四组固定顺序分组，**组内按 `sortOrder`** 继承
- *   资产页分组排序；MUST NOT 把 `quickOrder` 混进来（活文档 §1753：两套排序
- *   混用会导致「排完记一笔看到的不是排在前面的」）。切换后同一张卡在两种
- *   视图里位置不同是**预期行为**，不是 bug。
+ *   资产页分组排序；MUST NOT 把 `quickOrder` 混进来（活文档 §1753）。
+ *   切换后同一张卡在两种视图里位置不同是**预期行为**。
  *
- * 布局选择跨启动持久化（使用者第 3 项 B）：存 `LedgerPrefs.accountPickerLayout`，
- * 不进 Room / 不进备份 DTO / 不触发 Migration，换设备回退默认全局视图。
+ * 布局选择跨启动持久化于 `LedgerPrefs.accountPickerLayout`，
+ * 不进 Room / 不进备份 DTO / 不触发 Migration。
  *
  * 版式沿用第 82 批：44dp `AccountIconBox` + 放大卡种角标 + 次要小字，
- * **MUST NOT 显示余额**。搜索走 `accountBaseLabel`（含卡号后四位）；
- * 搜索非空时跨组平铺（与分类选择器「搜索跨组平铺」同口径）。
- * MUST NOT 引入 `ModalBottomSheet`（T12）、长按拖拽（§3.1）或新依赖。
+ * **MUST NOT 显示余额**。同名卡靠次要行「尾号 xxxx」区分（第 84 批删搜索后
+ * 这是唯一区分手段，MUST NOT 连带删掉 `cardLast4`）。
+ * 图标全部来自既有 `material-icons-core` + Compose 自绘，MUST NOT 新增图标资源。
  */
 enum class AccountPickerLayout(val key: String) {
     GLOBAL("global"),
@@ -103,8 +105,7 @@ private val AccountTypeOrder = listOf(
 
 /**
  * 账户次要信息唯一组合点 —— 卡号尾号 / 卡种 / 币种。
- * 第 82 批定义在 `RecordEditorDialog` 内，本批上提为全站共用（转账两卡、
- * 选择器、模板表单都读它）。余额刻意不进这里。
+ * 余额刻意不进这里。第 84 批删掉账户搜索后，尾号是同名卡唯一区分手段。
  */
 fun accountSecondaryLabel(a: AccountEntity): String = buildList {
     a.cardLast4?.takeIf { it.length == 4 }?.let { add("尾号 $it") }
@@ -115,6 +116,21 @@ fun accountSecondaryLabel(a: AccountEntity): String = buildList {
     add(a.currencyCode)
 }.joinToString(" · ")
 
+/** 网格里的两类格子：真实账户 / 「不指定」。第 84 批把后者收进网格第一格。 */
+private sealed class AccountSlot {
+    data class Item(val account: AccountEntity) : AccountSlot()
+    data class None(val label: String) : AccountSlot()
+}
+
+private val GlobalComparator = compareBy<AccountEntity> { it.isArchived }
+    .thenBy { it.quickOrder }
+    .thenBy { it.id }
+
+private val GroupComparator = compareBy<AccountEntity> { it.isArchived }
+    .thenBy { it.sortOrder }
+    .thenBy { it.id }
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountSelectDialog(
     accounts: List<AccountEntity>,
@@ -126,31 +142,32 @@ fun AccountSelectDialog(
     noneLabel: String = "不指定账户"
 ) {
     val (layout, onLayoutChange) = rememberAccountPickerLayout()
-    var query by remember { mutableStateOf("") }
-
-    val shown = accounts.filter {
-        accountBaseLabel(it).contains(query, ignoreCase = true)
-    }
     val currentLabel = accounts.firstOrNull { it.id == selectedId }
         ?.let { accountBaseLabel(it) } ?: noneLabel
 
-    Dialog(
+    /**
+     * 第 84 批：使用者明确选 B（`ModalBottomSheet`）。
+     * 清点更正：`ModalBottomSheet` **不是全仓禁令**——统计页
+     * `DrillDownDialog.kt` 自第 69 批起就在用，且已写进 `category-stats` 主 spec、
+     * `check_stats_merge.py` 还断言了它。第 77/80/83 批的「不用实验 API」
+     * 只是**记一笔低频项 sheet**（BottomPickerSheet / TemplateQuickPick）的局部惯例，
+     * 这两个文件本批一字不动，其禁令继续有效。
+     * sheet 自带 scrim 点击 / 下滑 / 系统返回三种关闭路径，故第 84 批删叉号后
+     * MUST NOT 再自己补遮罩 clickable（会与 sheet 的 scrim 抢事件）。
+     */
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        containerColor = LedgerColors.CardSurface
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                color = LedgerColors.CardSurface
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .navigationBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 12.dp)
-                ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -160,10 +177,30 @@ fun AccountSelectDialog(
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f)
                         )
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Filled.Close, contentDescription = "关闭")
+                        // 第 84 批 1：点一下在两种布局间轮换，图标显示**当前模式**。
+                        // 图标随模式变是使用者标注的「可选」项，本批采纳：
+                        // 全局 = 既有 Icons.Filled.List（三横线）；分组 = 自绘 2×2 圆角方块。
+                        IconButton(
+                            onClick = {
+                                onLayoutChange(
+                                    if (layout == AccountPickerLayout.GLOBAL)
+                                        AccountPickerLayout.GROUPED
+                                    else AccountPickerLayout.GLOBAL
+                                )
+                            }
+                        ) {
+                            if (layout == AccountPickerLayout.GLOBAL) {
+                                Icon(
+                                    Icons.Filled.List,
+                                    contentDescription = "当前全局排序，点击切换到按类型分组",
+                                    tint = LedgerColors.OnSurface
+                                )
+                            } else {
+                                LayoutGridGlyph()
+                            }
                         }
                     }
+                    // 第 84 批 2：保留「当前：xxx」，编辑态一眼看得到当前账户。
                     Text(
                         "当前：" + currentLabel,
                         style = MaterialTheme.typography.labelSmall,
@@ -171,105 +208,107 @@ fun AccountSelectDialog(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = layout == AccountPickerLayout.GLOBAL,
-                            onClick = { onLayoutChange(AccountPickerLayout.GLOBAL) },
-                            label = { Text("全局排序") }
-                        )
-                        FilterChip(
-                            selected = layout == AccountPickerLayout.GROUPED,
-                            onClick = { onLayoutChange(AccountPickerLayout.GROUPED) },
-                            label = { Text("按类型分组") }
+                }
+            }
+
+            /** 点选即写回并关闭；sheet 的 onDismissRequest 不重复调 onDismiss。 */
+            fun pick(id: Long?) {
+                onSelect(id)
+                onDismiss()
+            }
+
+            if (layout == AccountPickerLayout.GLOBAL) {
+                val slots = buildList {
+                    if (allowNone) add(AccountSlot.None(noneLabel))
+                    accounts.sortedWith(GlobalComparator).forEach { add(AccountSlot.Item(it)) }
+                }
+                items(slots.chunked(2)) { row -> SlotRow(row, selectedId) { pick(it) } }
+            } else {
+                // 第 84 批 3：「不指定」收进网格第一格，不再单独占一条横幅。
+                // 分组视图里它排在所有组标题之前（不属于任何 AccountType 组），
+                // 第一格之后留一格空位；全局视图则与第一个账户同行。
+                if (allowNone) {
+                    items(listOf(listOf(AccountSlot.None(noneLabel)))) { row ->
+                        SlotRow(row, selectedId) { pick(it) }
+                    }
+                }
+                AccountTypeOrder.forEach { type ->
+                    val group = accounts.filter { it.type == type }.sortedWith(GroupComparator)
+                    if (group.isEmpty()) return@forEach
+                    item {
+                        Text(
+                            type.displayName(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LedgerColors.Neutral,
+                            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        placeholder = {
-                            Text("搜索账户名 / 卡号后四位", style = MaterialTheme.typography.bodyMedium)
-                        },
-                        textStyle = MaterialTheme.typography.bodyMedium,
-                        singleLine = true,
-                        trailingIcon = {
-                            if (query.isNotEmpty()) {
-                                IconButton(onClick = { query = "" }) {
-                                    Icon(Icons.Filled.Close, contentDescription = "清空账户搜索")
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
+                    items(group.map { AccountSlot.Item(it) }.chunked(2)) { row ->
+                        SlotRow(row, selectedId) { pick(it) }
+                    }
+                }
+            }
+
+            if (accounts.isEmpty()) {
+                item {
+                    Text(
+                        "暂无可显示的账户",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LedgerColors.Neutral,
+                        modifier = Modifier.padding(top = 8.dp)
                     )
-                    Spacer(Modifier.height(8.dp))
-
-                    if (allowNone) {
-                        NoneTile(noneLabel, selectedId == null) {
-                            onSelect(null)
-                            onDismiss()
-                        }
-                        Spacer(Modifier.height(8.dp))
-                    }
-
-                    // 搜索命中跨组平铺，与分类选择器同口径；
-                    // 空搜索且选分组视图时才按 AccountType 分段。
-                    if (query.isNotBlank() || layout == AccountPickerLayout.GLOBAL) {
-                        val ordered = shown.sortedWith(
-                            compareBy<AccountEntity> { it.isArchived }
-                                .thenBy { it.quickOrder }
-                                .thenBy { it.id }
-                        )
-                        AccountGrid(ordered, selectedId) { id -> onSelect(id); onDismiss() }
-                    } else {
-                        var any = false
-                        AccountTypeOrder.forEach { type ->
-                            val group = shown.filter { it.type == type }
-                                .sortedWith(
-                                    compareBy<AccountEntity> { it.isArchived }
-                                        .thenBy { it.sortOrder }
-                                        .thenBy { it.id }
-                                )
-                            if (group.isEmpty()) return@forEach
-                            any = true
-                            Text(
-                                type.displayName(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = LedgerColors.Neutral,
-                                modifier = Modifier.padding(top = 6.dp, bottom = 4.dp)
-                            )
-                            AccountGrid(group, selectedId) { id -> onSelect(id); onDismiss() }
-                            Spacer(Modifier.height(4.dp))
-                        }
-                        if (!any) {
-                            Text(
-                                if (query.isBlank()) "暂无可显示的账户" else "没有匹配的账户",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = LedgerColors.Neutral
-                            )
-                        }
-                    }
                 }
             }
         }
     }
 }
 
+/** 自绘 2×2 圆角方块：分组视图图标。零新增 drawable 资源、零新增依赖。 */
 @Composable
-private fun AccountGrid(
-    items: List<AccountEntity>,
-    selectedId: Long?,
-    onPick: (Long) -> Unit
-) {
-    items.chunked(2).forEach { row ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            row.forEach { a -> AccountTile(a, a.id == selectedId, { onPick(a.id) }, Modifier.weight(1f)) }
-            if (row.size == 1) Spacer(Modifier.weight(1f))
+private fun LayoutGridGlyph() {
+    val color = LedgerColors.OnSurface
+    Canvas(modifier = Modifier.size(24.dp)) {
+        val gap = 3.dp.toPx()
+        val cell = (size.width - gap) / 2f
+        val radius = CornerRadius(3.dp.toPx())
+        for (r in 0..1) for (c in 0..1) {
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(c * (cell + gap), r * (cell + gap)),
+                size = Size(cell, cell),
+                cornerRadius = radius
+            )
         }
-        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun SlotRow(
+    slots: List<AccountSlot>,
+    selectedId: Long?,
+    onPick: (Long?) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        slots.forEach { slot ->
+            when (slot) {
+                is AccountSlot.Item -> AccountTile(
+                    a = slot.account,
+                    selected = slot.account.id == selectedId,
+                    onClick = { onPick(slot.account.id) },
+                    modifier = Modifier.weight(1f)
+                )
+                is AccountSlot.None -> NoneTile(
+                    label = slot.label,
+                    selected = selectedId == null,
+                    onClick = { onPick(null) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        if (slots.size == 1) Spacer(Modifier.weight(1f))
     }
 }
 
@@ -321,25 +360,52 @@ private fun AccountTile(
     }
 }
 
+/**
+ * 第 84 批：「不指定 / 全部账户」与真实账户同款 tile，贴一羽「无账户」灰圆。
+ * MUST NOT 再做成独立整行横幅（那样又多占一行）。
+ */
 @Composable
-private fun NoneTile(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun NoneTile(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 44.dp)
+        modifier = modifier
+            .heightIn(min = 56.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 if (selected) LedgerColors.Primary.copy(alpha = 0.12f)
-                else LedgerColors.SurfaceVariant,
-                RoundedCornerShape(12.dp)
+                else LedgerColors.SurfaceVariant
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         contentAlignment = Alignment.CenterStart
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) LedgerColors.Primary else LedgerColors.OnSurface
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(LedgerColors.SurfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "—",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = LedgerColors.Neutral
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selected) LedgerColors.Primary else LedgerColors.OnSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }

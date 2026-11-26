@@ -1579,3 +1579,37 @@ Release `v0.2.62` 产物 3,513,300 B / SHA256 `300ab0f9…`。
 归档时 delta 真的合并回 `reporting-ui`（3 MODIFIED + 2 ADDED）与
 `privacy-security`（1 ADDED），逐块比对正文一致；12 个静态检查全 PASS。
 试验分支相对 `main` 零落后，fast-forward 合并。
+
+### 第 84 批（v0.2.63）：账户弹层顶部压到一行 + T12 口径更正
+
+真机反馈（截图 6 为一羽弹层，非本 App）：「账户切换用一个小图标就行，
+没必要大量按钮占空间」「叉号与账户搜索应该都不需要」。
+
+**清点更正**：`ModalBottomSheet` 自第 69 批 `StatsDrillSheet` 起已在本仓使用，
+且写进 `category-stats` 主 spec、`check_stats_merge.py` 亦有断言；
+第 77/80/83 批的「不用实验 API」只是**记一笔低频项 sheet**
+（`BottomPickerSheet` / `TemplateQuickPick`）的局部惯例，非全仓禁令。
+使用者选 1B 因此不是破例；sheet 自带点遮罩 / 下滑 / 系统返回，
+省掉了「删叉号后必须自绘遮罩 clickable」这一必做项。
+
+**改动**：`ui/components/AccountSelectSheet.kt` 壳改
+`ModalBottomSheet(containerColor = CardSurface)`，内容改
+`LazyColumn + chunked(2)`（与 `DrillDownDialog.kt` 同款滚动口径）；
+顶部由 4 行压到 1 行——删 `Icons.Filled.Close` 叉号、
+`OutlinedTextField` 搜索框、两枚 `FilterChip`，
+改单枚 24dp 轮换图标（`Icons.Filled.List` ↔ `Canvas` 自绘 2×2 方块，
+零新增 drawable）；「当前：xxx」按使用者要求保留；
+「不指定 / 全部账户」由独立横幅改为同款 tile 收进网格第一格。
+
+**规格收口**：删一个搜索框牵动 8 条 MODIFIED + 1 条 ADDED——
+4 条 Requirement 里的「账户搜索 / 输入 3344 能搜到」全部改写为
+「由 `尾号 xxxx` 显示区分」，`cardLast4` / `accountSecondaryLabel` /
+`accountBaseLabel` / `FilterSheet.accountOptions` 全部保留；
+`记一笔低频项收起…` 里的 T12 禁令精确化作用域而非删除。
+版本号 0.2.63，`check_record_layout.py` 换第 84 批双向断言 +
+归档态「delta 必须已合并」，12 个静态检查全 PASS。
+
+**范围**：零改表（version 仍 9）、零新增依赖 / drawable / 权限 / `INTERNET`，
+`BottomPickerSheet`、`TemplateQuickPick`、`CategorySelectDialog` 一字不动，
+4 Tab / 转账两卡 / 聚合 SQL / CSV/Firefly 往返 / 备份 DTO 零改动。
+**可直接覆盖 v0.2.62。**

@@ -122,8 +122,14 @@ def main():
         a=asel.read_text()
         for k in ["AccountPickerLayout","GLOBAL","GROUPED","quickOrder","sortOrder",
                   "AccountTypeOrder","accountSecondaryLabel","AccountIconBox(",
-                  "allowNone","noneLabel","清空账户搜索","rememberAccountPickerLayout"]:
+                  "allowNone","noneLabel","rememberAccountPickerLayout",
+                  "ModalBottomSheet(","ExperimentalMaterial3Api","LayoutGridGlyph",
+                  "AccountSlot.None","Icons.Filled.List","cardLast4",
+                  "LazyColumn(","chunked(2)"]:
             if k not in a:e.append("AccountSelectSheet 缺: "+k)
+        for k in ["FilterChip(","OutlinedTextField(","Icons.Filled.Close",
+                  "清空账户搜索","搜索账户名","DialogProperties"]:
+            if k in a:e.append("第 84 批残留旧控件: "+k)
         if "Cents(" in a or "balanceCents" in a:e.append("通用账户选择器仍显示余额")
     prefs=read("app/src/main/java/com/zwz/offlineledger/core/prefs/LedgerPrefs.kt")
     if "accountPickerLayout" not in prefs:e.append("偏好未持久化账户布局（第83批 3B）")
@@ -141,6 +147,12 @@ def main():
         for m in re.finditer(r"^### Requirement: (.+)$", f.read_text(), re.M):
             if m.group(1).strip() not in base:
                 e.append("第 83 批 delta 未合并: "+m.group(1).strip())
+    a84 = sorted(ROOT.glob(
+        "openspec/changes/archive/*simplify-account-picker-sheet*/specs/*/spec.md"))
+    for f in a84:
+        for m in re.finditer(r"^### Requirement: (.+)$", f.read_text(), re.M):
+            if m.group(1).strip() not in base:
+                e.append("第 84 批 delta 未合并: "+m.group(1).strip())
     if "EntryChip(accountLabel, 2.2f" not in rec:
         e.append("收支态账户 chip 未获最宽权重 / 入口被误删")
 
@@ -152,7 +164,7 @@ def main():
     db=read("app/src/main/java/com/zwz/offlineledger/data/local/AppDatabase.kt")
     if "version = 9," not in db:e.append("第 82 批升表口径被破坏（version 必须为 9）")
     gd=read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.62"' not in gd:e.append("版本号未升 0.2.62")
+    if 'defaultVersionName = "0.2.63"' not in gd:e.append("版本号未升 0.2.63")
     wf=read(".github/workflows/build.yml")
     if "check_record_layout.py" not in wf:e.append("build.yml 未挂脚本")
     man=read("app/src/main/AndroidManifest.xml")
