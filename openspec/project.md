@@ -1483,3 +1483,24 @@ ADDED 调整为「键盘上方芯片直达」「联想条与输入框同屏」�
 `openspec/specs/privacy-security/spec.md`（1 ADDED），change 移入 archive，
 12 个静态检查全 PASS，逐块比对正文一致。试验分支 `feature/record-entry-chip-bar`
 相对 `main` 零落后，按 fast-forward 合并，不产生 merge commit。
+
+### 第 81 批（v0.2.60）：转账账户常驻 / 一键清空补齐 / 坚果云上传恢复
+
+真机反馈两条：描述与备注框没有删除叉号；转账态转出/转入账户不该折叠。
+按流程新开 change `polish-transfer-accounts-and-clear-fields`，阶段 0 五项对齐
++ 使用者三项确认（只改转账态 / 不做 ⇅ 互换 / 移除转账账户 chip）后才动文件。
+
+**改动**：抽 `ClearFieldIcon` 统一交易对方 / 描述 / 备注 / 账户搜索四处一键清空
+（36dp 容器、18dp Icon、有内容才显示、不撑高 40dp 行），补齐既有 spec
+「三个输入框一键清空」的实现缺口，并 MODIFIED 掉同一条 Requirement 里残留的
+「『更多』展开区」过期段落。转账态首屏新增两张中性卡片常驻（转出 / 转入），
+点卡锁定 `AccountPickerSheet` 的 target、sheet 内不再显示分段；
+转账态 chips 由 5 枚改为 4 枚（移除「转出/转入」），支出/收入态仍 5 枚。
+零新增图标依赖、零改表、零新增依赖、零 permission 变化。
+
+**坚果云上传回归排查（认账）**：`release.yml` 的 `upload_nutstore` 默认 `true`
+且步骤只认该 input，workflow 与 secrets 均未坏；v0.2.57–59 三次出包步骤为
+skipped，根因是本会话每次 `workflow_dispatch` 全量覆盖 inputs 时显式传了
+`"upload_nutstore":"false"`。v0.2.56 及之前均 success。
+本批 dispatch 恢复为 `true`，并在 `check_workflow_syntax.py` 加两条断言
+（默认值必须为 true、步骤必须绑定该 input）作为可执行防范。

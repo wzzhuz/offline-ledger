@@ -31,6 +31,17 @@ def main() -> int:
     if 'minify:' not in s or 'upload_nutstore:' not in s:
         problems.append('release.yml 缺少 minify / upload_nutstore 输入')
 
+    # 第 81 批：v0.2.57–59 连续三次出包把 upload_nutstore 显式传成 false，
+    # 坚果云步骤被 skipped（workflow 本身没坏）。落成可执行断言：
+    # workflow 默认值必须是 true，且「上传到坚果云」步骤只认 inputs.upload_nutstore。
+    nut = re.search(
+        r'^\s*upload_nutstore:[ \t]*\n((?:^[ \t]+\S[^\n]*\n){0,8})',
+        s, re.M)
+    if not nut or not re.search(r'^[ \t]*default:[ \t]*true[ \t]*$', nut.group(1), re.M):
+        problems.append('upload_nutstore 的 workflow 默认值不是 true（坚果云会被静默跳过）')
+    if not re.search(r'^[ \t]*if:[ \t]*inputs\.upload_nutstore[ \t]*$', s, re.M):
+        problems.append('上传到坚果云步骤未绑定 inputs.upload_nutstore')
+
     # YAML 1.1 会把裸 on 解析成布尔 true，与 default 的字符串类型对不上，
     # GitHub 会「静默不注册」这个工作流（文件在、Actions 页找不到）。
     # 精确匹配 choice 的 option 行，不去搜全文的 'on'。
@@ -73,7 +84,7 @@ def main() -> int:
             print('  - ' + p)
         return 1
     print('check_workflow_syntax: PASS（workflow_dispatch / choice 引号 / 权限 / '
-          'overwrite / ASCII 产物名 / 无硬编码凭据）')
+          'overwrite / ASCII 产物名 / 坚果云默认开启 / 无硬编码凭据）')
     return 0
 
 

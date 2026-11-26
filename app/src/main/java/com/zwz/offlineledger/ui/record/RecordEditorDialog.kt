@@ -180,6 +180,17 @@ fun RecordEditorDialog(
                     )
                     FormDivider()
 
+                    // 第 81 批：转账态转出 / 转入是必需主字段，不是低频项，
+                    // 两张卡常驻首屏；支出 / 收入态账户仍在 chip（默认账户兜底）。
+                    if (state.type == RecordType.TRANSFER) {
+                        TransferAccountCards(
+                            accounts = accounts,
+                            fromId = state.fromAccountId,
+                            toId = state.toAccountId,
+                            onPick = { accountTarget = it; activeSheet = EntrySheet.ACCOUNT }
+                        )
+                    }
+
                     // 分类快捷栏是用户明确的「选择方便」优点，MUST NOT 收进面板。
                     if (state.type != RecordType.TRANSFER) {
                         FormRow("分类", onRowClick = { showAllCategories = true }) {
@@ -211,18 +222,7 @@ fun RecordEditorDialog(
                                 colors = borderlessFieldColors(),
                                 trailingIcon = {
                                     if (state.counterparty.isNotEmpty()) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clickable { vm.setCounterparty("") },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                Icons.Filled.Close,
-                                                contentDescription = "清空收款方",
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
+                                        ClearFieldIcon("清空收款方") { vm.setCounterparty("") }
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
@@ -254,6 +254,11 @@ fun RecordEditorDialog(
                             textStyle = MaterialTheme.typography.bodyMedium,
                             singleLine = true,
                             colors = borderlessFieldColors(),
+                            trailingIcon = {
+                                if (state.description.isNotEmpty()) {
+                                    ClearFieldIcon("清空描述") { vm.setDescription("") }
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
                         )
                     }
@@ -312,6 +317,7 @@ fun RecordEditorDialog(
             fromId = state.fromAccountId,
             toId = state.toAccountId,
             initialTarget = accountTarget,
+            lockTarget = state.type == RecordType.TRANSFER,
             onFrom = { vm.setFromAccount(it) },
             onTo = { vm.setToAccount(it) },
             onDismiss = { activeSheet = null }
@@ -856,13 +862,10 @@ private fun EntryChipBar(
     onExtra: () -> Unit
 ) {
     val isTransfer = state.type == RecordType.TRANSFER
-    val accountLabel = if (isTransfer) {
-        "转出/转入"
-    } else {
-        val chosenId = if (state.type == RecordType.EXPENSE)
-            state.fromAccountId else state.toAccountId
-        accounts.firstOrNull { it.id == chosenId }?.name ?: "无账户"
-    }
+    // 第 81 批：转账态账户已常驻首屏两张卡，MUST NOT 再留一枚重复入口。
+    val chosenId = if (state.type == RecordType.EXPENSE)
+        state.fromAccountId else state.toAccountId
+    val accountLabel = accounts.firstOrNull { it.id == chosenId }?.name ?: "无账户"
     val noteLabel = buildString {
         append(if (state.note.isBlank()) "备注" else "备注·" + state.note.take(3))
         if (state.excludeFromStats) append("·不计入")
@@ -871,13 +874,23 @@ private fun EntryChipBar(
     val extraLabel = if (isTransfer) "手续费" else "优惠"
     val extraChip = if (state.extraExpr.isBlank()) extraLabel
     else extraLabel + "·" + state.extraExpr.take(4)
-    val chips: List<Pair<String, () -> Unit>> = listOf(
-        accountLabel to onAccount,
-        "模板" to onTemplate,
-        noteLabel to onNote,
-        tagLabel to onTag,
-        extraChip to onExtra
-    )
+    val chips: List<Pair<String, () -> Unit>> = if (isTransfer) {
+        // 转账态 4 枚：模板 / 备注 / 标签 / 手续费，MUST NOT 出现「转出/转入」chip。
+        listOf(
+            "模板" to onTemplate,
+            noteLabel to onNote,
+            tagLabel to onTag,
+            extraChip to onExtra
+        )
+    } else {
+        listOf(
+            accountLabel to onAccount,
+            "模板" to onTemplate,
+            noteLabel to onNote,
+            tagLabel to onTag,
+            extraChip to onExtra
+        )
+    }
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -917,6 +930,7 @@ private fun AccountPickerSheet(
     fromId: Long?,
     toId: Long?,
     initialTarget: Int,
+    lockTarget: Boolean = false,
     onFrom: (Long) -> Unit,
     onTo: (Long) -> Unit,
     onDismiss: () -> Unit
@@ -932,8 +946,13 @@ private fun AccountPickerSheet(
         type == RecordType.EXPENSE -> fromId
         else -> toId
     }
-    BottomPickerSheet(title = "选择账户", onDismiss = onDismiss) {
-        if (type == RecordType.TRANSFER) {
+    val sheetTitle = when {
+        type == RecordType.TRANSFER && lockTarget && initialTarget == 0 -> "选择转出账户"
+        type == RecordType.TRANSFER && lockTarget -> "选择转入账户"
+        else -> "选择账户"
+    }
+    BottomPickerSheet(title = sheetTitle, onDismiss = onDismiss) {
+        if (type == RecordType.TRANSFER && !lockTarget) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = target == 0,
@@ -954,6 +973,11 @@ private fun AccountPickerSheet(
             placeholder = { Text("搜索账户名 / 卡号后四位") },
             textStyle = MaterialTheme.typography.bodyMedium,
             singleLine = true,
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    ClearFieldIcon("清空账户搜索") { query = "" }
+                }
+            },
             modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
         )
         Spacer(Modifier.height(8.dp))
@@ -1027,6 +1051,11 @@ private fun NoteSheet(
             placeholder = { Text("可选", style = MaterialTheme.typography.bodyMedium) },
             textStyle = MaterialTheme.typography.bodyMedium,
             singleLine = true,
+            trailingIcon = {
+                if (state.note.isNotEmpty()) {
+                    ClearFieldIcon("清空备注") { onNote("") }
+                }
+            },
             modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp)
         )
         FormDivider()
@@ -1072,5 +1101,109 @@ private fun CounterpartySuggestionRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * 第 81 批：四处输入框共用的一键清空出口。
+ * 36dp 容器 + 18dp Icon，MUST NOT 把 heightIn(min=40.dp) 的输入行撑到 48dp。
+ * 空内容时由调用方不渲染，MUST NOT 常驻一个空叉号。
+ */
+@Composable
+private fun ClearFieldIcon(contentDescription: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.Filled.Close,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+/**
+ * 第 81 批：转账态转出 / 转入账户常驻首屏两张中性卡片。
+ * 借一羽的「两张大白卡」观感，MUST NOT 用阴影 / 描边 / 卡片堆叠（§7.41）。
+ * 不做 ⇅ 互换（新增手势，使用者明确否决）；点哪张卡就把 sheet 锁到哪个 target，
+ * 故 sheet 内 MUST NOT 再出现转出 / 转入分段（避免双入口）。
+ * 图标容器用 40dp 圆角矩形 + 主色 12% 底，零新增图标依赖。
+ */
+@Composable
+private fun TransferAccountCards(
+    accounts: List<AccountEntity>,
+    fromId: Long?,
+    toId: Long?,
+    onPick: (Int) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        TransferAccountCard("转出账户", "出", accounts, fromId) { onPick(0) }
+        TransferAccountCard("转入账户", "入", accounts, toId) { onPick(1) }
+    }
+    FormDivider()
+}
+
+@Composable
+private fun TransferAccountCard(
+    tag: String,
+    glyph: String,
+    accounts: List<AccountEntity>,
+    selectedId: Long?,
+    onClick: () -> Unit
+) {
+    val a = accounts.firstOrNull { it.id == selectedId }
+    val label = when {
+        a != null -> accountBaseLabel(a)
+        selectedId != null -> "原账户已删除，请重新指定"
+        else -> "选择账户"
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(LedgerColors.CardSurface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(LedgerColors.Primary.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                glyph,
+                style = MaterialTheme.typography.titleMedium,
+                color = LedgerColors.Primary
+            )
+        }
+        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(
+                tag,
+                style = MaterialTheme.typography.labelSmall,
+                color = LedgerColors.Neutral
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = LedgerColors.OnSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            a?.let {
+                Text(
+                    Cents(it.balanceCents).toYuanString() + " " + it.currencyCode,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LedgerColors.Neutral
+                )
+            }
+        }
+        Text("›", style = MaterialTheme.typography.labelMedium, color = LedgerColors.Neutral)
     }
 }

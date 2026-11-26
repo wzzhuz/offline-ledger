@@ -69,6 +69,17 @@ def main():
     # chips 点击区不得低于 40dp
     if "heightIn(min = 40.dp)" not in rec:e.append("chips / 联想条点击区被压缩到 40dp 以下")
 
+    # 第 81 批：转账态两卡常驻 + 移除转账账户 chip + 四处一键清空
+    for k in ["TransferAccountCards(","TransferAccountCard(","ClearFieldIcon(",
+              "lockTarget","清空描述","清空备注","清空账户搜索"]:
+        if k not in rec:e.append("第 81 批缺: "+k)
+    for k in ['"转出/转入"',"账号 chips 转账"]:
+        if k in rec:e.append("第 81 批残留: "+k)
+    if rec.count("ClearFieldIcon(")<5:
+        e.append("一键清空出口未覆盖四处输入框（含定义应 >=5 处）")
+    if "listOf(\n            accountLabel to onAccount" not in rec:
+        e.append("收支态 5 枚 chips 的账户入口被误删")
+
     tpl=read("app/src/main/java/com/zwz/offlineledger/ui/record/TemplateQuickPick.kt")
     if "TemplatePickerSheet(" not in tpl:e.append("模板未改成一羽式底部 sheet")
     if "ModalBottomSheet(" in tpl or "AlertDialog(" in tpl:
@@ -77,7 +88,7 @@ def main():
     db=read("app/src/main/java/com/zwz/offlineledger/data/local/AppDatabase.kt")
     if "version = 8," not in db:e.append("零改表口径被破坏")
     gd=read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.59"' not in gd:e.append("版本号未升 0.2.59")
+    if 'defaultVersionName = "0.2.60"' not in gd:e.append("版本号未升 0.2.60")
     wf=read(".github/workflows/build.yml")
     if "check_record_layout.py" not in wf:e.append("build.yml 未挂脚本")
     man=read("app/src/main/AndroidManifest.xml")
