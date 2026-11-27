@@ -28,6 +28,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,7 +38,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -45,6 +46,7 @@ import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.lifecycleScope
 import com.zwz.offlineledger.core.intake.TextIntakeCommitDraft
 import com.zwz.offlineledger.core.intake.TextIntakeCommitOutcome
 import com.zwz.offlineledger.core.intake.TextIntakeInspector
@@ -61,26 +63,44 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.abs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private data class UiStatus(val kind: String, val message: String, val recordId: Long? = null)
 
 /**
- * 第 87 批：系统文本选择菜单 / 分享选择器 / 设置页共用的文本识别页。
+ * 第 89 批：系统文本选择菜单 / 分享选择器 / 设置页共用的自动记账页。
  *
- * - 严格充分条件 + 自动开关开启时自动落库；否则只显示草稿，MUST NOT 猜值。
- * - 规则覆盖层与结果摘要走 LedgerPrefs，原文只留内存态，不进备份。
- * - 解锁前只渲染 AppLockScreen；excludeFromRecents 防最近任务快照泄露。
+ * 三条硬约束：
+ * - 写事务 MUST 跑在 Activity 的 lifecycleScope，MUST NOT 跑在 LaunchedEffect /
+ *   rememberCoroutineScope 里（composition 离开会 cancel，第 88 批「写入失败
+ *   The coroutine scope left the composition」即此坑）。
+ * - CancellationException MUST 原样抛出，MUST NOT 被包装成「写入失败」。
+ * - 页面分三区：本次结果 / 规则与试解析 / 记录。外部入口默认落在「本次结果」，
+ *   结果条置顶且常驻，失败原因第一屏可见。
  */
 @AndroidEntryPoint
 class TextIntakeActivity : FragmentActivity() {
 
     @Inject lateinit var repository: LedgerRepository
 
+    private lateinit var prefs: LedgerPrefs
+    private var source: String = ACTION_DEBUG
+    private var initialRaw: String = ""
+    private var autoCommitStarted = false
+
+    /** Activity 级 snapshot state：由 lifecycleScope 写，Compose 只读订阅。 */
+    private val intakeStatus = mutableStateOf<UiStatus?>(null)
+    private val intakeLog = mutableStateOf("")
+    private val activeDraft = mutableStateOf<TextIntakeCommitDraft?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val prefs = LedgerPrefs(this)
-        val (source, initialRaw) = extract(intent)
+        prefs = LedgerPrefs(this)
+        val extracted = extract(intent)
+        source = extracted.first
+        initialRaw = extracted.second
+        intakeLog.value = prefs.textIntakeLog
 
         LedgerColors.applyReverseColors(prefs.reverseColors)
         AmountMask.hidden = prefs.hideAmounts
@@ -88,6 +108,10 @@ class TextIntakeActivity : FragmentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
+
+        // 未开应用锁时立刻触发；开锁时由 AppLockScreen 的 onUnlocked 触发。
+        // 两者都只调一次，且完全不依赖 composition coroutine。
+        if (!prefs.appLockEnabled) triggerAutoCommit()
 
         setContent {
             LedgerTheme {
@@ -97,22 +121,18 @@ class TextIntakeActivity : FragmentActivity() {
                 var manualMode by remember { mutableStateOf(source == ACTION_DEBUG) }
                 var rulePatch by remember { mutableStateOf(prefs.textIntakeRulePatch.take(TextIntakeRules.MAX_PATCH_CHARS)) }
                 var autoEnabled by remember { mutableStateOf(prefs.textIntakeAutoCommitEnabled) }
-                var logText by remember { mutableStateOf(prefs.textIntakeLog) }
-                var commitState by remember { mutableStateOf<UiStatus?>(null) }
-                var lastDraft by remember { mutableStateOf<TextIntakeCommitDraft?>(null) }
-                var autoAttempted by remember { mutableStateOf(false) }
+                var tab by remember { mutableStateOf(if (source == ACTION_DEBUG) 1 else 0) }
 
                 val lifecycleOwner = LocalLifecycleOwner.current
-                val scope = rememberCoroutineScope()
                 val patchResult = remember(rulePatch) { TextIntakeRules.withPatch(rulePatch) }
                 val rules = patchResult.rules
-                // 第 88 批：只看「是否收到非空文本且不是内部试解析」，
-                // 不再枚举 action 字符串——部分 ROM 把分享文本放在 clipData，
-                // 旧写法会把它判成 empty，于是既不自动落库也不形成预填草稿。
                 val external = initialRaw.isNotBlank() && source != ACTION_DEBUG
                 val previewSource = if (manualMode) ACTION_DEBUG else source
                 val previewText = if (manualMode) testInput else rawText
                 val preview = TextIntakeInspector.from(previewSource, previewText, rules)
+                val status = intakeStatus.value
+                val logText = intakeLog.value
+                val draft = activeDraft.value ?: preview.commitDraft
 
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
@@ -124,267 +144,222 @@ class TextIntakeActivity : FragmentActivity() {
                     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
 
-                fun appendLog(kind: String, draft: TextIntakeCommitDraft?, reason: String) {
-                    val ts = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-                    val amount = draft?.amountCents?.let { centsToYuan(it) } ?: "--"
-                    val sourceTail = draft?.sourceId?.takeLast(6) ?: "------"
-                    val line = "$ts | $kind | ${amount}元 | 来源尾号$sourceTail | $reason"
-                    val next = (logText + "\n" + line)
-                        .lines().filter { it.isNotBlank() }.takeLast(20).joinToString("\n")
-                    prefs.textIntakeLog = next
-                    logText = next
-                }
-
-                fun applyOutcome(outcome: TextIntakeCommitOutcome, mode: String, draft: TextIntakeCommitDraft) {
-                    lastDraft = draft
-                    when (outcome) {
-                        is TextIntakeCommitOutcome.Inserted -> {
-                            commitState = UiStatus("INSERTED", outcome.message, outcome.recordId)
-                            appendLog(mode, draft, "已记账")
-                        }
-                        is TextIntakeCommitOutcome.Duplicate -> {
-                            commitState = UiStatus("DUPLICATE", outcome.message)
-                            appendLog(mode, draft, "已存在")
-                        }
-                        is TextIntakeCommitOutcome.Rejected -> {
-                            commitState = UiStatus("REJECTED", outcome.reason)
-                            appendLog(mode, draft, "降级草稿")
-                        }
-                    }
-                }
-
-                suspend fun doCommit(draft: TextIntakeCommitDraft): TextIntakeCommitOutcome = try {
-                    repository.commitTextIntake(draft)
-                } catch (e: Exception) {
-                    TextIntakeCommitOutcome.Rejected("写入失败：" + (e.message ?: e.javaClass.simpleName))
-                }
-
-                LaunchedEffect(unlocked, external, manualMode, autoEnabled, autoAttempted, rulePatch) {
-                    if (!unlocked || !external || manualMode || !autoEnabled || autoAttempted || initialRaw.isBlank()) {
-                        return@LaunchedEffect
-                    }
-                    autoAttempted = true
-                    val p = TextIntakeInspector.from(source, initialRaw, rules)
-                    if (p.readyForAutoCommit && p.commitDraft != null) {
-                        applyOutcome(doCommit(p.commitDraft!!), "自动", p.commitDraft!!)
-                    } else {
-                        lastDraft = p.commitDraft
-                        commitState = UiStatus(
-                            "DRAFT",
-                            "未达严格充分条件，已降级草稿：" + p.missing.joinToString("；"),
-                        )
-                        appendLog("草稿", p.commitDraft, "未达严格门槛")
-                    }
-                }
-
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                         if (!unlocked) {
                             AppLockScreen(
                                 prefs = prefs,
-                                onUnlocked = { unlocked = true },
+                                onUnlocked = {
+                                    unlocked = true
+                                    triggerAutoCommit()
+                                },
                                 onPrefsChanged = { applyFlagSecure(prefs.flagSecureEnabled) },
                             )
                         } else {
-                            val scroll = rememberScrollState()
-                            Column(
-                                modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(scroll),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Text("自动记账 / 文本诊断", style = MaterialTheme.typography.headlineSmall)
-                                Text(
-                                    "原文只在内存，退出或一键清空即释放。规则与结果摘要不含原文，且已排除系统备份。",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("本次入口状态", style = MaterialTheme.typography.titleSmall)
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            when {
-                                                manualMode -> "试解析模式：请在下方粘贴原文，本模式不会自动写库。"
-                                                preview.rawText.isBlank() ->
-                                                    "未收到文本。请确认从系统「全选 → 分享 → 离线账本 · 自动记账」进入；" +
-                                                        "若仍为空，把原文贴进下方试解析框，或复制给我排查。"
-                                                else -> "已收到 ${preview.rawText.length} 字符 · 来源：${sourceText(preview.source)}" +
-                                                    if (autoEnabled && external) " · 达标即自动记账，未达标形成预填草稿"
-                                                    else " · 当前仅草稿，不会自动写库"
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                                    Text("自动记账", style = MaterialTheme.typography.headlineSmall)
+                                    Text(
+                                        "原文只在内存；规则与结果摘要不含原文，且已排除系统备份。",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                TabRow(selectedTabIndex = tab) {
+                                    listOf("本次结果", "规则与试解析", "记录").forEachIndexed { i, title ->
+                                        Tab(
+                                            selected = tab == i,
+                                            onClick = { tab = i },
+                                            text = { Text(title, style = MaterialTheme.typography.labelMedium) },
                                         )
                                     }
                                 }
-
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text("自动记账", style = MaterialTheme.typography.titleSmall)
-                                        Row(modifier = Modifier.fillMaxWidth()) {
-                                            Text("严格条件达标后自动落库", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                                            Switch(
-                                                checked = autoEnabled,
-                                                onCheckedChange = {
-                                                    autoEnabled = it
-                                                    prefs.textIntakeAutoCommitEnabled = it
-                                                },
+                                val scroll = rememberScrollState()
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                        .verticalScroll(scroll),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    when (tab) {
+                                        // ── 分区 1：本次结果（外部入口默认落这里） ──
+                                        0 -> {
+                                            ResultBanner(
+                                                status = status,
+                                                rawCount = rawText.length,
+                                                sourceLabel = sourceText(source),
+                                                external = external,
+                                                autoEnabled = autoEnabled,
+                                                manualMode = manualMode,
                                             )
-                                        }
-                                        Text(
-                                            "关闭后所有文本只形成草稿，不会自动写库；未知格式也只会降级草稿。",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text("规则增补（可粘贴 AI 给你的一行词）", style = MaterialTheme.typography.titleSmall)
-                                        OutlinedTextField(
-                                            value = rulePatch,
-                                            onValueChange = {
-                                                val next = it.take(TextIntakeRules.MAX_PATCH_CHARS)
-                                                rulePatch = next
-                                                prefs.textIntakeRulePatch = next
-                                                manualMode = true
-                                                commitState = null
-                                            },
-                                            modifier = Modifier.fillMaxWidth().heightIn(min = 88.dp),
-                                            label = { Text("状态词 / 优惠词 / 噪声 / 分类映射") },
-                                        )
-                                        Text(
-                                            "示例：状态词 += 付款完成　优惠词 += 立减金　噪声 += 查看购物详情　分类 文化休闲 = 学习娱乐",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        if (patchResult.invalidLines.isNotEmpty()) {
-                                            Text("已忽略 ${patchResult.invalidLines.size} 行无效指令", style = MaterialTheme.typography.bodySmall)
-                                        }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            TextButton(onClick = {
-                                                copyRaw(this@TextIntakeActivity, RULE_PROMPT)
-                                            }) { Text("复制规则生成提示词") }
-                                            TextButton(onClick = {
-                                                rulePatch = ""
-                                                prefs.textIntakeRulePatch = ""
-                                                manualMode = true
-                                                commitState = null
-                                            }) { Text("恢复默认规则") }
-                                        }
-                                    }
-                                }
-
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text("粘贴原文试解析（不自动落库）", style = MaterialTheme.typography.titleSmall)
-                                        OutlinedTextField(
-                                            value = testInput,
-                                            onValueChange = { testInput = it },
-                                            modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
-                                            label = { Text("把失败那一笔原文贴进来") },
-                                        )
-                                        Button(onClick = {
-                                            manualMode = true
-                                            commitState = null
-                                            lastDraft = null
-                                        }) { Text("试解析") }
-                                        if (manualMode) {
+                                            if (status?.kind == "INSERTED" && status.recordId != null) {
+                                                Button(onClick = { undo(status.recordId!!) }) {
+                                                    Text("撤销这笔")
+                                                }
+                                            }
+                                            if (draft != null && draft.amountYuan.isNotBlank() &&
+                                                (status == null || status.kind == "DRAFT" ||
+                                                    status.kind == "REJECTED" || status.kind == "DUPLICATE")
+                                            ) {
+                                                InfoCard("本次识别摘要", listOf(
+                                                    "金额" to "${draft.amountYuan} 元",
+                                                    "状态" to draft.statusWord.ifEmpty { "未找到" },
+                                                    "时间" to draft.localDate.toString(),
+                                                    "账户" to "${draft.accountName}(${draft.cardLast4})",
+                                                    "收款方" to draft.counterparty.ifEmpty { "未找到" },
+                                                    "分类" to (draft.categoryRoot ?: "未映射，留空"),
+                                                    "来源号尾号" to draft.sourceId.takeLast(6),
+                                                ).let { rows ->
+                                                    if (draft.discountCents != null) rows +
+                                                        listOf("原价 / 优惠" to "${draft.originalYuan} / ${draft.discountYuan}")
+                                                    else rows
+                                                })
+                                                DraftForm(draft) { edited -> saveManual(edited) }
+                                            }
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Button(onClick = { copyRaw(this@TextIntakeActivity, initialRaw) }) {
+                                                    Text("复制本次原文")
+                                                }
+                                                OutlinedButton(onClick = {
+                                                    rawText = ""
+                                                    activeDraft.value = null
+                                                    intakeStatus.value = null
+                                                }) { Text("一键清空") }
+                                                TextButton(onClick = { finish() }) { Text("关闭") }
+                                            }
                                             Text(
-                                                "当前为试解析模式：不会自动写库；可手工保存下方草稿。",
+                                                "原文全文与结果留痕在「记录」页；规则和试解析在第二个页签。",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
-                                    }
-                                }
 
-                                if (commitState != null) {
-                                    val st = commitState!!
-                                    Card(modifier = Modifier.fillMaxWidth()) {
-                                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text("处理结果：${st.kind}", style = MaterialTheme.typography.titleSmall)
-                                            Text(st.message, style = MaterialTheme.typography.bodySmall)
-                                            if (st.kind == "INSERTED" && st.recordId != null) {
-                                                Button(onClick = {
-                                                    val id = st.recordId!!
-                                                    scope.launch {
-                                                        try {
-                                                            repository.deleteRecord(id)
-                                                            commitState = UiStatus("UNDONE", "已撤销，余额已重算")
-                                                            appendLog("撤销", lastDraft, "已撤销")
-                                                        } catch (e: Exception) {
-                                                            commitState = UiStatus("REJECTED", "撤销失败：" + (e.message ?: "未知错误"))
-                                                        }
+                                        // ── 分区 2：规则与试解析（设置页内部入口默认落这里） ──
+                                        1 -> {
+                                            Card(modifier = Modifier.fillMaxWidth()) {
+                                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Text("自动 / 仅草稿", style = MaterialTheme.typography.titleSmall)
+                                                    Row(modifier = Modifier.fillMaxWidth()) {
+                                                        Text(
+                                                            "严格条件达标后自动落库",
+                                                            modifier = Modifier.weight(1f),
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                        )
+                                                        Switch(
+                                                            checked = autoEnabled,
+                                                            onCheckedChange = {
+                                                                autoEnabled = it
+                                                                prefs.textIntakeAutoCommitEnabled = it
+                                                            },
+                                                        )
                                                     }
-                                                }) { Text("撤销这笔") }
+                                                    Text(
+                                                        "关闭后所有文本只形成草稿；未知格式也只会降级草稿，不会误记。",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                            }
+                                            Card(modifier = Modifier.fillMaxWidth()) {
+                                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Text("规则增补（可粘贴 AI 生成的一行词）", style = MaterialTheme.typography.titleSmall)
+                                                    OutlinedTextField(
+                                                        value = rulePatch,
+                                                        onValueChange = {
+                                                            val next = it.take(TextIntakeRules.MAX_PATCH_CHARS)
+                                                            rulePatch = next
+                                                            prefs.textIntakeRulePatch = next
+                                                        },
+                                                        modifier = Modifier.fillMaxWidth().heightIn(min = 88.dp),
+                                                        label = { Text("状态词 / 优惠词 / 噪声 / 分类映射") },
+                                                    )
+                                                    Text(
+                                                        "示例：状态词 += 付款完成　优惠词 += 立减金　噪声 += 查看购物详情　分类 文化休闲 = 学习娱乐",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                    if (patchResult.invalidLines.isNotEmpty()) {
+                                                        Text(
+                                                            "已忽略 ${patchResult.invalidLines.size} 行无效指令",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                        )
+                                                    }
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        TextButton(onClick = {
+                                                            copyRaw(this@TextIntakeActivity, RULE_PROMPT)
+                                                        }) { Text("复制规则生成提示词") }
+                                                        TextButton(onClick = {
+                                                            rulePatch = ""
+                                                            prefs.textIntakeRulePatch = ""
+                                                        }) { Text("恢复默认规则") }
+                                                    }
+                                                }
+                                            }
+                                            Card(modifier = Modifier.fillMaxWidth()) {
+                                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Text("粘贴原文试解析（不写库）", style = MaterialTheme.typography.titleSmall)
+                                                    OutlinedTextField(
+                                                        value = testInput,
+                                                        onValueChange = { testInput = it; manualMode = true },
+                                                        modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
+                                                        label = { Text("把失败那一笔原文贴进来") },
+                                                    )
+                                                    Button(onClick = { manualMode = true }) { Text("试解析") }
+                                                    InfoCard("试解析结果", listOf(
+                                                        "来源" to sourceText(preview.source),
+                                                        "字符数" to "${preview.rawText.length} / ${preview.originalCharCount}" +
+                                                            if (preview.truncated) "（已截断）" else "",
+                                                        "页面特征数" to "${preview.commitDraft?.pageMarkers ?: 0}",
+                                                        "主金额" to preview.commitDraft?.amountYuan.orEmpty().ifEmpty { "未找到" },
+                                                        "全部金额候选" to preview.amountCandidates
+                                                            .ifEmpty { listOf("未找到") }.joinToString("、"),
+                                                        "方向 / 时间 / 收款方" to
+                                                            "${yesNo(preview.hasDirection)} / ${yesNo(preview.hasTime)} / ${yesNo(preview.hasCounterparty)}",
+                                                        "严格门槛" to yesNo(preview.readyForAutoCommit),
+                                                    ))
+                                                    if (preview.missing.isNotEmpty()) {
+                                                        Text(
+                                                            "未达标：" + preview.missing.joinToString("；"),
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                        )
+                                                    }
+                                                    if (preview.warnings.isNotEmpty()) {
+                                                        Text(
+                                                            "提示：" + preview.warnings.joinToString("；"),
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // ── 分区 3：记录 ──
+                                        else -> {
+                                            Card(modifier = Modifier.fillMaxWidth()) {
+                                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Text("最近结果摘要（不含原文）", style = MaterialTheme.typography.titleSmall)
+                                                    Text(logText.ifBlank { "（暂无）" }, style = MaterialTheme.typography.bodySmall)
+                                                    TextButton(onClick = {
+                                                        intakeLog.value = ""
+                                                        prefs.textIntakeLog = ""
+                                                    }) { Text("清除留痕") }
+                                                }
+                                            }
+                                            Card(modifier = Modifier.fillMaxWidth()) {
+                                                Column(modifier = Modifier.padding(16.dp)) {
+                                                    Text("本次收到的原文", style = MaterialTheme.typography.titleSmall)
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    SelectionContainer {
+                                                        Text(
+                                                            text = rawText.ifEmpty { "（已清空）" },
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
-                                }
-
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text("只读预演", style = MaterialTheme.typography.titleSmall)
-                                        InfoRow("来源", sourceText(preview.source))
-                                        InfoRow("字符数", "${preview.rawText.length} / ${preview.originalCharCount}" + if (preview.truncated) "（已截断）" else "")
-                                        InfoRow("页面特征数", "${preview.commitDraft?.pageMarkers ?: 0}")
-                                        InfoRow("主金额", preview.commitDraft?.amountYuan.orEmpty().ifEmpty { "未找到" })
-                                        InfoRow("全部金额候选", preview.amountCandidates.ifEmpty { listOf("未找到") }.joinToString("、"))
-                                        InfoRow("方向", yesNo(preview.hasDirection))
-                                        InfoRow("时间", yesNo(preview.hasTime))
-                                        InfoRow("收款方", yesNo(preview.hasCounterparty))
-                                        InfoRow("严格门槛", yesNo(preview.readyForAutoCommit))
-                                        if (preview.missing.isNotEmpty()) {
-                                            Text("未达标：" + preview.missing.joinToString("；"), style = MaterialTheme.typography.bodySmall)
-                                        }
-                                        if (preview.warnings.isNotEmpty()) {
-                                            Text("提示：" + preview.warnings.joinToString("；"), style = MaterialTheme.typography.bodySmall)
-                                        }
-                                    }
-                                }
-
-                                val showDraft = preview.commitDraft != null &&
-                                    (commitState == null || commitState!!.kind == "DRAFT" || commitState!!.kind == "REJECTED")
-                                if (showDraft) {
-                                    DraftForm(preview.commitDraft!!) { d ->
-                                        scope.launch { applyOutcome(doCommit(d), "手工", d) }
-                                    }
-                                }
-
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("收到的原文", style = MaterialTheme.typography.titleSmall)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        SelectionContainer {
-                                            Text(
-                                                text = preview.rawText.ifEmpty { "（已清空）" },
-                                                style = MaterialTheme.typography.bodySmall,
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text("最近结果摘要（不含原文）", style = MaterialTheme.typography.titleSmall)
-                                        Text(logText.ifBlank { "（暂无）" }, style = MaterialTheme.typography.bodySmall)
-                                        TextButton(onClick = {
-                                            logText = ""
-                                            prefs.textIntakeLog = ""
-                                        }) { Text("清除留痕") }
-                                    }
-                                }
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(onClick = { copyRaw(this@TextIntakeActivity, preview.rawText) }) { Text("复制全文") }
-                                    OutlinedButton(onClick = {
-                                        if (manualMode) testInput = "" else rawText = ""
-                                        commitState = null
-                                        lastDraft = null
-                                    }) { Text("一键清空") }
-                                    TextButton(onClick = { finish() }) { Text("关闭") }
                                 }
                             }
                         }
@@ -392,6 +367,90 @@ class TextIntakeActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    /** 只在 Activity 级调用一次；写事务在 lifecycleScope，不受 composition 取消影响。 */
+    private fun triggerAutoCommit() {
+        if (autoCommitStarted || initialRaw.isBlank() || source == ACTION_DEBUG) return
+        if (!prefs.textIntakeAutoCommitEnabled) {
+            // 仅草稿模式：不写状态，Tab 0 的结果条会说明，草稿由 inspector 直接给出。
+            return
+        }
+        autoCommitStarted = true
+        lifecycleScope.launch {
+            val rules = TextIntakeRules.withPatch(prefs.textIntakeRulePatch).rules
+            val p = TextIntakeInspector.from(source, initialRaw, rules)
+            activeDraft.value = p.commitDraft
+            if (p.readyForAutoCommit && p.commitDraft != null) {
+                applyOutcome(commitSafely(p.commitDraft!!), "自动", p.commitDraft!!)
+            } else {
+                intakeStatus.value = UiStatus(
+                    "DRAFT",
+                    "未达严格充分条件，已降级草稿：" + p.missing.joinToString("；"),
+                )
+                appendLog("草稿", p.commitDraft, "未达严格门槛")
+            }
+        }
+    }
+
+    /** CancellationException MUST 原样抛出，绝不伪装成业务失败。 */
+    private suspend fun commitSafely(draft: TextIntakeCommitDraft): TextIntakeCommitOutcome = try {
+        repository.commitTextIntake(draft)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        TextIntakeCommitOutcome.Rejected("写入失败：" + (e.message ?: e.javaClass.simpleName))
+    }
+
+    private fun saveManual(draft: TextIntakeCommitDraft) {
+        lifecycleScope.launch { applyOutcome(commitSafely(draft), "手工", draft) }
+    }
+
+    private fun undo(id: Long) {
+        lifecycleScope.launch {
+            try {
+                repository.deleteRecord(id)
+                intakeStatus.value = UiStatus("UNDONE", "已撤销，余额已重算")
+                appendLog("撤销", activeDraft.value, "已撤销")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                intakeStatus.value = UiStatus("REJECTED", "撤销失败：" + (e.message ?: "未知错误"))
+            }
+        }
+    }
+
+    private fun applyOutcome(
+        outcome: TextIntakeCommitOutcome,
+        mode: String,
+        draft: TextIntakeCommitDraft,
+    ) {
+        activeDraft.value = draft
+        when (outcome) {
+            is TextIntakeCommitOutcome.Inserted -> {
+                intakeStatus.value = UiStatus("INSERTED", outcome.message, outcome.recordId)
+                appendLog(mode, draft, "已记账")
+            }
+            is TextIntakeCommitOutcome.Duplicate -> {
+                intakeStatus.value = UiStatus("DUPLICATE", outcome.message)
+                appendLog(mode, draft, "已存在")
+            }
+            is TextIntakeCommitOutcome.Rejected -> {
+                intakeStatus.value = UiStatus("REJECTED", outcome.reason)
+                appendLog(mode, draft, "降级草稿")
+            }
+        }
+    }
+
+    private fun appendLog(kind: String, draft: TextIntakeCommitDraft?, reason: String) {
+        val ts = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val amount = draft?.amountCents?.let { centsToYuan(it) } ?: "--"
+        val sourceTail = draft?.sourceId?.takeLast(6) ?: "------"
+        val line = "$ts | $kind | ${amount}元 | 来源尾号$sourceTail | $reason"
+        val next = (intakeLog.value + "\n" + line)
+            .lines().filter { it.isNotBlank() }.takeLast(20).joinToString("\n")
+        prefs.textIntakeLog = next
+        intakeLog.value = next
     }
 
     private fun applyFlagSecure(enabled: Boolean) {
@@ -418,7 +477,7 @@ class TextIntakeActivity : FragmentActivity() {
             if (!send.isNullOrEmpty()) return "send" to send
             // 第 88 批：HyperOS 等 ROM 的「全选 → 分享」可能只把文本放进 clipData，
             // EXTRA_TEXT 为空。不兜底会落到 "empty"，页面显示「未收到文本」，
-            // LaunchedEffect 直接 return，于是既不自动落库也不形成预填草稿 —— 正是使用者反馈的现象。
+            // 于是既不自动落库也不形成预填草稿。
             val clip = try {
                 intent.clipData?.takeIf { it.itemCount > 0 }
                     ?.getItemAt(0)?.text?.toString()
@@ -427,6 +486,11 @@ class TextIntakeActivity : FragmentActivity() {
             }
             if (!clip.isNullOrEmpty()) return "send" to clip
             return "empty" to ""
+        }
+
+        fun copyRaw(context: Context, text: String) {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("账单原文", text))
         }
 
         /** 离开本会话后，复制这段给任意 AI，即可生成可粘贴的规则增补行。 */
@@ -459,10 +523,56 @@ class TextIntakeActivity : FragmentActivity() {
 状态词 += 自动扣款成功
 优惠词 += 立减金
 """
+    }
+}
 
-        fun copyRaw(context: Context, text: String) {
-            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cm.setPrimaryClip(ClipData.newPlainText("账单原文", text))
+/** 置顶常驻的结果条：失败原因第一屏可见，不用在长页面里找。 */
+@Composable
+private fun ResultBanner(
+    status: UiStatus?,
+    rawCount: Int,
+    sourceLabel: String,
+    external: Boolean,
+    autoEnabled: Boolean,
+    manualMode: Boolean,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("本次入口状态 / 处理结果", style = MaterialTheme.typography.titleSmall)
+            val (kind, message) = when {
+                status != null -> status.kind to status.message
+                manualMode -> "试解析" to "试解析模式：不会自动写库。"
+                !external || rawCount == 0 ->
+                    "未收到文本" to "未收到文本。请确认从系统「全选 → 分享 → 离线账本 · 自动记账」进入；" +
+                        "若仍为空，把原文贴进「规则与试解析」页，或复制给我排查。"
+                !autoEnabled -> "仅草稿" to "当前仅草稿模式：不会自动写库，可在下方改好后手工保存。"
+                else -> "处理中" to "正在处理…"
+            }
+            Text(
+                text = "处理结果：$kind",
+                style = MaterialTheme.typography.titleMedium,
+                color = when (kind) {
+                    "INSERTED" -> MaterialTheme.colorScheme.primary
+                    "REJECTED", "未收到文本" -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+            )
+            Text(message, style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = "已收到 $rawCount 字符 · 来源：$sourceLabel",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InfoCard(title: String, rows: List<Pair<String, String>>) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            rows.forEach { (label, value) -> InfoRow(label, value) }
         }
     }
 }
@@ -492,12 +602,6 @@ private fun DraftForm(initial: TextIntakeCommitDraft, onSave: (TextIntakeCommitD
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("预填草稿（未自动写库）", style = MaterialTheme.typography.titleSmall)
-            InfoRow("日期", initial.localDate.toString())
-            InfoRow("状态", initial.statusWord.ifEmpty { "未找到" })
-            InfoRow("账户", "${initial.accountName}(${initial.cardLast4})")
-            if (initial.discountCents != null) {
-                InfoRow("原价 / 优惠", "${initial.originalYuan} / ${initial.discountYuan}")
-            }
             OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("实付金额") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = sourceId, onValueChange = { sourceId = it }, label = { Text("来源号 / 订单号") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = counterparty, onValueChange = { counterparty = it }, label = { Text("收款方") }, modifier = Modifier.fillMaxWidth())
@@ -549,7 +653,7 @@ private fun InfoRow(label: String, value: String) {
     }
 }
 
-private fun yesNo(hit: Boolean): String = if (hit) "✓ 命中" else "✗ 未命中"
+private fun yesNo(hit: Boolean): String = if (hit) "✓" else "✗"
 
 private fun sourceText(source: String): String = when (source) {
     "process_text" -> "文本选择菜单（PROCESS_TEXT）"

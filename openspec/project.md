@@ -1743,3 +1743,26 @@ HyperOS 的分享可能只把文本放进 `clipData`，于是判成「未收到�
 **流程**：修 bug（恢复第 87 批已承诺行为）+ 文档补充，不新建 change；
 同一 `text-intake-diagnosis` 补 tasks/design/delta，仍活跃不归档。
 零改表、零新增依赖 / 权限 / `INTERNET`、零后台组件，**可直接覆盖 v0.2.66**。
+
+
+---
+
+## 第 89 批：自动落库协程隔离 + 页面三分区
+
+**使用者反馈**：分享进来提示「REJECTED 写入失败 The coroutine scope left the composition」，没有入库；
+并指出页面把规则、试解析、错误提示、手工保存、结果摘要全堆在一列，失败原因要找半天。
+
+**根因**：自动落库写在 `LaunchedEffect` 里，而 effect 内部修改了作为 key 的 `autoAttempted` state，
+触发自我取消；`db.withTransaction` 抛 `CancellationException` 后被
+`catch (e: Exception)` 吞掉，包装成「写入失败」。应用锁解锁 / ON_PAUSE / 改规则同样会让 key 变化。
+这是第 88 批引入的实现缺陷，不是数据库或 Repository 问题。
+
+**改动**：
+- 自动落库、手工保存、撤销全部移到 Activity `lifecycleScope`；结果改 Activity 级 `mutableStateOf`
+- 一次性标记改普通 `var`，不再作 effect key；`CancellationException` MUST 原样抛出
+- 页面拆「本次结果 / 规则与试解析 / 记录」三页签；外部入口默认结果页、设置入口默认试解析页
+- 结果条置顶常驻，第一屏显示处理结果类型与失败原因；预填草稿紧随其后
+- 静态脚本新增「LaunchedEffect 块内不得调用 commitTextIntake」扫描断言
+
+**流程**：修 bug + 同一活跃 change 内信息架构重排，不新建 change；仍不归档。
+零改表、零新增依赖 / 权限 / `INTERNET`、零后台组件，**可直接覆盖 v0.2.67**。

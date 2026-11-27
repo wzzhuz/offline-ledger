@@ -13,6 +13,16 @@ Activity SHALL 同时读 `EXTRA_PROCESS_TEXT`、`EXTRA_TEXT` 与 `Intent.clipDat
 MUST NOT 因 ROM 只把分享文本放进 `clipData` 而判定为「未收到文本」；
 收到非空文本且非内部试解析时 SHALL 进入自动落库 / 预填草稿判定，
 MUST NOT 停留在空诊断页。页面 SHALL 显式显示「本次入口状态」（字符数 / 来源 / 是否会写库）。
+页面 SHALL 分为「本次结果 / 规则与试解析 / 记录」三个页签（第 89 批）。
+从外部 Intent 进入 SHALL 默认落在「本次结果」页，从设置页内部入口进入 SHALL 默认落在
+「规则与试解析」页。
+「本次结果」页 SHALL 置顶常驻结果条，第一屏即显示处理结果类型与原因（含
+`REJECTED` 的失败文案）、本次收到的字符数与来源；
+MUST NOT 把失败原因藏在长页面底部或与规则编辑、留痕、原文混在同一滚动列。
+预填草稿表单 SHALL 紧随结果条与本次识别摘要之后，
+`DRAFT` / `REJECTED` / `DUPLICATE` 状态下 SHALL 可编辑并手工保存。
+「规则与试解析」页 SHALL 承载自动开关、规则增补、复制提示词与粘贴试解析，且 MUST NOT 写库。
+「记录」页 SHALL 承载结果摘要与原文只读查看。
 页面 SHALL 以只读方式显示来源、字符数与截断标记、**全部**疑似金额串、
 主金额、页面特征数、方向 / 时间 / 收款方命中、严格门槛结论、
 缺失项与提示；SHALL 提供一键复制、一键清空与关闭，并 SHALL 用
@@ -138,3 +148,37 @@ SHALL 降级为预填草稿，MUST NOT 静默落库。
 - **AND** 结果摘要追加「撤销」但不包含原文
 
 **理由**：0 次确认最需要保险丝；去重、撤销与既有事务共同把自动化的风险控制住。
+
+
+---
+
+## ADDED Requirements（第 89 批）
+
+### Requirement: 写事务与 composition 协程隔离
+
+自动落库、手工保存与撤销 SHALL 运行在 Activity 的 `lifecycleScope`，
+MUST NOT 运行在 `LaunchedEffect` 或 `rememberCoroutineScope()` 的协程中。
+结果状态 SHALL 由 Activity 级 snapshot state 持有，Compose SHALL 只读订阅。
+自动落库流程 MUST 只触发一次（普通标记位，MUST NOT 用会触发重组的 state 作 effect key）。
+`CancellationException` SHALL 原样抛出，MUST NOT 被 `catch (e: Exception)`
+包装成「写入失败」等文案。
+`check_text_intake.py` MUST 断言 LaunchedEffect 块内不得出现 `commitTextIntake`。
+
+#### Scenario: 从系统分享进入并自动落库
+
+- **GIVEN** 使用者开启自动开关且未开应用锁
+- **WHEN** 从「全选 → 分享 → 离线账本 · 自动记账」进入
+- **THEN** `lifecycleScope` 执行 `commitTextIntake` 并写入流水
+- **AND** 「本次结果」页顶部显示「处理结果：INSERTED」
+- **AND** 不出现 `The coroutine scope left the composition`
+
+#### Scenario: 重组或页面切换期间写入
+
+- **GIVEN** 自动落库事务正在执行
+- **WHEN** 使用者切换页签或 Compose 发生重组
+- **THEN** 事务不被取消、结果仍回写到「本次结果」页
+- **AND** 不会重复触发第二次自动落库
+
+**理由**：第 88 批把写事务放在 `LaunchedEffect` 内，并在 effect 里修改作为 key 的 state，
+导致 effect 自我取消；宽泛 catch 又把 `CancellationException` 伪装成业务失败。
+这是「没有入库」的直接根因。

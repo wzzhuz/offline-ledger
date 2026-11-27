@@ -150,3 +150,20 @@ Activity `excludeFromRecents` SHALL 为 `true`。
 - **WHEN** AI 按提示词判断
 - **THEN** 只输出 `# 结构变化，需要改代码并发版`
 - **AND** 使用者不会把无效规则粘进覆盖层反复试
+
+
+---
+
+### Requirement: 三分区不扩大隐私面（第 89 批）
+
+页面拆分后，原文 SHALL 仍只存在 Activity 内存态；
+「本次结果」页 MUST NOT 渲染完整原文，
+完整原文 SHALL 只在「记录」页以 `SelectionContainer` 只读展示。
+「本次识别摘要」与结果摘要 MUST NOT 含完整订单号，只显示来源号尾号。
+
+#### Scenario: 结果页不含原文
+
+- **GIVEN** 一笔自动落库失败并显示 `REJECTED`
+- **WHEN** 使用者停留在「本次结果」页
+- **THEN** 页面显示失败原因、金额、账户、来源号尾号，但不显示整屏原文
+- **AND** 切到「记录」页才可用 `SelectionContainer` 选择原文

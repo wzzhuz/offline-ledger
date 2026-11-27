@@ -36,13 +36,36 @@ def main():
               "SelectionContainer", "EXTRA_PROCESS_TEXT", "EXTRA_TEXT",
               "ACTION_TEXT_INTAKE_DEBUG", "takeLast(6)",
               "intent.clipData", "initialRaw.isNotBlank()", "本次入口状态",
-              "RULE_PROMPT", "复制规则生成提示词", "未收到文本"]:
+              "RULE_PROMPT", "复制规则生成提示词", "未收到文本",
+              # 第 89 批：写事务 MUST 在 Activity scope，页面 MUST 三分区
+              "lifecycleScope.launch", "CancellationException", "commitSafely",
+              "TabRow", "ResultBanner", "本次结果", "规则与试解析", "记录",
+              "未达严格充分条件"]:
         if k not in act:
             e.append("Activity 缺: " + k)
+    # 剥注释后再判禁止项：KDoc 里写「MUST NOT 用 rememberCoroutineScope」不该自误报
+    act_code = "\n".join(
+        line for line in act.splitlines()
+        if not line.lstrip().startswith("//")
+        and not line.lstrip().startswith("*")
+        and not line.lstrip().startswith("/*")
+    )
     for k in ["rememberSaveable", "openOutputStream", "startForeground",
-              "registerListener", "withTransaction", "Room", "openFileOutput"]:
-        if k in act:
+              "registerListener", "withTransaction", "Room", "openFileOutput",
+              "rememberCoroutineScope", "scope.launch"]:
+        if k in act_code:
             e.append("Activity 不得出现: " + k)
+    # 写事务不得落在 LaunchedEffect 块里
+    le_start = act_code.find("LaunchedEffect(")
+    while le_start >= 0:
+        le_end = act_code.find("LaunchedEffect(", le_start + 1)
+        if le_end < 0:
+            le_end = len(act_code)
+        if "commitTextIntake" in act_code[le_start:le_end]:
+            e.append("LaunchedEffect 块内不得调用 commitTextIntake")
+        le_start = act_code.find("LaunchedEffect(", le_start + 1)
+        if le_start >= len(act_code):
+            break
 
     rules = C("app/src/main/java/com/zwz/offlineledger/core/intake/TextIntakeRules.kt")
     for k in ["MAX_PATCH_CHARS", "状态词", "优惠词", "噪声", "分类", "val invalid"]:
@@ -111,16 +134,16 @@ def main():
 
     gd_raw = C("app/build.gradle.kts")
     gd = "\n".join(line.split("//")[0] for line in gd_raw.splitlines()).lower()
-    if 'defaultVersionName = "0.2.67"' not in gd_raw:
-        e.append("版本号未升 0.2.67")
+    if 'defaultVersionName = "0.2.68"' not in gd_raw:
+        e.append("版本号未升 0.2.68")
     for dep in ["mlkit", "text-recognition", "coil", "glide", "okhttp", "retrofit"]:
         if dep in gd:
             e.append("不得新增依赖: " + dep)
     if "check_text_intake.py" not in C(".github/workflows/build.yml"):
         e.append("build.yml 未挂 check_text_intake.py")
-    for p, k in [("docs/页面优化经验与避坑指南.md", "§7.70"),
-                 ("openspec/project.md", "第 88 批"),
-                 ("openspec/changes/text-intake-diagnosis/proposal.md", "第 88 批修正")]:
+    for p, k in [("docs/页面优化经验与避坑指南.md", "§7.71"),
+                 ("openspec/project.md", "第 89 批"),
+                 ("openspec/changes/text-intake-diagnosis/proposal.md", "第 89 批修正")]:
         if k not in C(p):
             e.append("文档未登记: " + p)
 

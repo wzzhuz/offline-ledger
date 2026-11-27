@@ -36,6 +36,17 @@
 - [x] 3b.6 delta / proposal / design / project.md / 活文档 §7.70 同步；版本号 0.2.67
 - [x] 3b.7 `check_text_intake.py` 增加 clipData / 标签 / 提示词文档断言；13 个静态检查本地全 PASS
 
+## 3c. 第 89 批：协程隔离 + 三分区重排
+
+- [x] 3c.1 写事务从 `LaunchedEffect` 移到 Activity `lifecycleScope`；删除 `rememberCoroutineScope`
+- [x] 3c.2 自动落库一次性触发改为普通 `var autoCommitStarted`；`onCreate` / `onUnlocked` 双入口
+- [x] 3c.3 `CancellationException` 原样抛出，不再伪装成「写入失败」
+- [x] 3c.4 结果 / 日志 / 草稿改 Activity 级 snapshot state，Compose 只读订阅
+- [x] 3c.5 三页签：本次结果 / 规则与试解析 / 记录；入口来源决定默认页
+- [x] 3c.6 `ResultBanner` 置顶常驻，失败原因第一屏可见；草稿表单紧随摘要
+- [x] 3c.7 delta / proposal / design / project.md / 活文档 §7.71 / 提示词文档路径同步；版本号 0.2.68
+- [x] 3c.8 `check_text_intake.py` 增加 lifecycleScope / CancellationException / TabRow / LaunchedEffect 块断言；13 个静态检查本地全 PASS
+
 ## 4. 出包
 
 - [ ] 4.1 编译与校验 CI 全绿（含 `testDebugUnitTest`）

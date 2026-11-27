@@ -20,6 +20,9 @@
 | 14 | change 保持活跃不归档 | 微信页后面几轮再验，避免新开 change |
 | 15 | `extract()` MUST 读 `EXTRA_PROCESS_TEXT` / `EXTRA_TEXT` / `Intent.clipData` 三层 | 第 88 批真机反馈：HyperOS 分享可能只用 clipData，旧实现判成「未收到文本」，导致既不落库也不预填 |
 | 16 | 入口标签改「离线账本 · 自动记账」，并写独立提示词文档 | 第 87 批已能记账，再叫「文本诊断」是误导；用户离开会话后需要一段可复制 Prompt |
+| 17 | 写事务 MUST 在 Activity `lifecycleScope`，MUST NOT 在 `LaunchedEffect` / `rememberCoroutineScope` | 第 89 批真机「The coroutine scope left the composition」：effect key 自我变化导致取消 |
+| 18 | `CancellationException` MUST 原样抛出 | 宽泛 `catch (Exception)` 会把取消伪装成「写入失败」，掩盖真实原因 |
+| 19 | 页面三分区，结果条置顶常驻 | 单列堆叠时失败原因要找半天，第一屏看不到 |
 
 ## 考虑过的其他方案（被否决）
 
@@ -111,8 +114,9 @@ TextIntakeActivity (@AndroidEntryPoint)
 
 ## 真机待验（全部 [ ]）
 
-0. **第 88 批首要项**：从系统「全选 → 分享 → 离线账本 · 自动记账」进入，
-   页面是否显示「已收到 N 字符」并自动记账 / 形成预填草稿，而不是空白诊断页
+-1. **第 89 批首要项**：从系统「全选 → 分享 → 离线账本 · 自动记账」进入，
+   是否真的写入流水且顶部显示「处理结果：INSERTED」，不再出现 `The coroutine scope left the composition`
+0. **第 88 批项**：页面是否显示「已收到 N 字符」，而不是空白诊断页
 1. 6 笔支付宝原文是否能自动落库，优惠两笔是否显示原价 / 优惠 / 实付
 2. 同一笔分享两次是否只记一笔
 3. 账户 2203 / 7375 是否归到正确卡片；账户不存在时是否降级草稿
@@ -165,3 +169,59 @@ App 内「复制规则生成提示词」按钮直接复制常量，手机上即�
 贴给外部 AI 是**使用者主动、可控的一次导出**，不等于 App 默认回传；
 但文档 MUST 提示先删订单号 / 商家订单号 / 卡号尾号。App 本体仍零 `INTERNET`、
 不写原文到任何文件、不进备份。
+
+
+---
+
+## 第 89 批：协程隔离与三分区
+
+### 故障链
+
+```
+LaunchedEffect(key = [..., autoAttempted, rulePatch, unlocked, ...])
+  └─ 内部第一行 autoAttempted = true        ← 改的就是自己的 key
+       └─ 重组 → 旧 effect coroutine 被 cancel
+            └─ db.withTransaction 抛 CancellationException
+                 ("The coroutine scope left the composition")
+                 └─ catch (e: Exception) 吞掉
+                      └─ Rejected("写入失败：...")  ← 看起来像 DB 失败
+```
+
+此外 `scope = rememberCoroutineScope()` 用于手工保存 / 撤销，同样会在 composition
+离开时被取消；`unlocked` 在 ON_PAUSE 变 false 也会让 key 变化。
+
+### 修正
+
+| 层 | 之前 | 现在 |
+|---|---|---|
+| 自动落库 | `LaunchedEffect` 内 suspend | `onCreate` / `onUnlocked` → `lifecycleScope.launch` |
+| 一次性标记 | `autoAttempted` 是 state，又是 effect key | 普通 `var autoCommitStarted` |
+| 结果状态 | Compose `remember` state，由 effect 写 | Activity 级 `mutableStateOf`，Compose 只读订阅 |
+| 手工保存 / 撤销 | `rememberCoroutineScope().launch` | Activity 方法 → `lifecycleScope.launch` |
+| CancellationException | 被 `catch (Exception)` 吞 | `catch (CancellationException) { throw e }` 前置 |
+| 规则编辑 | 改 `rulePatch` 会取消正在跑的事务 | 与写事务完全解耦，只影响试解析 |
+
+`check_text_intake.py` 新增：禁止 `rememberCoroutineScope` / `scope.launch`；
+扫描每个 `LaunchedEffect(` 块，块内出现 `commitTextIntake` 即 FAIL。
+
+### 信息架构
+
+```
+TabRow
+ ├─ 本次结果（外部入口默认）
+ │    ├─ ResultBanner  ← 置顶常驻：处理结果 / 原因 / 字符数 / 来源
+ │    ├─ 撤销（INSERTED 时）
+ │    ├─ 本次识别摘要（金额 / 状态 / 时间 / 账户 / 收款方 / 分类 / 来源尾号）
+ │    ├─ DraftForm（DRAFT / REJECTED / DUPLICATE / 未处理时可编辑手工保存）
+ │    └─ 复制本次原文 / 一键清空 / 关闭
+ ├─ 规则与试解析（设置页入口默认；不写库）
+ │    ├─ 自动 / 仅草稿开关
+ │    ├─ 规则增补 + 复制提示词 + 恢复默认
+ │    └─ 粘贴原文试解析 + 只读预演
+ └─ 记录
+      ├─ 最近结果摘要 + 清除留痕
+      └─ 原文全文（SelectionContainer 只读）
+```
+
+「本次结果」页 MUST NOT 渲染完整原文；完整订单号也不出现，只显示尾号 6 位。
+失败时结果条用 `error` 色并置于第一屏，不用再往下翻。

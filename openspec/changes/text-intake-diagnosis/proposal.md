@@ -109,3 +109,46 @@
 
 **流程判定**：修 bug（恢复第 87 批已承诺的自动落库行为）+ 文档补充，**不新建 change**，
 在同一活跃 `text-intake-diagnosis` 内补 tasks/design/delta，仍不归档。
+
+
+---
+
+## 第 89 批修正：真机反馈「没有入库 + 页面太乱」
+
+**使用者反馈**：
+
+> 「没有入库，提示处理结果： REJECTED 写入失败 The coroutine scope left the composition」
+> 「当前自动记账/文本诊断页面太混乱了。包含了新增规则，试解析，错误提示，手工保存，
+> 最近结果摘要等等，自动记账失败都要找半天错误提示在哪，页面是不是拆一拆或者重新规划一下」
+
+**根因（第 1 条，认账）**：
+
+第 88 批把自动落库放在 `LaunchedEffect(unlocked, external, manualMode, autoEnabled,
+autoAttempted, rulePatch)` 里，却在 effect 内部第一行写 `autoAttempted = true`——
+它是 effect 的 key，赋值即触发重组 → effect 自我取消 → 正在跑的
+`db.withTransaction` 被 cancel。应用锁 ON_PAUSE / 解锁 / 改规则也会让 key 变化。
+而 `doCommit` 用 `catch (e: Exception)` 把 `CancellationException` 一并吞掉，
+包装成 `Rejected("写入失败：The coroutine scope left the composition")`，
+看起来像数据库失败，其实是**协程被取消**；事务可能根本没提交。
+
+**根因（第 2 条）**：第 87/88 批把所有能力堆进一条垂直滚动列，
+结果条、原文、规则、试解析、摘要、表单互相挤；
+失败时 `REJECTED` 卡片混在中段，第一屏看不到。
+
+**本批改动**：
+
+- 写事务整体移到 Activity 级 `lifecycleScope`；结果用 Activity 级 `mutableStateOf` 持有，Compose 只读订阅
+- 自动落库触发改为普通 `var autoCommitStarted` 一次性标记，不再作 effect key；
+  未开应用锁在 `onCreate` 触发，开锁在 `onUnlocked` 触发，重复解锁不重跑
+- `commitSafely` / `undo` MUST 先 `catch (e: CancellationException) { throw e }` 再 catch 业务异常
+- 页面拆三页签：**本次结果 / 规则与试解析 / 记录**；外部入口默认「本次结果」，
+  设置页内部入口默认「规则与试解析」
+- 「本次结果」置顶常驻结果条（类型 + 原因 + 字符数 + 来源），紧随识别摘要与预填草稿表单；
+  失败原因第一屏可见
+- 规则、试解析、自动开关收进第二页；原文全文与结果留痕收进第三页
+- 版本号 0.2.67 → 0.2.68；静态脚本新增 lifecycleScope / CancellationException /
+  TabRow / 「LaunchedEffect 块内不得写库」断言
+
+**流程判定**：修 bug（恢复自动落库）+ 同一 change 内的信息架构重排，**不新建 change**；
+`text-intake-diagnosis` 仍活跃不归档（微信页留后续轮）。
+零改表、零新增依赖 / 权限 / `INTERNET`、零后台组件，可直接覆盖 v0.2.67。
