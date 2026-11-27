@@ -60,6 +60,10 @@ import com.zwz.offlineledger.engine.CategoryTree
 import com.zwz.offlineledger.engine.LedgerEngine
 import com.zwz.offlineledger.engine.Reconciliation
 import com.zwz.offlineledger.engine.RecurringSchedule
+import com.zwz.offlineledger.backup.csv.ParsedAccount
+import com.zwz.offlineledger.core.intake.TextIntakeCommitDraft
+import com.zwz.offlineledger.core.intake.TextIntakeCommitOutcome
+import com.zwz.offlineledger.engine.ExtraAmountRules
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -126,6 +130,88 @@ class LedgerRepository @Inject constructor(
         val id = recordDao.insert(withResolvedRoot(record))
         rebuildAllBalancesInternal()
         id
+    }
+
+    /**
+     * 第 87 批：文本自动记账唯一写入口。
+     *
+     * 仍走本 Repository 的 db.withTransaction + withResolvedRoot +
+     * rebuildAllBalancesInternal，与 insertRecord / importRecords 同一套余额联动；
+     * MUST NOT 新开一条写余额分支。去重按既有 importSource + sourceId 唯一口径。
+     * 原文绝不传到这里，失败一律返回 Rejected 让 UI 降级草稿。
+     */
+    suspend fun commitTextIntake(draft: TextIntakeCommitDraft): TextIntakeCommitOutcome =
+        db.withTransaction {
+            if (draft.amountCents <= 0L || draft.localDate <= 0 || draft.timestamp <= 0L) {
+                return@withTransaction TextIntakeCommitOutcome.Rejected("金额或时间缺失")
+            }
+            if (draft.accountName.isBlank() || draft.cardLast4.isBlank()) {
+                return@withTransaction TextIntakeCommitOutcome.Rejected("账户信息缺失")
+            }
+            if (draft.sourceId.isBlank() || draft.importSource.isBlank()) {
+                return@withTransaction TextIntakeCommitOutcome.Rejected("缺少稳定来源号")
+            }
+            val amountError = ExtraAmountRules.validate(
+                RecordType.EXPENSE,
+                draft.amountCents,
+                draft.discountCents,
+                null,
+            )
+            if (amountError != null) {
+                return@withTransaction TextIntakeCommitOutcome.Rejected(amountError)
+            }
+            if (recordDao.countByImportSource(draft.importSource, draft.sourceId) > 0) {
+                return@withTransaction TextIntakeCommitOutcome.Duplicate("同一来源号已存在，未重复记账")
+            }
+            val refs = toAccountRefs(accountDao.all().filter { !it.isArchived })
+            val parsedAccount = ParsedAccount(draft.accountName, draft.cardLast4)
+            val accountId = when (val m = resolveAccount(refs, parsedAccount)) {
+                is AccountMatch.Unique -> m.ref.id
+                is AccountMatch.Missing -> return@withTransaction TextIntakeCommitOutcome.Rejected(m.reason)
+                is AccountMatch.Ambiguous -> return@withTransaction TextIntakeCommitOutcome.Rejected(m.reason)
+            }
+            var categoryId: Long? = null
+            val rootName = draft.categoryRoot?.trim().orEmpty()
+            if (rootName.isNotBlank()) {
+                val root = categoryDao.all().firstOrNull {
+                    it.level == 0 && !it.isArchived && it.name == rootName
+                }
+                if (root == null) {
+                    return@withTransaction TextIntakeCommitOutcome.Rejected("一级分类不存在：$rootName")
+                }
+                categoryId = root.id
+            }
+            val aliases = aliasDao.all()
+            val entity = RecordEntity(
+                type = RecordType.EXPENSE,
+                amountCents = draft.amountCents,
+                categoryId = categoryId,
+                rootCategoryId = categoryId,
+                fromAccountId = accountId,
+                toAccountId = null,
+                timestamp = draft.timestamp,
+                localDate = draft.localDate,
+                yearMonth = draft.localDate / 100,
+                note = draft.note,
+                description = draft.description,
+                excludeFromStats = false,
+                counterparty = CounterpartyNormalizer.normalize(draft.counterparty, aliases),
+                importSource = draft.importSource,
+                sourceId = draft.sourceId,
+                discountCents = draft.discountCents,
+                feeCents = null,
+            )
+            val id = recordDao.insert(withResolvedRoot(entity))
+            rebuildAllBalancesInternal()
+            TextIntakeCommitOutcome.Inserted(
+                id,
+                "已记账 " + formatTextIntakeYuan(draft.amountCents) + " 元 · " + draft.importSource,
+            )
+        }
+
+    private fun formatTextIntakeYuan(cents: Long): String {
+        val v = kotlin.math.abs(cents)
+        return (v / 100L).toString() + "." + (v % 100L).toString().padStart(2, '0')
     }
 
     suspend fun updateRecord(record: RecordEntity) = db.withTransaction {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""第 86 批：把「零权限文本诊断入口」变成可执行断言。"""
+"""第 87 批：把「零权限自动记账 + 规则覆盖层 + 永不误记」变成可执行断言。"""
 import pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -9,13 +9,11 @@ CH = ROOT / "openspec/changes/text-intake-diagnosis"
 
 def main():
     e = []
-    # 1. 四件套（本 change 刻意保持活跃）
     for f in ["proposal.md", "design.md", "tasks.md",
               "specs/privacy-security/spec.md", "specs/reporting-ui/spec.md"]:
         if not (CH / f).is_file():
             e.append("缺活跃 change 四件套: " + f)
 
-    # 2. Manifest：两个 intent-filter、exported、excludeFromRecents、零新增权限
     man = C("app/src/main/AndroidManifest.xml")
     for k in ["android.intent.action.PROCESS_TEXT", "android.intent.action.SEND",
               'android:name=".ui.intake.TextIntakeActivity"',
@@ -30,36 +28,75 @@ def main():
     if "BIND_ACCESSIBILITY_SERVICE" in man or "NotificationListenerService" in man:
         e.append("不得注册无障碍 / 通知监听服务")
 
-    # 3. 代码：只读，不落库、不联网、不常驻
     act = C("app/src/main/java/com/zwz/offlineledger/ui/intake/TextIntakeActivity.kt")
-    for k in ["TextIntakeInspector.from", "AppLockScreen", "excludeFromRecents",
-              "remember { mutableStateOf(initialRaw)", "SelectionContainer",
-              "EXTRA_PROCESS_TEXT", "EXTRA_TEXT"]:
+    for k in ["@AndroidEntryPoint", "@Inject lateinit var repository",
+              "AppLockScreen", "TextIntakeRules.withPatch", "TextIntakeInspector.from",
+              "repository.commitTextIntake", "repository.deleteRecord",
+              "textIntakeAutoCommitEnabled", "textIntakeRulePatch", "textIntakeLog",
+              "SelectionContainer", "EXTRA_PROCESS_TEXT", "EXTRA_TEXT",
+              "ACTION_TEXT_INTAKE_DEBUG", "takeLast(6)"]:
         if k not in act:
             e.append("Activity 缺: " + k)
-    for k in ["LedgerRepository", "withTransaction", "Room", "startForeground",
-              "registerListener", "rememberSaveable", "openOutputStream"]:
+    for k in ["rememberSaveable", "openOutputStream", "startForeground",
+              "registerListener", "withTransaction", "Room", "openFileOutput"]:
         if k in act:
             e.append("Activity 不得出现: " + k)
 
+    rules = C("app/src/main/java/com/zwz/offlineledger/core/intake/TextIntakeRules.kt")
+    for k in ["MAX_PATCH_CHARS", "状态词", "优惠词", "噪声", "分类", "val invalid"]:
+        if k not in rules:
+            e.append("TextIntakeRules 缺: " + k)
     insp = C("app/src/main/java/com/zwz/offlineledger/core/intake/TextIntakeInspector.kt")
-    for k in ["MAX_CHARS = 20_000", "readyForAutoCommit", "import android."]:
-        if k == "import android." and k in insp:
-            e.append("Inspector 不得依赖 Android 类（须可纯 JVM 单测）")
-        elif k != "import android." and k not in insp:
+    for k in ["MAX_CHARS = 20_000", "readyForAutoCommit", "页面特征不足",
+              "原价 / 优惠 / 实付算术不成立", "ExtraAmountRules.validate"]:
+        if k not in insp:
             e.append("Inspector 缺: " + k)
+    if "import android." in insp:
+        e.append("Inspector 不得依赖 Android 类（须可纯 JVM 单测）")
+
+    repo = C("app/src/main/java/com/zwz/offlineledger/data/repository/LedgerRepository.kt")
+    for k in ["commitTextIntake(draft: TextIntakeCommitDraft)", "countByImportSource",
+              "ExtraAmountRules.validate", "withResolvedRoot(entity)", "rebuildAllBalancesInternal()",
+              "ParsedAccount(draft.accountName, draft.cardLast4)"]:
+        if k not in repo:
+            e.append("Repository 缺: " + k)
+
+    prefs = C("app/src/main/java/com/zwz/offlineledger/core/prefs/LedgerPrefs.kt")
+    for k in ["textIntakeRulePatch", "textIntakeAutoCommitEnabled", "textIntakeLog",
+              "KEY_TEXT_INTAKE_RULE_PATCH", "KEY_TEXT_INTAKE_AUTO_COMMIT", "KEY_TEXT_INTAKE_LOG"]:
+        if k not in prefs:
+            e.append("LedgerPrefs 缺: " + k)
+
+    settings = C("app/src/main/java/com/zwz/offlineledger/ui/settings/SettingsScreen.kt")
+    for k in ["自动记账 / 文本诊断", "TextIntakeActivity.ACTION_TEXT_INTAKE_DEBUG"]:
+        if k not in settings:
+            e.append("SettingsScreen 缺内部入口: " + k)
+
+    for p in ["app/src/main/res/xml/backup_rules.xml", "app/src/main/res/xml/data_extraction_rules.xml"]:
+        s = C(p)
+        if 'domain="sharedpref" path="offline_ledger_prefs.xml"' not in s:
+            e.append("未排除 prefs: " + p)
 
     test = ROOT / "app/src/test/java/com/zwz/offlineledger/core/intake/TextIntakeInspectorTest.kt"
     if not test.is_file():
         e.append("缺 TextIntakeInspectorTest.kt")
+    else:
+        t = test.read_text(encoding='utf-8')
+        for k in ["all six alipay samples", "unknown page degrades", "rule patch only adds"]:
+            if k not in t:
+                e.append("单测缺场景: " + k)
 
-    # 4. 版本号、脚本挂载、文档登记
-    if 'defaultVersionName = "0.2.65"' not in C("app/build.gradle.kts"):
-        e.append("版本号未升 0.2.65")
+    gd_raw = C("app/build.gradle.kts")
+    gd = "\n".join(line.split("//")[0] for line in gd_raw.splitlines()).lower()
+    if 'defaultVersionName = "0.2.66"' not in gd_raw:
+        e.append("版本号未升 0.2.66")
+    for dep in ["mlkit", "text-recognition", "coil", "glide", "okhttp", "retrofit"]:
+        if dep in gd:
+            e.append("不得新增依赖: " + dep)
     if "check_text_intake.py" not in C(".github/workflows/build.yml"):
         e.append("build.yml 未挂 check_text_intake.py")
-    for p, k in [("docs/页面优化经验与避坑指南.md", "§7.68"),
-                 ("openspec/project.md", "第 86 批")]:
+    for p, k in [("docs/页面优化经验与避坑指南.md", "§7.69"),
+                 ("openspec/project.md", "第 87 批")]:
         if k not in C(p):
             e.append("文档未登记: " + p)
 
@@ -68,7 +105,7 @@ def main():
         for x in e:
             print("  -", x)
         return 1
-    print("check_text_intake: PASS（零权限 / 两入口 / 应用锁 / 内存态 / 不落库 / 版本 / 文档）")
+    print("check_text_intake: PASS（B 方案 / 严格充分条件 / 规则覆盖层 / 自动落库 / 撤销 / 去重 / 留痕 / 文档）")
     return 0
 
 

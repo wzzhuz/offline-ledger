@@ -55,6 +55,22 @@ class LedgerPrefs(context: Context) {
      * 使用者第 3 项拍板 B：跨启动持久化。沿用 SharedPreferences 口径，
      * 不进 Room / 不进备份 DTO / 不触发 Migration，换设备回退默认全局视图。
      */
+    /**
+     * 第 87 批：自动记账规则覆盖层 / 自动开关 / 结果摘要留痕。
+     * 只存人读规则与摘要，MUST NOT 存账单原文；clear/卸载后回默认基线。
+     */
+    var textIntakeRulePatch: String
+        get() = sp.getString(KEY_TEXT_INTAKE_RULE_PATCH, null) ?: ""
+        set(value) = sp.edit().putString(KEY_TEXT_INTAKE_RULE_PATCH, value).apply()
+
+    var textIntakeAutoCommitEnabled: Boolean
+        get() = sp.getBoolean(KEY_TEXT_INTAKE_AUTO_COMMIT, true)
+        set(value) = sp.edit().putBoolean(KEY_TEXT_INTAKE_AUTO_COMMIT, value).apply()
+
+    var textIntakeLog: String
+        get() = sp.getString(KEY_TEXT_INTAKE_LOG, null) ?: ""
+        set(value) = sp.edit().putString(KEY_TEXT_INTAKE_LOG, value).apply()
+
     var accountPickerLayout: String
         get() = sp.getString(KEY_ACCOUNT_PICKER_LAYOUT, null)
             ?.takeIf { it == "global" || it == "grouped" } ?: "global"
@@ -114,6 +130,9 @@ class LedgerPrefs(context: Context) {
         private const val KEY_DEFAULT_ACCOUNT_ID = "default_account_id"
         private const val KEY_HIDE_AMOUNTS = "hide_amounts"
         private const val KEY_ACCOUNT_PICKER_LAYOUT = "account_picker_layout"
+    private const val KEY_TEXT_INTAKE_RULE_PATCH = "text_intake_rule_patch"
+    private const val KEY_TEXT_INTAKE_AUTO_COMMIT = "text_intake_auto_commit"
+    private const val KEY_TEXT_INTAKE_LOG = "text_intake_log"
         const val MAX_THRESHOLD_CENTS = 100_000L // 1000.00 元
     }
 }

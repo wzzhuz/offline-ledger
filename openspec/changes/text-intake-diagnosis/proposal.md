@@ -1,17 +1,17 @@
 # text-intake-diagnosis
 
-## 对齐结论（阶段 0）
+## 对齐结论（阶段 0，含第 87 批修正）
 
 | # | 项 | 结论 |
 |---|---|---|
-| 1 | 要解决什么 | 出**诊断小包**，验两件事：HyperOS 3.0 文本选择「竖向三点 → 更多」是否对第三方 `ACTION_PROCESS_TEXT` 开放，以及「全选 → 分享」能否把整页原文送到本 App；并把收到的原文质量（节点聚合 vs 系统 OCR、噪声多少、四项字段命中率）摊给使用者人工检查。无障碍整套一行不写，相册垃圾 / CSV 延迟 / 后台耗电 / 服务保活四个副作用同时消失 |
-| 2 | 改什么 / 不改什么 | 改：`AndroidManifest.xml` 新增 `TextIntakeActivity`（两个 intent-filter）、`TextIntakeInspector` 纯函数 + JVM 单测、原文预览页、版本号 0.2.64→0.2.65、静态脚本、`project.md`、活文档、delta spec。**不改**：`MainActivity` / `LedgerApp` / `RecordEditorDialog` / `LedgerRepository` / `AppDatabase`（version 仍 9）/ 备份 DTO / 4 Tab / 分类与账户数据路径。**本批 MUST NOT 落库** |
-| 3 | 关键约束 | 零 `uses-permission`、零新增 Gradle 依赖、零 `INTERNET`、零改表、零 SAF 导出（原文只在内存、退出即清）；诊断页 MUST 先过应用锁、`excludeFromRecents=true`；原文截断上限 20,000 字符；置信度门槛写进 spec 作后续批约束；沙盒不编译 APK，走 Actions |
-| 4 | 验收标准 | 12 个静态检查 + 单测 + Debug + Release lintVital 全绿；真机上「全选 → 更多」出现入口**或**「全选 → 分享」选择器里出现「离线账本」，至少一条通即算成功；原文预览可贴回；应用锁生效、退出后无残留文件；坚果云 job step success |
+| 1 | 要解决什么 | 用 HyperOS「系统全选文本」入口做零电量自动记账；第 86 批验入口与原文质量，第 87 批用 6 笔实测原文写规则表、严格充分条件自动落库，并提供规则覆盖层与试解析页，使开放集格式不会造成错账 |
+| 2 | 改什么 / 不改什么 | 改：`TextIntakeActivity` / `TextIntakeInspector` / `TextIntakeRules` / `TextIntakeModels`、JVM 单测、`LedgerRepository.commitTextIntake`、`LedgerPrefs`、设置入口、备份排除规则、版本号 0.2.66、静态脚本、`project.md`、活文档、delta spec。**不改**：表结构（version 9）、CSV/Firefly 写路径、`MainActivity` 主导航、4 Tab、备份 DTO、无障碍搁置结论 |
+| 3 | 关键约束 | 零 `uses-permission`、零新增 Gradle 依赖、零 `INTERNET`、零后台组件；严格充分条件才自动落库，缺项一律降级草稿、MUST NOT 猜值；优惠过 `ExtraAmountRules`；分类只预置 `餐饮美食→餐饮`；账户匹配不到降级；复用 Repository 事务与既有去重，MUST NOT 新开写余额分支；原文只在内存；微信页未验不外推 |
+| 4 | 验收标准 | 13 静态检查 + 单测（6 笔原文 + 未知格式 + 规则覆盖层）+ Debug + Release lintVital 全绿；真机「同一笔分享两次只记一笔」「优惠显示原价/优惠/实付」「2203 与 7375 归对账户」「仅草稿开关生效」「撤销后余额复原」「未知格式不误记」；坚果云 job step success |
 | 5 | 被否决方案 | 完整表见 `design.md`「考虑过的其他方案」 |
 
-分级判定：**需要建 change**（新增系统入口、改变 Manifest 行为），不是 bug 修复。
-本 change **保持活跃、不归档**：真机原文回来后还要在同一 change 里写规则表 + 自动落库，最后一起归档。
+分级判定：**需要建 change**（新增系统入口、自动落库行为），不是 bug 修复。
+本 change **保持活跃、不归档**：微信支付成功页后面几轮再验，同一 change 收口。
 
 ## 为什么改（使用者原始诉求）
 
@@ -22,43 +22,59 @@
 - 下拉磁贴：平台层不能主动弹出，Android 12+ 要手动拖进快捷设置，手感不尽人意
 - 系统截屏 → 分享：截图自动进相册，**要定期清理，使用不方便**
 - 支付宝定期导出 CSV：**不能及时记录，导出也麻烦**
-- 无障碍读节点树 + 摇一摇：一次系统级广泛授权、进程常驻内存、厂商可能为省电主动关服务；使用者手机用了 2 年，**对电量敏感**
+- 无障碍读节点树 + 摇一摇：一次系统级广泛授权、进程常驻内存、厂商可能为省电主动关服务；手机用了 2 年，**对电量敏感**
 
-转折来自真机反馈（HyperOS 3.0，小米）：
+转折来自真机反馈（小米 HyperOS 3.0）：
 
 > 「系统全选可以整个页面内容选中。选中之后我看到有『复制』『分享』『网页搜索』『朗读』，竖向 3 个点的更多选项，里面有『百度地图』『百度搜索』『百度翻译』『问AI』『问问DeepSeek』『浏览器搜索』等选项」。
 
-这条信息同时给出两个关键事实：**系统层做了整屏文字聚合**（绕过 App 自身是否 `textIsSelectable`，也绕过支付宝/微信改版），以及**「分享」是一级菜单项**。于是零电量文本入口成立：没有图片、没有文件、没有后台、没有权限。我此前按 AOSP 口径说「Android 没有全选整页文字」属凭印象外推（§7.51），在此更正。
+系统层做了整屏文字聚合，绕过 App 自身是否 `textIsSelectable`、绕过支付宝/微信改版与 WebView / 自绘控件 L2 风险；「分享」是一级菜单项。于是零电量文本入口成立：没有图片、没有文件、没有后台、没有权限。此前按 AOSP 口径说「Android 没有全选整页文字」属 §7.51「凭印象外推」，在此更正。
 
 ## 使用者拍板
 
 | # | 问题 | 拍板 |
 |---|---|---|
 | 1 | 无障碍整套是否搁置、改走零电量文本入口 | **同意** |
-| 2 | 是否先出诊断小包 | **先出诊断小包** |
-| 3 | 置信度门槛按「四项齐全 + 金额精确匹配才自动落库，否则降级草稿」写死 | **可以** |
+| 2 | 是否先出诊断小包 | **先出诊断小包**（v0.2.65 已完成） |
+| 3 | 置信度门槛 | **可以**；后续修正为「严格充分条件 + 算术自洽」 |
+| 4 | 自动落库 | **维持** |
+| 5 | 分类 / 备注 / 账户降级 | **接受推荐**：只预置 `餐饮美食→餐饮`，备注不填，账户匹配不到降级草稿 |
+| 6 | 规则外置形态 | **B**：AI 生成 1~3 行人读规则，用户粘贴到规则增补框即时生效，不用自己写、不用等出包 |
+| 7 | 微信支付成功页 | **后面几轮再看**，本批不外推 |
+
+## 第 87 批实测原文
+
+6 笔全部走 App 入口，覆盖：
+
+- 状态词：`交易成功` / `自动扣款成功`
+- 优惠：`实体店通用红包 -0.30` / `中国银行立减金 -0.29`，并有 `订单金额 15.90 / 40.00`
+- 无优惠但 `商品说明` 混入 `消费6.00元`（推翻「金额候选唯一」）
+- 商户字段：`收款方全称` / `交易详情` 区块 / 仅首行代付人
+- 账户：`交通银行信用卡(2203)` / `中国银行储蓄卡(7375)`
+- 分类：`餐饮美食` / `亲友代付` / `文化休闲` / `公共服务`
+- 图标占位符：`logo` / `arrow` / `extend-icon`
+- `商家订单号` 16 / 22 / 32 位，掩码前缀 7895 / 2026 / 0920
 
 ## 改什么
 
-- 新增 `ui/intake/TextIntakeActivity.kt`：`FragmentActivity` + `setContent`，先过 `AppLockScreen` 再渲染只读预览页；读取 `EXTRA_PROCESS_TEXT` / `EXTRA_TEXT`
-- 新增 `core/intake/TextIntakeInspector.kt`：纯 Kotlin 只读分析（截断、疑似金额串、方向 / 时间 / 商户命中、门槛预演），**不解析入库、不猜值**
-- 新增 JVM 单测 `TextIntakeInspectorTest.kt`
-- `AndroidManifest.xml` 注册两个 intent-filter（`PROCESS_TEXT` + `ACTION_SEND`，均 `text/plain` + `CATEGORY_DEFAULT`），`exported=true`、`excludeFromRecents=true`
-- 新增 `scripts/check_text_intake.py` 并挂进 `build.yml`，把「零权限 / 不落库 / 应用锁 / 版本号」变成可执行断言
-- 版本号 0.2.65；`check_record_layout.py` 硬编码版本断言同步
-- `project.md` 把「自动记账」从 6c-2 待决策改为进行中；活文档补 §7.68
+- `core/intake/`：规则集、覆盖层解析、只读状态机、字段抽取、金额/时间/优惠/账户/分类/订单号模型
+- `ui/intake/TextIntakeActivity`：应用锁、规则增补框、粘贴试解析、自动/仅草稿总开关、只读预演、预填草稿、手工保存、撤销、结果摘要与一键清空
+- `data/repository/LedgerRepository.commitTextIntake`：复用事务 / `withResolvedRoot` / 余额重算 / `countByImportSource` / `ExtraAmountRules`
+- `core/prefs/LedgerPrefs`：规则覆盖层、自动开关、结果摘要；备份规则排除 SharedPreferences
+- `ui/settings/SettingsScreen`：内部入口「自动记账 / 文本诊断」
+- 静态脚本、版本号、文档与 delta
 
 ## 不改什么
 
-无障碍服务、摇一摇 / 音量键触发、传感器、`takeScreenshot`、节点树 dump、OCR 依赖、云端 / 端侧大模型、通知与前台服务、悬浮窗、任何 Room 写路径、任何自动落库。
+无障碍服务、摇一摇 / 音量键触发、传感器、`takeScreenshot`、节点树 dump、OCR 依赖、云端 / 端侧大模型、通知与前台服务、悬浮窗、任何新权限、任何新 Gradle 依赖、任何 Room 表结构或备份 DTO 字段。
 
 ## 影响
 
-- Manifest 多一个 exported Activity，但 `check_manifest_privacy.py` 精确匹配 `<uses-permission>`，不误报
+- Manifest 仍只多一个 exported Activity；`check_manifest_privacy.py` 精确匹配 `<uses-permission>`，不误报
 - `MainActivity` 一字不动，桌面快捷方式与应用锁零回归
-- 零改表，可直接覆盖 v0.2.64
-- 隐私面扩大可控：原文含商户全称与卡号尾号，故应用锁 + excludeFromRecents + 内存态 + 一键清空四道护栏
+- 零改表，可直接覆盖 v0.2.65
+- 隐私面扩大可控：原文只在内存、先过应用锁、`excludeFromRecents=true`；规则/开关/摘要不含原文且排除系统备份
 
 ## 验收
 
-12 个静态检查 + 单测 + Debug + Release lintVital 全绿；真机三项见对齐结论第 4 项。
+13 个静态检查 + 单测 + Debug + Release lintVital 全绿；真机重点从「入口能不能打开」转为「格式命中、误判降级、去重、撤销、规则覆盖层即时生效」。

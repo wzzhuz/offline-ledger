@@ -7,6 +7,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
+import com.zwz.offlineledger.ui.intake.TextIntakeActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -19,6 +22,7 @@ import com.zwz.offlineledger.ui.theme.LedgerColors
  */
 @Composable
 fun SettingsScreen(onOpen: (String) -> Unit) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -50,6 +54,16 @@ fun SettingsScreen(onOpen: (String) -> Unit) {
             title = "规则列表",
             summary = "保存的规则 / 编辑 / 应用到历史 / 一键撤销"
         ) { onOpen("bulk") }
+        SettingGroupCard(
+            title = "自动记账 / 文本诊断",
+            summary = "规则增补 / 粘贴原文试解析 / 自动与仅草稿开关 / 结果摘要"
+        ) {
+            context.startActivity(
+                Intent(context, TextIntakeActivity::class.java).apply {
+                    action = TextIntakeActivity.ACTION_TEXT_INTAKE_DEBUG
+                }
+            )
+        }
         SettingGroupCard(
             title = "偏好",
             summary = "对账阈值 / 配色 / 默认币种 / 默认账户"

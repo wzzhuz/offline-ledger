@@ -8,11 +8,13 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="database" path="offline_ledger.db" />
+        <exclude domain="sharedpref" path="offline_ledger_prefs.xml" />
         <exclude domain="database" path="offline_ledger.db-wal" />
         <exclude domain="database" path="offline_ledger.db-shm" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="database" path="offline_ledger.db" />
+        <exclude domain="sharedpref" path="offline_ledger_prefs.xml" />
         <exclude domain="database" path="offline_ledger.db-wal" />
         <exclude domain="database" path="offline_ledger.db-shm" />
     </device-transfer>

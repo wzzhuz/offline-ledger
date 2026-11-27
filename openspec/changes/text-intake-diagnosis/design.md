@@ -1,85 +1,121 @@
-# text-intake-diagnosis · Design
+# text-intake-diagnosis · Design（第 87 批修订）
 
 ## 决策
 
 | # | 决策 | 理由 |
 |---|---|---|
-| 1 | 走**零电量文本入口**，无障碍整套搁置但不删除结论 | 使用者对 2 年旧机电量敏感；HyperOS 全选已把整页文字交到系统层，绕过了节点树 L2 与 App 改版风险 |
-| 2 | 同时注册 `ACTION_PROCESS_TEXT` 与 `ACTION_SEND`（text/plain） | 前者若对第三方开放可省 1 步；后者是使用者已亲眼看到的一级菜单，作为保底。一个 Manifest 两个 filter，成本近零 |
-| 3 | 不注册剪贴板监听，不读 `ClipboardManager` 后台 | Android 10+ 只有默认输入法或前台持焦点应用能读；13+ 后台返回 null/空且不抛异常，是隐性失效 |
-| 4 | 本批**只诊断、不落库** | 原文质量未验前写规则表与自动落库，等于把不确定性固化进代码。先看清是节点聚合还是 OCR |
-| 5 | 预览页只读 + 内存态 + 一键清空，默认不导出文件 | 使用者已明确嫌「截图进相册要定期清理」；调试产物再变文件等于换个目录把麻烦带回来 |
-| 6 | 诊断页 MUST 先过应用锁，`excludeFromRecents=true`，尊重 `FLAG_SECURE` 偏好 | 原文含商户全称、卡号尾号甚至余额，属 privacy-security「应用锁与界面防泄露」覆盖范围 |
-| 7 | 入口 label 用「离线账本 · 文本诊断」，**不叫「记一笔」** | 避免误以为本包已能记账；本批没有任何写库路径 |
-| 8 | change **保持活跃不归档** | 真机原文回来后要在同一 change 里补规则表 + 自动落库，最后一起归档；避免第 77 批那样跨批收口又新开 change |
+| 1 | 走**零电量文本入口**，无障碍整套搁置但不删除结论 | 用户对 2 年旧机电量敏感；HyperOS 全选已把整页文字交到系统层 |
+| 2 | 同时注册 `ACTION_PROCESS_TEXT` 与 `ACTION_SEND`（text/plain） | 前者若对第三方开放可省 1 步；后者是用户已看到的一级菜单，作为保底 |
+| 3 | 不注册剪贴板监听，不读后台剪贴板 | Android 10+ 只有默认输入法或前台持焦点应用能读；13+ 后台返回 null/空且不抛异常 |
+| 4 | 主金额靠「状态锚点前最近独立负金额行」选，不靠候选唯一 | 6 笔里「订单金额/红包/立减金」与「商品说明 `6.00元`」两次证伪金额唯一 |
+| 5 | 优惠靠 `原价 = 实付 + 优惠` 整数分算术校验，落 `discountCents` | 项目 `ExtraAmountRules` 已有唯一真相源语义；零浮点，能对上「差 1 分钱」铁律 |
+| 6 | 严格充分条件才自动落库；失败降级预填草稿 | 支付宝格式是开放集，无法穷举；未知格式的代价必须是「少省一步」，不是静默记错账 |
+| 7 | 规则覆盖层用 B 方案：AI 生成 1~3 行人读规则，用户粘贴 | 用户明确问「需要我自己生成吗」；默认规则随包，日常不碰；新格式当场可修，结构变化才发版 |
+| 8 | 覆盖层只允许增补状态词 / 优惠词 / 噪声 / 分类映射 | MUST NOT 碰金额正则、主金额锚点、算术校验、落库门槛；坏规则最多让某笔降级草稿 |
+| 9 | 设置页内部入口 + 粘贴原文试解析（不自动写库） | 样例给不齐时，只贴失败那一笔即可；`TextIntakeInspector` 纯 JVM，可试解析也可单测 |
+| 10 | 「自动 / 仅草稿」总开关默认自动 | 万一真出现误记，一键全局降级，不用卸载 |
+| 11 | 结果摘要留痕 + 一键撤销 | 留痕不含原文，只写时间/金额/来源尾号/结果；撤销走 `deleteRecord` 既有回收站事务 |
+| 12 | 分类只预置 `餐饮美食 → 餐饮`，其余留空 | 预置一级没有「亲友代付 / 文化休闲 / 公共服务」，硬映射就是静默记错账 |
+| 13 | 账户先剥卡种词、保留尾号，再走 `resolveAccount` | 支付宝是 `交通银行信用卡(2203)`，既有 `parseAccountCell` 要求括号前有空格，不能直接复用 |
+| 14 | change 保持活跃不归档 | 微信页后面几轮再验，避免新开 change |
 
 ## 考虑过的其他方案（被否决）
 
 | 方案 | 否决理由 |
 |---|---|
-| 无障碍读节点树 + 摇一摇 / 长按音量键 | 一次系统级广泛授权；进程常驻内存、厂商可能为省电主动关服务、开关与绑定状态分离；对 2 年旧机不友好。搁置为「以后真嫌 3 步多」的备选 |
-| 常驻自动识别（支付完成即扫） | 每来一次界面事件 dump 整棵树，耗电与隐私感都最差 |
-| 系统截屏 → 分享 → OCR | 截图自动进相册、要定期清理；需 2MB 中文 OCR 依赖；OCR 金额有误差风险 |
-| 支付宝 / 微信导出 CSV 或交易流水证明 | 不能及时记录、导出麻烦（申请 / 密码 / 邮箱 / 解压 / SAF 选文件） |
-| 剪贴板一键填充 / 后台监听 | 后台读不到；步数 5~6，反而更多 |
-| `NotificationListenerService` | 不少消费无通知或通知无金额；需 `POST_NOTIFICATIONS` 与保活，撞 project.md 永久不做条目 |
-| `MediaProjection` / 无障碍 `takeScreenshot` | API 34+ 每会话弹窗；FLAG_SECURE 页面拿不到；不落盘但仍需无障碍授权 |
-| 云端大模型（含菜单里的「问AI / 问问DeepSeek」） | 把整段账单文本发给第三方，直接撞第一条铁律「默认回传且用户不可控」 |
-| 端侧 Gemini Nano / ML Kit GenAI | 设备门槛（AICore / 旗舰芯片 / 12GB RAM）、API Beta、每应用配额、仅前台可推理、短文本数秒延迟；最要命是**金额幻觉**与「自动落库」组合会静默记错账，撞铁律 2 |
-| `SYSTEM_ALERT_WINDOW` 悬浮球 / 常驻通知 Action / 前台服务 | 高危权限或撞 project.md 永久不做条目；覆盖层还会污染节点树 |
+| 无障碍读节点树 + 摇一摇 / 长按音量键 | 系统级广泛授权、进程常驻内存、厂商可能省电关服务；对旧机不友好。搁置为备选 |
+| 常驻自动识别 | 每次界面事件 dump 整棵树，耗电与隐私感最差 |
+| 系统截屏 → 分享 → OCR | 进相册、要清理；OCR 依赖与金额误差风险 |
+| 支付宝 / 微信导出 CSV | 不及时、导出麻烦 |
+| 剪贴板后台监听 | 后台读不到，步数更多 |
+| 金额候选唯一门槛 | 6 笔里 2 笔证伪 |
+| 同行正则 / 机械取标签下一行 | 标签与值分行；`商家订单号` 后第一行是文案 |
+| 枚举优惠标签 / 机构名 | 红包、立减金、拉卡拉、网联等持续变化 |
+| 硬映射未对应分类 | `亲友代付 / 文化休闲 / 公共服务` 不对应任何一级，猜错即错账 |
+| 大模型兜底覆盖 | 能降维护成本但不能保证可靠性；金额幻觉 + 0 次确认最危险 |
+| 穷举所有支付宝格式 | 开放集，做不到；且用户不能保证样例齐全 |
+| 未知格式静默落库 | 直接撞铁律 2 |
+| 规则随包写死不可改 | 新状态词/优惠词一来就要等发版 |
+| 规则覆盖层允许改正则/门槛 | 一段坏规则可能造成误记，违反「永不误记」 |
 
 ## 架构
 
 ```
-系统文本选择菜单 / 分享选择器
-        │  Intent(EXTRA_PROCESS_TEXT | EXTRA_TEXT)
+系统文本选择 / 分享 / 设置页入口
+        │
         ▼
-TextIntakeActivity (exported, excludeFromRecents)
-        ├── LedgerPrefs → AppLockScreen（未解锁不渲染任何内容）
-        ├── FLAG_SECURE / edge-to-edge（复用 MainActivity 口径）
-        └── TextIntakePreviewScreen（只读）
-                └── TextIntakeInspector.from(source, rawText)  ← 纯 Kotlin，可 JVM 单测
-                        · 截断 20,000 字符并标记
-                        · 疑似金额串全量列出（-?\d[\d,]*\.\d{2}），不去重成一个「答案」
-                        · 方向 / 时间 / 商户 三项命中（标签 + 关键词）
-                        · readyForAutoCommit 只读预演标签，不触发任何写
+TextIntakeActivity (@AndroidEntryPoint)
+        ├── AppLockScreen / FLAG_SECURE / excludeFromRecents
+        ├── LedgerPrefs：规则覆盖层、自动开关、结果摘要
+        ├── TextIntakeRules.withPatch(人读文本)
+        ├── TextIntakeInspector.from(source, rawText, rules)  ← 纯 JVM
+        │       · 状态锚点选主金额
+        │       · 标签精确等于 + 值格式双保险
+        │       · 原价/优惠/实付算术一致性
+        │       · 页面特征、订单号、账户、分类、收款方
+        ├── 严格充分条件 + 自动开关 → LedgerRepository.commitTextIntake
+        │       · countByImportSource 去重
+        │       · ExtraAmountRules.validate
+        │       · resolveAccount
+        │       · withResolvedRoot + rebuildAllBalancesInternal
+        └── 失败 / 仅草稿 → 预填草稿表单 → 手工保存
+                └── 已落库 → App 内撤销条 → deleteRecord
 ```
 
-`TextIntakeInspector` 刻意不依赖 Android 类，便于纯 JVM 单测；Intent 抽取留在 Activity 侧。
+## 严格充分条件
 
-## 置信度门槛（后续批的硬约束，本批只预演不执行）
+自动落库 MUST 全部满足：
 
-写进 `reporting-ui` delta，后续「规则表 + 自动落库」必须遵守：
+- 原文未截断，页面特征数 ≥ 2（防止把微信/其他页面外推成支付宝）
+- 状态锚点来自受控词表
+- 主金额是状态锚点前最近独立负金额行，严格两位小数
+- 支付时间严格 `yyyy-MM-dd HH:mm:ss`
+- `订单号` 标签精确等于，且其后取得 `^\d{20,}$`
+- 收款方来源明确
+- 账户 `(纯名, 尾号)` 在 Repository 中复合匹配唯一
+- 若有优惠：`原价 = 实付 + 优惠` 整数分成立，且过 `ExtraAmountRules`
+- `check_text_intake.py` MUST 断言覆盖层不能修改上述条件
 
-- 金额 MUST 精确匹配 `-?\d+\.\d{2}` 且**唯一候选**；多候选 MUST NOT 取第一个
-- 方向 / 时间 / 商户四项齐全才允许自动落库；缺任一项降级草稿并提示手填
-- 疑似 OCR 噪声（错字、小数点丢失、字段乱序）MUST NOT 由模型或启发式「猜一个值补上」
-- 去重复用既有 `importSource` + `sourceId` / 「账户 + amountCents + localDate + note」复合键口径
-- 自动落库仅适用于 `auto-text-intake` 入口；模板 / 手动 / 桌面快捷方式仍 MUST NOT 自动落库（保持现有 spec 条款原样）
+任一不满足 → 预填草稿并提示，MUST NOT 猜值补上。
 
-理由：`project.md` 原始场景里弃用 Firefly 的原因正是「差 1 分钱、账单太多核算太费事，最后记一笔虚拟支出凑平」。0 次确认 + 不确定抽取，等于把这类事故自动化。
+## 规则覆盖层格式
 
-## 隐私护栏
+只接受四种行：
 
-- 零 `uses-permission`、零新增 Gradle 依赖、零 `INTERNET`、零改表
-- 原文只在 `remember { mutableStateOf }` 内存态；**不用 rememberSaveable**（避免写进 savedInstanceState / 系统保存状态）
-- 一键清空把字符串置空、GC 可回收；退出 Activity 即释放
-- 默认不写任何文件；如后续需要留存，必须走 SAF 由使用者自选位置（本批不实现）
-- 预览页顶部明示「本页含屏幕原文，请勿在公共场合展开」
-- `excludeFromRecents=true` 防最近任务快照
+```
+状态词 += 自动扣款成功, 付款完成
+优惠词 += 立减金
+噪声 += 查看购物详情
+分类 文化休闲 = 学习娱乐
+```
+
+- `#` 开头与空行忽略；非法行显示在「已忽略 N 行无效指令」
+- 覆盖层存 `LedgerPrefs`，最多 4000 字符；「恢复默认」清空
+- 结构变化（字段位置/金额区块改变）不能靠覆盖层解决，需改 `TextIntakeInspector` 并发版
+
+## 隐私与备份
+
+- 原文只在 `remember` 内存态，不用可保存状态容器
+- 规则、开关、结果摘要不含原文；留痕只写时间 / 金额 / 来源尾号 / 结果
+- `backup_rules.xml` 与 `data_extraction_rules.xml` 增加 `sharedpref/offline_ledger_prefs.xml` 排除
+- 一键清空、一键清除留痕；Activity `excludeFromRecents=true`
+- 零 `uses-permission`、零新增 Gradle 依赖、零 `INTERNET`、零后台组件
 
 ## 静态脚本影响
 
-- `check_record_layout.py` 第 173 行硬编码 `defaultVersionName = "0.2.64"` → 同步 0.2.65
-- 新增 `check_text_intake.py` 并挂 `build.yml`：断言两个 intent-filter / 无新增 uses-permission / Activity 不引用 `LedgerRepository` 与 Room / 单测存在 / 版本号 / 文档登记 / 活跃 change 四件套齐全
-- `check_manifest_privacy.py` 不改：它精确匹配 `<uses-permission>`，新 Activity 的 `exported` 不触发
+- `check_record_layout.py` 硬编码版本 0.2.65 → 0.2.66
+- `check_text_intake.py` 增加：规则覆盖层、试解析、总开关、Repository 写路径、撤销、备份排除、设置入口、单测场景、零依赖与版本断言
+- `check_manifest_privacy.py` 不改：精确匹配 `<uses-permission>`，新增 SharedPreferences 排除不触发
 
 ## 真机待验（全部 [ ]）
 
-1. 支付宝账单详情页「全选 → 竖向三点 → 更多」是否出现「离线账本 · 文本诊断」（判 PROCESS_TEXT 是否对第三方开放）
-2. 「全选 → 分享」选择器里是否出现「离线账本」（判 ACTION_SEND 链路）
-3. 两条任一成功后，把**原文预览贴回**：判节点聚合 vs 系统 OCR、噪声多少、四项字段是否齐全
-4. 原文是否混入状态栏时间、贴纸文案、「更多 ⌄」等噪声
-5. 应用锁开启时诊断页是否先要求解锁
-6. 清空 / 退出后无残留文件
-7. 深色模式、从 v0.2.64 覆盖安装零回归
+1. 6 笔支付宝原文是否能自动落库，优惠两笔是否显示原价 / 优惠 / 实付
+2. 同一笔分享两次是否只记一笔
+3. 账户 2203 / 7375 是否归到正确卡片；账户不存在时是否降级草稿
+4. 未知格式是否只形成草稿、不误记
+5. 自动 / 仅草稿总开关是否即时生效
+6. 规则增补框粘贴一行词后试解析是否即时生效；恢复默认是否回基线
+7. 撤销后余额是否复原；结果摘要是否不含原文；退出后无残留文件
+8. 设置页「自动记账 / 文本诊断」入口是否过应用锁
+9. 微信支付成功页留后续轮，MUST NOT 外推
+10. 从 v0.2.65 覆盖安装零回归、坚果云上传 success
