@@ -3,4 +3,6 @@
     <string name="app_name">离线账本</string>
     <string name="shortcut_record_short">记一笔</string>
     <string name="shortcut_record_long">直接打开记一笔</string>
+    <string name="text_intake_label">离线账本 · 文本诊断</string>
+    <string name="text_intake_process_label">识别账单文本</string>
 </resources>

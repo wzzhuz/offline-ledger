@@ -42,6 +42,31 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!--
+            第 86 批：系统文本选择菜单 / 分享选择器进来的只读诊断页。
+            两个 intent-filter 都是 framework 隐式 Intent 能力，
+            SHALL NOT 声明任何 uses-permission、无障碍服务或后台组件。
+            excludeFromRecents: 原文含商户全称与卡号，防最近任务快照泄露。
+            入口标签刻意叫「文本诊断」，不叫「记一笔」：本批还不能记账。
+        -->
+        <activity
+            android:name=".ui.intake.TextIntakeActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="@string/text_intake_label"
+            android:theme="@style/Theme.OfflineLedger">
+            <intent-filter android:label="@string/text_intake_process_label">
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <!-- 第三批：趋势图全屏横屏页，仅内部调用，不导出、不新增权限。 -->
         <activity
             android:name=".ui.charts.ChartFullscreenActivity"
