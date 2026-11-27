@@ -34,7 +34,9 @@ def main():
               "repository.commitTextIntake", "repository.deleteRecord",
               "textIntakeAutoCommitEnabled", "textIntakeRulePatch", "textIntakeLog",
               "SelectionContainer", "EXTRA_PROCESS_TEXT", "EXTRA_TEXT",
-              "ACTION_TEXT_INTAKE_DEBUG", "takeLast(6)"]:
+              "ACTION_TEXT_INTAKE_DEBUG", "takeLast(6)",
+              "intent.clipData", "initialRaw.isNotBlank()", "本次入口状态",
+              "RULE_PROMPT", "复制规则生成提示词", "未收到文本"]:
         if k not in act:
             e.append("Activity 缺: " + k)
     for k in ["rememberSaveable", "openOutputStream", "startForeground",
@@ -72,6 +74,27 @@ def main():
         if k not in settings:
             e.append("SettingsScreen 缺内部入口: " + k)
 
+    strings = C("app/src/main/res/values/strings.xml")
+    if "离线账本 · 自动记账" not in strings or "离线账本 · 文本诊断" in strings:
+        e.append("入口标签未改为「离线账本 · 自动记账」")
+    if "自动识别并记账" not in strings:
+        e.append("PROCESS_TEXT 菜单标签未改")
+    if "本批还不能记账" in C("app/src/main/AndroidManifest.xml"):
+        e.append("Manifest 仍有过期注释「本批还不能记账」")
+
+    prompt_doc = ROOT / "docs/自动记账规则生成提示词.md"
+    if not prompt_doc.is_file():
+        e.append("缺 docs/自动记账规则生成提示词.md")
+    else:
+        d = prompt_doc.read_text(encoding='utf-8')
+        for k in ["状态词 +=", "优惠词 +=", "噪声 +=", "分类 支付宝账单分类",
+                  "结构变化", "删掉订单号", "隐私提醒", "可复制的完整提示词"]:
+            if k not in d:
+                e.append("提示词文档缺: " + k)
+    for k in ["状态词 +=", "优惠词 +=", "噪声 +=", "结构变化", "删掉订单号"]:
+        if k not in act:
+            e.append("RULE_PROMPT 常量缺关键句: " + k)
+
     for p in ["app/src/main/res/xml/backup_rules.xml", "app/src/main/res/xml/data_extraction_rules.xml"]:
         s = C(p)
         if 'domain="sharedpref" path="offline_ledger_prefs.xml"' not in s:
@@ -88,15 +111,16 @@ def main():
 
     gd_raw = C("app/build.gradle.kts")
     gd = "\n".join(line.split("//")[0] for line in gd_raw.splitlines()).lower()
-    if 'defaultVersionName = "0.2.66"' not in gd_raw:
-        e.append("版本号未升 0.2.66")
+    if 'defaultVersionName = "0.2.67"' not in gd_raw:
+        e.append("版本号未升 0.2.67")
     for dep in ["mlkit", "text-recognition", "coil", "glide", "okhttp", "retrofit"]:
         if dep in gd:
             e.append("不得新增依赖: " + dep)
     if "check_text_intake.py" not in C(".github/workflows/build.yml"):
         e.append("build.yml 未挂 check_text_intake.py")
-    for p, k in [("docs/页面优化经验与避坑指南.md", "§7.69"),
-                 ("openspec/project.md", "第 87 批")]:
+    for p, k in [("docs/页面优化经验与避坑指南.md", "§7.70"),
+                 ("openspec/project.md", "第 88 批"),
+                 ("openspec/changes/text-intake-diagnosis/proposal.md", "第 88 批修正")]:
         if k not in C(p):
             e.append("文档未登记: " + p)
 

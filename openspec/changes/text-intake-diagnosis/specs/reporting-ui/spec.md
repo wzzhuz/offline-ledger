@@ -2,11 +2,17 @@
 
 ## ADDED Requirements
 
-### Requirement: 文本诊断入口与原文预览页
+### Requirement: 自动记账文本入口与原文预览页
 
 系统 SHALL 提供 `TextIntakeActivity`，通过 `ACTION_PROCESS_TEXT` 与
 `ACTION_SEND`（`text/plain`）两个 intent-filter 接收使用者主动提交的整页文本，
-入口标签 SHALL 为「离线账本 · 文本诊断」。
+入口标签 SHALL 为「离线账本 · 自动记账」（第 88 批修订：第 86 批曾用
+「离线账本 · 文本诊断」，会让使用者误以为该入口只诊断、不记账，MUST NOT 再用）。
+`ACTION_PROCESS_TEXT` 的菜单项标签 SHALL 为「自动识别并记账」。
+Activity SHALL 同时读 `EXTRA_PROCESS_TEXT`、`EXTRA_TEXT` 与 `Intent.clipData` 第一项的文本，
+MUST NOT 因 ROM 只把分享文本放进 `clipData` 而判定为「未收到文本」；
+收到非空文本且非内部试解析时 SHALL 进入自动落库 / 预填草稿判定，
+MUST NOT 停留在空诊断页。页面 SHALL 显式显示「本次入口状态」（字符数 / 来源 / 是否会写库）。
 页面 SHALL 以只读方式显示来源、字符数与截断标记、**全部**疑似金额串、
 主金额、页面特征数、方向 / 时间 / 收款方命中、严格门槛结论、
 缺失项与提示；SHALL 提供一键复制、一键清空与关闭，并 SHALL 用
@@ -17,7 +23,7 @@
 #### Scenario: 支付宝账单详情全选分享
 
 - **GIVEN** 使用者在 HyperOS 3.0 的支付宝账单详情页用系统「全选」选中整页文字
-- **WHEN** 点「分享」→「离线账本」
+- **WHEN** 点「分享」→「离线账本 · 自动记账」
 - **THEN** 页面显示来源 `send`、原文全文、全部疑似金额串、主金额与四项命中结果
 - **AND** 严格条件满足且自动开关开启时写事务落库，否则显示预填草稿
 

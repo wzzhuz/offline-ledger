@@ -26,6 +26,16 @@
 - [x] 3.8 `project.md` 第 87 批、活文档 §7.69、proposal/design/tasks/delta 同步
 - [x] 3.9 13 个静态检查本地全 PASS
 
+## 3b. 第 88 批：入口链路修复 + 提示词文档
+
+- [x] 3b.1 `extract()` 增加 `Intent.clipData` 兜底；`external` 改为非空文本判定
+- [x] 3b.2 入口标签改「离线账本 · 自动记账」；Manifest 过期注释同步
+- [x] 3b.3 页面新增「本次入口状态」醒目卡片（字符数 / 来源 / 是否写库 / 空文本引导）
+- [x] 3b.4 新增 `docs/自动记账规则生成提示词.md`：完整 Prompt、四种指令、步骤、结构变化判定、隐私提醒
+- [x] 3b.5 App 内「复制规则生成提示词」按钮（`RULE_PROMPT` 常量）
+- [x] 3b.6 delta / proposal / design / project.md / 活文档 §7.70 同步；版本号 0.2.67
+- [x] 3b.7 `check_text_intake.py` 增加 clipData / 标签 / 提示词文档断言；13 个静态检查本地全 PASS
+
 ## 4. 出包
 
 - [ ] 4.1 编译与校验 CI 全绿（含 `testDebugUnitTest`）

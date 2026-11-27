@@ -1717,3 +1717,29 @@ MUST NOT 设 `userScrollEnabled = false`。
 **范围**：版本号 0.2.65 → 0.2.66；零改表（version 仍 9）、零新增 Gradle 依赖、零新增 `uses-permission`、零 `INTERNET`、零后台组件；`MainActivity`、`LedgerApp` 主导航、CSV/Firefly 写路径、备份 DTO 全部一字未动。`TextIntakeActivity` 注入 `LedgerRepository`，新增 `commitTextIntake` 仍走既有事务 / `withResolvedRoot` / `rebuildAllBalancesInternal`，MUST NOT 新开写余额分支。**可直接覆盖 v0.2.65**。
 
 **change 状态**：`text-intake-diagnosis` 仍活跃不归档；微信支付成功页未验，MUST NOT 外推规则表。后续遇到失败那一笔，复制原文贴回 → AI 给一行规则 → 粘贴到规则增补框即时生效，或随下个版本合入默认基线。
+
+
+---
+
+## 第 88 批：分享入口链路修复 + 规则生成提示词文档
+
+**使用者反馈**：从系统「全选 → 分享」进入的只有「离线账本 文本诊断」，没有自动记录，也不是预填；
+并要求把「离开本会话后用什么提示词生成规则」写进文档。
+
+**根因**：`extract()` 只读 `EXTRA_PROCESS_TEXT` / `EXTRA_TEXT`，没有 `Intent.clipData` 兜底。
+HyperOS 的分享可能只把文本放进 `clipData`，于是判成「未收到文本」：
+`LaunchedEffect` 直接 return，既不调用 `commitTextIntake`，预填草稿也全是空字段。
+同时入口标签仍是第 86 批的「文本诊断」，Manifest 注释还写着「本批还不能记账」，属文档腐化。
+
+**改动**：
+- `extract()` 三层读取；`external = initialRaw.isNotBlank() && source != ACTION_DEBUG`
+- `text_intake_label = 离线账本 · 自动记账`、`text_intake_process_label = 自动识别并记账`
+- 页面新增「本次入口状态」卡片，显式显示字符数 / 来源 / 是否自动写库
+- 新增 `docs/自动记账规则生成提示词.md`：完整可复制 Prompt、四种指令、使用步骤、
+  结构变化判定、以及「贴给外部 AI 前先删订单号 / 卡号尾号」的隐私提醒
+- App 内规则增补卡片新增「复制规则生成提示词」，手机上即可复制，不用翻文档
+- 版本号 0.2.66 → 0.2.67；静态脚本增加 clipData / 标签 / 提示词一致性断言
+
+**流程**：修 bug（恢复第 87 批已承诺行为）+ 文档补充，不新建 change；
+同一 `text-intake-diagnosis` 补 tasks/design/delta，仍活跃不归档。
+零改表、零新增依赖 / 权限 / `INTERNET`、零后台组件，**可直接覆盖 v0.2.66**。

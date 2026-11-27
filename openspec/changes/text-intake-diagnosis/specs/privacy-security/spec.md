@@ -2,7 +2,7 @@
 
 ## ADDED Requirements
 
-### Requirement: 文本诊断入口不新增权限与后台组件
+### Requirement: 自动记账文本入口不新增权限与后台组件
 
 系统 SHALL 通过 `TextIntakeActivity` 的两个 `intent-filter`
 （`android.intent.action.PROCESS_TEXT` 与 `android.intent.action.SEND`，均为 `text/plain`）
@@ -36,7 +36,7 @@ App 只在被主动调用时存在一次，不运行时对电量的贡献严格�
 
 ---
 
-### Requirement: 文本诊断原文只在内存且过应用锁
+### Requirement: 自动记账原文只在内存且过应用锁
 
 `TextIntakeActivity` SHALL 在 `AppLockScreen` 解锁后才渲染任何原文内容，
 解锁前 MUST NOT 渲染账目或诊断内容；SHALL 尊重既有 `FLAG_SECURE` 与隐藏金额偏好。
@@ -119,7 +119,34 @@ Activity `excludeFromRecents` SHALL 为 `true`。
 
 #### Scenario: 外部文本入口
 
-- **GIVEN** 使用者从系统文本选择菜单或分享选择器点「离线账本 · 文本诊断」
+- **GIVEN** 使用者从系统文本选择菜单或分享选择器点「离线账本 · 自动记账」
 - **WHEN** Activity 被创建
 - **THEN** 复用同一套 `AppLockScreen` 校验，不提供绕过锁的路径
 - **AND** 该 Activity 不出现在最近任务列表
+
+
+---
+
+## ADDED Requirements（第 88 批）
+
+### Requirement: 规则生成提示词可复制且文档化
+
+系统 SHALL 在规则增补卡片提供「复制规则生成提示词」按钮，
+复制内容 SHALL 与 `docs/自动记账规则生成提示词.md` 的完整提示词一致。
+该文档 SHALL 包含：可复制的完整 Prompt、四种指令格式、使用步骤、
+「结构变化不能靠覆盖层解决」的判定、以及「贴给外部 AI 前先删订单号 / 卡号尾号」的隐私提醒。
+`check_text_intake.py` MUST 断言文档与 Activity 常量中的关键句一致。
+
+#### Scenario: 离开本会话后修复新格式
+
+- **GIVEN** 使用者在另一个 AI 会话里，手上有一笔未自动记账的原文
+- **WHEN** 复制 App 内提示词 + 处理后的原文一起发给 AI
+- **THEN** AI 只返回 1~3 行四种指令之一的规则增补行
+- **AND** 使用者粘贴到规则增补框、试解析即时生效，不需要等新版本
+
+#### Scenario: 结构变化
+
+- **GIVEN** 原文字段位置变了，不是某个词没覆盖
+- **WHEN** AI 按提示词判断
+- **THEN** 只输出 `# 结构变化，需要改代码并发版`
+- **AND** 使用者不会把无效规则粘进覆盖层反复试

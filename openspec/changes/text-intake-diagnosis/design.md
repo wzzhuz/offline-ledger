@@ -18,6 +18,8 @@
 | 12 | 分类只预置 `餐饮美食 → 餐饮`，其余留空 | 预置一级没有「亲友代付 / 文化休闲 / 公共服务」，硬映射就是静默记错账 |
 | 13 | 账户先剥卡种词、保留尾号，再走 `resolveAccount` | 支付宝是 `交通银行信用卡(2203)`，既有 `parseAccountCell` 要求括号前有空格，不能直接复用 |
 | 14 | change 保持活跃不归档 | 微信页后面几轮再验，避免新开 change |
+| 15 | `extract()` MUST 读 `EXTRA_PROCESS_TEXT` / `EXTRA_TEXT` / `Intent.clipData` 三层 | 第 88 批真机反馈：HyperOS 分享可能只用 clipData，旧实现判成「未收到文本」，导致既不落库也不预填 |
+| 16 | 入口标签改「离线账本 · 自动记账」，并写独立提示词文档 | 第 87 批已能记账，再叫「文本诊断」是误导；用户离开会话后需要一段可复制 Prompt |
 
 ## 考虑过的其他方案（被否决）
 
@@ -109,6 +111,8 @@ TextIntakeActivity (@AndroidEntryPoint)
 
 ## 真机待验（全部 [ ]）
 
+0. **第 88 批首要项**：从系统「全选 → 分享 → 离线账本 · 自动记账」进入，
+   页面是否显示「已收到 N 字符」并自动记账 / 形成预填草稿，而不是空白诊断页
 1. 6 笔支付宝原文是否能自动落库，优惠两笔是否显示原价 / 优惠 / 实付
 2. 同一笔分享两次是否只记一笔
 3. 账户 2203 / 7375 是否归到正确卡片；账户不存在时是否降级草稿
@@ -119,3 +123,45 @@ TextIntakeActivity (@AndroidEntryPoint)
 8. 设置页「自动记账 / 文本诊断」入口是否过应用锁
 9. 微信支付成功页留后续轮，MUST NOT 外推
 10. 从 v0.2.65 覆盖安装零回归、坚果云上传 success
+
+
+---
+
+## 第 88 批：入口链路与提示词
+
+### 根因链
+
+```
+HyperOS 全选 → 分享
+   └─ Intent.clipData 有文本，EXTRA_TEXT 为空
+        └─ extract() 返回 ("empty", "")
+             ├─ external = false（旧实现还额外枚举 action 字符串）
+             ├─ LaunchedEffect 条件 initialRaw.isBlank() → return
+             ├─ 不调用 commitTextIntake → 没有自动记录
+             └─ preview 为空文本 → 预填草稿全是空字段 → 看起来「也不是预填」
+```
+
+同时 `strings.xml` 的标签仍是第 86 批的「离线账本 · 文本诊断」，
+Manifest 注释还写着「本批还不能记账」，与第 87 批能力不符。
+
+### 修正
+
+- **读三层**：`EXTRA_PROCESS_TEXT` → `EXTRA_TEXT` → `clipData.getItemAt(0).text`；
+  任何一层非空即返回 `("send"/"process_text", text)`
+- **external 判定**：`initialRaw.isNotBlank() && source != ACTION_DEBUG`，
+  不再枚举 action 字符串，未来 ROM 变体也不会漏
+- **醒目状态条**：显示字符数 / 来源 / 是否自动写库；未收到文本时给出明确操作引导
+- **标签**：`text_intake_label = 离线账本 · 自动记账`、
+  `text_intake_process_label = 自动识别并记账`
+
+### 提示词单一真相源
+
+`TextIntakeActivity.RULE_PROMPT` 与 `docs/自动记账规则生成提示词.md` 是同一段文本，
+`check_text_intake.py` 断言两边都含「状态词 +=」「优惠词 +=」「噪声 +=」「分类」「结构变化」「删掉订单号」关键句。
+App 内「复制规则生成提示词」按钮直接复制常量，手机上即可用，不依赖 GitHub 文档。
+
+### 隐私边界
+
+贴给外部 AI 是**使用者主动、可控的一次导出**，不等于 App 默认回传；
+但文档 MUST 提示先删订单号 / 商家订单号 / 卡号尾号。App 本体仍零 `INTERNET`、
+不写原文到任何文件、不进备份。

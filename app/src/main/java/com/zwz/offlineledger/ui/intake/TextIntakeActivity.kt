@@ -106,7 +106,10 @@ class TextIntakeActivity : FragmentActivity() {
                 val scope = rememberCoroutineScope()
                 val patchResult = remember(rulePatch) { TextIntakeRules.withPatch(rulePatch) }
                 val rules = patchResult.rules
-                val external = source == "process_text" || source == "send"
+                // 第 88 批：只看「是否收到非空文本且不是内部试解析」，
+                // 不再枚举 action 字符串——部分 ROM 把分享文本放在 clipData，
+                // 旧写法会把它判成 empty，于是既不自动落库也不形成预填草稿。
+                val external = initialRaw.isNotBlank() && source != ACTION_DEBUG
                 val previewSource = if (manualMode) ACTION_DEBUG else source
                 val previewText = if (manualMode) testInput else rawText
                 val preview = TextIntakeInspector.from(previewSource, previewText, rules)
@@ -188,12 +191,32 @@ class TextIntakeActivity : FragmentActivity() {
                                 modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(scroll),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Text("文本诊断 / 自动记账", style = MaterialTheme.typography.headlineSmall)
+                                Text("自动记账 / 文本诊断", style = MaterialTheme.typography.headlineSmall)
                                 Text(
                                     "原文只在内存，退出或一键清空即释放。规则与结果摘要不含原文，且已排除系统备份。",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+
+                                Card(modifier = Modifier.fillMaxWidth()) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text("本次入口状态", style = MaterialTheme.typography.titleSmall)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            when {
+                                                manualMode -> "试解析模式：请在下方粘贴原文，本模式不会自动写库。"
+                                                preview.rawText.isBlank() ->
+                                                    "未收到文本。请确认从系统「全选 → 分享 → 离线账本 · 自动记账」进入；" +
+                                                        "若仍为空，把原文贴进下方试解析框，或复制给我排查。"
+                                                else -> "已收到 ${preview.rawText.length} 字符 · 来源：${sourceText(preview.source)}" +
+                                                    if (autoEnabled && external) " · 达标即自动记账，未达标形成预填草稿"
+                                                    else " · 当前仅草稿，不会自动写库"
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
 
                                 Card(modifier = Modifier.fillMaxWidth()) {
                                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -239,12 +262,17 @@ class TextIntakeActivity : FragmentActivity() {
                                         if (patchResult.invalidLines.isNotEmpty()) {
                                             Text("已忽略 ${patchResult.invalidLines.size} 行无效指令", style = MaterialTheme.typography.bodySmall)
                                         }
-                                        TextButton(onClick = {
-                                            rulePatch = ""
-                                            prefs.textIntakeRulePatch = ""
-                                            manualMode = true
-                                            commitState = null
-                                        }) { Text("恢复默认规则") }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            TextButton(onClick = {
+                                                copyRaw(this@TextIntakeActivity, RULE_PROMPT)
+                                            }) { Text("复制规则生成提示词") }
+                                            TextButton(onClick = {
+                                                rulePatch = ""
+                                                prefs.textIntakeRulePatch = ""
+                                                manualMode = true
+                                                commitState = null
+                                            }) { Text("恢复默认规则") }
+                                        }
                                     }
                                 }
 
@@ -388,8 +416,49 @@ class TextIntakeActivity : FragmentActivity() {
             if (!process.isNullOrEmpty()) return "process_text" to process
             val send = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
             if (!send.isNullOrEmpty()) return "send" to send
+            // 第 88 批：HyperOS 等 ROM 的「全选 → 分享」可能只把文本放进 clipData，
+            // EXTRA_TEXT 为空。不兜底会落到 "empty"，页面显示「未收到文本」，
+            // LaunchedEffect 直接 return，于是既不自动落库也不形成预填草稿 —— 正是使用者反馈的现象。
+            val clip = try {
+                intent.clipData?.takeIf { it.itemCount > 0 }
+                    ?.getItemAt(0)?.text?.toString()
+            } catch (_: Exception) {
+                null
+            }
+            if (!clip.isNullOrEmpty()) return "send" to clip
             return "empty" to ""
         }
+
+        /** 离开本会话后，复制这段给任意 AI，即可生成可粘贴的规则增补行。 */
+        const val RULE_PROMPT = """你是「离线账本」Android App 的自动记账规则助手。
+
+我会贴一段从手机系统「全选 → 分享」得到的账单原文（我会先手动删掉订单号、卡号尾号等敏感信息），以及 App 里显示的「未达标」提示。
+
+当前默认规则基线：
+- 状态词：交易成功 / 自动扣款成功 / 支付成功 / 付款成功
+- 优惠词：红包 / 立减 / 券 / 满减 / 折扣 / 优惠 / 减免
+- 噪声：账单管理 / 支付奖励 / 收单机构 / 清算机构 / 标签 / 请选择 / 为您推荐 / 计入收支 / 备注 / 添加 / AA收款 / 查看往来记录 / 对此订单有疑问 / logo / arrow / extend-icon 等
+- 分类映射：餐饮美食 = 餐饮
+- 本项目一级分类只有：餐饮 / 交通 / 养车 / 居住 / 购物 / 医疗 / 学习娱乐 / 宠物 / 人情社交 / 其他
+
+任务：判断这段原文为什么没有达到自动落库门槛，只输出需要增补的规则行。每行一条，不要解释、不要输出正则 / JSON / 代码 / 其他文字。
+
+只允许这四种格式：
+状态词 += 新状态词
+优惠词 += 新优惠关键词
+噪声 += 新噪声行
+分类 支付宝账单分类 = 本项目一级分类名
+
+约束：
+1. 只增补词表与分类映射，不要改金额规则、主金额位置、优惠算术校验或自动落库门槛。
+2. 没有对应的一级分类就不要输出分类映射，留空让我自己配；不要硬猜。
+3. 若失败原因是字段位置 / 区块结构变了，而不是某个词没覆盖，只输出一行：# 结构变化，需要改代码并发版
+4. 最多 3 行；多个词可用中文逗号写在同一行。
+
+示例输出：
+状态词 += 自动扣款成功
+优惠词 += 立减金
+"""
 
         fun copyRaw(context: Context, text: String) {
             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

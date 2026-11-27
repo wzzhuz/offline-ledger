@@ -43,11 +43,12 @@
         </activity>
 
         <!--
-            第 86 批：系统文本选择菜单 / 分享选择器进来的只读诊断页。
+            第 86/88 批：系统文本选择菜单 / 分享选择器进来的自动记账页。
             两个 intent-filter 都是 framework 隐式 Intent 能力，
             SHALL NOT 声明任何 uses-permission、无障碍服务或后台组件。
             excludeFromRecents: 原文含商户全称与卡号，防最近任务快照泄露。
-            入口标签刻意叫「文本诊断」，不叫「记一笔」：本批还不能记账。
+            第 88 批起标签改为「离线账本 · 自动记账」：收到严格达标的文本会直接落库，
+            未达标则形成预填草稿，MUST NOT 再叫「文本诊断」以免误导。
         -->
         <activity
             android:name=".ui.intake.TextIntakeActivity"
