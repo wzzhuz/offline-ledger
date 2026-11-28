@@ -1908,3 +1908,37 @@ Composable 里同步调 `vm.applyPreset()` 紧跟其后；协程随后整体赋�
 与「自动记账永远落主账本」两条核心口径。零改表，可直接覆盖 v0.2.72。
 
 `reporting-ui` 3 条 MODIFIED + 1 条 ADDED；`VirtualBookCodecTest` 扩 6 个 JVM 单测。
+
+
+## 第 95 批：虚拟账本设置页 IA 整理 + 设置主菜单功能分组（v0.2.74）
+
+**用户反馈**：① 新建和列表挤在一页；② 没有删除、配置/重命名等占两行，
+应参考账户列表收进右侧三点；③ 设置主菜单规划乱。
+
+**清点纠正**：上一轮影响分析写「设置主菜单是一条大 `LazyColumn` 全平铺」是错的。
+`SettingsScreen` 第 4/15 批起就是 8 张 `SettingGroupCard`，且已有
+`SectionTitle("关于")`。真正缺的是**其余 7 张卡无小节标题、顺序按频率交错**。
+又一次 §7.51 外推前未清点。
+
+**处理**（用户拍板 1A / 2A / 3 按推荐）：
+
+1. 新建拆到独立 `VirtualBookCreateScreen`（路由 `virtual-book-create`），
+   列表页右上角「+」进入；模板说明复用 `VirtualBookTemplate.hint`。
+2. `VirtualBookCard` 七项操作（查看 / 配置 / 重命名 / 归档 / 上移 / 下移 / 删除）
+   收进右侧「⋮」，两行压一行，与 `AssetsScreen.AccountCard` 同款。
+   删除触发用 `pendingDelete + LaunchedEffect(menu)` 解耦（第 60 批 Q2A
+   「点删除没弹窗」坑）。
+3. `VirtualBookStore.remove(id)` **只删 prefs 里的视图定义**，
+   MUST NOT 删流水 / 改标签 / 碰 DAO / 碰回收站。流水仍带 `台账:` 标签，
+   主账本明细可见、余额不变；`tagFor(name)` 稳定派生，建同名视图即重新聚合。
+   确认弹窗 MUST 明说这两句。
+4. 设置主菜单补 4 个 `SectionTitle` 并重排：账本与分类 / 数据与自动记账 /
+   偏好与安全 / 关于。**7 个 `onOpen` route 与 TextIntakeActivity 内部入口
+   逐字不动**，8 张卡片一条不少；脚本逐条断言防丢项。
+   「账户与资产」组未落地（账户管理在资产 Tab，设置页无此入口，硬凑是空组）。
+
+**不改**：Room version 仍 9、备份 DTO、CSV、预置分类清单、4 Tab 骨架、
+统计模块、自动记账落库位置、场景模板逻辑（第 94 批）、切换不带录入归属。
+零改表，可直接覆盖 v0.2.73。
+
+`reporting-ui` 1 条 MODIFIED + 2 条 ADDED；`VirtualBookCodecTest` 扩 2 个 JVM 单测。

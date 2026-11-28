@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""第 91/93/94 批：虚拟账本（视图级台账）静态契约检查。
+"""第 91/93/94/95 批：虚拟账本（视图级台账）静态契约检查。
 
 核心守住五条口径：零账本维度、切换不带录入归属、台账聚合不过滤不计入、
 台账流水 MUST NOT 从主账本明细排除（否则全局失去编辑入口）、
-场景模板决定文案与预填分类（MUST NOT 写死礼金专用 UI）。
+场景模板决定文案与预填分类（MUST NOT 写死礼金专用 UI）、
+新建独立页 / 三点菜单 / 删除只删视图定义不删流水。
 """
 import os
 import re
@@ -130,8 +131,8 @@ def main():
         e.append("VirtualBookDao 未注册")
 
     gd = read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.73"' not in gd:
-        e.append("版本号未升 0.2.73")
+    if 'defaultVersionName = "0.2.74"' not in gd:
+        e.append("版本号未升 0.2.74")
 
     proj = read("openspec/project.md")
     if "虚拟台账视图不属此禁令" not in proj:
@@ -165,10 +166,46 @@ def main():
             e.append("预填分类缺少按 id 精确命中：" + k)
 
     settings = read("app/src/main/java/com/zwz/offlineledger/ui/settings/VirtualBookSettingsScreen.kt")
-    for k in ['newTemplate', 'store.add(newName, newTemplate)', 'setTemplate(',
-              'setDefaultCategory(', 'categoryLabel(']:
+    create = read("app/src/main/java/com/zwz/offlineledger/ui/settings/VirtualBookCreateScreen.kt")
+    for k in ['setTemplate(', 'setDefaultCategory(', 'categoryLabel(', 'MoreVert',
+              'remove(', 'pendingDelete', 'LaunchedEffect(menu)', 'onCreate']:
         if k not in settings:
-            e.append("设置页缺少场景模板配置：" + k)
+            e.append("虚拟账本列表页缺少：" + k)
+    # 第 95 批：新建表单 MUST 在独立页，列表页 MUST NOT 再内嵌新建输入框
+    for k in ['store.add(name, template)', 'VirtualBookTemplate.entries', 'onCreated']:
+        if k not in create:
+            e.append("独立新建页缺少：" + k)
+    if 'label = { Text("新建' in settings or 'OutlinedTextField(' in settings and '名称，如' in settings:
+        e.append("虚拟账本列表页 MUST NOT 再内嵌新建表单（已拆到独立页）")
+
+    # 删除只删视图定义：Store.remove MUST NOT 碰 records / DAO
+    if 'fun remove(id: String)' not in store or 'filterNot { it.id == id }' not in store:
+        e.append("VirtualBookStore 缺少只删定义的 remove()")
+    for bad in ['recordDao.', 'deleteRecord(', 'DELETE FROM', 'import com.zwz.offlineledger.data']:
+        if bad in store:
+            e.append("VirtualBookStore MUST NOT 触碰流水数据：" + bad)
+    # 删除确认 MUST 明说「不删流水 / 可同名重建」
+    for k in ['不会删除任何已记流水', '同名视图即可重新聚合', '确认删除']:
+        if k not in settings:
+            e.append("删除确认弹窗缺少口径说明：" + k)
+
+    # 设置主菜单 MUST 按 4 组排，且 8 张卡片一条不少
+    main_settings = read("app/src/main/java/com/zwz/offlineledger/ui/settings/SettingsScreen.kt")
+    for g in ['账本与分类', '数据与自动记账', '偏好与安全', '关于']:
+        if 'SectionTitle("%s")' % g not in main_settings:
+            e.append("设置主菜单缺少分组小节：" + g)
+    for route in ['onOpen("ledger")', 'onOpen("tags")', 'onOpen("virtual-book-settings")',
+                  'onOpen("bulk")', 'onOpen("backup")', 'onOpen("prefs")', 'onOpen("security")',
+                  'TextIntakeActivity.ACTION_TEXT_INTAKE_DEBUG']:
+        if route not in main_settings:
+            e.append("设置主菜单分组重排丢条目：" + route)
+
+    # 新建页路由必须注册
+    if 'composable("virtual-book-create")' not in app or 'VirtualBookCreateScreen(' not in app:
+        e.append("LedgerApp 缺少独立新建页路由")
+    if 'onCreate = { navController.navigate("virtual-book-create") }' not in app:
+        e.append("列表页右上角 + 未接到独立新建页")
+
     # 第 93 批漏收口的三处腐化文案 MUST NOT 残留
     for bad in ['主账本明细默认不显示', '左上角切换器', '据此排除台账记录',
                 '供主账本明细排除']:

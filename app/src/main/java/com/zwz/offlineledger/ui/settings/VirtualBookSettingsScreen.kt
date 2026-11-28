@@ -1,5 +1,7 @@
 package com.zwz.offlineledger.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,10 +12,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,6 +28,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -37,30 +43,34 @@ import com.zwz.offlineledger.core.prefs.VirtualBookStore
 import com.zwz.offlineledger.core.prefs.VirtualBookTemplate
 import com.zwz.offlineledger.data.local.entity.CategoryEntity
 import com.zwz.offlineledger.ui.LedgerDi
+import com.zwz.offlineledger.ui.theme.LedgerColors
 
 /**
  * 第 91 批：虚拟账本管理。定义只存 SharedPreferences，不进 Room / 备份 DTO。
  * 新建同名视图即可把带「台账:」标签的历史流水重新聚合出来，不需要迁移数据。
  *
  * 第 94 批：新建时选场景模板（人情往来 / 专项支出 / 自定义），非礼金模板可设
- * 默认分类，之后每笔台账录入自动带入，不用逐笔手选。顺带修掉第 93 批漏收口的
- * 三处过期表述（明细排除 / 旧入口位置）。
+ * 默认分类，之后每笔台账录入自动带入，不用逐笔手选。
+ *
+ * 第 95 批：
+ * - 新建表单拆到独立页，本页只留总开关 + 列表 + 右上角「+」；
+ * - 每张卡片的六项操作收进右侧「⋮」，两行压成一行，与账户列表同款；
+ * - 补真实删除：只删视图定义，MUST NOT 删流水，确认弹窗写明可同名重建找回。
  */
 @Composable
 fun VirtualBookSettingsScreen(
     onBack: () -> Unit,
+    onCreate: () -> Unit,
     onOpenBook: (String) -> Unit
 ) {
     val context = LocalContext.current
     val store = remember { VirtualBookStore(context) }
     var tick by remember { mutableStateOf(0) }
-    var newName by remember { mutableStateOf("") }
-    var newTemplate by remember { mutableStateOf(VirtualBookTemplate.GIFT) }
     var renameTarget by remember { mutableStateOf<VirtualBook?>(null) }
     var renameText by remember { mutableStateOf("") }
     var configTarget by remember { mutableStateOf<VirtualBook?>(null) }
     var categoryTarget by remember { mutableStateOf<VirtualBook?>(null) }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    var deleteTarget by remember { mutableStateOf<VirtualBook?>(null) }
     // tick 作重组信号：改动后重读 SharedPreferences 的最新定义。
     val books = remember(tick) { store.all() }
     var exclude by remember { mutableStateOf(store.excludeByDefault) }
@@ -74,7 +84,11 @@ fun VirtualBookSettingsScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "返回")
             }
-            Text("虚拟账本", style = MaterialTheme.typography.headlineSmall)
+            Text("虚拟账本", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            // 第 95 批：新建不再和列表混在一屏。
+            IconButton(onClick = onCreate) {
+                Icon(Icons.Filled.Add, contentDescription = "新建虚拟账本")
+            }
         }
         Text(
             text = "虚拟账本只是按标签聚合的视图：流水仍在主账本明细可见，切换入口只切浏览范围，" +
@@ -102,102 +116,31 @@ fun VirtualBookSettingsScreen(
         }
 
         Text(
-            "场景模板",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 18.dp, bottom = 4.dp)
-        )
-        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-            VirtualBookTemplate.entries.forEach { t ->
-                FilterChip(
-                    selected = newTemplate == t,
-                    onClick = { newTemplate = t },
-                    label = { Text(t.label) }
-                )
-            }
-        }
-        Text(
-            text = newTemplate.hint,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp)
-        )
-
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 10.dp)) {
-            OutlinedTextField(
-                value = newName,
-                onValueChange = { newName = it; errorText = null },
-                label = { Text("新建，如「结婚礼金」或「装修」") },
-                singleLine = true,
-                modifier = Modifier.weight(1f)
-            )
-            Button(
-                onClick = {
-                    val b = store.add(newName, newTemplate)
-                    if (b == null) errorText = "名称为空或已存在" else {
-                        newName = ""
-                        tick += 1
-                    }
-                },
-                modifier = Modifier.padding(start = 8.dp)
-            ) { Text("新建") }
-        }
-        errorText?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-        }
-
-        Text(
             "已建视图",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 18.dp, bottom = 8.dp)
         )
         if (books.isEmpty()) {
             Text(
-                // 第 94 批：第 93 批把切换器从常驻条改成明细页标题行图标，文案同步。
-                "还没有虚拟账本。新建后从明细页标题行的账本图标进入。",
+                "还没有虚拟账本。点右上角「+」新建，之后从明细页标题行的账本图标进入。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         books.forEach { b ->
-            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = b.name + if (b.archived) "（已归档）" else "",
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = { onOpenBook(b.id) }) { Text("查看") }
-                    }
-                    Text(
-                        // 第 94 批：第 93 批已撤回明细排除 SQL，原「默认不显示」是错的。
-                        "标签 ${b.tagName} · ${b.spec.label} · 不计入主账本收支",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (b.spec != VirtualBookTemplate.GIFT) {
-                        Text(
-                            "默认分类：" + categoryLabel(categories, b.defaultCategoryId),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Row(modifier = Modifier.padding(top = 4.dp)) {
-                        TextButton(onClick = { configTarget = b }) { Text("配置") }
-                        TextButton(onClick = { renameTarget = b; renameText = b.name }) { Text("重命名") }
-                        TextButton(onClick = { store.setArchived(b.id, !b.archived); tick += 1 }) {
-                            Text(if (b.archived) "恢复" else "归档")
-                        }
-                    }
-                    Row {
-                        TextButton(onClick = { store.move(b.id, -1); tick += 1 }) { Text("上移") }
-                        TextButton(onClick = { store.move(b.id, 1); tick += 1 }) { Text("下移") }
-                    }
-                }
-            }
+            VirtualBookCard(
+                book = b,
+                categories = categories,
+                onOpen = { onOpenBook(b.id) },
+                onConfig = { configTarget = b },
+                onRename = { renameTarget = b; renameText = b.name },
+                onArchived = { store.setArchived(b.id, !b.archived); tick += 1 },
+                onMove = { d -> store.move(b.id, d); tick += 1 },
+                onDelete = { deleteTarget = b }
+            )
         }
         Text(
-            "提示：归档只从切换列表隐藏，历史流水与标签不受影响；" +
+            "提示：删除只移除这个视图的入口，已记流水仍在主账本明细；归档只从切换列表隐藏。" +
                 "CSV 导出不含「不计入」列，台账数据请以加密备份为准。",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -246,7 +189,7 @@ fun VirtualBookSettingsScreen(
             text = {
                 Column {
                     Text("场景模板", style = MaterialTheme.typography.titleSmall)
-                    Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         VirtualBookTemplate.entries.forEach { t ->
                             FilterChip(
                                 selected = picked == t,
@@ -312,6 +255,113 @@ fun VirtualBookSettingsScreen(
             confirmButton = {},
             dismissButton = { TextButton(onClick = { categoryTarget = null }) { Text("取消") } }
         )
+    }
+
+    // 第 95 批：真删除。弹窗 MUST 明说「不删流水 / 可同名重建找回」。
+    deleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("删除虚拟账本") },
+            text = {
+                Column {
+                    Text("视图：「${target.name}」", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "标签：${target.tagName}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "只删除这个视图的入口，不会删除任何已记流水。" +
+                            "那些流水仍带此标签、仍在主账本明细可见；" +
+                            "以后新建一个同名视图即可重新聚合查看。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LedgerColors.ExpenseRed,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    store.remove(target.id)
+                    tick += 1
+                    deleteTarget = null
+                }) { Text("确认删除", color = LedgerColors.ExpenseRed) }
+            },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } }
+        )
+    }
+}
+
+/**
+ * 第 95 批：六项操作收进右侧「⋮」，与账户列表同款，一行放下。
+ *
+ * 删除触发用 pendingDelete + LaunchedEffect(menu) 解耦：第 60 批 Q2A 真机反馈
+ * 「点删除没弹窗」——DropdownMenu 的 Popup dismiss 与 AlertDialog 新窗口同帧竞争。
+ */
+@Composable
+private fun VirtualBookCard(
+    book: VirtualBook,
+    categories: List<CategoryEntity>,
+    onOpen: () -> Unit,
+    onConfig: () -> Unit,
+    onRename: () -> Unit,
+    onArchived: () -> Unit,
+    onMove: (Int) -> Unit,
+    onDelete: () -> Unit
+) {
+    var menu by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf(false) }
+    LaunchedEffect(menu) {
+        if (!menu && pendingDelete) {
+            pendingDelete = false
+            onDelete()
+        }
+    }
+
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, bottom = 6.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = book.name + if (book.archived) "（已归档）" else "",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    "标签 ${book.tagName} · ${book.spec.label} · 不计入主账本收支",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (book.spec != VirtualBookTemplate.GIFT) {
+                    Text(
+                        "默认分类：" + categoryLabel(categories, book.defaultCategoryId),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Box {
+                IconButton(onClick = { menu = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("查看") }, onClick = { menu = false; onOpen() })
+                    DropdownMenuItem(text = { Text("配置") }, onClick = { menu = false; onConfig() })
+                    DropdownMenuItem(text = { Text("重命名") }, onClick = { menu = false; onRename() })
+                    DropdownMenuItem(
+                        text = { Text(if (book.archived) "恢复" else "归档") },
+                        onClick = { menu = false; onArchived() }
+                    )
+                    DropdownMenuItem(text = { Text("上移") }, onClick = { menu = false; onMove(-1) })
+                    DropdownMenuItem(text = { Text("下移") }, onClick = { menu = false; onMove(1) })
+                    DropdownMenuItem(
+                        text = { Text("删除", color = LedgerColors.ExpenseRed) },
+                        onClick = { menu = false; pendingDelete = true }
+                    )
+                }
+            }
+        }
     }
 }
 

@@ -63,6 +63,7 @@ import com.zwz.offlineledger.ui.templates.TemplateManagerScreen
 import com.zwz.offlineledger.ui.trash.TrashScreen
 import com.zwz.offlineledger.core.prefs.VirtualBookStore
 import com.zwz.offlineledger.ui.settings.VirtualBookSettingsScreen
+import com.zwz.offlineledger.ui.settings.VirtualBookCreateScreen
 import com.zwz.offlineledger.ui.virtual.VirtualBookScreen
 import com.zwz.offlineledger.ui.virtual.VirtualBookSwitcher
 
@@ -313,7 +314,15 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
             composable("virtual-book-settings") {
                 VirtualBookSettingsScreen(
                     onBack = { goBack() },
+                    // 第 95 批：新建拆到独立页，不再和列表混在一屏。
+                    onCreate = { navController.navigate("virtual-book-create") },
                     onOpenBook = { id -> navController.navigate("virtual-book/$id") }
+                )
+            }
+            composable("virtual-book-create") {
+                VirtualBookCreateScreen(
+                    onBack = { goBack() },
+                    onCreated = { goBack() }
                 )
             }
         }

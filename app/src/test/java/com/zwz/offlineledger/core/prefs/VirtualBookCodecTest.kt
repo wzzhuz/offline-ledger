@@ -115,4 +115,30 @@ class VirtualBookCodecTest {
         assertEquals("记收礼", VirtualBookTemplate.GIFT.incomeAction)
         assertEquals("记收入", VirtualBookTemplate.CUSTOM.incomeAction)
     }
+
+    // ---- 第 95 批：删除只删定义，同名重建可重新聚合 ----
+
+    @Test
+    fun tagForIsDerivedFromNameSoRecreateReaggregates() {
+        // 删除视图定义后流水仍带此标签；新建同名视图 tagFor(name) 必须得到同一串。
+        val tag = VirtualBookCodec.tagFor("结婚礼金")
+        val removed = VirtualBookCodec.normalize(emptyList<VirtualBook>())
+        assertTrue(removed.isEmpty())
+        val recreated = VirtualBook("vb-new", "结婚礼金", VirtualBookCodec.tagFor("结婚礼金"))
+        assertEquals(tag, VirtualBookCodec.normalize(listOf(recreated))[0].tagName)
+    }
+
+    @Test
+    fun removingDefinitionKeepsOtherBooksAndStableOrder() {
+        val a = VirtualBook("vb-1", "礼金", VirtualBookCodec.tagFor("礼金"), sortOrder = 0)
+        val b = VirtualBook("vb-2", "装修", VirtualBookCodec.tagFor("装修"), sortOrder = 1,
+            template = VirtualBookTemplate.PROJECT.id)
+        val c = VirtualBook("vb-3", "旅行", VirtualBookCodec.tagFor("旅行"), sortOrder = 2,
+            template = VirtualBookTemplate.PROJECT.id)
+        // 模拟 Store.remove：filterNot + normalize
+        val kept = VirtualBookCodec.normalize(listOf(a, b, c).filterNot { it.id == "vb-2" })
+        assertEquals(listOf("vb-1", "vb-3"), kept.map { it.id })
+        assertEquals(listOf(0, 1), kept.map { it.sortOrder })
+        assertEquals(VirtualBookTemplate.PROJECT, kept[1].spec)
+    }
 }

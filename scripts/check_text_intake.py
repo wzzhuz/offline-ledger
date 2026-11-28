@@ -134,8 +134,8 @@ def main():
 
     gd_raw = C("app/build.gradle.kts")
     gd = "\n".join(line.split("//")[0] for line in gd_raw.splitlines()).lower()
-    if 'defaultVersionName = "0.2.73"' not in gd_raw:
-        e.append("版本号未升 0.2.73")
+    if 'defaultVersionName = "0.2.74"' not in gd_raw:
+        e.append("版本号未升 0.2.74")
     for dep in ["mlkit", "text-recognition", "coil", "glide", "okhttp", "retrofit"]:
         if dep in gd:
             e.append("不得新增依赖: " + dep)

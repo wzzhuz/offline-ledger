@@ -42,6 +42,16 @@ class VirtualBookStore(context: Context) {
         return book
     }
 
+    /**
+     * 第 95 批：只删**视图定义**，MUST NOT 动流水。
+     * 流水仍带 `台账:<name>` 标签躺在 records 表，主账本明细照常可见；
+     * 在设置页新建同名视图即可重新聚合回来（tagFor(name) 由名字派生，稳定）。
+     * 删除确认弹窗 MUST 把这两句写清楚，避免误以为「删了=钱没了」。
+     */
+    fun remove(id: String) {
+        save(all().filterNot { it.id == id })
+    }
+
     fun rename(id: String, newName: String) {
         val trimmed = newName.trim()
         if (trimmed.isEmpty()) return
