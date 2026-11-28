@@ -16,6 +16,7 @@ import com.zwz.offlineledger.data.local.dao.RecordDao
 import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
 import com.zwz.offlineledger.data.local.dao.TemplateDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
+import com.zwz.offlineledger.data.local.dao.VirtualBookDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -63,4 +64,6 @@ object DatabaseModule {
     @Provides fun provideCounterpartyAliasDao(db: AppDatabase): CounterpartyAliasDao = db.counterpartyAliasDao()
     /** 第 75 批：LedgerEntryPoint.tagDao() 与标签管理页共用此绑定。 */
     @Provides fun provideTagDao(db: AppDatabase): TagDao = db.tagDao()
+    /** 第 91 批：LedgerEntryPoint.virtualBookDao() 与台账页共用此绑定。 */
+    @Provides fun provideVirtualBookDao(db: AppDatabase): VirtualBookDao = db.virtualBookDao()
 }

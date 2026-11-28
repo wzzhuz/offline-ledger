@@ -67,16 +67,7 @@ jobs:
       # assembleDebug 只编译主源码，不碰 src/test。
       # 必须单独跑一次 test，否则测试文件写错了也照样「编译通过」。
       - name: 运行单元测试
-        run: |
-          set +e
-          gradle testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/unit.log
-          code=${PIPESTATUS[0]}
-          if [ "$code" -ne 0 ]; then
-            grep -E "^e: |error:|FAILED|What went wrong|Execution failed|Caused by:|expected:|AssertionError|Unresolved reference" /tmp/unit.log | head -60 | while IFS= read -r line; do
-              echo "::error::$line"
-            done
-          fi
-          exit "$code"
+        run: gradle testDebugUnitTest --stacktrace --no-daemon
 
       - name: 编译 Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon
