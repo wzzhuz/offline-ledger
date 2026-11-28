@@ -102,7 +102,9 @@ fun RecordEditorDialog(
     /** 第 91 批：仅虚拟台账录入使用；普通记一笔与自动记账 MUST 保持默认空值。 */
     presetType: RecordType? = null,
     presetTagNames: List<String> = emptyList(),
-    presetExcludeFromStats: Boolean = false
+    presetExcludeFromStats: Boolean = false,
+    /** 第 94 批：场景模板给出的默认分类，停用项也可（只校验存在 + type 一致）。 */
+    presetCategoryId: Long? = null
 ) {
     val context = LocalContext.current
     val vm: RecordEditorViewModel = viewModel(
@@ -117,8 +119,8 @@ fun RecordEditorDialog(
     // 第 92 批修订：预填 MUST 作为 load 的参数传进去，在同一个协程内合并。
     // 第 91 批「load() 启动协程 + 外部同步 applyPreset()」会被 load 后续的整体
     // 赋值覆盖，导致台账标签与不计入开关全部丢失。
-    LaunchedEffect(recordId, presetTagNames, presetType, presetExcludeFromStats) {
-        vm.load(recordId, presetType, presetTagNames, presetExcludeFromStats)
+    LaunchedEffect(recordId, presetTagNames, presetType, presetExcludeFromStats, presetCategoryId) {
+        vm.load(recordId, presetType, presetTagNames, presetExcludeFromStats, presetCategoryId)
     }
 
     val state by vm.state.collectAsState()

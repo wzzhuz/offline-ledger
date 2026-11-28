@@ -24,7 +24,8 @@ class VirtualBookStore(context: Context) {
         sp.edit().putString(KEY_BOOKS, VirtualBookCodec.encode(VirtualBookCodec.normalize(list))).apply()
     }
 
-    fun add(name: String): VirtualBook? {
+    /** 第 94 批：新建时 MUST 带场景模板；缺省按礼金模板，兼容旧调用。 */
+    fun add(name: String, template: VirtualBookTemplate = VirtualBookTemplate.GIFT): VirtualBook? {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return null
         val current = all().toMutableList()
@@ -33,7 +34,8 @@ class VirtualBookStore(context: Context) {
             id = VirtualBookCodec.newId(),
             name = trimmed,
             tagName = VirtualBookCodec.tagFor(trimmed),
-            sortOrder = current.size
+            sortOrder = current.size,
+            template = template.id
         )
         current += book
         save(current)
@@ -48,6 +50,22 @@ class VirtualBookStore(context: Context) {
 
     fun setArchived(id: String, archived: Boolean) {
         save(all().map { if (it.id == id) it.copy(archived = archived) else it })
+    }
+
+    /** 第 94 批：改场景模板；切到礼金时清掉自定义默认分类，避免两套口径并存。 */
+    fun setTemplate(id: String, template: VirtualBookTemplate) {
+        save(all().map {
+            if (it.id != id) it else it.copy(
+                template = template.id,
+                defaultCategoryId = if (template == VirtualBookTemplate.GIFT) null
+                else it.defaultCategoryId
+            )
+        })
+    }
+
+    /** 第 94 批：专项支出 / 自定义模板的默认分类，设一次后每笔自动预填。 */
+    fun setDefaultCategory(id: String, categoryId: Long?) {
+        save(all().map { if (it.id == id) it.copy(defaultCategoryId = categoryId) else it })
     }
 
     fun move(id: String, delta: Int) {
@@ -69,7 +87,7 @@ class VirtualBookStore(context: Context) {
         get() = sp.getBoolean(KEY_EXCLUDE_BY_DEFAULT, true)
         set(value) = sp.edit().putBoolean(KEY_EXCLUDE_BY_DEFAULT, value).apply()
 
-    /** 所有台账标签前缀，供主账本明细排除与静态断言共用。 */
+    /** 台账标签统一前缀，供台账视图聚合与静态断言共用（第 93 批起不再用于明细排除）。 */
     val tagPrefix: String get() = VirtualBookCodec.TAG_PREFIX
 
     private companion object {

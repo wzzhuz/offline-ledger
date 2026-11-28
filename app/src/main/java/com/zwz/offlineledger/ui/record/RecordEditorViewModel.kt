@@ -85,27 +85,38 @@ class RecordEditorViewModel(
      * 表现就是台账录入产出的流水不带 `台账:` 标签，台账视图查不到、
      * 主账本明细也不排除 →「只在主记录显示」。
      *
-     * 只带类型 / 标签 / 不计入三项，不预填账户，避免依赖硬编码 id。
-     * 分类 MUST 按预填后的 type 取启用一级：默认取 EXPENSE，
-     * 「记收礼」是 INCOME，沿用 EXPENSE 分类会在保存时被
-     * 「分类与收支类型不一致」拦住。
+     * 第 94 批：分类优先按 presetCategoryId **精确命中**（只校验存在 + type 一致，
+     * 不要求 enabled）——礼金模板指向清单里默认停用的「红包收入 / 礼金」，
+     * 这样既不用逐笔手选分类，也不用改清单把停用一级塞进快捷栏。
+     * 未指定或失效时才回退到「该 type 下第一个启用一级」。
+     * 保存校验（save()）同样只查存在 + type 一致，停用分类可正常落库。
+     * 仍不预填账户，避免依赖硬编码 id。
      */
     private fun applyPresetTo(
         base: EditorState,
         categories: List<CategoryEntity>,
         type: RecordType?,
         tagNames: List<String>,
-        excludeFromStats: Boolean
+        excludeFromStats: Boolean,
+        presetCategoryId: Long? = null
     ): EditorState {
         if (tagNames.isEmpty()) return base
         val effectiveType = type ?: base.type
-        val categoryId = categories.firstOrNull {
+        val categoryId = presetCategoryId?.takeIf { id ->
+            categories.any { it.id == id && it.type == effectiveType }
+        } ?: categories.firstOrNull {
             it.level == 0 && it.type == effectiveType && it.enabled && !it.isArchived
         }?.id
+        // 第 94 批：预填命中二级分类（9001 / 34004）时，展开态 MUST 指向其父一级，
+        // 否则分类快捷栏不会展开到对应分组。
+        val chosen = categories.firstOrNull { it.id == categoryId }
+        val expandedRootId = chosen?.let {
+            if (it.level == 0) it.id else it.parentId
+        } ?: categoryId
         return base.copy(
             type = effectiveType,
             categoryId = categoryId,
-            expandedRootId = categoryId,
+            expandedRootId = expandedRootId,
             tagNames = tagNames.distinct().take(8),
             excludeFromStats = excludeFromStats
         )
@@ -116,7 +127,8 @@ class RecordEditorViewModel(
         recordId: Long?,
         presetType: RecordType? = null,
         presetTagNames: List<String> = emptyList(),
-        presetExcludeFromStats: Boolean = false
+        presetExcludeFromStats: Boolean = false,
+        presetCategoryId: Long? = null
     ) {
         viewModelScope.launch {
             // 第 60 批 Q4A：数据源改按 quickOrder，记一笔候选由「全部账户排序」页决定。
@@ -159,7 +171,8 @@ class RecordEditorViewModel(
                 )
                 // 第 92 批：预填与整体赋值在同一次赋值里完成，杜绝异步覆盖。
                 _state.value = applyPresetTo(
-                    base, c, presetType, presetTagNames, presetExcludeFromStats
+                    base, c, presetType, presetTagNames,
+                    presetExcludeFromStats, presetCategoryId
                 )
             } else {
                 val r = recordDao.byId(recordId)

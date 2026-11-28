@@ -1,6 +1,7 @@
 package com.zwz.offlineledger.core.prefs
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -49,5 +50,69 @@ class VirtualBookCodecTest {
         val good = VirtualBook("vb-1", "礼金", VirtualBookCodec.tagFor("礼金"))
         val raw = VirtualBookCodec.encode(listOf(good)) + "\u0002" + "broken-segment"
         assertEquals(1, VirtualBookCodec.decode(raw).size)
+    }
+
+    // ---- 第 94 批：场景模板与默认分类 ----
+
+    @Test
+    fun legacyFiveSegmentDataFallsBackToGiftTemplate() {
+        // 第 91～93 批落盘格式：id / name / tag / archived / order
+        val legacy = "vb-old\u0001结婚礼金\u0001台账:结婚礼金\u00010\u00010"
+        val restored = VirtualBookCodec.normalize(VirtualBookCodec.decode(legacy))
+        assertEquals(1, restored.size)
+        assertEquals(VirtualBookTemplate.GIFT, restored[0].spec)
+        assertNull(restored[0].defaultCategoryId)
+    }
+
+    @Test
+    fun templateAndDefaultCategoryRoundTrip() {
+        val a = VirtualBook(
+            "vb-1", "装修", VirtualBookCodec.tagFor("装修"),
+            template = VirtualBookTemplate.PROJECT.id,
+            defaultCategoryId = 5009L
+        )
+        val b = VirtualBook(
+            "vb-2", "自定义台账", VirtualBookCodec.tagFor("自定义台账"),
+            template = VirtualBookTemplate.CUSTOM.id
+        )
+        val restored = VirtualBookCodec.decode(VirtualBookCodec.encode(listOf(a, b)))
+        assertEquals(VirtualBookTemplate.PROJECT, restored[0].spec)
+        assertEquals(5009L, restored[0].defaultCategoryId)
+        assertEquals(VirtualBookTemplate.CUSTOM, restored[1].spec)
+        assertNull(restored[1].defaultCategoryId)
+    }
+
+    @Test
+    fun illegalTemplateAndCategoryAreNormalized() {
+        val raw = listOf(
+            VirtualBook("vb-1", "脏数据", "台账:脏数据",
+                template = "not-a-template", defaultCategoryId = -3L)
+        )
+        val n = VirtualBookCodec.normalize(raw)
+        assertEquals(VirtualBookTemplate.GIFT, n[0].spec)
+        assertNull(n[0].defaultCategoryId)
+    }
+
+    @Test
+    fun giftTemplateCarriesBuiltinCategoryIdsWithoutUserSelection() {
+        assertEquals(34_004L, VirtualBookTemplate.GIFT.categoryFor(true, null))
+        assertEquals(9_001L, VirtualBookTemplate.GIFT.categoryFor(false, null))
+        // 礼金模板忽略视图自定义默认分类，避免两套口径并存
+        assertEquals(9_001L, VirtualBookTemplate.GIFT.categoryFor(false, 5009L))
+    }
+
+    @Test
+    fun projectAndCustomUseViewsDefaultCategory() {
+        assertEquals(5009L, VirtualBookTemplate.PROJECT.categoryFor(false, 5009L))
+        assertNull(VirtualBookTemplate.PROJECT.categoryFor(false, null))
+        assertEquals(1L, VirtualBookTemplate.CUSTOM.categoryFor(true, 1L))
+    }
+
+    @Test
+    fun projectOnlyOffersExpenseAction() {
+        assertNull(VirtualBookTemplate.PROJECT.incomeAction)
+        assertEquals("记支出", VirtualBookTemplate.PROJECT.expenseAction)
+        assertEquals("记收礼", VirtualBookTemplate.GIFT.incomeAction)
+        assertEquals("记收入", VirtualBookTemplate.CUSTOM.incomeAction)
     }
 }

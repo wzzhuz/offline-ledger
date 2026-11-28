@@ -72,7 +72,9 @@ private data class TabSpec(val route: String, val label: String, val icon: Image
 private data class VirtualEditorPreset(
     val type: RecordType,
     val tagNames: List<String>,
-    val excludeFromStats: Boolean
+    val excludeFromStats: Boolean,
+    /** 第 94 批：由虚拟账本场景模板给出的默认分类 id。 */
+    val categoryId: Long? = null
 )
 
 private val MAIN_ROUTES = setOf("detail", "assets", "stats", "settings")
@@ -289,7 +291,7 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                     bookId = id,
                     refreshTick = refreshTick,
                     onBack = { goBack() },
-                    onRecord = { type ->
+                    onRecord = { type, categoryId ->
                         val store = VirtualBookStore(context)
                         val b = store.byId(id)
                         if (b != null) {
@@ -298,7 +300,8 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                                 VirtualEditorPreset(
                                     type = type,
                                     tagNames = listOf(b.tagName),
-                                    excludeFromStats = store.excludeByDefault
+                                    excludeFromStats = store.excludeByDefault,
+                                    categoryId = categoryId
                                 )
                             )
                         }
@@ -323,6 +326,7 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
             presetType = editorPreset?.type,
             presetTagNames = editorPreset?.tagNames ?: emptyList(),
             presetExcludeFromStats = editorPreset?.excludeFromStats ?: false,
+            presetCategoryId = editorPreset?.categoryId,
             onDismiss = { showEditor = false },
             onSaved = {
                 showEditor = false

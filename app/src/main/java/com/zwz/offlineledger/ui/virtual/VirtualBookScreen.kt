@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.zwz.offlineledger.core.prefs.LedgerPrefs
 import com.zwz.offlineledger.core.prefs.VirtualBookStore
+import com.zwz.offlineledger.core.prefs.VirtualBookTemplate
 import com.zwz.offlineledger.data.local.dao.VirtualBookPartyRow
 import com.zwz.offlineledger.data.local.dao.VirtualBookRecordRow
 import com.zwz.offlineledger.data.model.RecordType
@@ -62,7 +63,8 @@ fun VirtualBookScreen(
     bookId: String,
     refreshTick: Int,
     onBack: () -> Unit,
-    onRecord: (RecordType) -> Unit,
+    /** 第 94 批：回传该笔应预填的分类 id，由模板决定，避免每笔手选分类。 */
+    onRecord: (RecordType, Long?) -> Unit,
     onEditRecord: (Long) -> Unit
 ) {
     val context = LocalContext.current
@@ -72,6 +74,8 @@ fun VirtualBookScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val currency = remember { LedgerPrefs(context).defaultCurrency }
     val book = store.byId(bookId)
+    // 第 94 批：所有文案 / 按钮 / 预填分类都由场景模板决定，MUST NOT 写死「记收礼」。
+    val spec = book?.spec ?: VirtualBookTemplate.GIFT
 
     var parties by remember { mutableStateOf(emptyList<VirtualBookPartyRow>()) }
     var records by remember { mutableStateOf(emptyList<VirtualBookRecordRow>()) }
@@ -151,15 +155,15 @@ fun VirtualBookScreen(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
-                        Text("收 ${formatCents(totalReceived)}", style = MaterialTheme.typography.bodySmall)
-                        Text("还 ${formatCents(totalReturned)}", style = MaterialTheme.typography.bodySmall)
+                        Text("${spec.incomeWord} ${formatCents(totalReceived)}", style = MaterialTheme.typography.bodySmall)
+                        Text("${spec.expenseWord} ${formatCents(totalReturned)}", style = MaterialTheme.typography.bodySmall)
                     }
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.padding(top = 4.dp)
                     ) {
                         Text(
-                            "待还 ${formatCents(totalReceived - totalReturned)}",
+                            "${spec.netWord} ${formatCents(totalReceived - totalReturned)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -170,7 +174,7 @@ fun VirtualBookScreen(
                         )
                     }
                     Text(
-                        "这些流水不计入主账本收支；钱仍如实进入账户余额。",
+                        spec.hint,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp)
@@ -185,7 +189,7 @@ fun VirtualBookScreen(
                 FilterChip(
                     selected = segment == BookSegment.PARTIES,
                     onClick = { segment = BookSegment.PARTIES },
-                    label = { Text("往来汇总") }
+                    label = { Text(spec.segmentLabel) }
                 )
                 FilterChip(
                     selected = segment == BookSegment.RECORDS,
@@ -205,7 +209,7 @@ fun VirtualBookScreen(
                             item { EmptyHint("还没有记录。点下方按钮记一笔，记得填交易对方。") }
                         }
                         parties.forEach { p ->
-                            item { PartyCard(p) }
+                            item { PartyCard(p, spec) }
                         }
                     }
                     BookSegment.RECORDS -> {
@@ -231,7 +235,7 @@ fun VirtualBookScreen(
                                         val dayOut = dayRecords.filter { it.type == "EXPENSE" }
                                             .sumOf { it.amountCents }
                                         Text(
-                                            "收 ${formatCents(dayIn)} · 还 ${formatCents(dayOut)}",
+                                            "${spec.incomeWord} ${formatCents(dayIn)} · ${spec.expenseWord} ${formatCents(dayOut)}",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -251,19 +255,34 @@ fun VirtualBookScreen(
                 }
             }
 
-            // 底部固定录入区：不随 LazyColumn 滚动，和列表彻底分开。
+            // 第 94 批：底部固定录入区按场景模板渲染，礼金专用文案不再写死。
+            // 专项支出只给一个按钮；分类 id 由模板（或视图默认分类）一次性给出。
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxWidth().padding(16.dp)
             ) {
-                Button(
-                    onClick = { onRecord(RecordType.INCOME) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("记收礼") }
-                Button(
-                    onClick = { onRecord(RecordType.EXPENSE) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("记还礼") }
+                spec.incomeAction?.let { label ->
+                    Button(
+                        onClick = {
+                            onRecord(
+                                RecordType.INCOME,
+                                spec.categoryFor(true, book.defaultCategoryId)
+                            )
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text(label) }
+                }
+                spec.expenseAction?.let { label ->
+                    Button(
+                        onClick = {
+                            onRecord(
+                                RecordType.EXPENSE,
+                                spec.categoryFor(false, book.defaultCategoryId)
+                            )
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text(label) }
+                }
             }
         }
     }
@@ -280,7 +299,7 @@ private fun EmptyHint(text: String) {
 }
 
 @Composable
-private fun PartyCard(p: VirtualBookPartyRow) {
+private fun PartyCard(p: VirtualBookPartyRow, spec: VirtualBookTemplate) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(p.party, style = MaterialTheme.typography.titleSmall)
@@ -291,7 +310,7 @@ private fun PartyCard(p: VirtualBookPartyRow) {
                 Text("收 ${formatCents(p.receivedCents)}", style = MaterialTheme.typography.bodySmall)
                 Text("还 ${formatCents(p.returnedCents)}", style = MaterialTheme.typography.bodySmall)
                 Text(
-                    "待还 ${formatCents(p.pendingCents)}",
+                    "${spec.netWord} ${formatCents(p.pendingCents)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )

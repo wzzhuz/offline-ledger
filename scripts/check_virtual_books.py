@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""第 91/93 批：虚拟账本（视图级台账）静态契约检查。
+"""第 91/93/94 批：虚拟账本（视图级台账）静态契约检查。
 
-核心守住四条口径：零账本维度、切换不带录入归属、台账聚合不过滤不计入、
-台账流水 MUST NOT 从主账本明细排除（否则全局失去编辑入口）。
+核心守住五条口径：零账本维度、切换不带录入归属、台账聚合不过滤不计入、
+台账流水 MUST NOT 从主账本明细排除（否则全局失去编辑入口）、
+场景模板决定文案与预填分类（MUST NOT 写死礼金专用 UI）。
 """
 import os
 import re
@@ -22,6 +23,7 @@ def main():
     files = [
         "app/src/main/java/com/zwz/offlineledger/core/prefs/VirtualBookCodec.kt",
         "app/src/main/java/com/zwz/offlineledger/core/prefs/VirtualBookStore.kt",
+        "app/src/main/java/com/zwz/offlineledger/core/prefs/VirtualBookTemplate.kt",
         "app/src/main/java/com/zwz/offlineledger/data/local/dao/VirtualBookDao.kt",
         "app/src/main/java/com/zwz/offlineledger/ui/virtual/VirtualBookScreen.kt",
         "app/src/main/java/com/zwz/offlineledger/ui/virtual/VirtualBookSwitcher.kt",
@@ -88,7 +90,8 @@ def main():
 
     editor = read("app/src/main/java/com/zwz/offlineledger/ui/record/RecordEditorDialog.kt")
     for k in ["presetType", "presetTagNames", "presetExcludeFromStats",
-              "vm.load(recordId, presetType, presetTagNames, presetExcludeFromStats)"]:
+              "presetCategoryId",
+              "vm.load(recordId, presetType, presetTagNames, presetExcludeFromStats, presetCategoryId)"]:
         if k not in editor:
             e.append("记一笔缺少台账预填出口：" + k)
     # 第 92 批：预填 MUST 在 load 协程内部合并，外部同步 apply 会被整体重置覆盖
@@ -127,12 +130,55 @@ def main():
         e.append("VirtualBookDao 未注册")
 
     gd = read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.72"' not in gd:
-        e.append("版本号未升 0.2.72")
+    if 'defaultVersionName = "0.2.73"' not in gd:
+        e.append("版本号未升 0.2.73")
 
     proj = read("openspec/project.md")
     if "虚拟台账视图不属此禁令" not in proj:
         e.append("project.md 缺少「虚拟台账视图不属永久不做」界定句")
+
+    # ---- 第 94 批：通用容器 + 场景模板 ----
+    tpl = read("app/src/main/java/com/zwz/offlineledger/core/prefs/VirtualBookTemplate.kt")
+    for k in ['GIFT(', 'PROJECT(', 'CUSTOM(', 'incomeCategoryId = 34_004L',
+              'expenseCategoryId = 9_001L', 'fun categoryFor(', 'LEGACY_ID']:
+        if k not in tpl:
+            e.append("场景模板缺少：" + k)
+
+    # 旧 5 段数据 MUST 回退礼金模板，历史台账零回归
+    if 'p.getOrNull(5)' not in codec or 'p.getOrNull(6)' not in codec:
+        e.append("codec MUST 兼容旧 5 段数据（template / defaultCategoryId 可缺省）")
+    if 'p.size < 5' not in codec:
+        e.append("codec MUST 继续允许 5 段旧数据")
+
+    # 台账页 MUST NOT 写死礼金专用按钮文案
+    if 'Text("记收礼")' in screen or 'Text("记还礼")' in screen:
+        e.append("台账页 MUST NOT 写死「记收礼 / 记还礼」，文案由场景模板给出")
+    for k in ['spec.incomeAction', 'spec.expenseAction', 'spec.categoryFor(',
+              'spec.netWord', 'spec.segmentLabel', 'spec.hint']:
+        if k not in screen:
+            e.append("台账页未接场景模板：" + k)
+
+    # 预填分类 MUST 按 id 精确命中，停用项也可（保存只查存在 + type 一致）
+    for k in ['presetCategoryId?.takeIf', 'categories.any { it.id == id && it.type == effectiveType }',
+              'presetCategoryId: Long? = null']:
+        if k not in vm:
+            e.append("预填分类缺少按 id 精确命中：" + k)
+
+    settings = read("app/src/main/java/com/zwz/offlineledger/ui/settings/VirtualBookSettingsScreen.kt")
+    for k in ['newTemplate', 'store.add(newName, newTemplate)', 'setTemplate(',
+              'setDefaultCategory(', 'categoryLabel(']:
+        if k not in settings:
+            e.append("设置页缺少场景模板配置：" + k)
+    # 第 93 批漏收口的三处腐化文案 MUST NOT 残留
+    for bad in ['主账本明细默认不显示', '左上角切换器', '据此排除台账记录',
+                '供主账本明细排除']:
+        for f in [settings, codec, store, record_dao, vm]:
+            if bad in f:
+                e.append("腐化文案残留：" + bad)
+                break
+
+    if 'presetCategoryId = editorPreset?.categoryId' not in app:
+        e.append("LedgerApp 未把模板分类传进记一笔预填")
 
     if e:
         for x in e:
