@@ -114,12 +114,11 @@ fun RecordEditorDialog(
         }
     )
 
-    LaunchedEffect(recordId, presetTagNames) {
-        vm.load(recordId)
-        // 第 91 批：预填必须在 load 之后（同一协程内），否则被 load 的整体重置覆盖。
-        if (presetTagNames.isNotEmpty() && recordId == null) {
-            vm.applyPreset(presetType, presetTagNames, presetExcludeFromStats)
-        }
+    // 第 92 批修订：预填 MUST 作为 load 的参数传进去，在同一个协程内合并。
+    // 第 91 批「load() 启动协程 + 外部同步 applyPreset()」会被 load 后续的整体
+    // 赋值覆盖，导致台账标签与不计入开关全部丢失。
+    LaunchedEffect(recordId, presetTagNames, presetType, presetExcludeFromStats) {
+        vm.load(recordId, presetType, presetTagNames, presetExcludeFromStats)
     }
 
     val state by vm.state.collectAsState()

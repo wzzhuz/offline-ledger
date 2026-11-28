@@ -61,9 +61,28 @@ def main():
         e.append("按标签筛选 MUST 能查回台账记录")
 
     editor = read("app/src/main/java/com/zwz/offlineledger/ui/record/RecordEditorDialog.kt")
-    for k in ["presetType", "presetTagNames", "presetExcludeFromStats", "vm.applyPreset"]:
+    for k in ["presetType", "presetTagNames", "presetExcludeFromStats",
+              "vm.load(recordId, presetType, presetTagNames, presetExcludeFromStats)"]:
         if k not in editor:
             e.append("记一笔缺少台账预填出口：" + k)
+    # 第 92 批：预填 MUST 在 load 协程内部合并，外部同步 apply 会被整体重置覆盖
+    if "vm.applyPreset(" in editor:
+        e.append("外部同步 applyPreset 已被 load 整体赋值覆盖，MUST 删除")
+
+    vm = read("app/src/main/java/com/zwz/offlineledger/ui/record/RecordEditorViewModel.kt")
+    for k in ["fun load(\n", "applyPresetTo(", "it.type == effectiveType",
+              "tagNames = tagNames.distinct()", "excludeFromStats = excludeFromStats"]:
+        if k not in vm:
+            e.append("VM 缺少台账预填合并实现：" + k)
+
+    tag_names = read("app/src/main/java/com/zwz/offlineledger/core/TagNames.kt")
+    for k in ["fun addPickedTag(", "fun visibleTagNames("]:
+        if k not in tag_names:
+            e.append("标签新建纯函数出口缺失：" + k)
+    picker = read("app/src/main/java/com/zwz/offlineledger/ui/record/TagPickerDialog.kt")
+    for k in ["visibleTagNames(", "addPickedTag(", "已选 "]:
+        if k not in picker:
+            e.append("标签选择器未接新建可见化：" + k)
 
     # 自动记账 MUST 永远落主账本：文本入口不得感知虚拟账本
     intake = read("app/src/main/java/com/zwz/offlineledger/ui/intake/TextIntakeActivity.kt")
@@ -83,8 +102,8 @@ def main():
         e.append("VirtualBookDao 未注册")
 
     gd = read("app/build.gradle.kts")
-    if 'defaultVersionName = "0.2.70"' not in gd:
-        e.append("版本号未升 0.2.70")
+    if 'defaultVersionName = "0.2.71"' not in gd:
+        e.append("版本号未升 0.2.71")
 
     proj = read("openspec/project.md")
     if "虚拟台账视图不属此禁令" not in proj:

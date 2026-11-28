@@ -76,21 +76,48 @@ class RecordEditorViewModel(
     private var editingId: Long? = null
 
     /**
-     * 第 91 批：虚拟台账录入的唯一预填出口。
-     * MUST 在 load() 之后调用（load 会整体重置 state）。
-     * 只带类型 / 标签 / 不计入三项，不预填分类与账户，避免依赖硬编码 id。
+     * 第 92 批修订：台账预填 MUST 在 load 的**同一个协程内**、构造完
+     * EditorState 之后一次性合并，MUST NOT 由外部同步调用。
+     *
+     * 第 91 批的写法是「vm.load() 启动协程 → 外部同步 vm.applyPreset()」，
+     * 但 load 内部有多个 DAO suspend，协程随后才执行
+     * `_state.value = EditorState(...)` 整体重置，把标签与不计入全部覆盖掉。
+     * 表现就是台账录入产出的流水不带 `台账:` 标签，台账视图查不到、
+     * 主账本明细也不排除 →「只在主记录显示」。
+     *
+     * 只带类型 / 标签 / 不计入三项，不预填账户，避免依赖硬编码 id。
+     * 分类 MUST 按预填后的 type 取启用一级：默认取 EXPENSE，
+     * 「记收礼」是 INCOME，沿用 EXPENSE 分类会在保存时被
+     * 「分类与收支类型不一致」拦住。
      */
-    fun applyPreset(type: RecordType?, tagNames: List<String>, excludeFromStats: Boolean) {
-        val s = _state.value
-        _state.value = s.copy(
-            type = type ?: s.type,
-            tagNames = (s.tagNames + tagNames).distinct().take(8),
+    private fun applyPresetTo(
+        base: EditorState,
+        categories: List<CategoryEntity>,
+        type: RecordType?,
+        tagNames: List<String>,
+        excludeFromStats: Boolean
+    ): EditorState {
+        if (tagNames.isEmpty()) return base
+        val effectiveType = type ?: base.type
+        val categoryId = categories.firstOrNull {
+            it.level == 0 && it.type == effectiveType && it.enabled && !it.isArchived
+        }?.id
+        return base.copy(
+            type = effectiveType,
+            categoryId = categoryId,
+            expandedRootId = categoryId,
+            tagNames = tagNames.distinct().take(8),
             excludeFromStats = excludeFromStats
         )
     }
 
     /** 每次打开编辑器都调用一次，避免复用 ViewModel 时残留上一次的状态。 */
-    fun load(recordId: Long?) {
+    fun load(
+        recordId: Long?,
+        presetType: RecordType? = null,
+        presetTagNames: List<String> = emptyList(),
+        presetExcludeFromStats: Boolean = false
+    ) {
         viewModelScope.launch {
             // 第 60 批 Q4A：数据源改按 quickOrder，记一笔候选由「全部账户排序」页决定。
             val a = accountDao.allByQuickOrder()
@@ -117,7 +144,7 @@ class RecordEditorViewModel(
             val defaultAcc = prefAcc ?: lastAccountId ?: sorted.firstOrNull { !it.isArchived }?.id
             editingId = recordId
             if (recordId == null) {
-                _state.value = EditorState(
+                val base = EditorState(
                     type = RecordType.EXPENSE,
                     fromAccountId = defaultAcc,
                     toAccountId = defaultAcc,
@@ -129,6 +156,10 @@ class RecordEditorViewModel(
                         }?.id,
                     timestamp = System.currentTimeMillis(),
                     loaded = true
+                )
+                // 第 92 批：预填与整体赋值在同一次赋值里完成，杜绝异步覆盖。
+                _state.value = applyPresetTo(
+                    base, c, presetType, presetTagNames, presetExcludeFromStats
                 )
             } else {
                 val r = recordDao.byId(recordId)

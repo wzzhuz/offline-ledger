@@ -2516,3 +2516,35 @@ SHALL 分别 SUM `INCOME` 与 `EXPENSE` 方向金额并带 `currencyCode` 条件
 - **WHEN** 用户在筛选面板按 `台账:结婚礼金` 精确筛选
 - **THEN** 该台账流水重新出现在明细列表
 - **AND** 明细行仍可进入详情页查看不计入收支标记
+
+---
+
+### Requirement: 台账预填与标签新建 MUST 在同一次状态赋值内完成
+
+第 92 批修订：`RecordEditorViewModel.load()` 内部是带多个 DAO suspend 的协程，
+会整体赋值 `EditorState`。虚拟台账预填（类型 / 标签 / 不计入）SHALL 作为 `load()`
+参数传入，并在**同一协程内、构造完 `EditorState` 之后**一次性合并；
+MUST NOT 由 Composable 在 `load()` 之外同步调用，否则会被后续整体赋值覆盖，
+产出的流水不带 `台账:` 标签（台账视图查不到、主账本明细也不排除）。
+预填 type 为 INCOME 时，分类 SHALL 取该 type 下启用且未归档的一级，
+MUST NOT 沿用默认 EXPENSE 分类（会被「分类与收支类型不一致」拦截）。
+
+标签选择器新建 SHALL 走 `addPickedTag` 纯函数出口，chip 名单 SHALL 用
+`visibleTagNames(已有名, picked)` 合并渲染，使新建项**即时可见且可反选**；
+MUST NOT 只渲染数据库已有标签。新建标签 SHALL 通过既有 `bindTags` 按名落库。
+
+#### Scenario: 台账录入产出的流水进入台账视图
+
+- **GIVEN** 用户在「结婚礼金」台账页点「记收礼」
+- **WHEN** 填对方张三与 500 元并保存
+- **THEN** 流水带 `台账:结婚礼金` 标签且 `excludeFromStats = true`
+- **AND** 台账页按人出现张三一行，主账本明细默认不显示这笔
+- **AND** 不出现「分类与收支类型不一致」错误
+
+#### Scenario: 新建标签即时可见
+
+- **GIVEN** 记一笔里打开标签选择器，输入一个数据库里没有的名字
+- **WHEN** 点新建按钮
+- **THEN** 上方 chip 区立刻出现该名字且为选中态，点一下可取消
+- **WHEN** 点确定并保存流水
+- **THEN** 该标签随流水落库，再次打开选择器时出现在已有标签中

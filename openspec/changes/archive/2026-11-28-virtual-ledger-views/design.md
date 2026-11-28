@@ -70,3 +70,27 @@
 | 虚拟负债账户 + TRANSFER | 默认路径变绕，留作备选不实施 |
 | 补 CSV `excludeFromStats` 列 | 使用者明确 CSV 不会是备份主力；改格式需另验往返 |
 | 用云端/端侧模型识别礼金 | 与分类归属无关，且撞本地口径 |
+
+
+## 第 92 批修订注记（保留上文原文，不粉饰）
+
+**缺陷 1**：v0.2.70 里 `RecordEditorDialog` 写的是
+`vm.load(recordId)`（内部 `viewModelScope.launch` + 多个 DAO suspend）
+紧跟一行同步 `vm.applyPreset(...)`。本文决策 2 与代码注释都写「预填必须在
+load 之后、同一协程内」，但实现恰恰相反：`applyPreset` 先改 state，
+`load` 协程随后整体赋值 `EditorState(...)` 把标签与不计入全部覆盖。
+真机表现即使用者反馈的「记收礼/记还礼创建的记录不在台账视图，只在主记录显示」。
+
+修法：预填作为 `load()` 参数传入，在协程内构造完 `EditorState` 后由
+`applyPresetTo()` 一次性合并。**连带修正**：预填 INCOME 时分类必须取 INCOME
+启用一级，否则 `load(null)` 默认的 EXPENSE 分类会让保存被「分类与收支类型
+不一致」拦住——这是修完缺陷 1 才会暴露的第二个拦截点。
+
+**缺陷 2（既有问题，本次顺带修）**：`TagPickerDialog` 把新建名加进 `picked`，
+但 chip 区只渲染 `tags`（数据库已有），点 + 后既看不到新标签也无从反选，
+使用者判定「新增标签不生效」。修法：`addPickedTag` 纯函数收口校验 / 判重 /
+上限，`visibleTagNames` 合并已有名与 picked 渲染，并显示「已选 N / 8」。
+数据落库仍走既有 `bindTags`，零改表。
+
+两条均属**恢复 v0.2.70 已承诺的行为**，按流程不新建 change；静态断言
+`check_virtual_books.py` 已加防回退检查，主 spec 补实现约束段。

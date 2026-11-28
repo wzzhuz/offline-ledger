@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zwz.offlineledger.core.TagNameRules
+import com.zwz.offlineledger.core.addPickedTag
+import com.zwz.offlineledger.core.visibleTagNames
 import com.zwz.offlineledger.data.local.entity.TagEntity
 import com.zwz.offlineledger.ui.LedgerDi
 
@@ -60,20 +62,28 @@ fun TagPickerDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 // T12：不用 FlowRow / 实验性 API，改 Column + chunked(3) 纯 Row。
+                // 第 92 批：chip 名单 MUST 合并「数据库已有名 + picked」，
+                // 否则刚新建的标签在弹层里完全不可见、也无从反选。
+                Text(
+                    text = "已选 ${picked.size} / ${TagNameRules.MAX_PER_RECORD}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    tags.chunked(3).forEach { group ->
+                    visibleTagNames(tags.map { it.name }, picked).chunked(3).forEach { group ->
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            group.forEach { t ->
+                            group.forEach { name ->
                                 FilterChip(
-                                    selected = t.name in picked,
+                                    selected = name in picked,
                                     onClick = {
-                                        picked = if (t.name in picked) {
-                                            picked - t.name
+                                        picked = if (name in picked) {
+                                            picked - name
                                         } else if (picked.size < TagNameRules.MAX_PER_RECORD) {
-                                            picked + t.name
+                                            picked + name
                                         } else picked
                                     },
-                                    label = { Text(t.name) }
+                                    label = { Text(name) }
                                 )
                             }
                         }
@@ -89,18 +99,16 @@ fun TagPickerDialog(
                         textStyle = MaterialTheme.typography.bodyMedium
                     )
                     IconButton(onClick = {
-                        val n = newName.trim()
-                        val bad = TagNameRules.validate(n)
-                        when {
-                            bad != null -> error = bad
-                            n in tags.map { it.name } -> error = "标签已存在"
-                            picked.size >= TagNameRules.MAX_PER_RECORD ->
-                                error = "最多 ${TagNameRules.MAX_PER_RECORD} 个标签"
-                            else -> {
-                                picked = picked + n
-                                newName = ""
-                                error = null
-                            }
+                        // 第 92 批：走唯一纯函数出口，新建项立刻出现在上方 chip 区并可反选。
+                        val (next, bad) = addPickedTag(
+                            picked, tags.map { it.name }, newName
+                        )
+                        if (bad != null) {
+                            error = bad
+                        } else {
+                            picked = next
+                            newName = ""
+                            error = null
                         }
                     }) {
                         Icon(Icons.Filled.Add, contentDescription = "新建标签")
