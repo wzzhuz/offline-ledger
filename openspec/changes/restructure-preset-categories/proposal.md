@@ -43,3 +43,29 @@
   + 新增策略类 + 4 个测试文件 + 3 份 spec + project.md / 活文档。
 - **风险**：CSV / Firefly 按名称路径匹配，旧 CSV 会缺项；批量规则按名称存分类，改名后旧规则对不上。
   两者都因「不导旧数据」而不触发，写进装包说明。
+
+
+---
+
+## 第 90 批追加：v2 → v3（同一 change 收口，不另开分类 change）
+
+**Why（追加）**：v2 的「居住」边界与主 spec 自相矛盾（话费 / 家具家电 / 保洁搬家
+挂在只该含租房成本的「居住」下）；日常生成场景缺理发、快递、家政等最易漏记项；
+家具家电归购物更合理；宠物应默认启用。
+
+**What Changes（追加）**：新增支出一级「日常」(11)，按「房子 / 人 / 实物」三段收口；
+话费 / 保洁搬家 / 家具家电三条换新 id 迁入；5004 改名「家居家纺」并与 5009 并存；
+宠物与 7 个二级改默认启用；补齐 7 条日常/医疗二级；新增 `scissors` / `flower`
+两个 Tabler 图标。清单 version 4 → 5、106 → 114 行、一级 15 → 16。
+
+**Impact（追加）**：
+- 清单三处 + `CategoryIconKeys` + 2 个 drawable + Catalog / Tints / NOTICE +
+  `SeedCatalogTest` / `CategoryIconKeysTest` + 主 spec `category-stats` / `reporting-ui` +
+  `project.md` / 提示词文档 / `RULE_PROMPT` / 活文档 §7.72 / 静态断言。
+- **不改**：表结构（version 仍 9）、备份 DTO、CSV / Firefly 写路径、自动记账解析器、
+  4 Tab、三条铁律、零新增 Gradle 依赖 / 权限 / `INTERNET`。
+- **破坏性**：必须卸载重装且不导 v0.2.68 及更早备份；旧备份会整表覆盖回 v2 分类。
+
+**分级**：改预制清单 + MODIFIED 主 spec 多条 Requirement，属需求变更；
+但主题与本 change 完全同源，为避免两层 delta 打架，**并入本 change 一起收口**，
+不新建第二个分类 change。本 change 仍保持活跃、不提前归档（真机待验）。

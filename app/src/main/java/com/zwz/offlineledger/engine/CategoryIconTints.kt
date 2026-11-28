@@ -75,6 +75,7 @@ object CategoryIconTints {
         "file-certificate" -> CarSlate
         "file-text" -> IncomeGreen
         "flame" -> HomeTeal
+        "flower" -> HomeTeal
         "gas-station" -> CarSlate
         "gift" -> SocialPink
         "gift-card" -> SocialPink
@@ -102,6 +103,7 @@ object CategoryIconTints {
         "road" -> CarSlate
         "rotate" -> IncomeGreen
         "run" -> LeisureGreen
+        "scissors" -> ShoppingPurple
         "shield" -> CarSlate
         "shirt" -> ShoppingPurple
         "shopping-bag" -> ShoppingPurple

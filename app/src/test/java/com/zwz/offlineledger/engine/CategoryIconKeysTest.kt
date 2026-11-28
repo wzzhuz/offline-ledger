@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 第 55 批：覆盖安装兜底 —— 预置 106 个 id 必须全部能回查到 iconKey。 */
+/** 第 55 批建、第 90 批随清单 v3 同步：预置 114 个 id 必须全部能回查到 iconKey。 */
 class CategoryIconKeysTest {
 
     @Test
@@ -46,11 +46,17 @@ class CategoryIconKeysTest {
             4004L,
             4005L,
             4006L,
-            4007L,
             4008L,
-            4009L,
             4010L,
-            4011L,
+            11L,
+            11001L,
+            11002L,
+            11003L,
+            11004L,
+            11005L,
+            11006L,
+            11007L,
+            11008L,
             5L,
             5001L,
             5002L,
@@ -60,6 +66,7 @@ class CategoryIconKeysTest {
             5006L,
             5007L,
             5008L,
+            5009L,
             6L,
             6001L,
             6002L,
@@ -69,6 +76,7 @@ class CategoryIconKeysTest {
             6006L,
             6007L,
             6008L,
+            6009L,
             7L,
             7001L,
             7002L,
@@ -117,7 +125,7 @@ class CategoryIconKeysTest {
             34003L,
             34004L
         )
-        assertEquals(106, ids.size)
+        assertEquals(114, ids.size)
         ids.forEach { id ->
             val key = CategoryIconKeys.keyOfPreset(id) ?: error("预置 id=$id 缺 iconKey")
             check(CategoryIconTints.tintOf(key) != null) { "id=$id 的 key=$key 缺配色" }
@@ -126,7 +134,6 @@ class CategoryIconKeysTest {
 
     @Test
     fun `custom category ids do not resolve`() {
-        // 手工分类 id 从 max+1 起、永不回填空洞，查不到 → 中性圆兜底。
         assertNull(CategoryIconKeys.keyOfPreset(999999L))
         assertNull(CategoryIconKeys.keyOfPreset(0L))
         assertNull(CategoryIconKeys.keyOfPreset(-1L))
@@ -137,7 +144,15 @@ class CategoryIconKeysTest {
         assertEquals("tools-kitchen-2", CategoryIconKeys.keyOfPreset(1L))
         assertEquals("bowl-chopsticks", CategoryIconKeys.keyOfPreset(1001L))
         assertEquals("bubble-tea", CategoryIconKeys.keyOfPreset(1007L))
-        assertEquals("home-move", CategoryIconKeys.keyOfPreset(4011L))
+        assertEquals("scissors", CategoryIconKeys.keyOfPreset(11001L))
+        assertEquals("phone", CategoryIconKeys.keyOfPreset(11002L))
+        assertEquals("home-move", CategoryIconKeys.keyOfPreset(11004L))
+        assertEquals("flower", CategoryIconKeys.keyOfPreset(11008L))
+        assertEquals("bed", CategoryIconKeys.keyOfPreset(5004L))
+        assertEquals("sofa", CategoryIconKeys.keyOfPreset(5009L))
         assertEquals("wallet", CategoryIconKeys.keyOfPreset(30L))
+        assertNull(CategoryIconKeys.keyOfPreset(4007L))
+        assertNull(CategoryIconKeys.keyOfPreset(4009L))
+        assertNull(CategoryIconKeys.keyOfPreset(4011L))
     }
 }

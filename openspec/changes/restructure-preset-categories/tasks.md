@@ -50,3 +50,21 @@
 ## 实测回填
 
 代码 `ca4c80f0db29` / push CI `45109206812`（代码门禁全绿，artifact 上传因配额失败）/ release `45109513641` success（tag `v0.2.34`，坚果云 success）/ GitHub Release 附件 `offline-ledger-v0.2.34-release-ca4c80f0.apk` 3,039,702 B。详见 `openspec/project.md` 第 51 批实测。
+
+
+## 6. 第 90 批：清单 v3（日常一级 / 宠物启用 / 居住边界）
+
+- [x] 6.1 `default_categories.json` 升 version 5、114 行；新增一级「日常」(11) 与 11001..11008
+- [x] 6.2 三条搬迁换 id：4007→11002 话费、4011→11004 家政保洁、4009→5009 家具家电；旧 id 全删
+- [x] 6.3 5004「家居」→「家居家纺」；6009 商业保险；宠物(8)与 7 个二级改默认启用
+- [x] 6.4 三处清单逐行一致（assets / test resources / `SeedData` fallback）
+- [x] 6.5 `CategoryIconKeys` 按新 id 重写；`CategoryIconKeysTest` 114 个 id + 代表映射
+- [x] 6.6 新增 `scissors` / `flower` 两个 Tabler v3.34.0 drawable；Catalog / Tints / NOTICE 同步至 92
+- [x] 6.7 `SeedCatalogTest` 改宠物启用断言 + 新增三段边界测试
+- [x] 6.8 主 spec `category-stats`（居住边界 / 停用 Scenario / 计数 / 第 90 批 ADDED）与 `reporting-ui` 计数同步
+- [x] 6.9 `project.md` 清单 v3 + 第 90 批、活文档 §7.72、提示词文档与 `RULE_PROMPT` 一级清单
+- [x] 6.10 `check_docs_consistency.py` 增加清单四处一致性 / 三段边界 / 图标覆盖断言；版本号 0.2.69
+- [ ] 6.11 编译校验 CI + 正式出包 + 坚果云上传
+- [ ] 6.12 真机：卸载重装后快捷栏、购物/日常/居住归属、92 图标观感、统计与 CSV 往返
+
+> 本 change 仍**保持活跃**：6.12 真机验收未回填前不归档。

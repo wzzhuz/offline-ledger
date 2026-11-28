@@ -8,7 +8,8 @@
 许可证：MIT License
 版权：Copyright (c) 2018-2026 Tabler
 
-本批仅从该版本的 icons/outline/ 中按需取用 90 个 SVG，转换为
+第 55 批从该版本的 icons/outline/ 中按需取用 90 个 SVG；第 90 批新增
+scissors / flower 两个（同版本、同 MIT 许可），合计 92 个，转换为
 app/src/main/res/drawable/ic_cat_*.xml 随包分发；未引入任何第三方
 依赖、未复制其它 App 的视觉资产、无运行时网络行为。
 

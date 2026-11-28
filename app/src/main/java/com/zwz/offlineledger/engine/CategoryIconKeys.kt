@@ -2,16 +2,15 @@ package com.zwz.offlineledger.engine
 
 /**
  * 第 55 批：预置分类 id → Tabler iconKey 的编译期显式表（纯 JVM）。
+ * 第 90 批：随清单 v3 同步（114 行）；新增「日常」一级与 11xxx 段，
+ * 4007/4009/4011 三条迁出后不再回查，新增 scissors / flower 两个 iconKey。
  *
  * **存在理由（覆盖安装）**：`SeedCatalog` 只在 `SeedCallback.onCreate`
- * 全新安装时把 iconKey 写进 `categories.iconName` 列。v0.2.35 覆盖安装的用户
- * 库已存在，106 行的 iconName 仍是空串；零改表前提下不能靠迁移回填。
- * 因此 `CategoryGlyph` 在 iconName 为空时按 id 回查本表，
- * 让**覆盖安装也能立刻看到图标**，且 MUST NOT 写库、MUST NOT 改 Entity。
- *
- * 语义：只认预置 id（清单 v4 的 1..10 / 30..34 及 父ID×1000+序号）。
- * 用户手工新建的分类 id 从 max+1 起、永不回填空洞，查不到即回退中性圆 + 首字。
- * 自定义分类将来若支持选图标，走 `iconName` 主路径，不进本表。
+ * 全新安装时把 iconKey 写进 `categories.iconName` 列。覆盖安装的用户库已存在，
+ * iconName 仍是空串；零改表前提下不能靠迁移回填。因此 `CategoryGlyph`
+ * 在 iconName 为空时按 id 回查本表，MUST NOT 写库、MUST NOT 改 Entity。
+ * 语义：只认预置 id；用户手工新建分类 id 从 max+1 起、永不回填空洞，
+ * 查不到即回退中性圆 + 首字。
  */
 object CategoryIconKeys {
     fun keyOfPreset(id: Long): String? = when (id) {
@@ -51,20 +50,27 @@ object CategoryIconKeys {
         4004L -> "flame"
         4005L -> "building"
         4006L -> "wifi"
-        4007L -> "phone"
         4008L -> "temperature"
-        4009L -> "sofa"
         4010L -> "hammer"
-        4011L -> "home-move"
+        11L -> "calendar"
+        11001L -> "scissors"
+        11002L -> "phone"
+        11003L -> "package"
+        11004L -> "home-move"
+        11005L -> "shirt"
+        11006L -> "tool"
+        11007L -> "receipt"
+        11008L -> "flower"
         5L -> "shopping-cart"
         5001L -> "shopping-bag"
         5002L -> "shirt"
         5003L -> "device-mobile"
-        5004L -> "sofa"
+        5004L -> "bed"
         5005L -> "sparkles"
         5006L -> "backpack"
         5007L -> "baby-carriage"
         5008L -> "ball-basketball"
+        5009L -> "sofa"
         6L -> "stethoscope"
         6001L -> "stethoscope"
         6002L -> "pill"
@@ -74,6 +80,7 @@ object CategoryIconKeys {
         6006L -> "vaccine"
         6007L -> "eyeglass"
         6008L -> "capsule"
+        6009L -> "shield"
         7L -> "books"
         7001L -> "book-2"
         7002L -> "movie"

@@ -41,7 +41,7 @@ val CategoryHeaderBlue: Color get() = LedgerColors.Primary
  * 目录缺项 MUST 回退 `CategoryIcon` 中性圆 + 中文首字。
  *
  * 图标资源来自 Tabler Icons v3.34.0（pin 版本，非 @latest），
- * 6,257 个 outline SVG 中按需取用 90 个，转成 res/drawable 本地资源，
+ * 6,257 个 outline SVG 中按需取用 92 个，转成 res/drawable 本地资源，
  * **零新增第三方依赖、零运行时网络**。来源、许可证与版权声明见
  * `assets/NOTICE` 与 change 的 `design.md`「依赖与许可」。
  */
@@ -90,6 +90,7 @@ object CategoryIconCatalog {
         "eyeglass" -> R.drawable.ic_cat_eyeglass
         "ferry" -> R.drawable.ic_cat_ferry
         "file-certificate" -> R.drawable.ic_cat_file_certificate
+        "flower" -> R.drawable.ic_cat_flower
         "file-text" -> R.drawable.ic_cat_file_text
         "flame" -> R.drawable.ic_cat_flame
         "gas-station" -> R.drawable.ic_cat_gas_station
@@ -120,6 +121,7 @@ object CategoryIconCatalog {
         "rotate" -> R.drawable.ic_cat_rotate
         "run" -> R.drawable.ic_cat_run
         "shield" -> R.drawable.ic_cat_shield
+        "scissors" -> R.drawable.ic_cat_scissors
         "shirt" -> R.drawable.ic_cat_shirt
         "shopping-bag" -> R.drawable.ic_cat_shopping_bag
         "shopping-cart" -> R.drawable.ic_cat_shopping_cart

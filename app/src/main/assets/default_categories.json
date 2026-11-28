@@ -1,6 +1,6 @@
 {
-  "version": 4,
-  "note": "第51批 v2：一级按生活领域（1..10 支出 / 30..34 收入，11..99 预留）；二级 = 父ID×1000+序号(1..999)，ID 无语义、树关系只看 parentId。扩展二级 enabled=false，在分类管理按需启用；停用一级下二级同步停用。SeedData.fallback 与本文件逐行一致（SeedCatalogTest 断言）。",
+  "version": 5,
+  "note": "第90批 v3：新增支出一级「日常」(11)，收口「居住」边界——话费迁日常、家具家电迁购物、保洁搬家迁日常并改名家政保洁；宠物一级与 7 个二级改默认启用；补齐理发美容/快递邮寄/洗衣护理/上门维修/生活杂费/绿植鲜花/商业保险等日常场景。一级 16、二级 98、共 114 行。ID 规则不变（一级 1..99 / 二级 父ID×1000+序号），扩展二级 enabled=false。SeedData.fallback 与本文件逐行一致（SeedCatalogTest 断言）。SeedCallback.onCreate 仅对全新库生效，本版 MUST 卸载重装、MUST NOT 导入旧备份。",
   "categories": [
     {
       "id": 1,
@@ -363,34 +363,14 @@
       "iconKey": "wifi"
     },
     {
-      "id": 4007,
-      "name": "话费",
-      "type": "EXPENSE",
-      "parentId": 4,
-      "level": 1,
-      "enabled": false,
-      "sortOrder": 7,
-      "iconKey": "phone"
-    },
-    {
       "id": 4008,
       "name": "取暖费",
       "type": "EXPENSE",
       "parentId": 4,
       "level": 1,
       "enabled": false,
-      "sortOrder": 8,
+      "sortOrder": 7,
       "iconKey": "temperature"
-    },
-    {
-      "id": 4009,
-      "name": "家具家电",
-      "type": "EXPENSE",
-      "parentId": 4,
-      "level": 1,
-      "enabled": false,
-      "sortOrder": 9,
-      "iconKey": "sofa"
     },
     {
       "id": 4010,
@@ -399,18 +379,98 @@
       "parentId": 4,
       "level": 1,
       "enabled": false,
-      "sortOrder": 10,
+      "sortOrder": 8,
       "iconKey": "hammer"
     },
     {
-      "id": 4011,
-      "name": "保洁搬家",
+      "id": 11,
+      "name": "日常",
       "type": "EXPENSE",
-      "parentId": 4,
+      "parentId": null,
+      "level": 0,
+      "enabled": true,
+      "sortOrder": 5,
+      "iconKey": "calendar"
+    },
+    {
+      "id": 11001,
+      "name": "理发美容",
+      "type": "EXPENSE",
+      "parentId": 11,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 1,
+      "iconKey": "scissors"
+    },
+    {
+      "id": 11002,
+      "name": "话费",
+      "type": "EXPENSE",
+      "parentId": 11,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 2,
+      "iconKey": "phone"
+    },
+    {
+      "id": 11003,
+      "name": "快递邮寄",
+      "type": "EXPENSE",
+      "parentId": 11,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 3,
+      "iconKey": "package"
+    },
+    {
+      "id": 11004,
+      "name": "家政保洁",
+      "type": "EXPENSE",
+      "parentId": 11,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 4,
+      "iconKey": "home-move"
+    },
+    {
+      "id": 11005,
+      "name": "洗衣护理",
+      "type": "EXPENSE",
+      "parentId": 11,
       "level": 1,
       "enabled": false,
-      "sortOrder": 11,
-      "iconKey": "home-move"
+      "sortOrder": 5,
+      "iconKey": "shirt"
+    },
+    {
+      "id": 11006,
+      "name": "上门维修",
+      "type": "EXPENSE",
+      "parentId": 11,
+      "level": 1,
+      "enabled": false,
+      "sortOrder": 6,
+      "iconKey": "tool"
+    },
+    {
+      "id": 11007,
+      "name": "生活杂费",
+      "type": "EXPENSE",
+      "parentId": 11,
+      "level": 1,
+      "enabled": false,
+      "sortOrder": 7,
+      "iconKey": "receipt"
+    },
+    {
+      "id": 11008,
+      "name": "绿植鲜花",
+      "type": "EXPENSE",
+      "parentId": 11,
+      "level": 1,
+      "enabled": false,
+      "sortOrder": 8,
+      "iconKey": "flower"
     },
     {
       "id": 5,
@@ -419,7 +479,7 @@
       "parentId": null,
       "level": 0,
       "enabled": true,
-      "sortOrder": 5,
+      "sortOrder": 6,
       "iconKey": "shopping-cart"
     },
     {
@@ -454,13 +514,13 @@
     },
     {
       "id": 5004,
-      "name": "家居",
+      "name": "家居家纺",
       "type": "EXPENSE",
       "parentId": 5,
       "level": 1,
       "enabled": true,
       "sortOrder": 4,
-      "iconKey": "sofa"
+      "iconKey": "bed"
     },
     {
       "id": 5005,
@@ -503,13 +563,23 @@
       "iconKey": "ball-basketball"
     },
     {
+      "id": 5009,
+      "name": "家具家电",
+      "type": "EXPENSE",
+      "parentId": 5,
+      "level": 1,
+      "enabled": true,
+      "sortOrder": 9,
+      "iconKey": "sofa"
+    },
+    {
       "id": 6,
       "name": "医疗",
       "type": "EXPENSE",
       "parentId": null,
       "level": 0,
       "enabled": true,
-      "sortOrder": 6,
+      "sortOrder": 7,
       "iconKey": "stethoscope"
     },
     {
@@ -593,13 +663,23 @@
       "iconKey": "capsule"
     },
     {
+      "id": 6009,
+      "name": "商业保险",
+      "type": "EXPENSE",
+      "parentId": 6,
+      "level": 1,
+      "enabled": false,
+      "sortOrder": 9,
+      "iconKey": "shield"
+    },
+    {
       "id": 7,
       "name": "学习娱乐",
       "type": "EXPENSE",
       "parentId": null,
       "level": 0,
       "enabled": false,
-      "sortOrder": 7,
+      "sortOrder": 8,
       "iconKey": "books"
     },
     {
@@ -688,8 +768,8 @@
       "type": "EXPENSE",
       "parentId": null,
       "level": 0,
-      "enabled": false,
-      "sortOrder": 8,
+      "enabled": true,
+      "sortOrder": 9,
       "iconKey": "paw"
     },
     {
@@ -698,7 +778,7 @@
       "type": "EXPENSE",
       "parentId": 8,
       "level": 1,
-      "enabled": false,
+      "enabled": true,
       "sortOrder": 1,
       "iconKey": "dog-bowl"
     },
@@ -708,7 +788,7 @@
       "type": "EXPENSE",
       "parentId": 8,
       "level": 1,
-      "enabled": false,
+      "enabled": true,
       "sortOrder": 2,
       "iconKey": "box"
     },
@@ -718,7 +798,7 @@
       "type": "EXPENSE",
       "parentId": 8,
       "level": 1,
-      "enabled": false,
+      "enabled": true,
       "sortOrder": 3,
       "iconKey": "medical-cross"
     },
@@ -728,7 +808,7 @@
       "type": "EXPENSE",
       "parentId": 8,
       "level": 1,
-      "enabled": false,
+      "enabled": true,
       "sortOrder": 4,
       "iconKey": "bath"
     },
@@ -738,7 +818,7 @@
       "type": "EXPENSE",
       "parentId": 8,
       "level": 1,
-      "enabled": false,
+      "enabled": true,
       "sortOrder": 5,
       "iconKey": "home"
     },
@@ -748,7 +828,7 @@
       "type": "EXPENSE",
       "parentId": 8,
       "level": 1,
-      "enabled": false,
+      "enabled": true,
       "sortOrder": 6,
       "iconKey": "shield"
     },
@@ -758,7 +838,7 @@
       "type": "EXPENSE",
       "parentId": 8,
       "level": 1,
-      "enabled": false,
+      "enabled": true,
       "sortOrder": 7,
       "iconKey": "bone"
     },
@@ -769,7 +849,7 @@
       "parentId": null,
       "level": 0,
       "enabled": false,
-      "sortOrder": 9,
+      "sortOrder": 10,
       "iconKey": "gift"
     },
     {
@@ -839,7 +919,7 @@
       "parentId": null,
       "level": 0,
       "enabled": true,
-      "sortOrder": 10,
+      "sortOrder": 11,
       "iconKey": "dots"
     },
     {
@@ -879,7 +959,7 @@
       "parentId": null,
       "level": 0,
       "enabled": true,
-      "sortOrder": 11,
+      "sortOrder": 12,
       "iconKey": "wallet"
     },
     {
@@ -919,7 +999,7 @@
       "parentId": null,
       "level": 0,
       "enabled": true,
-      "sortOrder": 12,
+      "sortOrder": 13,
       "iconKey": "award"
     },
     {
@@ -949,7 +1029,7 @@
       "parentId": null,
       "level": 0,
       "enabled": true,
-      "sortOrder": 13,
+      "sortOrder": 14,
       "iconKey": "briefcase"
     },
     {
@@ -979,7 +1059,7 @@
       "parentId": null,
       "level": 0,
       "enabled": true,
-      "sortOrder": 14,
+      "sortOrder": 15,
       "iconKey": "trending-up"
     },
     {
@@ -1019,7 +1099,7 @@
       "parentId": null,
       "level": 0,
       "enabled": true,
-      "sortOrder": 15,
+      "sortOrder": 16,
       "iconKey": "cash"
     },
     {

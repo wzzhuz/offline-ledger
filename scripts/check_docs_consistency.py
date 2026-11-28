@@ -50,12 +50,88 @@ def main() -> int:
     if '阶段 0' not in project and '阶段0' not in project:
         problems.append('openspec/project.md 未包含分阶段计划')
 
+    # ---- 第 90 批：预制分类清单 v3 四处一致性 + 三段边界 ----
+    import json as _json
+    root = os.path.join(BASE, 'app', 'src')
+    assets = os.path.join(root, 'main', 'assets', 'default_categories.json')
+    testres = os.path.join(root, 'test', 'resources', 'default_categories.json')
+    if read(assets) != read(testres):
+        problems.append('default_categories.json 的 assets 与 test resources 不逐字一致')
+    cat = _json.loads(read(assets))
+    rows = cat['categories']
+    if cat.get('version') != 5 or len(rows) != 114:
+        problems.append('清单 v3 应为 version 5 / 114 行')
+    roots = [r for r in rows if r['level'] == 0]
+    leaves = [r for r in rows if r['level'] == 1]
+    if len(roots) != 16 or len(leaves) != 98:
+        problems.append('清单 v3 应为一级 16 / 二级 98')
+    if sum(1 for r in rows if r['enabled']) != 61:
+        problems.append('清单 v3 启用数应为 61')
+    byid = {r['id']: r for r in rows}
+    if not any(r['id'] == 11 and r['name'] == '日常' and r['enabled'] for r in roots):
+        problems.append('缺新增一级「日常」(11) 或未默认启用')
+    for old in (4007, 4009, 4011):
+        if old in byid:
+            problems.append('旧 id %d 迁入后 MUST NOT 留在清单' % old)
+    disabled_roots = sorted(r['name'] for r in roots if not r['enabled'])
+    if disabled_roots != ['人情社交', '学习娱乐']:
+        problems.append('默认停用一级应只剩 学习娱乐 / 人情社交，实为 %s' % disabled_roots)
+    pet = [r for r in rows if r['id'] == 8 or r.get('parentId') == 8]
+    if len(pet) != 8 or not all(r['enabled'] for r in pet):
+        problems.append('宠物一级与其 7 个二级 MUST 全部默认启用')
+    names = lambda pid: [r['name'] for r in leaves if r.get('parentId') == pid]
+    housing, daily, shopping = names(4), names(11), names(5)
+    for n in ('话费', '家具家电', '保洁搬家'):
+        if n in housing:
+            problems.append('「居住」不应再含 ' + n)
+    for n in ('话费', '理发美容', '快递邮寄', '家政保洁', '绿植鲜花'):
+        if n not in daily:
+            problems.append('「日常」缺 ' + n)
+    if '家具家电' not in shopping or '家居家纺' not in shopping or '家居' in shopping:
+        problems.append('「购物」应含 家具家电 / 家居家纺，且旧名「家居」MUST 已改')
+    # ID 段规则
+    for r in leaves:
+        if r['id'] // 1000 != r['parentId']:
+            problems.append('二级 %d 不在父段' % r['id'])
+    # 四处 Kotlin / 资源一致性
+    keys = {r['iconKey'] for r in rows}
+    catalog = read(os.path.join(root, 'main', 'java', 'com', 'zwz', 'offlineledger', 'ui', 'components', 'CategoryIconCatalog.kt'))
+    tints = read(os.path.join(root, 'main', 'java', 'com', 'zwz', 'offlineledger', 'engine', 'CategoryIconTints.kt'))
+    keys_kt = read(os.path.join(root, 'main', 'java', 'com', 'zwz', 'offlineledger', 'engine', 'CategoryIconKeys.kt'))
+    seed = read(os.path.join(root, 'main', 'java', 'com', 'zwz', 'offlineledger', 'data', 'local', 'SeedData.kt'))
+    for k in sorted(keys):
+        if '"%s" ->' % k not in catalog:
+            problems.append('CategoryIconCatalog 缺 ' + k)
+        if '"%s" ->' % k not in tints:
+            problems.append('CategoryIconTints 缺 ' + k)
+    for r in rows:
+        if '%dL ->' % r['id'] not in keys_kt:
+            problems.append('CategoryIconKeys 缺 id=%d' % r['id'])
+        if 'c(%d, "%s"' % (r['id'], r['name']) not in seed:
+            problems.append('SeedData fallback 缺/错 id=%d %s' % (r['id'], r['name']))
+    for k in ('scissors', 'flower'):
+        if not os.path.isfile(os.path.join(root, 'main', 'res', 'drawable', 'ic_cat_%s.xml' % k)):
+            problems.append('缺新增 drawable ic_cat_%s.xml' % k)
+    notice = read(os.path.join(root, 'main', 'assets', 'NOTICE'))
+    if '92 个' not in notice:
+        problems.append('NOTICE 未同步 92 个 SVG')
+    # 文档同步
+    prompt = read(os.path.join(BASE, 'docs', '自动记账规则生成提示词.md'))
+    activity = read(os.path.join(root, 'main', 'java', 'com', 'zwz', 'offlineledger', 'ui', 'intake', 'TextIntakeActivity.kt'))
+    for text, label in ((prompt, '提示词文档'), (activity, 'RULE_PROMPT')):
+        if '居住 / 日常 / 购物' not in text:
+            problems.append('%s 一级清单未含「日常」' % label)
+    for text, label in ((read(os.path.join(BASE, 'openspec', 'specs', 'category-stats', 'spec.md')), 'category-stats'),
+                        (read(os.path.join(BASE, 'docs', '页面优化经验与避坑指南.md')), '活文档')):
+        if '第 90 批' not in text:
+            problems.append('%s 未登记第 90 批' % label)
+
     if problems:
         print('check_docs_consistency: FAIL')
         for p in problems:
             print('  - ' + p)
         return 1
-    print('check_docs_consistency: PASS（版本表 / targetSdk / 不引入清单一致）')
+    print('check_docs_consistency: PASS（版本表 / targetSdk / 不引入清单 / 预制分类 v3 一致性）')
     return 0
 
 
