@@ -2459,9 +2459,12 @@ MUST NOT 加图片加载库、MUST NOT 新增 drawable、MUST NOT 声明 `INTERN
 
 应用 SHALL 提供「虚拟账本」能力：每个虚拟账本对应一条统一前缀标签 `台账:<名称>`
 与一个独立只读视图，MUST NOT 引入 `bookId`、账本维度、互斥归属或第二个数据库。
-主界面 4 Tab 顶部 SHALL 提供切换器，二级页 MUST NOT 重复显示；切换器 SHALL
-**只切浏览范围，MUST NOT 携带录入归属**，默认永远回主账本且 MUST NOT 跨启动记忆。
-记一笔中央 `+` 按钮与自动记账入口 SHALL 永远落主账本，MUST NOT 感知当前虚拟账本。
+第 93 批修订：切换器 SHALL **只在明细页月份卡标题行占一枚 36dp 图标按钮**，
+MUST NOT 在 4 个主 Tab 常驻一整行、MUST NOT 自带状态栏避让容器与说明文字；
+资产 / 统计 / 设置三个 Tab 不显示。状态栏避让由 Scaffold 的薄 topBar 统一处理。
+切换器 SHALL **只切浏览范围，MUST NOT 携带录入归属**，默认永远回主账本且
+MUST NOT 跨启动记忆。记一笔中央 `+` 按钮与自动记账入口 SHALL 永远落主账本，
+MUST NOT 感知当前虚拟账本。
 
 #### Scenario: 切换不影响自动记账
 
@@ -2487,6 +2490,7 @@ SHALL 分别 SUM `INCOME` 与 `EXPENSE` 方向金额并带 `currencyCode` 条件
 `待还 = 收 − 还`，SHALL NOT 设置「结清」状态。
 台账录入 SHALL 自动带入本账本标签与「不计入收支」开关，MUST NOT 预填分类或账户 id。
 设置页 SHALL 提供新建 / 重命名 / 归档 / 排序与「台账记录不计入收支」总开关（默认开）。
+台账页 SHALL 另按「台账页提供总览、分段与记录维护」提供分段、总览与记录维护能力。
 
 #### Scenario: 礼金不虚高
 
@@ -2504,18 +2508,22 @@ SHALL 分别 SUM `INCOME` 与 `EXPENSE` 方向金额并带 `currencyCode` 条件
 
 ---
 
-### Requirement: 主账本明细默认排除台账记录
+### Requirement: 台账流水在主账本明细可见且带不计入标记
 
-明细分页查询 SHALL 默认排除带 `台账:%` 标签的流水，MUST NOT 改变方法签名、
-`RecordFilter` 结构或 Paging 调用链。用户显式按标签筛选时 SHALL 恢复显示台账记录，
-作为查回入口。MUST NOT 用 `excludeFromStats` 过滤明细列表本身。
+第 93 批修订：撤回第 91 批「默认排除台账记录」。明细分页查询 SHALL 原样返回
+带 `台账:%` 标签的流水，MUST NOT 在 SQL 里追加任何排除条件、MUST NOT 改变方法
+签名、`RecordFilter` 结构或 Paging 调用链。台账记录与常规流水的区别由
+`excludeFromStats` 标记呈现；统计、预算、趋势等报表聚合继续过滤该列，
+因此月度收入 SHALL NOT 因台账流水虚高。明细列表 MUST NOT 用
+`excludeFromStats` 过滤记录本身。
 
-#### Scenario: 查回台账记录
+#### Scenario: 台账流水在主账本可查可改
 
-- **GIVEN** 主账本明细默认不显示台账流水
-- **WHEN** 用户在筛选面板按 `台账:结婚礼金` 精确筛选
-- **THEN** 该台账流水重新出现在明细列表
-- **AND** 明细行仍可进入详情页查看不计入收支标记
+- **GIVEN** 「结婚礼金」台账下已有一笔收礼流水
+- **WHEN** 用户切回主账本明细页（未做任何筛选）
+- **THEN** 该流水出现在明细列表中，并显示不计入收支标记
+- **AND** 点该行可进入只读详情页并解锁进入编辑，或走台账页行内删除
+- **AND** 主账本月度收入合计仍不含这笔
 
 ---
 
@@ -2525,7 +2533,7 @@ SHALL 分别 SUM `INCOME` 与 `EXPENSE` 方向金额并带 `currencyCode` 条件
 会整体赋值 `EditorState`。虚拟台账预填（类型 / 标签 / 不计入）SHALL 作为 `load()`
 参数传入，并在**同一协程内、构造完 `EditorState` 之后**一次性合并；
 MUST NOT 由 Composable 在 `load()` 之外同步调用，否则会被后续整体赋值覆盖，
-产出的流水不带 `台账:` 标签（台账视图查不到、主账本明细也不排除）。
+产出的流水不带 `台账:` 标签（台账视图查不到，主账本明细却会显示）。
 预填 type 为 INCOME 时，分类 SHALL 取该 type 下启用且未归档的一级，
 MUST NOT 沿用默认 EXPENSE 分类（会被「分类与收支类型不一致」拦截）。
 
@@ -2538,7 +2546,7 @@ MUST NOT 只渲染数据库已有标签。新建标签 SHALL 通过既有 `bindT
 - **GIVEN** 用户在「结婚礼金」台账页点「记收礼」
 - **WHEN** 填对方张三与 500 元并保存
 - **THEN** 流水带 `台账:结婚礼金` 标签且 `excludeFromStats = true`
-- **AND** 台账页按人出现张三一行，主账本明细默认不显示这笔
+- **AND** 台账页按人出现张三一行，主账本明细可见这笔且带不计入收支标记
 - **AND** 不出现「分类与收支类型不一致」错误
 
 #### Scenario: 新建标签即时可见
@@ -2548,3 +2556,37 @@ MUST NOT 只渲染数据库已有标签。新建标签 SHALL 通过既有 `bindT
 - **THEN** 上方 chip 区立刻出现该名字且为选中态，点一下可取消
 - **WHEN** 点确定并保存流水
 - **THEN** 该标签随流水落库，再次打开选择器时出现在已有标签中
+
+---
+
+### Requirement: 台账页提供总览、分段与记录维护
+
+第 93 批：台账页 SHALL 由五块组成，MUST NOT 把录入按钮与流水混在同一条滚动列表里：
+标题行（返回 / 名称）、总览卡、分段 chip、内容区、底部固定录入区。
+总览卡 SHALL 显示本台账 总收 / 总还 / 待还 / 笔数，由 `partyTotals` 结果在页内
+汇总得出，MUST NOT 给统计模块新增台账 scope 或新开聚合分支。
+分段 SHALL 提供「往来汇总」与「流水」两段；流水段按 `localDate` 分组并给出当日
+收 / 还小计。底部录入区 SHALL 固定不随列表滚动。
+
+台账流水行 SHALL 可点进全屏 `RecordEditorDialog` 编辑态（不带任何预填），
+行尾 SHALL 提供删除入口：二次确认后走既有 `LedgerRepository.deleteRecord`
+（移入回收站 + 标签快照 + 余额重算），MUST NOT 新开写余额分支。
+删除事务 SHALL 跑在 LifecycleOwner 级 scope，MUST NOT 放进 `LaunchedEffect`
+或弹层局部 `rememberCoroutineScope`（第 89 批「coroutine scope left the composition」坑）。
+
+#### Scenario: 记错了能改能删
+
+- **GIVEN** 台账页「流水」段有一笔金额填错的记录
+- **WHEN** 点该行
+- **THEN** 打开全屏记一笔编辑态，金额 / 对方 / 标签 / 不计入开关均可修改
+- **WHEN** 改回台账页点行尾删除并确认
+- **THEN** 记录进入回收站、账户余额自动重算、台账总览与按人汇总同步刷新
+- **AND** 不出现 `The coroutine scope left the composition`
+
+#### Scenario: 新增与列表分离
+
+- **GIVEN** 台账页已有数十笔流水
+- **WHEN** 上下滚动「流水」段
+- **THEN**「记收礼 / 记还礼」始终固定在底部，不随列表滚动
+- **AND** 切到「往来汇总」只显示按人卡片，不夹杂流水行
+

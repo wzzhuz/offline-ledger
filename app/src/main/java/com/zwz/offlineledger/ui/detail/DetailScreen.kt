@@ -92,7 +92,9 @@ fun DetailScreen(
     refreshTick: Int,
     vm: DetailViewModel,
     listState: LazyListState,
-    onEdit: (Long) -> Unit
+    onEdit: (Long) -> Unit,
+    /** 第 93 批：虚拟账本入口只在明细页标题行占一枚图标按钮，其他 Tab 不常驻。 */
+    virtualBookEntry: @Composable () -> Unit = {}
 ) {
     val pagingItems = vm.pagingData.collectAsLazyPagingItems()
     val overview by vm.overview.collectAsState()
@@ -176,7 +178,8 @@ fun DetailScreen(
                     onPrev = { vm.switchMonth(-1) },
                     onNext = { vm.switchMonth(1) },
                     onPickMonth = { showMonthPicker = true },
-                    onFilter = { showFilter = true }
+                    onFilter = { showFilter = true },
+                    virtualBookEntry = virtualBookEntry
                 )
                 // 第 76 批：撤回互斥三选一 drillLabel，所有生效条件统一出 chip，
                 // 每枚独立 ✕ 只清自己；点文字区打开筛选面板。
@@ -385,7 +388,8 @@ private fun MonthOverviewCard(
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onPickMonth: () -> Unit,
-    onFilter: () -> Unit
+    onFilter: () -> Unit,
+    virtualBookEntry: @Composable () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -421,6 +425,8 @@ private fun MonthOverviewCard(
             IconButton(onClick = onNext) {
                 Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "下个月")
             }
+            // 第 93 批：一枚 36dp 图标按钮，不新增一行、不带说明文字。
+            virtualBookEntry()
         }
         // 第 47 批：顶部月概览只在「无筛选 · 月粒度 · 单月窄视图」显示。
         // 统计下钻 / 显式范围 / 全部时间 / 年粒度 / 任意筛选条件下，

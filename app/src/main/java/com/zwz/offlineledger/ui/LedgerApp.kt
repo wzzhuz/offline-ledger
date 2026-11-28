@@ -1,7 +1,10 @@
 package com.zwz.offlineledger.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.padding
@@ -134,12 +137,15 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // 第 91 批：左上角虚拟账本切换器只在 4 个主 Tab 出现，二级页不重复占行。
-            // 只切浏览范围，MUST NOT 影响记一笔 FAB 与自动记账落库位置。
+            // 第 93 批：切换器不再常驻 4 个主 Tab（真机反馈太占位置）。
+            // 只保留一层与状态栏等高的背景薄层做 edge-to-edge 避让，
+            // 内容区比第 91 批多回一整行；入口改为明细页标题行里的一枚图标按钮。
             if (currentRoute in MAIN_ROUTES) {
-                VirtualBookSwitcher(
-                    onOpen = { book -> navController.navigate("virtual-book/${book.id}") },
-                    onManage = { navController.navigate("virtual-book-settings") }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                        .statusBarsPadding()
                 )
             }
         },
@@ -187,7 +193,13 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                     refreshTick = refreshTick,
                     vm = detailVm,
                     listState = detailListState,
-                    onEdit = { id -> openEditor(id) }
+                    onEdit = { id -> openEditor(id) },
+                    virtualBookEntry = {
+                        VirtualBookSwitcher(
+                            onOpen = { book -> navController.navigate("virtual-book/${book.id}") },
+                            onManage = { navController.navigate("virtual-book-settings") }
+                        )
+                    }
                 )
             }
             composable("assets") {
@@ -290,7 +302,9 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
                                 )
                             )
                         }
-                    }
+                    },
+                    // 第 93 批：台账流水复用全屏记一笔编辑态，不带任何预填。
+                    onEditRecord = { recordId -> openEditor(recordId) }
                 )
             }
             composable("virtual-book-settings") {
