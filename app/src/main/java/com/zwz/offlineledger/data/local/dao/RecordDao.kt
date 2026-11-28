@@ -261,6 +261,12 @@ interface RecordDao {
                 OR EXISTS (SELECT 1 FROM record_tags rt
                             JOIN tags t ON t.id = rt.tagId
                            WHERE rt.recordId = r.id AND t.name = :tagName))
+           /* 第 91 批：主账本明细默认不混虚拟台账记录；用户显式按标签筛选时
+              （tagName 非空）恢复显示，作为查回入口，不改方法签名。 */
+           AND (:tagName IS NOT NULL OR NOT EXISTS (
+                SELECT 1 FROM record_tags vrt
+                          JOIN tags vt ON vt.id = vrt.tagId
+                         WHERE vrt.recordId = r.id AND vt.name LIKE '台账:%'))
          ORDER BY r.localDate DESC, r.id DESC
          LIMIT :limit OFFSET :offset
         """

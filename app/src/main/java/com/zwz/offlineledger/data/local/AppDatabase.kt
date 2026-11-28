@@ -14,6 +14,7 @@ import com.zwz.offlineledger.data.local.dao.RuleDao
 import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
 import com.zwz.offlineledger.data.local.dao.TemplateDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
+import com.zwz.offlineledger.data.local.dao.VirtualBookDao
 import com.zwz.offlineledger.data.local.entity.AccountEntity
 import com.zwz.offlineledger.data.local.entity.BalanceAdjustmentEntity
 import com.zwz.offlineledger.data.local.entity.BudgetEntity
@@ -90,6 +91,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun counterpartyAliasDao(): CounterpartyAliasDao
     abstract fun ruleDao(): RuleDao
     abstract fun tagDao(): TagDao
+    /** 第 91 批：虚拟台账只读聚合，不新增表、不升 version。 */
+    abstract fun virtualBookDao(): VirtualBookDao
 
     companion object {
         const val DATABASE_NAME = "offline_ledger.db"

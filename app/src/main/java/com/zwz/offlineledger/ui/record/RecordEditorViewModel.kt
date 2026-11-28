@@ -75,6 +75,20 @@ class RecordEditorViewModel(
     private var lastCategoryId: Long? = null
     private var editingId: Long? = null
 
+    /**
+     * 第 91 批：虚拟台账录入的唯一预填出口。
+     * MUST 在 load() 之后调用（load 会整体重置 state）。
+     * 只带类型 / 标签 / 不计入三项，不预填分类与账户，避免依赖硬编码 id。
+     */
+    fun applyPreset(type: RecordType?, tagNames: List<String>, excludeFromStats: Boolean) {
+        val s = _state.value
+        _state.value = s.copy(
+            type = type ?: s.type,
+            tagNames = (s.tagNames + tagNames).distinct().take(8),
+            excludeFromStats = excludeFromStats
+        )
+    }
+
     /** 每次打开编辑器都调用一次，避免复用 ViewModel 时残留上一次的状态。 */
     fun load(recordId: Long?) {
         viewModelScope.launch {

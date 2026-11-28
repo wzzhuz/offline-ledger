@@ -98,7 +98,11 @@ fun RecordEditorDialog(
     recordId: Long?,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
-    templateQuickPick: Boolean = true
+    templateQuickPick: Boolean = true,
+    /** 第 91 批：仅虚拟台账录入使用；普通记一笔与自动记账 MUST 保持默认空值。 */
+    presetType: RecordType? = null,
+    presetTagNames: List<String> = emptyList(),
+    presetExcludeFromStats: Boolean = false
 ) {
     val context = LocalContext.current
     val vm: RecordEditorViewModel = viewModel(
@@ -110,7 +114,13 @@ fun RecordEditorDialog(
         }
     )
 
-    LaunchedEffect(recordId) { vm.load(recordId) }
+    LaunchedEffect(recordId, presetTagNames) {
+        vm.load(recordId)
+        // 第 91 批：预填必须在 load 之后（同一协程内），否则被 load 的整体重置覆盖。
+        if (presetTagNames.isNotEmpty() && recordId == null) {
+            vm.applyPreset(presetType, presetTagNames, presetExcludeFromStats)
+        }
+    }
 
     val state by vm.state.collectAsState()
     val accounts by vm.accounts.collectAsState()

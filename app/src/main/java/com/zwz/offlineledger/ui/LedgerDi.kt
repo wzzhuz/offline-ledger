@@ -13,6 +13,7 @@ import com.zwz.offlineledger.data.local.dao.RecurringRuleDao
 import com.zwz.offlineledger.data.local.dao.TemplateDao
 import com.zwz.offlineledger.data.local.dao.TagDao
 import com.zwz.offlineledger.data.local.dao.TrashDao
+import com.zwz.offlineledger.data.local.dao.VirtualBookDao
 import com.zwz.offlineledger.data.repository.LedgerRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.android.EntryPointAccessors
@@ -37,6 +38,7 @@ interface LedgerEntryPoint {
     fun recurringRuleDao(): RecurringRuleDao
     fun budgetDao(): BudgetDao
     fun tagDao(): TagDao
+    fun virtualBookDao(): VirtualBookDao
 }
 
 object LedgerDi {

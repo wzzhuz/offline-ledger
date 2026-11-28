@@ -58,8 +58,19 @@ import com.zwz.offlineledger.ui.bulk.RuleListScreen
 import com.zwz.offlineledger.ui.stats.StatsScreen
 import com.zwz.offlineledger.ui.templates.TemplateManagerScreen
 import com.zwz.offlineledger.ui.trash.TrashScreen
+import com.zwz.offlineledger.core.prefs.VirtualBookStore
+import com.zwz.offlineledger.ui.settings.VirtualBookSettingsScreen
+import com.zwz.offlineledger.ui.virtual.VirtualBookScreen
+import com.zwz.offlineledger.ui.virtual.VirtualBookSwitcher
 
 private data class TabSpec(val route: String, val label: String, val icon: ImageVector)
+
+/** 第 91 批：仅虚拟台账录入使用的预填上下文；普通记一笔与自动记账一律 null。 */
+private data class VirtualEditorPreset(
+    val type: RecordType,
+    val tagNames: List<String>,
+    val excludeFromStats: Boolean
+)
 
 private val MAIN_ROUTES = setOf("detail", "assets", "stats", "settings")
 
@@ -77,6 +88,7 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
 
     var showEditor by remember { mutableStateOf(startWithRecordEntry) }
     var editorRecordId by remember { mutableStateOf<Long?>(null) }
+    var editorPreset by remember { mutableStateOf<VirtualEditorPreset?>(null) }
     var refreshTick by remember { mutableStateOf(0) }
 
     // 第 5 批：ViewModel 与滚动状态提升到 Activity 作用域。
@@ -109,8 +121,9 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
         }
     }
 
-    fun openEditor(recordId: Long?) {
+    fun openEditor(recordId: Long?, preset: VirtualEditorPreset? = null) {
         editorRecordId = recordId
+        editorPreset = preset
         showEditor = true
     }
 
@@ -120,6 +133,16 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            // 第 91 批：左上角虚拟账本切换器只在 4 个主 Tab 出现，二级页不重复占行。
+            // 只切浏览范围，MUST NOT 影响记一笔 FAB 与自动记账落库位置。
+            if (currentRoute in MAIN_ROUTES) {
+                VirtualBookSwitcher(
+                    onOpen = { book -> navController.navigate("virtual-book/${book.id}") },
+                    onManage = { navController.navigate("virtual-book-settings") }
+                )
+            }
+        },
         bottomBar = {
             // 第 4 批：二级页隐藏底栏，进入设置子页时更像「点开了一页」。
             if (currentRoute in MAIN_ROUTES) {
@@ -247,6 +270,35 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
             composable("budgets") { BudgetManagerScreen(onBack = { goBack() }) }
             // 第 75 批：独立标签管理页，二级页隐藏底栏。
             composable("tags") { TagManagerScreen(onBack = { goBack() }) }
+            // 第 91 批：虚拟账本 = 标签聚合视图 + 设置页，零账本维度、零改表。
+            composable("virtual-book/{id}") { entry ->
+                val id = entry.arguments?.getString("id").orEmpty()
+                VirtualBookScreen(
+                    bookId = id,
+                    refreshTick = refreshTick,
+                    onBack = { goBack() },
+                    onRecord = { type ->
+                        val store = VirtualBookStore(context)
+                        val b = store.byId(id)
+                        if (b != null) {
+                            openEditor(
+                                null,
+                                VirtualEditorPreset(
+                                    type = type,
+                                    tagNames = listOf(b.tagName),
+                                    excludeFromStats = store.excludeByDefault
+                                )
+                            )
+                        }
+                    }
+                )
+            }
+            composable("virtual-book-settings") {
+                VirtualBookSettingsScreen(
+                    onBack = { goBack() },
+                    onOpenBook = { id -> navController.navigate("virtual-book/$id") }
+                )
+            }
         }
     }
 
@@ -254,6 +306,9 @@ fun LedgerApp(startWithRecordEntry: Boolean = false) {
         RecordEditorDialog(
             recordId = editorRecordId,
             templateQuickPick = editorRecordId == null,
+            presetType = editorPreset?.type,
+            presetTagNames = editorPreset?.tagNames ?: emptyList(),
+            presetExcludeFromStats = editorPreset?.excludeFromStats ?: false,
             onDismiss = { showEditor = false },
             onSaved = {
                 showEditor = false
